@@ -16,10 +16,10 @@ namespace RDCore.SDK.Runtime.Abstract.Execution;
 public interface IRuntimeSession
 {
     /// <summary>
-    /// <c>true</c> when the session describes a 64-bit environment. Determines <c>LongPtr</c> width
-    /// and the value of <c>#If Win64</c> / <c>#If VBA7</c> pre-compiler directives.
+    /// The host environment this session runs in — bitness (<c>Environment.Is64Bit</c> drives
+    /// <c>LongPtr</c> width and <c>#If Win64</c> / <c>#If VBA7</c>), locale, code page, …
     /// </summary>
-    bool Is64Bit { get; }
+    IRuntimeEnvironmentProfile Environment { get; }
 
     /// <summary>
     /// The session's memory allocator — tracks allocation size and fragmentation, MSVBVM-style.
