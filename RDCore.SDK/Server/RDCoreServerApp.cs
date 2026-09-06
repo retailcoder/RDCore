@@ -78,6 +78,7 @@ public abstract class RDCoreServerApp(
     }
 
     private NamedPipeServerStream _namedPipe = default!;
+    private bool _disposed;
 
     protected async virtual Task BeforeRunAsync(string[] args) { }
 
@@ -104,10 +105,14 @@ public abstract class RDCoreServerApp(
             Server?.ForcefulShutdown();
         }))
         {
+            // WaitForExit is `_exitSubject.ToTask(...)` — a fresh Task per access — so capture it once;
+            // comparing two separate reads for reference equality is always false.
+            var serverExit = Server.WaitForExit;
+
             // block until the server actually exits (client disconnect) OR shutdown is requested (token).
             try
             {
-                await Server.WaitForExit.WaitAsync(ServerStateProvider.ProcessTokenSource.Token);
+                await serverExit.WaitAsync(ServerStateProvider.ProcessTokenSource.Token);
             }
             catch (OperationCanceledException)
             {
@@ -116,8 +121,8 @@ public abstract class RDCoreServerApp(
 
             // the OmniSharp Rx pipeline does not always complete WaitForExit even after ForcefulShutdown;
             // bound the wait so it cannot hang process exit, then dispose explicitly.
-            if (!Server.WaitForExit.IsCompleted
-                && await Task.WhenAny(Server.WaitForExit, Task.Delay(shutdownTimeout)) != Server.WaitForExit)
+            if (!serverExit.IsCompleted
+                && await Task.WhenAny(serverExit, Task.Delay(shutdownTimeout)) != serverExit)
             {
                 LogIfEnabled(LogLevel.Warning, "Language server did not stop within the shutdown timeout; forcing.");
             }
@@ -175,6 +180,12 @@ public abstract class RDCoreServerApp(
     /// </summary>
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
+
         if (transportLayer is IDisposable disposableTransport)
         {
             disposableTransport.Dispose();
@@ -245,7 +256,7 @@ public abstract class RDCoreServerApp(
     /// <item><see cref="ShutdownHandler"/></item>
     /// <item><see cref="ExitHandler"/></item>
     /// <item><see cref="SetTraceHandler"/></item>
-    /// <item><see cref="ExecuteCommandHandler"/></item>
+    /// <item><see cref="PlatformInitializeHandler"/></item>
     /// </list>
     /// </remarks>
     protected abstract void ConfigureHandlers(IRDCoreLSPHandlerConfigurationBuilder builder);

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
+using OmniSharp.Extensions.LanguageServer.Protocol.General;
 using OmniSharp.Extensions.LanguageServer.Shared;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Server;
@@ -98,6 +99,7 @@ public sealed class ChildConnection(
     private NamedPipeClientStream? _pipe;
     private LanguageClient? _client;
     private volatile bool _shuttingDown;
+    private bool _disposed;
 
     /// <summary>
     /// The current lifecycle state of the connection.
@@ -184,20 +186,46 @@ public sealed class ChildConnection(
         }
         _shuttingDown = true;
 
-        if (State.Value is ConnectionStateValue.Ready)
+        if (State.Value is ConnectionStateValue.Ready && _client is ILanguageClient client)
         {
             Transition(ConnectionState.ShuttingDown);
             var timeoutSeconds = _request?.ShutdownTimeoutSeconds ?? 5;
             var timeout = TimeSpan.FromSeconds(timeoutSeconds > 0 ? timeoutSeconds : 5);
+
+            // drive the LSP shutdown/exit handshake directly rather than LanguageClient.Shutdown(),
+            // which also stops and disposes the connection and races the in-flight response to an
+            // "Internal error." a shared-console Ctrl+C also hits the child directly, so any step here
+            // may fail because the peer is already gone — each is bounded and non-fatal; the kill
+            // fallback below is the backstop.
             try
             {
-                await (_client?.Shutdown() ?? Task.CompletedTask).WaitAsync(timeout);
-                _client?.SendNotification("exit");
-                await serverProcess.WaitForExitAsync().WaitAsync(timeout);
+                await client.RequestShutdown().WaitAsync(timeout);
             }
             catch (Exception exception)
             {
-                logger.LogWarning("Graceful shutdown did not complete ({Message}); killing the child.", exception.Message);
+                logger.LogDebug("Child did not acknowledge shutdown ({Message}).", exception.Message);
+            }
+
+            try
+            {
+                client.SendExit();
+            }
+            catch (Exception exception)
+            {
+                logger.LogDebug("Could not send exit to the child ({Message}).", exception.Message);
+            }
+
+            try
+            {
+                await serverProcess.WaitForExitAsync().WaitAsync(timeout);
+            }
+            catch (TimeoutException)
+            {
+                logger.LogWarning("Child did not exit within {Timeout}s of the shutdown handshake; killing it.", timeout.TotalSeconds);
+            }
+            catch (Exception exception)
+            {
+                logger.LogDebug("Wait for child exit ended ({Message}).", exception.Message);
             }
         }
 
@@ -270,13 +298,28 @@ public sealed class ChildConnection(
             ExpectedComponent = _request.ExpectedComponent,
             Expected = _request.ExpectedCapabilities,
         }, ct);
-        logger.LogInformation("Platform handshake with {Component}: provides [{Provided}]",
-            PlatformInfo.Component, string.Join(", ", PlatformInfo.Provided));
+        logger.LogInformation("Platform handshake with {Component}: provides {Provided}",
+            PlatformInfo.Component, PlatformInfo.Provided);
 
         Transition(ConnectionState.Ready);
     }
 
     private async Task MonitorPeerAsync()
+    {
+        try
+        {
+            await MonitorPeerLoopAsync();
+        }
+        catch (Exception exception)
+        {
+            // this runs as a fire-and-forget task: an unobserved throw here would silently strand the
+            // platform. Escalate instead so the owner tears down.
+            logger.LogError(exception, "Peer monitor failed unexpectedly; escalating.");
+            _request?.OnPeerExited();
+        }
+    }
+
+    private async Task MonitorPeerLoopAsync()
     {
         while (true)
         {
@@ -291,6 +334,17 @@ public sealed class ChildConnection(
 
             if (_shuttingDown || State.Value is ConnectionStateValue.Exited or ConnectionStateValue.ShuttingDown)
             {
+                return;
+            }
+
+            // exit code 0 is a deliberate stop (graceful shutdown, or the peer escalating a fatal
+            // condition it cannot recover from) — following it down, not restarting it, is correct.
+            if (serverProcess.ExitCode == 0)
+            {
+                logger.LogInformation("Child exited cleanly (code 0); treating as a deliberate peer shutdown.");
+                Transition(ConnectionState.ShuttingDown);
+                Transition(ConnectionState.Exited);
+                _request?.OnPeerExited();
                 return;
             }
 
@@ -395,8 +449,17 @@ public sealed class ChildConnection(
     /// </summary>
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
         _shuttingDown = true;
-        _connectionCts.Cancel();
+
+        if (!_connectionCts.IsCancellationRequested)
+        {
+            _connectionCts.Cancel();
+        }
         _connectionCts.Dispose();
         _linkedCts?.Dispose();
         _client?.Dispose();

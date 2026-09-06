@@ -2,10 +2,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RDCore.SDK.Server.Configuration;
-using RDCore.SDK.Server.Handlers;
 using RDCore.SDK.Server.Services;
 using RDCore.SDK.Server.Services.States;
-using System.Diagnostics;
 
 namespace RDCore.SDK.Server;
 
@@ -22,13 +20,16 @@ public class RDCorePlatformServerHost<TApp>() : AppHost<TApp>()
     where TApp : class, IRDCoreServerApp
 {
     /// <summary>
-    /// Gets a service that manages the operational state of the language server.
+    /// The service that manages the operational state of the language server. Resolved from the built
+    /// host so it is the same singleton the app, the lifecycle handlers and the health check share.
     /// </summary>
-    protected IServerStateProvider ServerStateProvider { get; private set; } = default!;
+    protected IServerStateProvider ServerStateProvider
+        => HostServices?.GetService<IServerStateProvider>()
+           ?? throw new InvalidOperationException("The server state provider is not available until the host is built.");
     /// <summary>
     /// Gets the application exit code corresponding to the current <see cref="ServerState"/>.
     /// </summary>
-    public override int ExitCode => ServerStateProvider.State.ExitCode;
+    public override int ExitCode => HostServices?.GetService<IServerStateProvider>()?.State.ExitCode ?? 1;
 
     protected override void Configure(IConfigurationBuilder configuration, IServiceCollection services, string[] args)
     {
@@ -41,10 +42,5 @@ public class RDCorePlatformServerHost<TApp>() : AppHost<TApp>()
         _ = parsed.WorkspaceUri ?? throw new ArgumentNullException(nameof(SdkAppCommandLineArgs.WorkspaceUri));
 
         configuration.AddInMemoryCollection(parsed.ToConfigurationOverrides());
-    }
-    protected override void ConfigureAdditionalExternalServices(IServiceCollection services, IConfiguration configuration)
-    {
-        ServerStateProvider = new ServerStateProvider(configuration);
-        services.AddSingleton<ExecuteCommandHandler>();
     }
 }

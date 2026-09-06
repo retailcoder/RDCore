@@ -41,6 +41,11 @@ public abstract class AppHost<TApp>() : IDisposable
     protected readonly CancellationTokenSource ProcessTokenSource = new();
 
     /// <summary>
+    /// The built host's service provider, or <c>null</c> before <see cref="BuildAndRunAsync"/> has built the host.
+    /// </summary>
+    protected IServiceProvider? HostServices => _host?.Services;
+
+    /// <summary>
     /// Gets the <see cref="AssemblyName"/> of this application.
     /// </summary>
     /// <remarks>
@@ -197,7 +202,9 @@ public abstract class AppHost<TApp>() : IDisposable
             .AddSingleton<IRuntimeEnvironmentProfile>(sp =>
                 RuntimeEnvironmentProfile.From(sp.GetRequiredService<IOptions<SdkAppOptions>>().Value.Environment))
             .AddSingleton<TApp>()
-            .AddTransient<IServerStateProvider, ServerStateProvider>()
+            // stateful: owns the lifecycle state and the process/shutdown token sources. The server app,
+            // the LSP lifecycle handlers, and the health check must all observe the same instance.
+            .AddSingleton<IServerStateProvider, ServerStateProvider>()
             .AddTransient<IRDCoreServerProcess, RDCoreServerProcess>()
             .AddTransient<IHealthCheckService<TApp>, HealthCheckService<TApp>>()
             .AddTransient<ILanguageServerProtocolTransportLayer, RDCorePlatformDefaultTransportLayer>()
@@ -262,12 +269,9 @@ public abstract class AppHost<TApp>() : IDisposable
         {
             if (disposing)
             {
-                _hostTask?.Dispose();
+                // the host owns the TApp singleton's lifetime and disposes it; disposing _app here
+                // as well ran RDCoreClientApp/RDCoreServerApp.Dispose() twice.
                 _host?.Dispose();
-
-                // TODO verify the app doesn't get disposed twice:
-                _app?.Dispose();
-
                 ProcessTokenSource.Dispose();
             }
 

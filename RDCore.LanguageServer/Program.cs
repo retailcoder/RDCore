@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using RDCore.SDK.Server;
 
 [assembly: InternalsVisibleTo("RDCore.Tests")]
 namespace RDCore.LanguageServer;
@@ -18,12 +19,20 @@ public class Program
             Console.WriteLine(exception.ToString());
             code = -1;
         }
-        finally
+
+        // the shutdown sequence is bounded and returns promptly; this only guards against a wedged
+        // background thread (Serilog.Async, OmniSharp Rx) keeping the process alive past a clean exit.
+        ProcessWatchdog.Arm(code);
+
+        try
         {
             host.Dispose();
         }
-        // background threads (Serilog.Async, OmniSharp Rx, console logger) can otherwise delay process exit.
-        Environment.Exit(code);
+        catch (Exception exception)
+        {
+            Console.WriteLine(exception.ToString());
+        }
+
         return code;
     }
 }
