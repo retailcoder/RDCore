@@ -1,4 +1,5 @@
 ﻿using RDCore.Runtime.Semantics.Abstract;
+using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values;
@@ -33,11 +34,11 @@ public record class VBErrorTypeLetCoercionRuntimeSemantics(
                     NodeId: expression.Identity,
                     OperandIndex: frame.OperandIndex,
                     SourceValue: frame.SourceValue,
-                    DestinationTypeDesc: VBTypedValueFactory.DescribeType(VBDoubleType.TypeInfo)
+                    DestinationTypeDesc: new VBTypeDescValue(VBDoubleType.TypeInfo)
                 )).Result is VBDoubleValue coerced
-                    && (double)coerced.UnderlyingValue.RuntimeValue!.BoxedValue > VBErrorType.MinimumStdErrorValue 
-                    && (double)coerced.UnderlyingValue.RuntimeValue!.BoxedValue < VBErrorType.MaximumStdErrorValue
-                        ? LetCoercionResult.Success(VBTypedValueFactory.CreateValue(VBErrorType.TypeInfo, (double)coerced.UnderlyingValue.RuntimeValue!.BoxedValue))
+                    && (double)coerced.RuntimeValue.BoxedValue > VBErrorType.MinimumStdErrorValue 
+                    && (double)coerced.RuntimeValue.BoxedValue < VBErrorType.MaximumStdErrorValue
+                        ? LetCoercionResult.Success(new VBErrorValue((int)(double)coerced.RuntimeValue.BoxedValue))
                         : LetCoercionResult.Error(OnLetCoercionTypeMismatch(expression, frame), frame),
 
             _ => LetCoercionResult.NotApplicable(frame)

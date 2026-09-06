@@ -51,5 +51,6 @@ public sealed record class VBErrorType() : VBIntrinsicType<int>(VBTypeNames.VBEr
     /// </summary>
     public static int MaximumStdErrorValue => ushort.MaxValue;
 
-    public override int Size => sizeof(int);
+
+    public override VBTypedValue CreateValue(RDCore.SDK.Model.Values.Bindings.IBindingHandle handle) => new VBErrorValue(handle);
 }

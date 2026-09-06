@@ -1,4 +1,6 @@
 ﻿using RDCore.Runtime.Execution.Frames;
+using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Model.Values.Meta;
 using RDCore.Runtime.Semantics.Abstract;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK.Model.AST.Expressions;
@@ -49,16 +51,16 @@ where TFlags : struct, Enum
         => DetermineBinaryOperatorEffectiveType(resolver, context, (VBBinaryOperatorExpressionNode)expression, frame);
 
     protected abstract RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         TContext context,
         VBBinaryOperatorExpressionNode expression,
         OperatorEvaluationFrame frame);
 
     protected sealed override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         TContext context,
         VBOperatorExpression expression,
-        OperatorEvaluationFrame frame) => EvaluateExpressionResult(runtime, context, (VBBinaryOperatorExpressionNode)expression, frame);
+        OperatorEvaluationFrame frame) => EvaluateExpressionResult(resolver, context, (VBBinaryOperatorExpressionNode)expression, frame);
 
     /// <summary>
     /// Evaluates the <see cref="VBNullType"/> runtime semantics of a <em>binary operator expression</em>.<br/>
@@ -78,5 +80,5 @@ where TFlags : struct, Enum
     /// </list>
     /// </returns>
     protected virtual RuntimeSemanticsEvaluationResult EvaluateNullBinaryExpressionResult() 
-        => RuntimeSemanticsEvaluationResult.Success(VBTypedValueFactory.CreateNullValue());
+        => RuntimeSemanticsEvaluationResult.Success(VBNullValue.Null);
 }

@@ -22,7 +22,7 @@ public record class BinaryIntegerDivisionOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryArithmeticOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
-    protected override double EvaluateManagedNumericOp(double lhs, double rhs) => (int)Math.Round(lhs, 0, MidpointRounding.ToEven) / rhs;
+    protected override T EvaluateManagedNumericOp<T>(T lhs, T rhs) => lhs / rhs;
 
     protected override DetermineOperatorEffectiveTypeResult DetermineArithmeticOperatorEffectiveType(
         ISymbolResolver resolver, 
@@ -60,29 +60,21 @@ public record class BinaryIntegerDivisionOperatorRuntimeSemantics(
     }
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         BinaryArithmeticOperatorSemanticContext context,
         VBBinaryOperatorExpressionNode expression,
         OperatorEvaluationFrame frame)
     {
         var lhs = frame[InputIndex.BinaryLeftOperand];
         var rhs = frame[InputIndex.BinaryRightOperand];
-        if (frame.EffectiveType is VBByteType or VBIntegerType or VBLongType or VBLongLongType)
-        {
-            if (lhs is VBNumericTypedValue lhsValue && rhs is VBNumericTypedValue rhsValue)
-            {
-                var divisor = VBNumericType.BankersRounding((double)rhsValue.UnderlyingValue.RuntimeValue!.BoxedValue);
-                if (divisor == 0)
-                {
-                    OnDivisionByZero(expression, Exceptions.VBIntegerDivisionOp_DivisionByZero);
-                }
 
-                return RuntimeSemanticsEvaluationResult.Success(
-                    VBTypedValueFactory.CreateValue((VBNumericType)frame.EffectiveType, 
-                        EvaluateManagedNumericOp(
-                            (double)lhsValue.UnderlyingValue.RuntimeValue!.BoxedValue, 
-                            (double)rhsValue.UnderlyingValue.RuntimeValue!.BoxedValue)));
-            }
+        // '\' and 'Mod' always have an integral effective type, so the operands have been let-coerced
+        // (banker's-rounded) to it already: the managed operation is a plain integer division / remainder,
+        // and a zero divisor surfaces as DivideByZeroException from the dispatcher.
+        if (frame.EffectiveType is VBByteType or VBIntegerType or VBLongType or VBLongLongType
+            && lhs is VBNumericTypedValue lhsValue && rhs is VBNumericTypedValue rhsValue)
+        {
+            return EvaluateManagedArithmetic((VBNumericType)frame.EffectiveType, lhsValue, rhsValue, expression);
         }
         else if (frame.EffectiveType is VBNullType)
         {

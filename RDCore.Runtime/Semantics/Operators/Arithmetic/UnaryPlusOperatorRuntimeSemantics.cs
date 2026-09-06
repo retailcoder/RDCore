@@ -26,7 +26,7 @@ public sealed record class UnaryPlusOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService) 
     : UnaryArithmeticOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
-    protected override double EvaluateNumericOp(double operand) => 0 + operand;
+    protected override T EvaluateNumericOp<T>(T operand) => +operand;
 
     /// <summary>
     /// Explicitly defines the <em>effective type</em> runtime semantics of the unary '+' operator, 
@@ -43,20 +43,20 @@ public sealed record class UnaryPlusOperatorRuntimeSemantics(
         };
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         UnaryArithmeticOperatorSemanticContext context,
         VBOperatorExpression expression,
         OperatorEvaluationFrame frame) => frame.EffectiveType switch
         {
-            VBNumericType numericEffectiveType when frame[InputIndex.UnaryOperand] is VBNumericTypedValue numericOperand 
-                => RuntimeSemanticsEvaluationResult.Success(EvaluateRuntimeSemantics(numericEffectiveType, numericOperand)!),
-        
+            VBNumericType numericEffectiveType when frame[InputIndex.UnaryOperand] is VBNumericTypedValue numericOperand
+                => EvaluateRuntimeSemantics(numericEffectiveType, numericOperand, expression),
+
             // per specifications a VBDateValue operand was let-coerced into a VBDoubleValue during validation stage:
-            VBDateType dateEffectiveType when frame[InputIndex.UnaryOperand] is VBNumericTypedValue numericOperand 
-                => RuntimeSemanticsEvaluationResult.Success(EvaluateRuntimeSemantics(dateEffectiveType, numericOperand)!),
+            VBDateType dateEffectiveType when frame[InputIndex.UnaryOperand] is VBNumericTypedValue numericOperand
+                => EvaluateRuntimeSemantics(dateEffectiveType, numericOperand, expression),
 
             VBNullType nullEffectiveType when frame[InputIndex.UnaryOperand] is VBNullValue
-                => RuntimeSemanticsEvaluationResult.Success(VBTypedValueFactory.CreateValue(nullEffectiveType)!),
+                => RuntimeSemanticsEvaluationResult.Success(nullEffectiveType.DefaultValue),
 
             _ => RuntimeSemanticsEvaluationResult.InternalError(),
         };

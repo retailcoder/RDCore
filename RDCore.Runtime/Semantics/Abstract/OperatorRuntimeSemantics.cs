@@ -1,4 +1,5 @@
 ﻿using RDCore.Runtime.Execution.Frames;
+using RDCore.SDK.Model.Values.Meta;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK;
 using RDCore.SDK.Model.AST.Abstract;
@@ -93,7 +94,7 @@ where TFlags : struct, Enum
             .Aggregate((context, operation) => context.Merge(operation));
 
         // 3. evaluate the result:
-        var evaluationResult = EvaluateExpressionResult((IVBExecutionContext)resolver, initialContext, expression, frame);
+        var evaluationResult = EvaluateExpressionResult(resolver, initialContext, expression, frame);
 
         // 4. ...profit:
         var analysisContext = CreateAnalysisContext(expression, effectiveTypeResult, coercionResult, evaluationResult, initialContext.Flags);
@@ -210,7 +211,7 @@ where TFlags : struct, Enum
                 .Cast<VBTypedValue>();
 
             // 3. Evaluate the result.
-            var evaluateResult = EvaluateExpressionResult((IVBExecutionContext)resolver, context, expression, frame with { Operands = [.. validOperands] });
+            var evaluateResult = EvaluateExpressionResult(resolver, context, expression, frame with { Operands = [.. validOperands] });
             if (evaluateResult.IsInternalError)
             {
                 return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.InternalError, expression, 
@@ -234,7 +235,7 @@ where TFlags : struct, Enum
     /// <param name="expression">Any <c>BoundExpression</c> to be evaluated.</param>
     /// <param name="frame">The <see cref="OperatorEvaluationFrame"/> holding the semantic evaluation inputs.</param>
     protected abstract RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime, 
+        ISymbolResolver resolver, 
         TContext context, VBOperatorExpression expression, 
         OperatorEvaluationFrame frame);
 
@@ -276,7 +277,7 @@ where TFlags : struct, Enum
                     NodeId = expression.Identity,
                     OperandIndex = operandIndex,
                     SourceValue = operand,
-                    DestinationTypeDesc = VBTypedValueFactory.DescribeType(frame.EffectiveType),
+                    DestinationTypeDesc = new VBTypeDescValue(frame.EffectiveType),
                 });
     }
 
@@ -306,7 +307,7 @@ where TFlags : struct, Enum
                 NodeId = expression.Identity,
                 OperandIndex = operandIndex,
                 SourceValue = operand,
-                DestinationTypeDesc = VBTypedValueFactory.DescribeType(frame.EffectiveType),
+                DestinationTypeDesc = new VBTypeDescValue(frame.EffectiveType),
             });
     }
 }

@@ -28,11 +28,10 @@ public record class VBObjectValue : VBTypedValue,
     }
     public VBObjectValue(MemoryAddress reference) : this(new ValueBindingHandle(new VBRuntimeReference(reference))) { }
 
-    public MemoryAddress Value => UnderlyingValue.RuntimeReference!.Value.Value;
-    public override int Size => sizeof(int); // not quite
+    public MemoryAddress Value => ((VBRuntimeReference)RuntimeValue).Value;
+    public override int Size => sizeof(int);
 
     public bool IsNothing() => Value == Nothing.Value;
 
     public bool Equals(IVBTypedValue<VBObjectValue, MemoryAddress>? other) => Value.Value.Equals(other?.Value.Value);
-    public override int GetHashCode() => Value.GetHashCode();
 }

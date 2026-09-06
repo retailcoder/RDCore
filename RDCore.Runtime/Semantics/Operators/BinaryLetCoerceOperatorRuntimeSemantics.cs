@@ -70,16 +70,16 @@ public record class BinaryLetCoerceOperatorRuntimeSemantics(
                 : DetermineOperatorEffectiveTypeResult.NotApplicable();
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         ConversionOperationSemanticContext context, 
         VBBinaryOperatorExpressionNode expression, 
         OperatorEvaluationFrame frame)
     {
-        var coercionResult = LetCoercionProvider.EvaluateLetCoercionSemantics((ISymbolResolver)runtime, expression, 
+        var coercionResult = LetCoercionProvider.EvaluateLetCoercionSemantics(resolver, expression, 
             new(NodeId: expression.Identity, 
                 OperandIndex: InputIndex.BinaryLeftOperand, 
                 SourceValue: frame[InputIndex.BinaryLeftOperand], 
-                DestinationTypeDesc: VBTypedValueFactory.DescribeType(frame[InputIndex.BinaryRightOperand].GetTargetType())));
+                DestinationTypeDesc: new VBTypeDescValue(frame[InputIndex.BinaryRightOperand].GetTargetType())));
 
         return coercionResult.IsSuccess 
             ? RuntimeSemanticsEvaluationResult.Success(coercionResult.Result!)

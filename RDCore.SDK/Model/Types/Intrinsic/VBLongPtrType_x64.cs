@@ -46,8 +46,5 @@ public record class VBLongPtrType_x64() : VBIntrinsicType<long>(VBTypeNames.VBLo
     /// </summary>
     public static VBLongPtrValue Zero => _zero.Value;
 
-    /// <summary>
-    /// The size of a <c>VBLongPtrValue</c> depends on the bitness-aware pointer size.
-    /// </summary>
-    public override int Size => BitnessAwarePtrSize;
+    public override VBTypedValue CreateValue(RDCore.SDK.Model.Values.Bindings.IBindingHandle handle) => new VBLongPtrValue(handle);
 }

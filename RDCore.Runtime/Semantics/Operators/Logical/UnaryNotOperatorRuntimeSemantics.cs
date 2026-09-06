@@ -23,9 +23,9 @@ public record class UnaryNotOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService) 
     : UnaryLogicalOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
-    protected override double EvaluateBitwiseOp(double operand) => ~(long)operand;
+    protected override T EvaluateBitwiseOp<T>(T operand) => ~operand;
 
-    protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(IVBExecutionContext runtime,
+    protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(ISymbolResolver resolver,
         UnaryLogicalOperatorSemanticContext context,
         VBOperatorExpression expression,
         OperatorEvaluationFrame frame) =>

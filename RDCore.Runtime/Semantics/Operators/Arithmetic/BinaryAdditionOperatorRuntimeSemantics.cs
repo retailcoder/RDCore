@@ -1,4 +1,5 @@
 ﻿using RDCore.Runtime.Execution.Frames;
+using RDCore.SDK.Model.Values.Meta;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types;
@@ -22,7 +23,7 @@ public sealed record class BinaryAdditionOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryArithmeticOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
-    protected sealed override double EvaluateManagedNumericOp(double lhs, double rhs) => lhs + rhs;
+    protected sealed override T EvaluateManagedNumericOp<T>(T lhs, T rhs) => checked(lhs + rhs);
 
     protected override DetermineOperatorEffectiveTypeResult DetermineArithmeticOperatorEffectiveType(
         ISymbolResolver resolver, 
@@ -37,7 +38,7 @@ public sealed record class BinaryAdditionOperatorRuntimeSemantics(
         };
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         BinaryArithmeticOperatorSemanticContext context,
         VBBinaryOperatorExpressionNode expression,
         OperatorEvaluationFrame frame)
@@ -47,12 +48,14 @@ public sealed record class BinaryAdditionOperatorRuntimeSemantics(
             case VBNumericType numericEffectiveType:
                 return EvaluateBinaryExpressionResult(numericEffectiveType,
                     (VBNumericTypedValue)frame[InputIndex.BinaryLeftOperand],
-                    (VBNumericTypedValue)frame[InputIndex.BinaryRightOperand]);
+                    (VBNumericTypedValue)frame[InputIndex.BinaryRightOperand],
+                    expression);
 
             case VBDateType dateEffectiveType:
                 return EvaluateBinaryExpressionResult(dateEffectiveType,
                     (VBNumericTypedValue)frame[InputIndex.BinaryLeftOperand],
-                    (VBNumericTypedValue)frame[InputIndex.BinaryRightOperand]);
+                    (VBNumericTypedValue)frame[InputIndex.BinaryRightOperand],
+                    expression);
 
             case VBStringType stringEffectiveType:
                 // The result is the right operand string concatenated to the left operand string
@@ -61,17 +64,17 @@ public sealed record class BinaryAdditionOperatorRuntimeSemantics(
 
                 var leftOperand = frame[InputIndex.BinaryLeftOperand];
                 var leftCoercion = LetCoercionProvider.EvaluateLetCoercionSemantics(
-                    resolver: runtime.Memory, 
+                    resolver: resolver, 
                     expression: expression, 
                     frame: new(expression.Identity, InputIndex.BinaryLeftOperand, leftOperand, 
-                        VBTypedValueFactory.DescribeType(stringEffectiveType)));
+                        new VBTypeDescValue(stringEffectiveType)));
 
                 var rightOperand = frame[InputIndex.BinaryRightOperand];
                 var rightCoercion = LetCoercionProvider.EvaluateLetCoercionSemantics(
-                    resolver: runtime.Memory,
+                    resolver: resolver,
                     expression: expression,
                     frame: new(expression.Identity, InputIndex.BinaryRightOperand, rightOperand,
-                        VBTypedValueFactory.DescribeType(stringEffectiveType)));
+                        new VBTypeDescValue(stringEffectiveType)));
 
                 if (leftCoercion.IsSuccess && rightCoercion.IsSuccess)
                 {
@@ -91,5 +94,5 @@ public sealed record class BinaryAdditionOperatorRuntimeSemantics(
     }
 
     private static RuntimeSemanticsEvaluationResult EvaluateBinaryExpressionResult(VBStringValue lhs, VBStringValue rhs)
-        => RuntimeSemanticsEvaluationResult.Success(VBTypedValueFactory.CreateStringValue($"{lhs.Value}{rhs.Value}"));
+        => RuntimeSemanticsEvaluationResult.Success(new VBStringValue($"{lhs.Value}{rhs.Value}"));
 }

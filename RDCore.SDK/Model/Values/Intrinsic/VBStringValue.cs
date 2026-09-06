@@ -63,7 +63,7 @@ public record class VBStringValue : VBTypedValue, IVBTypedValue<VBStringValue, s
     /// </summary>
     public static VBStringValue ZeroLengthString => _zeroString.Value;
 
-    public string Value => Handle.GetValue(null!).BoxedValue.ToString() ?? string.Empty;
+    public string Value => RuntimeValue.BoxedValue.ToString() ?? string.Empty;
     public virtual int Length => Value?.Length ?? 0;
     public override int Size => Value is null ? 0 : 2 * Length + 2;
 
@@ -73,5 +73,4 @@ public record class VBStringValue : VBTypedValue, IVBTypedValue<VBStringValue, s
     public override string ToString() => Value ?? VBNullString.Value;
 
     public bool Equals(IVBTypedValue<VBStringValue, string>? other) => Value == other?.Value;
-    public override int GetHashCode() => Value.GetHashCode();
 }

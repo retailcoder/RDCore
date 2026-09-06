@@ -91,14 +91,14 @@ public record class BinaryConcatOperatorRuntimeSemantics(
     }
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         ConcatOperationSemanticContext context, 
         VBBinaryOperatorExpressionNode expression, 
         OperatorEvaluationFrame frame) =>
         frame.EffectiveType switch
         {
             VBStringType => RuntimeSemanticsEvaluationResult.Success(
-                VBTypedValueFactory.CreateStringValue($"{((VBStringValue)frame[InputIndex.BinaryLeftOperand]).Value}{((VBStringValue)frame[InputIndex.BinaryRightOperand]).Value}")),
+                new VBStringValue($"{((VBStringValue)frame[InputIndex.BinaryLeftOperand]).Value}{((VBStringValue)frame[InputIndex.BinaryRightOperand]).Value}")),
 
             VBNullType => EvaluateNullBinaryExpressionResult(),
 

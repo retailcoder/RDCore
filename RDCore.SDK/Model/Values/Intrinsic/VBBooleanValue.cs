@@ -25,13 +25,12 @@ public sealed record class VBBooleanValue : VBTypedValue, IVBTypedValue<VBBoolea
     public static VBBooleanValue True { get; } = _trueValue.Value;
 
 
-    public VBRuntimeBooleanValue Value => (VBRuntimeBooleanValue)UnderlyingValue.RuntimeValue!;
+    public VBRuntimeBooleanValue Value => (VBRuntimeBooleanValue)RuntimeValue;
     public override int Size { get; } = 16; // yes, really.
 
     public override string ToString() => Value.StoredValue != 0 ? Tokens.True : Tokens.False;
 
     public bool Equals(IVBTypedValue<VBBooleanValue, VBRuntimeBooleanValue>? other) => Value == other?.Value;
-    public override int GetHashCode() => Value.GetHashCode();
 
 
     // TOOD move to let-coercion semantics:

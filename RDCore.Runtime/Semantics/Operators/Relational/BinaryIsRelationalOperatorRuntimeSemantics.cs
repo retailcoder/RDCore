@@ -1,4 +1,5 @@
 ﻿using RDCore.Runtime.Execution.Frames;
+using RDCore.SDK.Model.Values.Runtime;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK;
 using RDCore.SDK.Model.AST.Expressions;
@@ -35,7 +36,7 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
         OperatorEvaluationFrame frame) => DetermineOperatorEffectiveTypeResult.Success(VBBooleanType.TypeInfo);
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags> context, 
         VBBinaryOperatorExpressionNode expression, 
         OperatorEvaluationFrame frame)
@@ -57,8 +58,8 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
             rhs.ResolvedSymbol != null && rhs is VBObjectValue or VBVariantValue)
         {
             return RuntimeSemanticsEvaluationResult.Success(
-                VBTypedValueFactory.CreateBooleanValue(
-                    Equals(lhs.UnderlyingValue.RuntimeReference!.Value.Value, rhs.UnderlyingValue.RuntimeReference!.Value.Value)));
+                new VBBooleanValue(
+                    Equals(((VBRuntimeReference)lhs.RuntimeValue).Value.Value, ((VBRuntimeReference)rhs.RuntimeValue).Value.Value)));
         }
 
         return RuntimeSemanticsEvaluationResult.InternalError();

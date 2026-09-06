@@ -14,8 +14,14 @@ public abstract record class VBNumericType<T>(string Name) : VBNumericType(Name,
 /// </summary>
 /// <typeparam name="T">The managed type (internal representation) associated with this data type.</typeparam>
 /// <param name="Name">The name (token) of the data type.</param>
-public abstract record class VBNumericType(string Name, Type ManagedType) : VBIntrinsicType(Name, ManagedType), INumericType 
+public abstract record class VBNumericType(string Name, Type ManagedType) : VBIntrinsicType(Name, ManagedType), INumericType
 {
+    /// <summary>
+    /// Creates a value of this numeric type holding <paramref name="value"/>, converted to this
+    /// type's managed representation (banker's rounding for integral targets, as per <c>Convert</c>).
+    /// </summary>
+    public abstract VBNumericTypedValue CreateValue(double value);
+
     /// <summary>
     /// Gets the minimum representable managed (.net) value for this data type.
     /// </summary>
@@ -31,21 +37,14 @@ public abstract record class VBNumericType(string Name, Type ManagedType) : VBIn
     /// that the least-significant digit is even.
     /// </summary>
     /// <param name="value">The floating-point numeric value to be rounded.</param>
-    public static int BankersRounding(double value) => (int)BankersRounding(value, 1);
+    public static int BankersRounding(double value) => (int)Math.Round(value, MidpointRounding.ToEven);
     /// <summary>
     /// Implements <strong>MS-VBAL 5.5.1.2.1.1</strong> Banker's Rounding.
     /// A midpoint rounding scheme also known as "round-to-even" rounds to the nearest rounded value such
     /// that the least-significant digit is even.
     /// </summary>
-    /// <param name="value">The floating-point numeric value to be rounded.</param>
-    public static int BankersRounding(VBNumericTypedValue value) => (int)BankersRounding((double)value.UnderlyingValue.RuntimeValue!.BoxedValue, 1);
-    /// <summary>
-    /// Implements <strong>MS-VBAL 5.5.1.2.1.1</strong> Banker's Rounding.
-    /// A midpoint rounding scheme also known as "round-to-even" rounds to the nearest rounded value such
-    /// that the least-significant digit is even.
-    /// </summary>
-    /// <param name="value">The floating-point numeric value to be rounded.</param>
-    public static double BankersRounding(double value, int digits) => Math.Round(value, digits);
+    /// <param name="value">The numeric value to be rounded.</param>
+    public static int BankersRounding(VBNumericTypedValue value) => BankersRounding(value.AsDouble);
 
     /// <summary>
     /// A helper function to test if a given source numeric value is within the range of a destination data type.

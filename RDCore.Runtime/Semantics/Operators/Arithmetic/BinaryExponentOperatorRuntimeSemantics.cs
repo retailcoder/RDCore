@@ -24,7 +24,9 @@ public record class BinaryExponentOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryArithmeticOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
-    protected override double EvaluateManagedNumericOp(double lhs, double rhs) => Math.Pow(lhs, rhs);
+    // '^' always has a Double effective type; IEEE-754 exponentiation does not fit INumber<T> cleanly.
+    protected override T EvaluateManagedNumericOp<T>(T lhs, T rhs)
+        => T.CreateChecked(Math.Pow(double.CreateChecked(lhs), double.CreateChecked(rhs)));
 
     protected override DetermineOperatorEffectiveTypeResult DetermineArithmeticOperatorEffectiveType(
         ISymbolResolver resolver, 
@@ -40,7 +42,7 @@ public record class BinaryExponentOperatorRuntimeSemantics(
         };
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        IVBExecutionContext runtime,
+        ISymbolResolver resolver,
         BinaryArithmeticOperatorSemanticContext context, 
         VBBinaryOperatorExpressionNode expression, 
         OperatorEvaluationFrame frame)
@@ -49,21 +51,21 @@ public record class BinaryExponentOperatorRuntimeSemantics(
             && frame[InputIndex.BinaryLeftOperand] is VBNumericTypedValue lhsValue 
             && frame[InputIndex.BinaryRightOperand] is VBNumericTypedValue rhsValue)
         {
-            if ((double)lhsValue.UnderlyingValue.RuntimeValue!.BoxedValue == 0 && (double)rhsValue.UnderlyingValue.RuntimeValue!.BoxedValue == 0)
+            if (lhsValue.AsDouble == 0 && rhsValue.AsDouble == 0)
             {
                 return RuntimeSemanticsEvaluationResult.Success(
-                    VBTypedValueFactory.CreateValue(frame.EffectiveType, VBDoubleType.One.Value));
+                    ((VBNumericType)frame.EffectiveType).CreateValue(VBDoubleType.One.Value));
             }
 
-            if ((double)lhsValue.UnderlyingValue.RuntimeValue.BoxedValue == 0 && (double)rhsValue.UnderlyingValue.RuntimeValue!.BoxedValue < 0)
+            if (lhsValue.AsDouble == 0 && rhsValue.AsDouble < 0)
             {
                 // if LHS is zero and RHS is negative, we must raise error 5.
                 return OnInvalidProcedureCallOrArgument(expression, Exceptions.VBExponentOp_InvalidProcedureCallOrArgument_Verbose);
             }
 
             return RuntimeSemanticsEvaluationResult.Success(
-                VBTypedValueFactory.CreateValue(frame.EffectiveType, 
-                EvaluateManagedNumericOp((double)lhsValue.UnderlyingValue.RuntimeValue.BoxedValue, (double)rhsValue.UnderlyingValue.RuntimeValue!.BoxedValue)));
+                ((VBNumericType)frame.EffectiveType).CreateValue(
+                EvaluateManagedNumericOp(lhsValue.AsDouble, rhsValue.AsDouble)));
         }
         else if (frame.EffectiveType is VBNullType)
         {

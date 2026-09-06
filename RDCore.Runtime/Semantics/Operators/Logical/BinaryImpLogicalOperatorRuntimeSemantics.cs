@@ -23,7 +23,7 @@ public record class BinaryImpLogicalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryLogicalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
-    protected override double EvaluateBitwiseOp(int lhs, int rhs) => (~lhs) | rhs;
+    protected override T EvaluateBitwiseOp<T>(T lhs, T rhs) => ~lhs | rhs;
 
     /// <summary>
     /// Evaluates the not-bitwise evaluation branches of the MS-VBAL specifications for a logical operator.
@@ -33,34 +33,28 @@ public record class BinaryImpLogicalOperatorRuntimeSemantics(
     /// Base implementation has already handled the case where both operands are <see cref="IIntegralNumericType"/>, and the case where they're both <see cref="VBNullValue"/>.
     /// </remarks>
     protected override RuntimeSemanticsEvaluationResult EvaluateSemanticallly(
-        IVBExecutionContext context, 
+        ISymbolResolver resolver, 
         VBBinaryOperatorExpressionNode expression, 
         OperatorEvaluationFrame frame)
     {
         var lhs = frame[InputIndex.BinaryLeftOperand];
         var rhs = frame[InputIndex.BinaryRightOperand];
 
-        if (lhs.TypeInfo is IIntegralNumericType && rhs.TypeInfo is IIntegralNumericType
-            && lhs is VBNumericTypedValue lhsIntegralNumeric && rhs is VBNumericTypedValue rhsIntegralNumeric)
+        // the both-integral case is handled upstream by the bitwise dispatcher; here only Null-operand edges remain.
+        if (lhs is VBNumericTypedValue lhsNumeric && rhs is VBNullValue)
         {
-            return RuntimeSemanticsEvaluationResult.Success(VBTypedValueFactory.CreateValue(VBIntegerType.TypeInfo,
-                EvaluateBitwiseOp((double)lhsIntegralNumeric.UnderlyingValue.RuntimeValue!.BoxedValue, 
-                                  (double)rhsIntegralNumeric.UnderlyingValue.RuntimeValue!.BoxedValue)));
-        }
-        else if (lhs is VBNumericTypedValue lhsNumeric && rhs is VBNullValue)
-        {
-            return (double)lhsNumeric.UnderlyingValue.RuntimeValue!.BoxedValue != (double)VBIntegerType.NegativeOne.UnderlyingValue.RuntimeValue!.BoxedValue
+            return lhsNumeric.AsDouble != -1
                 ? RuntimeSemanticsEvaluationResult.Success(
-                    VBTypedValueFactory.CreateValue(VBIntegerType.TypeInfo, 
-                    EvaluateBitwiseOp((int)lhsNumeric.UnderlyingValue.RuntimeValue!.BoxedValue, (int)VBIntegerType.Zero.UnderlyingValue.RuntimeValue!.BoxedValue)))
+                    VBIntegerType.TypeInfo.CreateValue(
+                    EvaluateBitwiseOp((int)lhsNumeric.AsDouble, 0)))
                 : EvaluateNullBinaryExpressionResult();
         }
-        else if (lhs is VBNullValue && rhs.TypeInfo is IIntegralNumericType && rhs is VBNumericTypedValue rhsNumeric && (double)rhsNumeric.UnderlyingValue.RuntimeValue!.BoxedValue != 0)
+        else if (lhs is VBNullValue && rhs.TypeInfo is IIntegralNumericType && rhs is VBNumericTypedValue rhsNumeric && rhsNumeric.AsDouble != 0)
         {
             return RuntimeSemanticsEvaluationResult.Success(
-                VBTypedValueFactory.CreateValue(frame.EffectiveType, (double)rhsNumeric.UnderlyingValue.RuntimeValue!.BoxedValue));
+                ((VBNumericType)frame.EffectiveType).CreateValue(rhsNumeric.AsDouble));
         }
-        else if (lhs is VBNullValue && rhs is VBNumericTypedValue rhsMaybeZero && (double)rhsMaybeZero.UnderlyingValue.RuntimeValue!.BoxedValue == 0)
+        else if (lhs is VBNullValue && rhs is VBNumericTypedValue rhsMaybeZero && rhsMaybeZero.AsDouble == 0)
         {
             return EvaluateNullBinaryExpressionResult();
         }

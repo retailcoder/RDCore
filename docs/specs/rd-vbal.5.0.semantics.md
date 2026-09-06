@@ -37,12 +37,60 @@ The role of _runtime semantics_ depends on the type of node being evaluated:
 The _evaluation pipeline_ of all operators follows a clear sequence:
 1. The _effective type_ of the operation is determined, based on the _declared type_ of its _operands_;
 2. Validation: all non-[null](../api/RDCore.SDK.Model.Values.Intrinsic.VBNullValue.html) _operands_ are let-coerced to the determined _effective type_ of the operation;
-3. Evaluation: a templated method evaluates a result, having the _execution context_ and the validated _operands_ to work with.
+3. Evaluation: a templated method evaluates a result from the validated _operands_.
 
 The sequence may be aborted at any point to return an _error result_ that encapsulates [VBRuntimeErrorInfo](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorInfo.html) error metadata.
 
+**Computation in the effective type.** The result of step 3 is computed in the _effective type_'s own
+representation — `Long` arithmetic in 64-bit integers, `Currency`/`Decimal` in `decimal`, `Single` in
+`float`, and so on — never through a `Double` intermediate. Arithmetic runs in a _checked_ context, so
+an integral or fixed-point result that does not fit the effective type raises
+[Overflow](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html) rather than wrapping or silently
+narrowing; an integral division or `Mod` by zero raises
+[DivisionByZero](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html). The `^` operator is the sole
+exception — its effective type is always `Double`, and it is evaluated as IEEE-754 exponentiation.
+Relational operators compare in the effective type (integral comparisons in 64-bit integers,
+fixed-point in `decimal`) and yield a [VBBooleanValue](../api/RDCore.SDK.Model.Values.Intrinsic.VBBooleanValue.html);
+a `NaN` operand raises [Overflow](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html). Logical
+operators compute bitwise in the effective integral type (`Boolean` over its `-1`/`0` representation).
 
-### 5.0.2.2 Statement Evaluation
+
+### 5.0.2.2 Let-Coercion
+> [!NOTE]
+> This section describes the implementation of **MS-VBAL §5.5.1.2 Let-coercion (run-time semantics)**.
+
+_Let-coercion_ is the implicit conversion applied to an operand (or an assignment RHS) so that its
+value fits a required _destination declared type_. It is driven by a let-coercion _provider_ that
+dispatches to a per-_destination-type_ strategy resolved by walking the destination
+[VBType](../api/RDCore.SDK.Model.Types.Abstract.VBType.html)'s base-type chain — one strategy keyed
+on `VBNumericType` serves every concrete numeric type. The
+provider maintains a coercion frame stack so that a _recursive let-coercion_ (a strategy that must
+coerce through an intermediate type, e.g. `Date → Double → Integer`) is detected and reported as
+[OutOfStackSpace](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html) rather than overflowing the
+call stack. Each step yields a [LetCoercionResult](../api/RDCore.SDK.Runtime.Shared.LetCoercionResult.html)
+that is `Success` (a coerced [VBTypedValue](../api/RDCore.SDK.Model.Values.Abstract.VBTypedValue.html)),
+`Error` ([TypeMismatch](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html) or `Overflow`), or
+`NotApplicable`.
+
+**Numeric let-coercion (MS-VBAL §5.5.1.2.1).** Coercion between numeric types validates that the
+source value is within the destination's representable range (`Overflow` otherwise), then:
+
+- widening, and narrowing to a wider-or-equal integral type: the value is copied, converted to the
+  destination's representation;
+- narrowing a floating-point or fixed-point value to an integral type: the value is rounded to the
+  nearest integer using **round-half-to-even ("banker's rounding", MS-VBAL §5.5.1.2.1.1)** before
+  conversion.
+
+> [!NOTE]
+> **RD-VBAL diverges from MS-VBAL** in the integral → floating-point block of §5.5.1.2.1: the MS
+> document specifies it as a verbatim copy of the preceding (narrowing) block, including the
+> finite-value and banker's-rounding checks — conditions no integer value can meet, for a conversion
+> that is unambiguously widening. RD-VBAL treats it as a plain widening copy. Divergences of this
+> kind (obvious copy/paste and transcription errors in the MS specification, and anything that
+> implicitly depends on the Windows Registry, ActiveX, or MSForms — all out of scope for the
+> run-time) are resolved in favour of the evident intent.
+
+### 5.0.2.3 Statement Evaluation
 > [!NOTE]
 > The specification of this section is currently a work in progress.
 
@@ -66,7 +114,8 @@ The `Analyze` method then yields a [_builder_](../api/RDCore.SDK.Semantics.Build
 > [!NOTE]
 > **Warning** diagnostics should be used carefully, for flagging _potential bugs_ or logical errors causing unexpected or unintended behavior, or perhaps _severe_ performance issues. Always consider the possibility of there being a _treat warnings as errors_ host environment configuration setting: if a diagnostic is not worth _breaking a build over_, then it's not a _warning_. 
 
-**RDCore** implements the MS-VBAL type coercion rules _verbatim_ through _pattern-matching_ against its type system.
+**RDCore** implements the MS-VBAL type-coercion rules through _pattern-matching_ against its type
+system, verbatim except for the resolved specification errors noted in §5.0.2.2.
 
 ---
 > ⏮️ [**RD-VBAL §4.0** Program Structure](rd-vbal.4.0.program-structure.html) | ⏭️ [**RD-VBAL §6.0** Standard Library](rd-vbal.6.0.standard-library.html)

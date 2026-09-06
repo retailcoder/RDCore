@@ -1,4 +1,6 @@
 ﻿using RDCore.Runtime.Semantics.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
+using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values;
@@ -27,7 +29,7 @@ public sealed record class VBNumericLetCoercionTypeRuntimeSemantics(
                 // if the source value is within the range of the destination type, the result is a copy of the value.
                 => ValidateDestinationTypeRange(expression, frame, out var numericCoercionError)
                     ? LetCoercionResult.Success(
-                        VBTypedValueFactory.CreateValue(frame.DestinationTypeDesc, (VBNumericTypedValue)frame.SourceValue))
+                        ((VBNumericType)frame.DestinationTypeDesc.Target).CreateValue(((VBNumericTypedValue)frame.SourceValue).AsDouble))
                     : LetCoercionResult.Error(numericCoercionError),
 
             IFloatingPointNumericType or IFixedPointNumericType when frame.DestinationTypeDesc.Target is IIntegralNumericType
@@ -38,7 +40,7 @@ public sealed record class VBNumericLetCoercionTypeRuntimeSemantics(
                         // NOTE semantic flags should note a lossy conversion here;
                         // if the source value is small enough, it can convert to zero.
                         // IMPLEMENTATION NOTE: MS-VBAL actually makes the above remark about lossy conversion in the next block.
-                        VBTypedValueFactory.CreateValue(frame.DestinationTypeDesc,                             VBNumericType.BankersRounding((VBNumericTypedValue)frame.SourceValue)))
+                        ((VBNumericType)frame.DestinationTypeDesc.Target).CreateValue(VBNumericType.BankersRounding((VBNumericTypedValue)frame.SourceValue)))
                     : LetCoercionResult.Error(integralCoercionError),
 
             IIntegralNumericType when frame.DestinationTypeDesc.Target is IFloatingPointNumericType or IFixedPointNumericType
@@ -52,7 +54,7 @@ public sealed record class VBNumericLetCoercionTypeRuntimeSemantics(
                 //      && !double.IsNaN(sourceValue.ManagedValue) && !double.IsInfinity(sourceValue.ManagedValue) 
                 => ValidateDestinationTypeRange(expression, frame, out var floatCoercionError)
                     ? LetCoercionResult.Success(
-                        VBTypedValueFactory.CreateValue(frame.DestinationTypeDesc, (VBNumericTypedValue)frame.SourceValue))
+                        ((VBNumericType)frame.DestinationTypeDesc.Target).CreateValue(((VBNumericTypedValue)frame.SourceValue).AsDouble))
                     : LetCoercionResult.Error(floatCoercionError),
 
             _ => LetCoercionResult.NotApplicable(frame)

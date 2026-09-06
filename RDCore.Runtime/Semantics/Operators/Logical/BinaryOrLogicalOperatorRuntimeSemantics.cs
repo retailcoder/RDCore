@@ -22,10 +22,10 @@ public record class BinaryOrLogicalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryLogicalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
-    protected override double EvaluateBitwiseOp(int lhs, int rhs) => lhs | rhs;
+    protected override T EvaluateBitwiseOp<T>(T lhs, T rhs) => lhs | rhs;
 
     protected override RuntimeSemanticsEvaluationResult EvaluateSemanticallly(
-        IVBExecutionContext context,
+        ISymbolResolver resolver,
         VBBinaryOperatorExpressionNode expression,
         OperatorEvaluationFrame frame)
     {
@@ -34,13 +34,13 @@ public record class BinaryOrLogicalOperatorRuntimeSemantics(
 
         return lhs switch
         {
-            VBNumericTypedValue lhsNumeric when lhs.TypeInfo is IIntegralNumericType && rhs is VBNullValue 
+            VBNumericTypedValue lhsNumeric when lhs.TypeInfo is IIntegralNumericType && rhs is VBNullValue
                 => RuntimeSemanticsEvaluationResult.Success(
-                    VBTypedValueFactory.CreateValue(frame.EffectiveType, (double)lhsNumeric.UnderlyingValue.RuntimeValue!.BoxedValue)),
+                    ((VBNumericType)frame.EffectiveType).CreateValue(lhsNumeric.AsDouble)),
 
-            VBNullValue when rhs is VBNumericTypedValue rhsNumeric && rhsNumeric.TypeInfo is IIntegralNumericType 
+            VBNullValue when rhs is VBNumericTypedValue rhsNumeric && rhsNumeric.TypeInfo is IIntegralNumericType
                 => RuntimeSemanticsEvaluationResult.Success(
-                    VBTypedValueFactory.CreateValue(frame.EffectiveType, (double)rhsNumeric.UnderlyingValue.RuntimeValue!.BoxedValue)),
+                    ((VBNumericType)frame.EffectiveType).CreateValue(rhsNumeric.AsDouble)),
 
             _ => RuntimeSemanticsEvaluationResult.InternalError()
         };

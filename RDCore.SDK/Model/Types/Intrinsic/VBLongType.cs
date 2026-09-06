@@ -28,7 +28,7 @@ public record class VBLongType() : VBNumericType<int>(VBTypeNames.VBLong), IInte
     /// Gets the minimum representable value for this data type.
     /// </summary>
     public static VBLongValue MinValue => _minValue.Value;
-    public override double ManagedMinValue => (double)_minValue.Value.UnderlyingValue.RuntimeValue!.BoxedValue;
+    public override double ManagedMinValue => Convert.ToDouble(_minValue.Value.RuntimeValue.BoxedValue);
 
     private static readonly Lazy<VBLongValue> _maxValue = new(()
         => new VBLongValue(int.MaxValue), LazyThreadSafetyMode.PublicationOnly);
@@ -36,7 +36,7 @@ public record class VBLongType() : VBNumericType<int>(VBTypeNames.VBLong), IInte
     /// Gets the maximum representable value for this data type.
     /// </summary>
     public static VBLongValue MaxValue => _maxValue.Value;
-    public override double ManagedMaxValue => (double)_maxValue.Value.UnderlyingValue.RuntimeValue!.BoxedValue;
+    public override double ManagedMaxValue => Convert.ToDouble(_maxValue.Value.RuntimeValue.BoxedValue);
 
     private static readonly Lazy<VBLongValue> _zero = new(()
         => new VBLongValue(0), LazyThreadSafetyMode.PublicationOnly);
@@ -46,5 +46,7 @@ public record class VBLongType() : VBNumericType<int>(VBTypeNames.VBLong), IInte
     public static VBLongValue Zero => _zero.Value;
 
     public override VBTypedValue DefaultValue => VBLongType.Zero;
-    public override int Size => sizeof(int);
+
+    public override VBNumericTypedValue CreateValue(double value) => new VBLongValue(Convert.ToInt32(value));
+    public override VBTypedValue CreateValue(RDCore.SDK.Model.Values.Bindings.IBindingHandle handle) => new VBLongValue(handle);
 }

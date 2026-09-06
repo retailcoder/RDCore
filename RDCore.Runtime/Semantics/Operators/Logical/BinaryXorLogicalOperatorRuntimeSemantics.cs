@@ -21,10 +21,10 @@ public record class BinaryXorLogicalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryLogicalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
-    protected override double EvaluateBitwiseOp(int lhs, int rhs) => (long)lhs ^ (long)rhs;
+    protected override T EvaluateBitwiseOp<T>(T lhs, T rhs) => lhs ^ rhs;
 
     protected override RuntimeSemanticsEvaluationResult EvaluateSemanticallly(
-        IVBExecutionContext context,
+        ISymbolResolver resolver,
         VBBinaryOperatorExpressionNode expression,
         OperatorEvaluationFrame frame)
     {
