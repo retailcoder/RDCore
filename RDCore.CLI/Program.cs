@@ -3,18 +3,19 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using RDCore.CLI.App.Commands;
-using RDCore.CLI.App.Messages;
+using RDCore.CLI.App.Console;
 using RDCore.CLI.Host;
 using RDCore.CLI.Host.Handlers;
-using RDCore.CLI.Themes.Model;
+using RDCore.CLI.Themes;
+using RDCore.SDK;
 using RDCore.SDK.Client;
+using RDCore.SDK.ConsoleIO;
 using RDCore.SDK.Client.Connection;
 using RDCore.SDK.Platform;
 using RDCore.SDK.Server;
@@ -31,6 +32,8 @@ using System.Runtime.CompilerServices;
 
 // platform capabilities provided by rdc.exe in environment-host mode:
 [assembly: ProvidesCorePlatformClientCapability<DefineSymbols>]
+// native command-mode verbs provided by rdc.exe:
+[assembly: ProvidesCorePlatformClientCapability<CliCommand>]
 
 namespace RDCore.CLI;
 
@@ -46,6 +49,14 @@ public class Program
             {
                 using var environmentHost = new RDCoreConsoleEnvironmentHost();
                 return await environmentHost.RunAsync(args);
+            }
+
+            // a leading non-option token is a command verb (e.g. rdc.exe describe-ext …): command mode,
+            // which needs neither a workspace nor an LSP connection.
+            if (args is [{ Length: > 0 } verb, ..] && !verb.StartsWith('-'))
+            {
+                using var commandHost = new RDCoreConsoleCommandHost();
+                return await commandHost.RunAsync(args);
             }
 
             using var clientHost = new RDCoreConsoleClientHost();
@@ -84,23 +95,48 @@ internal class RDCoreConsoleClientHost() : RDCoreLanguageClientHost<RDCoreConsol
     protected override void ConfigureAdditionalExternalServices(IServiceCollection services, IConfiguration configuration)
     {
         services
+            .Configure<AppOptions>(configuration.GetSection("Configuration:CLI"))
             .AddSingleton<IAppThemeService, AppThemeService>()
             .AddSingleton<IAppThemeLoaderService, AppThemeLoaderService>()
-            .AddSingleton<IConsoleMessageWriter, DefaultConsoleMessageWriter>()
-            //.AddSingleton<ILoggerProvider, RDCoreConsoleLoggerProvider>()
+            .AddSingleton(Spectre.Console.AnsiConsole.Console)
+            .AddSingleton<IConsoleMessageWriter, SpectreConsoleMessageWriter>()
             .AddSingleton<ShowSplashCommand>();
     }
 
+    // client mode renders its logs through the same Spectre-backed writer; framework lifetime
+    // chatter is quieted, but RDCore platform bring-up stays visible at the configured trace level.
     protected override void ConfigureExternalLogging(IServiceCollection services, ILoggingBuilder builder, IConfiguration configuration)
     {
-        builder.AddSimpleConsole(options => options.ColorBehavior = LoggerColorBehavior.Enabled);
-        builder.SetMinimumLevel(LogLevel.Trace /*Enum.Parse<LogLevel>(configuration["Server:TraceLevel"] ?? "None")*/);
+        builder.ClearProviders();
+        services.AddSingleton<ILoggerProvider, RDCoreConsoleLoggerProvider>();
+        builder.AddFilter("Microsoft", LogLevel.Warning);
+        // the CLI host's own bootstrap narration ("application resolved", "host started") is noise
+        // for an interactive shell; connection/platform logs (RDCore.SDK.Client.*) stay visible.
+        builder.AddFilter("RDCore.CLI", LogLevel.Warning);
+        base.ConfigureExternalLogging(services, builder, configuration);
     }
 
     protected override async Task BeforeAppStartAsync(IServiceProvider provider)
     {
-        var command = provider.GetRequiredService<ShowSplashCommand>();
-        command.Execute(new() { Show = true });
+        var themes = provider.GetRequiredService<IAppThemeService>();
+        await themes.InitializeAsync(CancellationToken.None);
+        ApplyShellFrame(themes.Theme);
+
+        provider.GetRequiredService<ShowSplashCommand>().Execute(new() { Show = true });
+    }
+
+    // the C64-style deep-blue shell frame — nearest ConsoleColor of the theme's 24-bit shell colours.
+    private static void ApplyShellFrame(AppTheme theme)
+    {
+        try
+        {
+            System.Console.BackgroundColor = theme.ShellBackground;
+            System.Console.ForegroundColor = theme.ShellForeground;
+            System.Console.Clear();
+        }
+        catch (System.IO.IOException)
+        {
+        }
     }
 }
 
@@ -134,6 +170,84 @@ internal class RDCoreConsoleClientApp(
     }
 
     protected override void Dispose(bool disposing) { }
+}
+
+/// <summary>
+/// <c>rdc.exe &lt;verb&gt; …</c>: command mode. No workspace, no LSP connection — resolves the verb
+/// against the native + extension command providers and runs it.
+/// </summary>
+internal class RDCoreConsoleCommandHost : AppHost<RDCoreConsoleCommandApp>
+{
+    public override int ExitCode => HostServices?.GetService<RDCoreConsoleCommandApp>()?.ExitCode ?? 0;
+
+    // configuration comes from appsettings.json (added by AppHost.RunAsync); per-command switches
+    // such as --unsafe-dev-mode are parsed by the command itself, so there is nothing to bind here.
+    protected override void Configure(IConfigurationBuilder configuration, IServiceCollection services, string[] args)
+    {
+    }
+
+    protected override async Task BeforeAppStartAsync(IServiceProvider provider)
+        => await provider.GetRequiredService<IAppThemeService>().InitializeAsync(CancellationToken.None);
+
+    protected override void ConfigureAdditionalExternalServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .Configure<AppOptions>(configuration.GetSection("Configuration:CLI"))
+            .AddSingleton<IAppThemeService, AppThemeService>()
+            .AddSingleton<IAppThemeLoaderService, AppThemeLoaderService>()
+            .AddSingleton(Spectre.Console.AnsiConsole.Console)
+            .AddSingleton<IConsoleMessageWriter, SpectreConsoleMessageWriter>()
+            // native verbs first: NativeCliCommandProvider is enumerated before the extension one, so
+            // a native verb wins a name collision.
+            .AddSingleton<ICliCommand, DescribeExtensionCommand>()
+            .AddSingleton<ICliCommandProvider, NativeCliCommandProvider>()
+            .AddSingleton<ICliCommandProvider, ExtensionCliCommandProvider>()
+            .AddSingleton<ICliCommandDispatcher, CliCommandDispatcher>();
+    }
+
+    // route ILogger<T> in command mode through the same Spectre-backed console writer, so CLI code
+    // and framework logs share one rendering. Framework categories are held down to warnings.
+    protected override void ConfigureExternalLogging(IServiceCollection services, ILoggingBuilder builder, IConfiguration configuration)
+    {
+        // drop the host builder's default console provider; command-mode logs render through the
+        // Spectre-backed console writer instead.
+        builder.ClearProviders();
+        services.AddSingleton<ILoggerProvider, RDCoreConsoleLoggerProvider>();
+        // a CLI verb shouldn't narrate hosting/discovery chatter — CLI code writes user-facing output
+        // through IConsoleMessageWriter directly; only surface warnings and errors from ILogger.
+        builder.AddFilter("Microsoft", LogLevel.Warning);
+        builder.AddFilter("RDCore", LogLevel.Warning);
+        // extension discovery narrates itself ("no manifest…", "…is valid") — not for a CLI verb.
+        builder.AddFilter("RDCore.SDK.Extensibility", LogLevel.Error);
+        base.ConfigureExternalLogging(services, builder, configuration);
+    }
+}
+
+internal sealed class RDCoreConsoleCommandApp(
+    ICliCommandDispatcher dispatcher,
+    ILogger<RDCoreConsoleCommandApp> logger) : IRDCoreApp
+{
+    public CoreServerComponent PlatformComponent => CoreServerComponent.ClientApp;
+
+    /// <summary>The dispatched command's exit code, surfaced by the host once <see cref="RunAsync"/> returns.</summary>
+    public int ExitCode { get; private set; }
+
+    public async Task RunAsync(IServiceProvider provider, string[] args)
+    {
+        var verb = args[0];
+        var verbArgs = args.Skip(1).ToArray();
+        ExitCode = await dispatcher.DispatchAsync(verb, verbArgs, CancellationToken.None);
+    }
+
+    public void LogIfEnabled(LogLevel logLevel, string message)
+    {
+        if (logger.IsEnabled(logLevel))
+        {
+            logger.Log(logLevel, "{message}", message);
+        }
+    }
+
+    public void Dispose() { }
 }
 
 /// <summary>
