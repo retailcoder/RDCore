@@ -8,15 +8,15 @@ using System.Text.Json.Serialization;
 namespace RDCore.SDK.Model.AST.Directives;
 
 /// <summary>
-/// A <c>BoundNode</c> representing a <c>VB_Attribute</c> directive.
+/// A <c>BoundNode</c> representing a <c>VB_Attribute</c> directive (module- or member-level).
 /// </summary>
 /// <param name="Identity">A unique identifier for this specific syntax node.</param>
 /// <param name="Location">The <c>Location</c> of the directive.</param>
-/// <param name="Name">The name of the attribute.</param>
-/// <param name="ValueExpression">An expression node that statically evaluates to the value of the attribute.</param>
-/// <param name="Binding">An optional qualifier used for binding the attribute to the member it belongs to.</param>
-public record class AttributeDirectiveNode(SyntaxNodeId Identity, SourceLocation Location, string Name, SyntaxNode ValueExpression, string? Binding = null)
-    : DirectiveNode(Identity, Location, [ValueExpression]);
+/// <param name="Name">The unqualified name of the attribute (e.g. <c>VB_Description</c>, <c>VB_UserMemId</c>).</param>
+/// <param name="Value">The raw source text of the attribute value(s) — e.g. <c>"…"</c>, <c>0</c>, <c>True</c>. Comma-separated values are joined with <c>", "</c>.</param>
+/// <param name="Binding">The member-name qualifier for a member-level attribute (<c>Foo</c> in <c>Attribute Foo.VB_Description</c>); <c>null</c> for a module-level attribute.</param>
+public record class AttributeDirectiveNode(SyntaxNodeId Identity, SourceLocation Location, string Name, string Value, string? Binding = null)
+    : DirectiveNode(Identity, Location, []);
 
 /// <summary>
 /// A <c>BoundNode</c> representing an <c>Option</c> module directive.
@@ -62,11 +62,12 @@ public record class TypeDefDirectiveNode(SyntaxNodeId Identity, SourceLocation L
 /// </summary>
 /// <param name="Identity">A unique identifier for this specific syntax node.</param>
 /// <param name="Location">The <c>Location</c> of the directive.</param>
-public record class ImplementsDirectiveNode(SyntaxNodeId Identity, SourceLocation Location, ExpressionNode? NameExpression = null)
+public record class ImplementsDirectiveNode(SyntaxNodeId Identity, SourceLocation Location, SyntaxNode? NameExpression = null)
     : DirectiveNode(Identity, Location, NameExpression is null ? [] : [NameExpression])
 {
     /// <summary>
-    /// Gets an expression resolving the identifier name of the implemented interface.
+    /// The name expression resolving the implemented interface — the directive's single child.
     /// </summary>
-    public ExpressionNode NameExpression => Children.OfType<ExpressionNode>().Single();
+    [JsonIgnore]
+    public SyntaxNode NameExpression => Children.Single();
 }
