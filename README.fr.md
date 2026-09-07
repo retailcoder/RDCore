@@ -1,5 +1,8 @@
 # RDCore™
-<sup>_This document is available in [English](./README.en.md)_</sup>
+<sup>_This document is available in [English](./README.md)_</sup>
+
+[![Build and Test](https://github.com/rubberduck-vba/RDCore/actions/workflows/build.yml/badge.svg)](https://github.com/rubberduck-vba/RDCore/actions/workflows/build.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/rubberduck-vba/RDCore/badges/coverage.json)](https://github.com/rubberduck-vba/RDCore/actions/workflows/build.yml)
 
 ![VIVAT CUCUMIS](./assets/vivat-cucumis-stonecore.png)
 
@@ -13,11 +16,10 @@ Ce référentiel contient différents projets **en phase de développement actif
 
 Cet arrangement protège tant les contributeurs historiques qu'actuels, tout en protégeant son avenir : **l'implémentation du _runtime_ de RDCore demeurera open-source**.
 
-👉 Nous construisons ici une solide fondation pour le _coeur de langage_, mais veuillez noter qu'en ce moment le seul livrable est le [site de documentation](https://rubberduck-vba.github.io/RDCore/index.fr.html).
+👉 Nous construisons ici une solide fondation pour le _coeur de langage_. Le [site de documentation](https://rubberduck-vba.github.io/RDCore/index.fr.html) demeure la référence principale, mais la plateforme commence à produire de vrais livrables : `rdc.exe` mène un _workspace_ du chargement à l'analyse jusqu'à la définition des symboles, de bout en bout.
 
 ### Dans ce document
 - [Statut du projet](#projectstatus)
-- [État de l'implémentation](#implementationstatus)
 
 ### Voir aussi
 - [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -29,7 +31,7 @@ Cet arrangement protège tant les contributeurs historiques qu'actuels, tout en 
 **RDCore**™ est une plateforme de _serveur de langage_ (LSP) dont les travaux d'implémentation sont **présentement en cours**. À la cible, les livrables de RDCore sont :
 - 🎯 **rdc.exe**: un _environnement hôte_ RD-VBA configurable et extensible, client LSP (CLI);
 - 🎯 **RDCore.LanguageServer.exe**: le serveur d'orchestration LSP de la plateforme;
-- 🎯 **RDCore.Parser.exe**: le _parser_ de la plateforme est une application serveur LSP satellite détenue et orchestrée par le serveur de langage principal;
+- 🎯 **RDCore.ParseServer.exe**: le _parser_ de la plateforme est une application serveur LSP satellite détenue et orchestrée par le serveur de langage principal;
 - 🎯 **RDCore.Diagnostics.exe**: une extension _core_ de la plateforme qui envoie les _diagnostics_ au serveur de langage principal de façon asynchrone;
 - 👉 **RDCore.Runtime.dll**: une librairie renfermant l'implémentation de toute la sémantique et mécanismes du run-time de RD-VBA, _incluant une implémentation de la librairie VBA standard_;
 - 🧩 **RDCore.SDK.dll**: une librairie exposant les abstractions de la plateforme RDCore et encapsulant les implémentations de base du _coeur de langage_ RD-VBA.
@@ -46,71 +48,65 @@ Entre autres :
 <a id="projectstatus"/>
 
 ### 📊 Statut du projet
-> [!NOTE]
-> Cette section est tenue à jour à mesure que progresse l'implémentation.
+RDCore est en phase active de développement **pré-alpha**. La **spécification** et la **documentation** sont les livrables stables; la plateforme s'exécute de bout en bout (_workspace_ → analyse → symboles) mais n'est pas encore publiée. Un portrait sommaire par projet — non suivi par tickets, simplement l'état des lieux :
 
-RDCore est présentement en phase active de développement **pré-alpha** - le **seul livrable pour l'instant** consiste en sa **spécification** et sa **documentation**.  
-- Architecture: ✅ stable
-- SDK langage: ✅ largement défini
-- Runtime: 🚧 implémentation en cours
-- Librarie standard: 🚧 partiellement définie
-- Parser: 🚧 existe (tout juste)
-- Hôte CLI (rdc.exe): 🚧 existe (tout juste)
-- **Contributions publiques individuelles: ✅ ouvertes ([CLA](CLA.fr.md))**
-- Contributions publiques corporatives: ⏳ à venir 
+**RDCore.SDK** — modèle de langage + plomberie partagée · ✅ stable
 
----
-# RD-VBA
-[RD-VBAL §1.0.2](https://rubberduck-vba.github.io/RDCore/specs/rd-vbal.1.0.introduction.html#102-rd-vba)  
-L'implémentation du _coeur de langage_ de la plateforme est également un **projet en cours de réalisation**. Ultimement, RD-VBA :
+| Domaine | |
+|---|---|
+| Système de types statiques, modèle de types _runtime_ | ✅ |
+| Sémantiques statiques — opérateurs, _let-coercions_ | ✅ |
+| Hôtes, transport, cycle de vie des connexions, racine de plateforme | ✅ |
+| Modèle de capacités (_handshake_ plateforme + LSP) | 🚧 informatif, sans application |
 
-- 🎯 **vise une stricte adhésion aux spécifications MS-VBAL**, assurant une compatibilité comportementale avec les sémantiques spécifiées existantes de VBA;
-- 🧩 **élève VBA en une plate-forme de langage moderne, extensible, et _entièrement open-source_**, séparant la _définition du langage_ de son _implémentation originale_ de 1993;
-- 👀 **rend explicite les comportements implicites du langage** en exposant les règles sémantiques, étapes d'évaluation, piles d'appels, et états d'erreur en tant que _faits observables_.
+**RDCore.Parsing** → `RDCore.ParseServer.exe` · 🚧
 
+| Domaine | |
+|---|---|
+| Analyse document complet — directives, déclarations, membres d'UDT | ✅ |
+| Nœuds d'AST de _statements_ | 🎯 débloque l'interpréteur |
+| Analyse de fragment ancré | 🎯 |
+| Expressions `#If` au-delà d'un simple nom · conformité des littéraux flottants | 🚧 |
 
-<a id="implementationstatus"/>
+**RDCore.LanguageServer** — orchestrateur + serveur LSP · 🚧
 
-## État de l'implémentation
-> [!NOTE]
-> Cette section est tenue à jour à mesure que progresse l'implémentation.
+| Domaine | |
+|---|---|
+| Cycle de vie LSP | ✅ |
+| Orchestration de la plateforme (démarrage, santé, arrêt) | 🚧 extensions non chargées |
+| Chargement du _workspace_ → aller-retour d'analyse → extraction de symboles → définition | ✅ types intrinsèques seulement |
+| Fonctionnalités LSP _document_ et _workspace_ | 👉 à saisir — spécifié |
 
-- ✅ Sémantiques _statiques_ IMPLÉMENTÉES pour les opérateurs  
-- ✅ Sémantiques _statiques_ IMPLÉMENTÉES pour les _let-coercions_
-- ✅ Sémantiques _runtime_ IMPLÉMENTÉEES pour tous les opérateurs
-- 🚧 Sémantiques _runtime_ EN COURS pour _let-coercions_  
-- 🎯 Sémantiques _runtime_ À FAIRE pour tous les _statements_  
-- 🎯 Sémantiques _runtime_ À FAIRE pour la _librairie standard_  
-- 🚧 Modélisation du pipeline d'évaluation EN COURS
-- 🚧 Modélisation du pipeline d'analyse EN COURS  
-- 🚧 Modélisation du pipeline d'exécution EN COURS
+**RDCore.CLI** → `rdc.exe` — client LSP + hôte d'environnement · 🚧
 
-### Sémantique du _coeur de langage_
+| Domaine | |
+|---|---|
+| Mode client (`--workspace`) pilote la plateforme de bout en bout | ✅ |
+| Session _runtime_ composée depuis `.rdproj` (`--host`) | ✅ |
+| Symboles de session (`rdcore/host/symbols/define`) | 🚧 définition seulement |
+| Modèle de mémoire / d'allocation de session | 🚧 couche de comptabilité; stockage adressable prévu |
+| Mode commande (`describe-extension`, …) · REPL | 🎯 |
 
-- 🚧 **Statique: EN COURS**
-  - Opérateurs: ✅ IMPLÉMENTÉ (couverture: 62.4 %blocs | 64.6 %lignes)  
-  - _Let-coercions_: ✅ IMPLÉMENTÉ (couverture: À FAIRE)
-  - _Statements_: 🎯 À FAIRE
-  - Librarie standard: 🎯 À FAIRE
+**RDCore.Runtime** — sémantiques _runtime_ RD-VBA + librairie standard VBA · 🚧
 
-- 🚧 **Runtime: IN PROGRESS**
-  - Opérateurs: ✅ IMPLÉMENTÉ (couverture: À FAIRE)
-  - _Let-coercions_: 🚧 EN COURS (_conceptuellement_ complété)
-  - _Statements_: 🎯 TODO 
-  - Librarie standard: 🎯 À FAIRE
+| Domaine | |
+|---|---|
+| Sémantiques _runtime_ — opérateurs | ✅ |
+| Sémantiques _runtime_ — _let-coercions_ | 🚧 |
+| Sémantiques _runtime_ — _set-coercions_, _statements_ | 🎯 |
+| Librairie standard (`IStd*`) | 🎯 |
+| Interpréteur · _IR lowering_ | 🎯 prévu |
+
+**RDCore.Diagnostics** — extension d'inspection _core_ · 🚧 squelette d'analyseur; chargement des extensions bloqué sur le mode commande + génération du _manifest_.
+
+**Tests** · 🎯 cible ~70% de couverture de lignes (le badge ci-haut est à jour) — sémantiques d'opérateurs et cycle de vie de la plateforme bien couverts; grammaire du _parser_ et CLI minces; le _runtime_ au-delà des opérateurs n'a encore rien à couvrir.
+
+**Contributions** — individuelles ✅ ouvertes ([CLA](CLA.fr.md)) · corporatives ⏳ à venir
+
+<sub>✅ fait / stable · 🚧 en cours · 🎯 non entamé · 👉 à saisir</sub>
 
 > [!NOTE]
 > La version française des documents techniques, lorsque disponible, utilise les termes originaux _en anglais_ qui conservent la précision de leur signification, plutôt qu'une traduction approximative qui pourrait facilement être plus confondante qu'utile.
-
-
-### Couverture de tests
-- 🧪 couverture TOTALE (rdcore.sdk.dll): 17.4 %blocs; **15.0 %lignes** | ⚠️ SOUS LA CIBLE (>70%)
-
-Des tests exercent les sémantiques statiques des opérateurs à travers une matrice de [VBIntrinsicType](https://rubberduck-vba.github.io/RDCore/api/RDCore.SDK.Model.Types.Abstract.VBIntrinsicType.html) qui traversent la plupart (toutes?) des combinaisons _spécifiées_ d'intrants:
-
-![tests sémantiques statiques opérateurs](./docs/images/operator-static-semantic-tests.png)  
-
-👉 Manquants: tests pour toutes combinaisons _non spécifiées_ (s'il y a lieu), et conditions d'erreur / validations des _type mismatch_.
 
 <hr/>
 <p align='left' style='margin-left: 32px;'>

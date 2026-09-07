@@ -1,6 +1,9 @@
 # RDCore™
 <sup>_Ce document est disponible en [français](./README.fr.md)_</sup>
 
+[![Build and Test](https://github.com/rubberduck-vba/RDCore/actions/workflows/build.yml/badge.svg)](https://github.com/rubberduck-vba/RDCore/actions/workflows/build.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/rubberduck-vba/RDCore/badges/coverage.json)](https://github.com/rubberduck-vba/RDCore/actions/workflows/build.yml)
+
 ![VIVAT CUCUMIS](./assets/vivat-cucumis-stonecore.png)
 
 ## Before we begin.
@@ -14,24 +17,23 @@ This repository contains different projects **under active development** produci
 
 This arrangement protects both the legacy and current contributors while enabling the future: **The RDCore runtime implementation shall remain open-source**.
 
-👉 We're building a solid _language core_ foundation here, but please note that at the moment the only deliverable is the [documentation site](https://rubberduck-vba.github.io/RDCore/index.html).
+👉 We're building a solid _language core_ foundation here. The [documentation site](https://rubberduck-vba.github.io/RDCore/index.html) remains the main reference, but the platform is now producing real deliverables: `rdc.exe` carries a workspace from load through parse to symbol definition, end to end.
 
 ### In this document
 - [Project status](#projectstatus)
-- [Implementation status](#implementationstatus)
 
 ### See also
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ---
-# 1.0.1 RDCore
+# RDCore
 [RD-VBAL §1.0.1](https://rubberduck-vba.github.io/RDCore/specs/rd-vbal.1.0.introduction.html#101-rdcore)  
 **RDCore**™ is an actively evolving _Language Server_ (LSP) platform that is currently a **work in progress**. Ultimately, the RDCore deliverables are:
 
 - 🎯 **rdc.exe**: a configurable and extensible RD-VBA _environment host_ and LSP client CLI application;
 - 🎯 **RDCore.LanguageServer.exe**: the platform's "orchestrator" LSP server application;
-- 🎯 **RDCore.Parser.exe**: the platform's parser is a satellite LSP server application owned and coordinated by the main language server;
+- 🎯 **RDCore.ParseServer.exe**: the platform's parser is a satellite LSP server application owned and coordinated by the main language server;
 - 🎯 **RDCore.Diagnostics.exe**: a core platform extension asynchronously issuing _diagnostics_ to the main language server;
 - 👉 **RDCore.Runtime.dll**: a library containing an implementation for all the RD-VBA runtime semantics and mechanics, _including an implementation of the VBA Standard Library_;
 - 🧩 **RDCore.SDK.dll**: a library exposing the RDCore abstractions and encapsulating the base RD-VBA _language core_ implementation.
@@ -47,68 +49,62 @@ This arrangement protects both the legacy and current contributors while enablin
 <a id="projectstatus"/>
 
 ## 📊 Project Status
-> [!NOTE]
-> This section is kept up to date as implementation progresses.
+RDCore is in active **pre-alpha** development. The **specification** and **documentation** are the stable deliverables; the platform runs end to end (workspace → parse → symbols) but is not released yet. A rough picture per project — not issue-tracked, just where things stand:
 
-RDCore is currently in active **pre-alpha** development - the **only deliverable for now** consists of its **specification** and **documentation**. 
-- Core architecture: ✅ stable
-- Language SDK: ✅ largely defined
-- Runtime: 🚧 implementation in progress
-- Standard library: 🚧 partially defined
-- Parser: 🚧 exists (barely)
-- CLI host (rdc.exe): 🚧 exists (barely)
-- **Public contributions (individuals): ✅ opened ([CLA](CLA.md))**
-- Public contributions (corporate): ⏳ planned
+**RDCore.SDK** — language model + shared plumbing · ✅ stable
 
----
-# 1.0.2 RD-VBA
-[RD-VBAL §1.0.2](https://rubberduck-vba.github.io/RDCore/specs/rd-vbal.1.0.introduction.html#102-rd-vba)  
-The implementation of the platform's _language core_ is a **work in progress**. Ultimately, RD-VBA:
+| Area | |
+|---|---|
+| Static type system, runtime type model | ✅ |
+| Static semantics — operators, let-coercions | ✅ |
+| Hosts, transport, connection lifecycle, platform-root | ✅ |
+| Capability model (platform + LSP handshake) | 🚧 informational, no enforcement |
 
-- 🎯 **aims for strict compliance with the MS-VBAL specifications**, ensuring behavioral compatibility with existing VBA semantics;
-- 🧩 **elevates VBA into a modern, extensible, _and fully open-sourced_ language platform** separating the language definition from its original 1993 implementation;
-- 👀 **makes implicit language behavior explicit**, exposing semantic rules, evaluation steps, call stacks, and error conditions as _observable facts_.
+**RDCore.Parsing** → `RDCore.ParseServer.exe` · 🚧
 
-<a id="implementationstatus"/>
+| Area | |
+|---|---|
+| Full-document parse — directives, declarations, UDT members | ✅ |
+| AST statement nodes | 🎯 unblocks the interpreter |
+| Anchored-fragment parse | 🎯 |
+| `#If` expressions past a bare name · float-literal conformance | 🚧 |
 
-## Implementation Status
-> [!NOTE]
-> This section is kept up to date as implementation progresses.
+**RDCore.LanguageServer** — orchestrator + LSP server · 🚧
 
-- ✅ Static semantics IMPLEMENTED for all operators  
-- ✅ Static semantics IMPLEMENTED for all let-coercions  
-- ✅ Runtime semantics IMPLEMENTED for all operators  
-- 🚧 Runtime semantics IN PROGRESS for let-coercions  
-- 🎯 Runtime semantics TODO for all statements  
-- 🎯 Runtime semantics TODO for the standard library  
-- 🚧 Evaluation pipeline modelization IN PROGRESS  
-- 🚧 Analysis pipeline modelization IN PROGRESS  
-- 🚧 Execution pipeline modelization IN PROGRESS  
+| Area | |
+|---|---|
+| LSP lifecycle | ✅ |
+| Platform orchestration (bring-up, health, teardown) | 🚧 extensions not loaded |
+| Workspace load → parse round-trip → symbol extraction → define | ✅ intrinsic types only |
+| LSP document + workspace features | 👉 up for grabs — spec'd |
 
+**RDCore.CLI** → `rdc.exe` — LSP client + environment host · 🚧
 
-### Language Core Semantics
+| Area | |
+|---|---|
+| Client mode (`--workspace`) drives the platform end to end | ✅ |
+| Runtime session composed from `.rdproj` (`--host`) | ✅ |
+| Session symbols (`rdcore/host/symbols/define`) | 🚧 define-only |
+| Session memory / allocation model | 🚧 accounting layer; addressable storage planned |
+| Command mode (`describe-extension`, …) · REPL | 🎯 |
 
-- 🚧 **Static: IN PROGRESS**
-  - Operators: ✅ IMPLEMENTED (coverage: 62.4 %block | 64.6 %lines)  
-  - Let-coercions: ✅ IMPLEMENTED (coverage: TODO)
-  - Statements: 🎯 TODO
-  - Standard library: 🎯 TODO
+**RDCore.Runtime** — RD-VBA runtime semantics + VBA stdlib · 🚧
 
-- 🚧 **Runtime: IN PROGRESS**
-  - Operators: ✅ IMPLEMENTED (coverage: TODO)
-  - Let-coercions: 🚧 IN PROGRESS (_conceptually_ completed)
-  - Statements: 🎯 TODO 
-  - Standard library: 🎯 TODO
+| Area | |
+|---|---|
+| Runtime semantics — operators | ✅ |
+| Runtime semantics — let-coercions | 🚧 |
+| Runtime semantics — set-coercions, statements | 🎯 |
+| Standard library (`IStd*`) | 🎯 |
+| Interpreter · IR lowering | 🎯 planned |
 
+**RDCore.Diagnostics** — core inspection extension · 🚧 analyzer skeleton; extension loading blocked on command mode + manifest generation.
 
-### Test Coverage
-- 🧪 OVERALL test coverage (rdcore.sdk.dll): 17.4 %blocks; **15.0 %lines** | ⚠️ BELOW TARGET (>70%)
+**Tests** · 🎯 target ~70% line coverage (badge above is live) — operator semantics and platform lifecycle well covered; parser grammar and CLI thin; runtime beyond operators has nothing to cover yet.
 
-The current operator tests run the static semantics through a matrix of [VBIntrinsicType](https://rubberduck-vba.github.io/RDCore/api/RDCore.SDK.Model.Types.Abstract.VBIntrinsicType.html) that exercises most if not all _specified_  input combinations:
+**Contributions** — individuals ✅ open ([CLA](CLA.md)) · corporate ⏳ planned
 
-![operator static semantics tests](./docs/images/operator-static-semantic-tests.png)  
-
-👉 Missing: tests for any _unspecified_ combinations (if any), and error conditions / type mismatch checks.
+<sub>✅ done / stable · 🚧 in progress · 🎯 not started · 👉 up for grabs</sub>
 
 <hr/>
 <p align='left' style='margin-left: 32px;'>
