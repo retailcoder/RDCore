@@ -4,6 +4,7 @@ using RDCore.LanguageServer.Workspace;
 using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Platform.Protocol;
 
 namespace RDCore.LanguageServer.Parsing;
@@ -48,8 +49,14 @@ internal sealed class ParsingClientService(
     {
         await orchestration.ParsingService.WaitForReadyAsync(token);
 
-        var result = await orchestration.ParsingService.SendRequestAsync<ParseDocumentParams, ModuleParseResult>(
+        var envelope = await orchestration.ParsingService.SendRequestAsync<ParseDocumentParams, PlatformJsonEnvelope>(
             new ParseDocumentParams { DocumentUri = documentUri, ModuleType = moduleType }, token);
+
+        // an error response from the parser comes back as a null envelope; degrade this one document
+        // rather than abort the whole workspace parse.
+        var result = envelope is not null
+            ? envelope.Unwrap<ModuleParseResult>()
+            : ModuleParseResult.Failed(new SourceLocation(documentUri, SourceRange.Empty), "the parser returned no result");
 
         _cache[documentUri] = result;
         if (logger.IsEnabled(LogLevel.Information))
