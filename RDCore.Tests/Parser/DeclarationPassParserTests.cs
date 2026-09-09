@@ -28,6 +28,20 @@ public class DeclarationPassParserTests
     }
 
     [TestMethod]
+    // review D1: an operator anywhere in a #If / #Const used to desync the CC listener and forfeit
+    // EVERY directive in the module. Walking the parse tree (rather than AddParseListener) fixes it.
+    [DataRow("#If VBA7 And Win64 Then\r\nPublic X As Long\r\n#End If", DisplayName = "#If A And B")]
+    [DataRow("#If DEBUG = 1 Then\r\nPublic X As Long\r\n#End If", DisplayName = "#If A = B")]
+    [DataRow("#If Not DEBUG Then\r\nPublic X As Long\r\n#End If", DisplayName = "#If Not A")]
+    [DataRow("#Const A = 1\r\n#Const B = A + 1\r\n#If B Then\r\nPublic X As Long\r\n#End If", DisplayName = "#Const B = A + 1")]
+    public void OperatorInConditional_PreservesPrecompilerTrivia(string content)
+    {
+        var result = new ModuleParser().Parse(TestUri.TestModuleUri(), ModuleType.StdModule, content);
+
+        Assert.IsNotEmpty(result.PrecompilerTrivia);
+    }
+
+    [TestMethod]
     public void SplitStatementConditional_ReportsLocatedSyntaxErrors()
     {
         // legal VBA, but a #If that splits a statement (here the function header) cannot be parsed by
@@ -224,6 +238,50 @@ End Sub
         Assert.IsNotNull(literal, "the Const's '42' literal was dropped from the AST");
         Assert.IsInstanceOfType<VBIntegerValue>(literal!.StaticValue);
         Assert.AreEqual((short)42, ((VBIntegerValue)literal.StaticValue).Value);
+    }
+
+    [TestMethod]
+    // C8: the declaration pass captured leaf literals only and dropped the unary minus, so
+    // `Const N = -1` came out as +1.
+    [DataRow("Public Const N As Long = -1", -1L)]
+    [DataRow("Public Const N = -32768", -32768L)]
+    [DataRow("Public Const N As Integer = -5", -5L)]
+    [DataRow("Public Const N = - -7", 7L)]
+    public void NegativeConstant_KeepsItsSign(string source, long expected)
+    {
+        var result = new ModuleParser().Parse(TestUri.TestModuleUri(), ModuleType.StdModule, source);
+        Assert.IsTrue(result.IsSuccess, result.SyntaxErrors.Length == 0 ? "" : result.SyntaxErrors[0]!.Description);
+
+        var literal = Descendants(result.SyntaxTree!).OfType<LiteralExpressionNode>().Single();
+        long actual = literal.StaticValue switch
+        {
+            VBIntegerValue v => v.Value,
+            VBLongValue v => v.Value,
+            _ => throw new AssertFailedException($"unexpected value type {literal.StaticValue.GetType().Name}"),
+        };
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void ReDimAsClause_DoesNotLeakItsTypeOntoTheMember()
+    {
+        // backlog G: ExitAsTypeClause had no parent guard, so a `ReDim x() As Long` in a body
+        // attached its type node to the enclosing member. A real local `Dim` still keeps its own.
+        const string content = """
+            Public Sub Grow()
+                Dim total As Long
+                ReDim buffer(1 To 10) As Long
+            End Sub
+            """;
+
+        var result = new ModuleParser().Parse(TestUri.TestModuleUri(), ModuleType.StdModule, content);
+        Assert.IsTrue(result.IsSuccess, result.SyntaxErrors.Length == 0 ? "" : result.SyntaxErrors[0]!.Description);
+
+        var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        Assert.IsEmpty(member.Children.OfType<AsTypeExpressionNode>());
+
+        var local = member.Children.OfType<VariableDeclarationNode>().Single(variable => variable.Name == "total");
+        Assert.ContainsSingle(local.Children.OfType<AsTypeExpressionNode>());
     }
 
     [TestMethod]

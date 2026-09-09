@@ -1,20 +1,21 @@
 ﻿using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
+using RDCore.Parsing;
 using RDCore.Parsing.Syntax;
+using RDCore.SDK;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Directives;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Globalization;
-using System.Xml.Linq;
+using System.Runtime.CompilerServices;
 
 namespace RDCore.Parsing.AST;
 
@@ -22,16 +23,23 @@ namespace RDCore.Parsing.AST;
 /// A <em>listener</em> that builds the AST nodes representing all the directives and declarations in a module.
 /// </summary>
 /// <param name="moduleNode">The root AST module node.</param>
-internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNode) : VBAParserBaseListener, ISyntaxNodeProvider
+/// <param name="errors">Collects the token-semantic syntax errors this pass raises (e.g. literal overflow).</param>
+internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNode, ErrorListener errors) : VBAParserBaseListener, ISyntaxNodeProvider
 {
     private readonly Uri _rootUri = sourceUri;
     private readonly ModuleNode _root = moduleNode;
+    private readonly ErrorListener _errors = errors;
     private readonly Stack<DeclarationNodeBuilder> _builderStack = new([new(sourceUri, moduleNode.Identity)]);
     private DeclarationNodeBuilder CurrentBuilder => _builderStack.Peek();
 
     private SyntaxNodeId GetCurrentNodeId() => CurrentBuilder.NodeId.Add(CurrentBuilder.ChildCount);
 
     public ImmutableArray<SyntaxNode> SyntaxNodes => [BuildModuleNode()];
+
+    // pathological nesting recurses through the expression rule to an uncatchable stack overflow;
+    // this turns it into a catchable exception the boundary net degrades to a located failure.
+    public override void EnterEveryRule([NotNull] ParserRuleContext context)
+        => RuntimeHelpers.EnsureSufficientExecutionStack();
 
     public ModuleNode BuildModuleNode()
     {
@@ -80,8 +88,10 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
     public override void ExitOptionBaseStmt([NotNull] VBAParser.OptionBaseStmtContext context)
     {
         var location = context.GetSourceLocation(_rootUri);
-        var value = int.Parse(context.numberLiteral()?.INTEGERLITERAL()?.GetText() ?? "0");
-        OnModuleOptionDirective(location, value == 1 ? ModuleOptions.OptionBase1 : ModuleOptions.OptionBase0);
+        // Option Base only accepts a bare 0 or 1; anything else the grammar's numberLiteral admits
+        // (hex/oct/float, a suffix, an out-of-range value) is not base 1 and must not throw here.
+        var isBase1 = int.TryParse(context.numberLiteral()?.GetText(), out var value) && value == 1;
+        OnModuleOptionDirective(location, isBase1 ? ModuleOptions.OptionBase1 : ModuleOptions.OptionBase0);
     }
     public override void ExitOptionCompareStmt([NotNull] VBAParser.OptionCompareStmtContext context)
     {
@@ -230,15 +240,32 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
 
     public override void ExitAsTypeClause([NotNull] VBAParser.AsTypeClauseContext context)
     {
-        // `As` with no type token (half-typed / recovery): the LL error listener already records the
-        // located "missing type" syntax error — just don't build a broken expression node.
+        // a body-level `ReDim x(1) As Long` carries an asTypeClause too; that type belongs to the
+        // ReDim statement, not the enclosing member, and this pass does not model body statements.
+        if (context.Parent is VBAParser.RedimVariableDeclarationContext)
+        {
+            return;
+        }
+
+        // `As` with no type token (half-typed / recovery): the LL error listener already located the
+        // "missing type" error — just don't build a broken node.
         if (context.type() is not { } type)
         {
             return;
         }
 
+        // recovery can still leave `type` synthetic: a "<missing …>" placeholder (`Dim a As, b As
+        // Long`), or the bare NEW keyword for `As New` with no class name (via complexType's ctNewExpr).
+        var typeText = type.GetText();
+        if (IdentifierNameExtensions.IsRecoveryPlaceholder(typeText)
+            || string.IsNullOrEmpty(typeText)
+            || string.Equals(typeText, "New", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         var location = context.GetSourceLocation(_rootUri);
-        var value = type.GetText().Split('.');
+        var value = typeText.Split('.');
 
         var qualifier = value.Length > 1 ? value[0] : null;
         var name = value.Last();
@@ -293,53 +320,6 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             }
         }
     }
-    // MS-VBAL 3.3.2 numeric type-declaration characters ("type hints"): the suffix forces the type.
-    private static readonly Dictionary<char, Func<double, VBTypedValue>> _typeHintValues = new()
-    {
-        ['%'] = n => new VBIntegerValue(Convert.ToInt16(n)),
-        ['&'] = n => new VBLongValue(Convert.ToInt32(n)),
-        ['^'] = n => new VBLongLongValue(Convert.ToInt64(n)),
-        ['!'] = n => new VBSingleValue(Convert.ToSingle(n)),
-        ['#'] = n => new VBDoubleValue(n),
-        ['@'] = n => new VBCurrencyValue(Convert.ToDecimal(n)),
-    };
-
-    private static (string digits, char hint) SplitTypeHint(string text)
-        => text.Length > 0 && "%&^!#@".IndexOf(text[^1]) >= 0 ? (text[..^1], text[^1]) : (text, '\0');
-
-    // MS-VBAL 3.3.2 note: an unsuffixed integer literal past Long range widens to Double
-    // (never LongLong). Long.Parse would throw; fall through to a Double approximation.
-    private static double ParseIntegerLiteralValue(string digits)
-        => long.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
-            ? value
-            : double.Parse(digits, NumberStyles.Float, CultureInfo.InvariantCulture);
-
-    /// <summary>
-    /// MS-VBAL 3.3.2: an explicit type-declaration character wins; otherwise an unsuffixed
-    /// floating-point literal is <c>Double</c> and an unsuffixed integer literal takes the smallest
-    /// of <c>Integer</c>, <c>Long</c>, <c>Double</c> that holds it.
-    /// </summary>
-    private static VBTypedValue ResolveNumericLiteral(char hint, double rawValue, bool isFloat)
-    {
-        if (hint != '\0')
-        {
-            return _typeHintValues[hint](rawValue);
-        }
-        if (isFloat)
-        {
-            return new VBDoubleValue(rawValue);
-        }
-        if (rawValue is >= Int16.MinValue and <= Int16.MaxValue)
-        {
-            return new VBIntegerValue(Convert.ToInt16(rawValue));
-        }
-        if (rawValue is >= Int32.MinValue and <= Int32.MaxValue)
-        {
-            return new VBLongValue(Convert.ToInt32(rawValue));
-        }
-        return new VBDoubleValue(rawValue);
-    }
-
     public override void ExitNumberLiteral([NotNull] VBAParser.NumberLiteralContext context)
     {
         if (!IsDeclarationPassExpression)
@@ -348,43 +328,30 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         }
 
         var location = context.GetSourceLocation(_rootUri);
-        OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, ResolveNumberLiteral(context)));
+        var token = (context.INTEGERLITERAL() ?? context.FLOATLITERAL() ?? context.HEXLITERAL() ?? context.OCTLITERAL())?.GetText()
+            ?? string.Empty;
+
+        var (value, overflow) = NumericLiteral.Resolve(token);
+        if (overflow)
+        {
+            _errors.Report(location, VBCompileErrorId.NumericLiteralOverflow, Exceptions.VBCompileError_NumericLiteralOverflow_Verbose);
+        }
+        OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value));
     }
-
-    // MS-VBAL 3.3.2. A literal whose value does not fit its forced or inferred type (`99999%`,
-    // `&H` past Int64) is a syntax error a later pass will formalize; here it degrades to an unknown
-    // value so the rest of the module still parses.
-    private static VBTypedValue ResolveNumberLiteral(VBAParser.NumberLiteralContext context)
+    public override void ExitUnaryMinusOp([NotNull] VBAParser.UnaryMinusOpContext context)
     {
-        try
+        if (!IsDeclarationPassExpression)
         {
-            if (context.INTEGERLITERAL() is { } intNumeric)
-            {
-                var (digits, hint) = SplitTypeHint(intNumeric.Symbol.Text);
-                return ResolveNumericLiteral(hint, ParseIntegerLiteralValue(digits), isFloat: false);
-            }
-            if (context.FLOATLITERAL() is { } floatNumeric)
-            {
-                var (digits, hint) = SplitTypeHint(floatNumeric.Symbol.Text);
-                return ResolveNumericLiteral(hint, double.Parse(digits, CultureInfo.InvariantCulture), isFloat: true);
-            }
-            if (context.HEXLITERAL() is { } hexNumeric)
-            {
-                var (digits, hint) = SplitTypeHint(hexNumeric.Symbol.Text);
-                return ResolveNumericLiteral(hint, Convert.ToInt64(digits[2..], fromBase: 16), isFloat: false);
-            }
-            if (context.OCTLITERAL() is { } octNumeric)
-            {
-                var (digits, hint) = SplitTypeHint(octNumeric.Symbol.Text);
-                return ResolveNumericLiteral(hint, Convert.ToInt64(digits[2..], fromBase: 8), isFloat: false);
-            }
-        }
-        catch (Exception exception) when (exception is FormatException or OverflowException or ArgumentException)
-        {
-            // out of range / malformed digits — leave the literal unresolved.
+            return;
         }
 
-        return VBUnknownValue.DefaultValue;
+        // VBA has no negative-literal token; `Const N = -1` is MINUS over the literal 1. This pass
+        // captures leaf literals only, so fold the sign into the last one it added.
+        if (CurrentBuilder.LastChild is LiteralExpressionNode literal
+            && NumericLiteral.Negate(literal.StaticValue) is { } negated)
+        {
+            CurrentBuilder.UpdateLastChild(literal with { StaticValue = negated });
+        }
     }
     public override void ExitLiteralExpression([NotNull] VBAParser.LiteralExpressionContext context)
     {
@@ -461,12 +428,12 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         if (context.standaloneLineNumberLabel()?.lineNumberLabel() is VBAParser.LineNumberLabelContext numContextA)
         {
             lineNumberLocation = numContextA.GetSourceLocation(_rootUri);
-            number = int.Parse(numContextA.numberLiteral().GetText());
+            number = LineNumber(numContextA);
         }
         else if (context.combinedLabels()?.lineNumberLabel() is VBAParser.LineNumberLabelContext numContextB)
         {
             lineNumberLocation = numContextB.GetSourceLocation(_rootUri);
-            number = int.Parse(numContextB.numberLiteral().GetText());
+            number = LineNumber(numContextB);
         }
         else if (context.identifierStatementLabel().legalLabelIdentifier().identifier() is VBAParser.IdentifierContext labelContextA)
         {
@@ -487,5 +454,12 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         {
             CurrentBuilder.AddChild(new LineLabelNode(GetCurrentNodeId(), labelLocation, name));
         }
+
+        // lineNumberLabel is `MINUS? numberLiteral`, so it can carry a sign or a non-decimal token;
+        // only a bare non-negative integer is a line number, anything else contributes no node.
+        static int? LineNumber(VBAParser.LineNumberLabelContext context)
+            => context.MINUS() is null && int.TryParse(context.numberLiteral()?.GetText(), out var value)
+                ? value
+                : null;
     }
 }

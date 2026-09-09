@@ -1,12 +1,15 @@
-﻿using Antlr4.Runtime.Misc;
+﻿using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using RDCore.Parsing.AST;
 using RDCore.Parsing.Syntax;
+using RDCore.SDK;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -35,9 +38,10 @@ internal class PrecompilerNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
         => new PrecompilerInlineIfStatementNode(NodeId, context.GetSourceLocation(_rootUri), [.. _children]);
 }
 
-internal class PrecompilerDirectiveListener(Uri sourceUri) : VBAConditionalCompilationBaseListener, ISyntaxNodeProvider
+internal class PrecompilerDirectiveListener(Uri sourceUri, ErrorListener errors) : VBAConditionalCompilationBaseListener, ISyntaxNodeProvider
 {
     private readonly Uri _rootUri = sourceUri;
+    private readonly ErrorListener _errors = errors;
     private readonly Stack<PrecompilerNodeBuilder> _builderStack = new([new(sourceUri, new($"{sourceUri}/conditional", []))]);
 
     private PrecompilerNodeBuilder CurrentBuilder => _builderStack.Peek();
@@ -181,7 +185,8 @@ internal class PrecompilerDirectiveListener(Uri sourceUri) : VBAConditionalCompi
     public override void EnterLogicalNotOp([NotNull] VBAConditionalCompilationParser.LogicalNotOpContext context)
         => OnEnterParent();
     public override void ExitLogicalNotOp([NotNull] VBAConditionalCompilationParser.LogicalNotOpContext context)
-        => OnExitParent(provider => new VBBinaryOperatorExpressionNode(Tokens.LogicalNotOp, GetCurrentNodeId(), context.GetSourceLocation(_rootUri), [.. provider.GetChildren]));
+        // `Not` is unary — one operand.
+        => OnExitParent(provider => new VBUnaryOperatorExpressionNode(Tokens.LogicalNotOp, GetCurrentNodeId(), context.GetSourceLocation(_rootUri), [.. provider.GetChildren]));
 
     public override void EnterLogicalXorOp([NotNull] VBAConditionalCompilationParser.LogicalXorOpContext context)
         => OnEnterParent();
@@ -218,6 +223,8 @@ internal class PrecompilerDirectiveListener(Uri sourceUri) : VBAConditionalCompi
     private void ResolveCcLiteral(VBAConditionalCompilationParser.LiteralContext context)
     {
         var location = context.GetSourceLocation(_rootUri);
+        var numeric = context.INTEGERLITERAL() ?? context.FLOATLITERAL() ?? context.HEXLITERAL() ?? context.OCTLITERAL();
+
         if (context.FALSE() is not null)
         {
             OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, VBBooleanValue.False));
@@ -226,55 +233,27 @@ internal class PrecompilerDirectiveListener(Uri sourceUri) : VBAConditionalCompi
         {
             OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, VBBooleanValue.True));
         }
-        else if (context.INTEGERLITERAL() is ITerminalNode intNode)
+        else if (numeric is not null)
         {
-            var rawValue = Int64.Parse(intNode.Symbol.Text);
-            VBTypedValue value = (rawValue <= Int16.MaxValue && rawValue >= Int16.MinValue)
-                ? new VBIntegerValue(new ConstantBindingHandle(new VBRuntimeValue<short>(Convert.ToInt16(rawValue))))
-                : (rawValue <= Int32.MaxValue && rawValue >= Int32.MinValue)
-                    ? new VBLongValue(new ConstantBindingHandle(new VBRuntimeValue<int>(Convert.ToInt32(rawValue))))
-                    : new VBDoubleValue(new ConstantBindingHandle(new VBRuntimeValue<double>(Convert.ToDouble(rawValue))));
+            // one resolver for both passes (MS-VBAL 3.3.2) — the declaration pass and this one must agree.
+            var (value, overflow) = NumericLiteral.Resolve(numeric.GetText());
+            if (overflow)
+            {
+                _errors.Report(location, VBCompileErrorId.NumericLiteralOverflow, Exceptions.VBCompileError_NumericLiteralOverflow_Verbose);
+            }
             OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value));
         }
         else if (context.STRINGLITERAL() is ITerminalNode stringNode)
         {
             OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, new VBStringValue(stringNode.Symbol.Text[1..^1])));
         }
-        else if (context.FLOATLITERAL() is ITerminalNode floatNode)
-        {
-            // MS-VBAL 3.3.2: the literal's decimal separator is '.', independent of the host locale.
-            var rawValue = double.Parse(floatNode.Symbol.Text, CultureInfo.InvariantCulture);
-            VBTypedValue value = (rawValue <= Single.MaxValue && rawValue >= Single.MinValue)
-                ? new VBSingleValue(new ConstantBindingHandle(new VBRuntimeValue<Single>(Convert.ToSingle(rawValue))))
-                : new VBDoubleValue(new ConstantBindingHandle(new VBRuntimeValue<double>(rawValue)));
-            OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value));
-        }
         else if (context.DATELITERAL() is ITerminalNode dateNode)
         {
-            if (DateTime.TryParse(dateNode.Symbol.Text.Trim('#'), out var rawValue))
+            // MS-VBAL 3.3.3: date literals are locale-independent.
+            if (DateTime.TryParse(dateNode.Symbol.Text.Trim('#'), CultureInfo.InvariantCulture, DateTimeStyles.None, out var rawValue))
             {
-                OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, new VBDateValue(new ConstantBindingHandle(new VBRuntimeValue<double>(rawValue.ToOADate())))));
+                OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, new VBDateValue(rawValue.ToOADate())));
             }
-        }
-        else if (context.HEXLITERAL() is ITerminalNode hexNode)
-        {
-            var rawValue = Convert.ToInt64(hexNode.Symbol.Text[2..], fromBase: 16);
-            VBTypedValue value = (rawValue <= Int16.MaxValue && rawValue >= Int16.MinValue) 
-                ? new VBIntegerValue(new ConstantBindingHandle(new VBRuntimeValue<short>(Convert.ToInt16(rawValue))))
-                : (rawValue <= Int32.MaxValue && rawValue >= Int32.MinValue) 
-                    ? new VBLongValue(new ConstantBindingHandle(new VBRuntimeValue<int>(Convert.ToInt32(rawValue))))
-                : new VBDoubleValue(new ConstantBindingHandle(new VBRuntimeValue<double>(Convert.ToDouble(rawValue))));
-            OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value));
-        }
-        else if (context.OCTLITERAL() is ITerminalNode octNode)
-        {
-            var rawValue = Convert.ToInt64(octNode.Symbol.Text[2..], fromBase: 8);
-            VBTypedValue value = (rawValue <= Int16.MaxValue && rawValue >= Int16.MinValue)
-                ? new VBIntegerValue(new ConstantBindingHandle(new VBRuntimeValue<short>(Convert.ToInt16(rawValue))))
-                : (rawValue <= Int32.MaxValue && rawValue >= Int32.MinValue)
-                    ? new VBLongValue(new ConstantBindingHandle(new VBRuntimeValue<int>(Convert.ToInt32(rawValue))))
-                : new VBDoubleValue(new ConstantBindingHandle(new VBRuntimeValue<double>(Convert.ToDouble(rawValue))));
-            OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value));
         }
         else if (context.NOTHING() is not null)
         {

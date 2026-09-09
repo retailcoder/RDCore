@@ -1,6 +1,11 @@
 using RDCore.Parsing;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST;
+using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
+using RDCore.SDK.Model.AST.Directives;
+using RDCore.SDK.Model.AST.Expressions;
+using System.Text.Json;
 
 namespace RDCore.Tests.Parser;
 
@@ -84,11 +89,208 @@ public sealed class ParserResilienceTests
     }
 
     [TestMethod]
-    public void ListenerException_StillYieldsLocatedErrorsAndTrivia()
+    public void HalfTypedMember_StillContributesTheGoodDeclarations()
     {
-        // a #Const so there is precompiler trivia to preserve, then a construct that stresses recovery.
+        // A1/A2: a member header with no name yet used to throw in the builder and, via the catch,
+        // empty the whole module. The three good members must survive.
         const string source = """
-            #Const DEBUG = 1
+            Option Explicit
+            Public Const A = 1
+            Public Sub Foo()
+            End Sub
+            Public Function Bar() As Long
+            End Function
+            Public Sub
+            """;
+
+        var result = Parse(source);
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsNotNull(result.SyntaxTree);
+        var members = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Select(m => m.Name).ToArray();
+        CollectionAssert.Contains(members, "Foo");
+        CollectionAssert.Contains(members, "Bar");
+        Assert.ContainsSingle(result.SyntaxTree.Children.OfType<ConstantDeclarationNode>().Where(c => c.Name == "A"));
+    }
+
+    [TestMethod]
+    // A3: names that are grammar keywords or bracketed foreign names used to null-deref
+    // IDENTIFIER().Symbol and fail the whole module.
+    [DataRow("Dim Name As String", "Name")]
+    [DataRow("Private Text As String", "Text")]
+    [DataRow("Public Const Version As String = \"1\"", "Version")]
+    // brackets are escape syntax, not part of the name.
+    [DataRow("Dim [My Var] As Long", "My Var")]
+    public void KeywordOrBracketedName_ParsesWithThatName(string source, string expectedName)
+    {
+        var result = Parse("Option Explicit\r\n" + source);
+
+        Assert.IsTrue(result.IsSuccess, result.SyntaxErrors.IsEmpty ? "" : result.SyntaxErrors[0].Description);
+        var declared = result.SyntaxTree!.Children
+            .Where(node => node is VariableDeclarationNode or ConstantDeclarationNode)
+            .Select(node => node is VariableDeclarationNode v ? v.Name : ((ConstantDeclarationNode)node).Name)
+            .ToArray();
+        CollectionAssert.Contains(declared, expectedName);
+    }
+
+    [TestMethod]
+    // B2: a value assertion — the modifier must bind, not fall through to Implicit, for every casing.
+    [DataRow("Public Sub S()\r\nEnd Sub", AccessModifier.Public)]
+    [DataRow("public Sub S()\r\nEnd Sub", AccessModifier.Public)]
+    [DataRow("PRIVATE Sub S()\r\nEnd Sub", AccessModifier.Private)]
+    [DataRow("Friend Function F()\r\nEnd Function", AccessModifier.Friend)]
+    [DataRow("Sub S()\r\nEnd Sub", AccessModifier.Implicit)]
+    public void Visibility_BindsToTheModifier(string source, AccessModifier expected)
+    {
+        var member = Parse(source).SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        Assert.AreEqual(expected, member.AccessModifier);
+    }
+
+    [TestMethod]
+    // A4: Option Base and line-number labels ran an unguarded int.Parse. The grammar's numberLiteral
+    // admits hex/oct/float tokens and a type-hint suffix, and a value can overflow Int32 — none of
+    // which is a line number or Option Base 1, and none of which may throw.
+    [DataRow("Option Base 1&", DisplayName = "Option Base, type-hint suffix")]
+    [DataRow("Option Base &H1", DisplayName = "Option Base, hex literal")]
+    [DataRow("Option Base 99999999999", DisplayName = "Option Base, overflows Int32")]
+    [DataRow("Sub S()\r\n99999999999 X = 1\r\nEnd Sub", DisplayName = "line number overflows Int32")]
+    [DataRow("Sub S()\r\n10& X = 1\r\nEnd Sub", DisplayName = "line number, type-hint suffix")]
+    [DataRow("Sub S()\r\n&HFF X = 1\r\nEnd Sub", DisplayName = "hex token as a line label")]
+    [DataRow("Sub S()\r\n1.5 X = 1\r\nEnd Sub", DisplayName = "float token as a line label")]
+    [DataRow("Sub S()\r\n-5 X = 1\r\nEnd Sub", DisplayName = "signed line label")]
+    public void OptionBaseAndLineLabels_NeverThrow(string source)
+    {
+        ModuleParseResult result = null!;
+        var thrown = Record(() => result = Parse(source));
+
+        Assert.IsNull(thrown, $"parsing threw {thrown?.GetType().Name}: {thrown?.Message}");
+        Assert.IsTrue(
+            result.SyntaxErrors.All(error => error.Location.Uri == Uri),
+            "every syntax error must be located in the parsed document");
+    }
+
+    [TestMethod]
+    // the bare, valid forms still bind.
+    [DataRow("Option Base 1", ModuleOptions.OptionBase1)]
+    [DataRow("Option Base 0", ModuleOptions.OptionBase0)]
+    public void OptionBase_BindsTheBareValue(string source, ModuleOptions expected)
+    {
+        var directive = Parse(source).SyntaxTree!.Children.OfType<ModuleOptionDirectiveNode>().Single();
+        Assert.AreEqual(expected, directive.ModuleOption);
+    }
+
+    [TestMethod]
+    // A4: a parameter is an `arg : … unrestrictedIdentifier …`, so its name can be a reserved word.
+    [DataRow("Next")]
+    [DataRow("Error")]
+    [DataRow("Name")]
+    public void KeywordNamedParameter_ParsesWithThatName(string keyword)
+    {
+        var result = Parse($"Public Sub Foo(ByVal {keyword} As Long)\r\nEnd Sub");
+
+        Assert.IsTrue(result.IsSuccess, result.SyntaxErrors.IsEmpty ? "" : result.SyntaxErrors[0].Description);
+        var parameter = Flatten(result.SyntaxTree!).OfType<ParameterDeclarationNode>().Single();
+        Assert.AreEqual(keyword, parameter.Name);
+    }
+
+    [TestMethod]
+    // F4: ANTLR's DefaultErrorStrategy inserts synthetic "<missing X>" tokens on recovery; none of
+    // them may be stored in the AST as a name, a library, or a type.
+    [DataRow("Public Declare Sub Foo Lib", DisplayName = "Declare ... Lib <missing string>")]
+    [DataRow("Public Declare Function F Lib \"k\" Alias", DisplayName = "Alias <missing string>")]
+    [DataRow("Option Explicit\r\nDim a As, b As Long", DisplayName = "As-clause list, missing first type")]
+    [DataRow("Option Explicit\r\nDim a As New", DisplayName = "As New <missing class>")]
+    public void RecoveryPlaceholders_NeverLeakIntoTheAst(string source)
+    {
+        var result = Parse(source);
+
+        if (result.SyntaxTree is null)
+        {
+            return; // fully degraded — nothing was built, nothing leaked
+        }
+
+        var json = JsonSerializer.Serialize(result.SyntaxTree);
+        Assert.IsFalse(
+            json.Contains("<missing ", StringComparison.Ordinal),
+            $"an ANTLR recovery placeholder leaked into the AST: {json}");
+        Assert.IsFalse(
+            Flatten(result.SyntaxTree).OfType<AsTypeExpressionNode>().Any(node => node.TypeName is "New" or ""),
+            "`As New` with no class name must not yield an As-type node");
+        Assert.IsFalse(
+            Flatten(result.SyntaxTree).OfType<ExternalMemberDeclarationNode>().Any(node => node.Library.Contains('<')),
+            "a Declare with a half-typed Lib string must not keep a placeholder library name");
+    }
+
+    [TestMethod]
+    public void ValidDeclare_StillKeepsItsLibraryAndAlias()
+    {
+        var result = Parse("Public Declare PtrSafe Sub Beep Lib \"kernel32\" Alias \"BeepA\" (ByVal x As Long)");
+
+        Assert.IsTrue(result.IsSuccess, result.SyntaxErrors.IsEmpty ? "" : result.SyntaxErrors[0].Description);
+        var declare = Flatten(result.SyntaxTree!).OfType<ExternalMemberDeclarationNode>().Single();
+        StringAssert.Contains(declare.Library, "kernel32");
+        StringAssert.Contains(declare.Alias!, "BeepA");
+    }
+
+    [TestMethod]
+    // C8: a parameter name carrying a type-declaration character keeps the name, not the hint.
+    [DataRow("count%", "count")]
+    [DataRow("name$", "name")]
+    [DataRow("amount@", "amount")]
+    public void TypedParameterName_DropsTheHintChar(string declared, string expectedName)
+    {
+        var result = Parse($"Public Sub Foo(ByVal {declared})\r\nEnd Sub");
+
+        Assert.IsTrue(result.IsSuccess, result.SyntaxErrors.IsEmpty ? "" : result.SyntaxErrors[0].Description);
+        var parameter = Flatten(result.SyntaxTree!).OfType<ParameterDeclarationNode>().Single();
+        Assert.AreEqual(expectedName, parameter.Name);
+    }
+
+    [TestMethod]
+    public void ValidLineNumberLabel_StillContributesALineNumberNode()
+    {
+        var result = Parse("Sub S()\r\n100: X = 1\r\nEnd Sub");
+
+        var lineNumbers = Flatten(result.SyntaxTree!).OfType<LineNumberNode>().ToArray();
+        Assert.ContainsSingle(lineNumbers);
+        Assert.AreEqual(100, lineNumbers[0].Number);
+    }
+
+    private static IEnumerable<SyntaxNode> Flatten(SyntaxNode node)
+    {
+        yield return node;
+        foreach (var child in node.Children)
+        {
+            foreach (var descendant in Flatten(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    [TestMethod]
+    public void DeepNesting_DoesNotCrashTheProcess()
+    {
+        // A5: pathological nesting recurses through the expression rule to an uncatchable stack
+        // overflow. EnterEveryRule's stack guard converts it to a catchable, located failure.
+        var source = "Public Const X = " + new string('(', 2000) + "1" + new string(')', 2000);
+
+        ModuleParseResult result = null!;
+        var thrown = Record(() => result = Parse(source));
+
+        Assert.IsNull(thrown, $"parsing threw {thrown?.GetType().Name}");
+        Assert.IsFalse(result.IsSuccess);
+    }
+
+    [TestMethod]
+    public void FailedParse_StillCarriesPrecompilerTrivia()
+    {
+        // a #Const so there is precompiler trivia to preserve, then a construct that fails the
+        // declaration pass — the trivia must survive the failure path.
+        const string source = """
+            #Const RDDEBUG = 1
+            #If RDDEBUG Then
+            #End If
             Public Property Get
             """;
 
@@ -97,6 +299,7 @@ public sealed class ParserResilienceTests
         Assert.IsFalse(result.IsSuccess);
         Assert.IsNotEmpty(result.SyntaxErrors);
         Assert.IsTrue(result.SyntaxErrors.All(error => error.Location.Uri == Uri));
+        Assert.IsNotEmpty(result.PrecompilerTrivia);
     }
 
     [TestMethod]

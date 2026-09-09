@@ -33,5 +33,4 @@ public record class PrecompilerConstantDeclarationNode(SyntaxNodeId Identity, So
 /// <param name="Location">The source location of this module; the <c>SourceRange</c> is invalid.</param>
 /// <param name="Name">The name of the referenced precompiler constant.</param>
 public record class PrecompilerNameExpressionNode(SyntaxNodeId Identity, SourceLocation Location, string Name)
-    : SyntaxNode(Identity, Location, []);
-
+    : ExpressionNode(Identity, Location, []);

@@ -2,6 +2,9 @@
 using Antlr4.Runtime.Atn;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using RDCore.Parsing.AST;
 using RDCore.Parsing.Syntax;
 using RDCore.SDK.ConsoleIO;
@@ -10,6 +13,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
+using RDCore.SDK.Server.Configuration;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
@@ -29,30 +33,35 @@ public interface IModuleParser
     ModuleParseResult Parse(Uri uri, ModuleType moduleType, string content);
 }
 
-/// <param name="wireErrorDetail">
-/// How a build-machine source path in a caught exception's text is anonymized before it can reach the
-/// wire. Supplied from configuration in the parse server; the default suits tests.
-/// </param>
-internal partial class ModuleParser(SourcePathScrubMode wireErrorDetail = SourcePathScrubMode.RepoRelative) : IModuleParser
+/// <param name="serverOptions">Supplies <see cref="SdkServerOptions.WireErrorDetail"/>; optional, the default suits tests.</param>
+/// <param name="logger">Records the exceptions the resilience guards swallow; optional, no-op by default.</param>
+internal partial class ModuleParser(
+    IOptions<SdkServerOptions>? serverOptions = null,
+    ILogger<ModuleParser>? logger = null) : IModuleParser
 {
+    private readonly ILogger<ModuleParser> _logger = logger ?? NullLogger<ModuleParser>.Instance;
+    private readonly SourcePathScrubMode _scrub = serverOptions?.Value.WireErrorDetail ?? SourcePathScrubMode.RepoRelative;
+
     public ModuleParseResult Parse(Uri uri, ModuleType moduleType, string content)
     {
         var errorListener = new ErrorListener(uri);
         var precompilerTrivia = ImmutableArray<SyntaxNode>.Empty;
+        DeclarationsParseTreeListener? declarations = null;
 
         try
         {
+            content = NormalizeSource(content);
             if (string.IsNullOrWhiteSpace(content))
             {
                 // an empty module is valid VBA, not a parse failure.
                 return ModuleParseResult.Success(EmptyModule(uri, moduleType));
             }
 
-            precompilerTrivia = ParsePrecompilerNodes(content, errorListener, [new PrecompilerDirectiveListener(uri)]);
+            precompilerTrivia = ParsePrecompilerNodes(content, errorListener, [new PrecompilerDirectiveListener(uri, errorListener)]);
             var node = new ModuleNode(new SyntaxNodeId(uri.AbsolutePath, []), new(uri, SourceRange.Empty), precompilerTrivia, moduleType);
 
             var sanitized = PrecompilerNodePattern().Replace(content, match => new string(' ', match.Length));
-            var listener = ParseWithFallback(sanitized, errorListener, () => new DeclarationsParseTreeListener(uri, node));
+            var listener = ParseWithFallback(sanitized, errorListener, () => declarations = new DeclarationsParseTreeListener(uri, node, errorListener));
             var ast = listener.BuildModuleNode();
 
             // a partial tree is still useful to the symbol pass — IsSuccess is governed by whether
@@ -65,19 +74,60 @@ internal partial class ModuleParser(SourcePathScrubMode wireErrorDetail = Source
         }
         catch (Exception exception)
         {
-            // the declaration pass must never throw: an exception escaping both parse attempts degrades
-            // to a failed result that still carries whatever the LL pass located, plus the precompiler
-            // trivia. Build-machine paths in the exception text are anonymized before they can leave.
-            return errorListener.Errors.IsEmpty
-                ? ModuleParseResult.Failed(new(uri, SourceRange.Empty), exception, wireErrorDetail) with { PrecompilerTrivia = precompilerTrivia }
-                : new ModuleParseResult { SyntaxErrors = errorListener.Errors, PrecompilerTrivia = precompilerTrivia };
+            // an exception past both parse attempts on a fresh listener is more likely a listener bug
+            // than bad input, so log it — the module still degrades to located errors + trivia +
+            // whatever the listener had already built (salvaged below).
+            _logger.LogWarning(exception, "❌ Parse of {uri} degraded after an unhandled exception in the declaration pass.", uri);
+
+            ModuleNode? salvaged = null;
+            try
+            {
+                salvaged = declarations?.BuildModuleNode();
+            }
+            catch (Exception salvageFailure)
+            {
+                _logger.LogDebug(salvageFailure, "The partial tree could not be salvaged for {uri}.", uri);
+            }
+
+            return new ModuleParseResult
+            {
+                SyntaxTree = salvaged,
+                PrecompilerTrivia = precompilerTrivia,
+                SyntaxErrors = errorListener.Errors.IsEmpty
+                    ? [VBSyntaxErrorInfo.For(VBCompileErrorId.SyntaxError, new(uri, SourceRange.Empty),
+                        SourcePathAnonymizer.Scrub(exception.ToString(), _scrub))]
+                    : errorListener.Errors,
+            };
         }
     }
 
     private static ModuleNode EmptyModule(Uri uri, ModuleType moduleType)
         => new(new SyntaxNodeId(uri.AbsolutePath, []), new(uri, SourceRange.Empty), [], moduleType);
 
-    private static ImmutableArray<SyntaxNode> ParsePrecompilerNodes(string source, ErrorListener errorListener, ISyntaxNodeProvider[] listeners)
+    // ANTLR's input stream and the precompiler-line regexes (RegexOptions.Multiline) only treat \n as
+    // a line boundary, and a leading BOM would land in column 0 of the first token. Fold every line
+    // ending to \n and drop one leading BOM so locations and #-directive detection hold regardless of
+    // how the client saved the file.
+    private static string NormalizeSource(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return string.Empty;
+        }
+
+        if (content[0] == '\uFEFF')
+        {
+            content = content[1..];
+        }
+
+        return content
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n')
+            .Replace('\u2028', '\n')
+            .Replace('\u2029', '\n');
+    }
+
+    private ImmutableArray<SyntaxNode> ParsePrecompilerNodes(string source, ErrorListener errorListener, ISyntaxNodeProvider[] listeners)
     {
         // ignore everything that is NOT a precompiler node,
         // because grammar matches everything as a ccBlock otherwise.
@@ -90,23 +140,22 @@ internal partial class ModuleParser(SourcePathScrubMode wireErrorDetail = Source
 
         parser.Interpreter.PredictionMode = PredictionMode.Ll;
         parser.AddErrorListener(errorListener);
-        foreach (var listener in listeners)
-        {
-            parser.AddParseListener(listener);
-        }
 
         try
         {
-            parser.compilationUnit();
-            // SyntaxNodes unwinds the listener's builder stack, so it can throw too — keep it inside
-            // the guard.
+            // parse to a tree, then walk it: AddParseListener fires Exit before Enter<Op> on a
+            // left-recursive ccExpression (`#If A And B`), desyncing the builder stack. A walk doesn't.
+            var tree = parser.compilationUnit();
+            foreach (var listener in listeners)
+            {
+                ParseTreeWalker.Default.Walk(listener, tree);
+            }
             return [.. listeners.SelectMany(provider => provider.SyntaxNodes)];
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // the conditional-compilation pass is best-effort: default error recovery can fire
-            // unbalanced enter/exit events into a stateful listener. A failure here forfeits the
-            // precompiler trivia for this module, not the module.
+            // best-effort: a failure here forfeits this module's precompiler trivia, not the module.
+            _logger.LogDebug(exception, "Precompiler-trivia pass failed; trivia forfeited for this module.");
             return [];
         }
     }
@@ -116,19 +165,24 @@ internal partial class ModuleParser(SourcePathScrubMode wireErrorDetail = Source
     /// recovery — which would desynchronize a stateful parse listener), then LL with default recovery
     /// on a <em>fresh</em> listener if SLL failed.
     /// </summary>
-    private static TListener ParseWithFallback<TListener>(string content, ErrorListener errorListener, Func<TListener> listenerFactory)
+    private TListener ParseWithFallback<TListener>(string content, ErrorListener errorListener, Func<TListener> listenerFactory)
         where TListener : IParseTreeListener
     {
         try
         {
             return ParseOnce(content, PredictionMode.Sll, new BailErrorStrategy(), errorListener: null, listenerFactory());
         }
-        catch (Exception)
+        catch (Exception exception)
         {
             // any SLL failure falls through to LL: a plain ParseCanceledException/RecognitionException,
             // but also a listener exception the bail strategy triggered on a half-matched rule. SLL
             // carries no error listener, so nothing located is lost. LL runs default recovery + the
             // error listener on a fresh listener and produces the located errors.
+            if (exception is not (ParseCanceledException or RecognitionException))
+            {
+                // a routine SLL bail needs no trace; anything else does, even though LL will retry.
+                _logger.LogDebug(exception, "SLL parse pass raised {type}; retrying on LL.", exception.GetType().Name);
+            }
             return ParseOnce(content, PredictionMode.Ll, new DefaultErrorStrategy(), errorListener, listenerFactory());
         }
     }
@@ -161,6 +215,8 @@ internal partial class ModuleParser(SourcePathScrubMode wireErrorDetail = Source
     private static partial Regex NoPrecompilerNodePattern();
 }
 
+// collects both ANTLR grammar-mismatch errors and the token-semantic errors a declaration listener
+// raises (e.g. a numeric literal overflow), so ModuleParseResult.SyntaxErrors carries either origin.
 internal class ErrorListener(Uri uri) : IAntlrErrorListener<IToken>
 {
     private readonly Uri _uri = uri;
@@ -171,5 +227,16 @@ internal class ErrorListener(Uri uri) : IAntlrErrorListener<IToken>
     {
         var location = new SourceLocation(_uri, new(line, charPositionInLine, line, charPositionInLine));
         _errors.Add(VBSyntaxErrorInfo.For(VBCompileErrorId.SyntaxError, location, msg));
+    }
+
+    // records a token-semantic syntax error; idempotent per (location, id) so the two-stage parse
+    // does not double-report a literal both passes reach.
+    public void Report(SourceLocation location, VBCompileErrorId id, string verbose)
+    {
+        if (_errors.Any(existing => existing.ErrorId == (int)id && existing.Location.Equals(location)))
+        {
+            return;
+        }
+        _errors.Add(VBSyntaxErrorInfo.For(id, location, verbose));
     }
 }
