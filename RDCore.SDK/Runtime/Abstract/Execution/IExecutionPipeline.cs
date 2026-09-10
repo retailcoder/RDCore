@@ -6,13 +6,15 @@ namespace RDCore.SDK.Runtime.Abstract.Execution;
 public interface IExecutionPipeline<out TResult> where TResult : ExecutionResultInfo
 {
     /// <summary>
-    /// Evaluates an <em>expression</em> given an <em>execution context</em>.
+    /// Evaluates an <em>expression</em> given the read face over the current execution context.
     /// </summary>
     /// <typeparam name="TNode">The type of <em>bound expression</em> node to evaluate.</typeparam>
-    /// <param name="context">The <em>runtime context</em> to evaluate the expression with.</param>
+    /// <param name="resolver">The read face over the current execution context.</param>
     /// <param name="expression">The <em>bound expression</em> node to evaluate.</param>
     /// <returns>A record encapsulating the <see cref="RuntimeSemanticsEvaluationResult"/>.</returns>
-    TResult Execute<TNode>(IVBExecutionContext context, TNode expression)
+    // TODO a side-effecting statement pipeline will also need write access / the call stack — widen
+    // beyond ISymbolResolver when statement execution lands (§R).
+    TResult Execute<TNode>(ISymbolResolver resolver, TNode expression)
         where TNode : ExpressionNode;
 }
 

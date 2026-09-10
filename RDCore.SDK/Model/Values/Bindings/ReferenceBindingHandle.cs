@@ -19,10 +19,12 @@ public record class ReferenceBindingHandle : IBindingHandle
 
     public BindingCapabilities BindingCapabilities => BindingCapabilities.GetValue | BindingCapabilities.SetValue;
 
-    public IRuntimeValue GetValue(IVBExecutionContext context) => _value;
+    // TODO now that a resolver is in hand, GetValue should follow the reference through
+    // resolver.TryRead(_value.Value, …) rather than returning the reference itself.
+    public IRuntimeValue GetValue(ISymbolResolver resolver) => _value;
 
-    public void SetValue(IVBExecutionContext context, IRuntimeValue value) => _value = value is VBRuntimeReference reference
+    public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => _value = value is VBRuntimeReference reference
         ? reference : throw new ArgumentException($"Expected {nameof(VBRuntimeReference)} value", nameof(value));
 
-    public IRuntimeValue Invoke(IVBExecutionContext context, IRuntimeValue[] args) => throw new NotSupportedException();
+    public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 }

@@ -19,9 +19,9 @@ public record class ValueBindingHandle : IBindingHandle
 
     public BindingCapabilities BindingCapabilities => BindingCapabilities.GetValue | BindingCapabilities.SetValue;
 
-    public IRuntimeValue GetValue(IVBExecutionContext context) => _value;
+    public IRuntimeValue GetValue(ISymbolResolver resolver) => _value;
 
-    public void SetValue(IVBExecutionContext context, IRuntimeValue value) => _value = value;
+    public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => _value = value;
 
-    public IRuntimeValue Invoke(IVBExecutionContext context, IRuntimeValue[] args) => throw new NotSupportedException();
+    public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 }

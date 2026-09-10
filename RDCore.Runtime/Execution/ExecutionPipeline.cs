@@ -9,14 +9,8 @@ namespace RDCore.Runtime.Execution;
 /// </summary>
 internal class ExecutionPipeline : IExecutionPipeline<ExecutionResultInfo>
 {
-    /// <summary>
-    /// Evaluates an <em>expression</em> given an <em>execution context</em>.
-    /// </summary>
-    /// <typeparam name="TNode">The type of <em>bound expression</em> node to evaluate.</typeparam>
-    /// <param name="context">The <em>runtime context</em> to evaluate the expression with.</param>
-    /// <param name="expression">The <em>bound expression</em> node to evaluate.</param>
-    /// <returns>A record encapsulating the <see cref="RuntimeSemanticsEvaluationResult"/>.</returns>
-    public ExecutionResultInfo Execute<TNode>(IVBExecutionContext context, TNode expression) where TNode : ExpressionNode
+    /// <inheritdoc/>
+    public ExecutionResultInfo Execute<TNode>(ISymbolResolver resolver, TNode expression) where TNode : ExpressionNode
     {
         // TODO get the appropriate runtime semantics for the specified node.
         return new ExecutionResultInfo(new(VBUnknownType.TypeInfo.DefaultValue, null));
