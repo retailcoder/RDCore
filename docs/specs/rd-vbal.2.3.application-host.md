@@ -27,14 +27,24 @@ An _execution session_ holds the _state_ of the execution engine and exposes met
 
 ### 2.3.1.2 Session Services
 An _execution session_ is rooted at an `IRuntimeSession` that exposes the environment bitness
-(`Is64Bit`, which also determines the value of the `#If Win64` and `#If VBA7` pre-compiler directives)
-and three services:
+(`Is64Bit`, which also determines the value of the `#If Win64` and `#If VBA7` pre-compiler directives),
+the workspace's `References` (see below), and three services:
 
 |Service|Responsibility|
 |---|---|
 |`ISessionMemoryAllocator`|Allocates and frees blocks in the session's memory space and reports allocation / fragmentation statistics (`TryAllocate`, `TryDeallocate`, `Info`). This is an _accounting_ layer — it tracks sizes and addresses, MSVBVM-style, not the values themselves.|
 |`ISessionSymbols`|The session's symbol table: `TryDefine` a `Symbol` in a scope, and `TryResolve` a name visible from a scope.|
 |`ISessionObjects`|Object lifetime: `CreateObject`, `AddRef` / `RemoveRef`, and `TryRemoveObject` for an instance whose reference count has reached zero.|
+
+`IRuntimeSession.References` is the workspace's project and library references as an ordered
+`IReadOnlyList<ProjectReference>` — the runtime-facing view of the `.rdproj`
+[RDCoreReference](rd-vbal.2.2.rdproj-structure.html#2232-rdcorereference) list, carrying only each
+reference's source-visible `Name` and its `Priority` (the list rank). It is the reference-priority
+order defined later in this section, preserved exactly as the language server provides it; a
+referenced library's own members are contributed by an `ISymbolProvider` and resolved through
+`ISymbolResolver`, not from this list. Name resolution across referenced projects and libraries
+consults the ordering to disambiguate a global-scope name; the resolution algorithm itself is a
+separate concern.
 
 The read face used by the static and runtime semantic layers is `ISymbolResolver`:
 

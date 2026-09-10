@@ -1,4 +1,5 @@
 ﻿using RDCore.SDK.Model;
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Runtime;
@@ -35,6 +36,16 @@ public interface IRuntimeSession
     /// The session's object lifetime manager.
     /// </summary>
     ISessionObjects Objects { get; }
+
+    /// <summary>
+    /// The workspace's references in declaration order (<strong>RD-VBAL §2.3.1.2</strong>): index
+    /// <c>0</c> appears first and is the lowest precedence (the <c>VBA</c> standard library), so a
+    /// later entry shadows it on a global-scope name collision. This is the precedence order only —
+    /// a reference's members are resolved through <c>ISymbolResolver</c>, not from here. Preserved
+    /// exactly as the language server provides it; empty when the session was composed without a
+    /// project (e.g. a bare REPL).
+    /// </summary>
+    IReadOnlyList<ProjectReference> References { get; }
 }
 
 /// <summary>
