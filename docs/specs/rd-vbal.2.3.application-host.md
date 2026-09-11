@@ -37,7 +37,7 @@ the workspace's `References` (see below), and three services:
 |`ISessionObjects`|Object lifetime: `CreateObject`, `AddRef` / `RemoveRef`, and `TryRemoveObject` for an instance whose reference count has reached zero.|
 
 `IRuntimeSession.References` is the workspace's project and library references as an ordered
-`IReadOnlyList<ProjectReference>` — the runtime-facing view of the `.rdproj`
+`IReadOnlyList<ReferencePriorityInfo>` — the runtime-facing view of the `.rdproj`
 [RDCoreReference](rd-vbal.2.2.rdproj-structure.html#2232-rdcorereference) list, carrying only each
 reference's source-visible `Name` and its `Priority` (the list rank). It is the reference-priority
 order defined later in this section, preserved exactly as the language server provides it; a
@@ -50,9 +50,24 @@ The read face used by the static and runtime semantic layers is `ISymbolResolver
 
 |Member|Description|
 |---|---|
-|`Resolve`|Resolves a specified _identifier name_ to a defined `Symbol` by inspecting a specified _allocation scope_|
+|`Resolve`|Resolves a specified _identifier name_, as seen from the scope the symbol at a specified _handle_ `Uri` belongs to, to a [SymbolResolutionResult](../api/RDCore.SDK.Runtime.Shared.SymbolResolutionResult.html)|
 |`GetValue`|Gets the `IBindingHandle` currently bound to a specified `Symbol`|
 |`TryRead`|Gets the `IBindingHandle` held at a specified `MemoryAddress`, if any|
+
+`Resolve` returns a `SymbolResolutionResult` — the bound `Symbol`, an _unbound_ result (the name is
+declared nowhere visible), or one of two compile-time errors with the colliding declarations
+attached: **VBC09303** _Duplicate declaration_ when the name is declared more than once within one
+module or procedure, and **VBC09301** _Ambiguous name_ when it resolves in more than one enclosing
+scope — members promoted from different modules or references — and the reference must qualify it.
+The resolver reports the error _kind_; the caller, which knows where the reference is, builds the
+located diagnostic.
+
+The compile-time implementation is
+[ScopeTreeSymbolResolver](../api/RDCore.SDK.Model.Symbols.ScopeTreeSymbolResolver.html): it walks
+the [ScopeTree](../api/RDCore.SDK.Model.Symbols.ScopeTree.html) described below and binds names only —
+its `GetValue` / `TryRead` throw, since it holds no run-time bindings. The session exposes one over
+its own symbols as `ISessionSymbols.Resolver`, rebuilt as symbols are defined; a design-time host
+composes its own over an AST-derived tree.
 
 `ISymbolProvider` exposes a single `ProvideSymbols` method that yields the `Symbol`s its source
 defines; the composition root then defines each one into the semantic layer (static context) or the
@@ -90,11 +105,30 @@ The correctly-scoped allocation of all symbols upon their definition should then
 3. If a name refers to a symbol defined in the _workspace heap_, then the resolved symbol is workspace-scoped;
 4. If a name refers to a symbol defined in the _global heap_, then the resolved symbol is globally-scoped.
 
-- If multiple symbols match a specified name before reaching the _global_ scope, then the name is ambiguous and an appropriate [compile-time error](../api/RDCore.SDK.Model.Errors.VBCompileErrorId.html) should be issued, in this case **VBC009303** _Duplicate declaration_.
+- If multiple symbols match a specified name within one _module_ or _procedure_ scope, that is a **VBC09303** _Duplicate declaration_; if they match across the _project_ or _global_ scope — members promoted from different modules or references — that is a **VBC09301** _Ambiguous name_ (the reference must qualify the name). An appropriate [compile-time error](../api/RDCore.SDK.Model.Errors.VBCompileErrorId.html) should be issued in either case.
 - If multiple symbols match a specified name within the _global_ scope, then the name is disambiguated using the _reference priority order_ of the _referenced library_ a matching symbol is defined in. This priotity is determined by the order in which project references appear in the `.rdproj` file of a _workspace folder_.
 
 > [!NOTE]
 > The **VBA** standard library always has the _lowest priority_ (i.e. always appears first), meaning any other project reference that defines any identically-named class type or public/global member is always going to _shadow_ the `VBA` library definitions; this _shadowing_ should be detected in the _semantic layer_ and reported through _semantic flags_ so **RDCore.Diagnostics** can issue _shadowed declaration_ diagnostics (see [**§2.6** Diagnostics](rd-vbal.2.6.diagnostics.html)).
+
+The mechanism behind that ordered lookup is a
+[ScopeTree](../api/RDCore.SDK.Model.Symbols.ScopeTree.html): a
+[ScopeTreeBuilder](../api/RDCore.SDK.Model.Symbols.ScopeTreeBuilder.html) folds the composed symbols
+into a tree of [LexicalScope](../api/RDCore.SDK.Model.Symbols.LexicalScope.html)s, one per
+[LexicalScopeKind](../api/RDCore.SDK.Model.Symbols.LexicalScopeKind.html) — the global scope at the
+root, the project scope beneath it, one scope per module, and one per procedure body. Each symbol is
+placed structurally from its `ParentUri`, concrete type, and access modifier: a standard module's
+non-`Private` members (an explicit `Public` / `Global` / `Friend`, or an implicit procedure-like
+member — **MS-VBAL §5.2.3**) are also declared in the project scope, so a sibling module resolves
+them without qualification. Resolving a name from a scope walks `SelfAndAncestors()` outward: the
+first scope that declares the name binds it; a name declared more than once in a single scope is the
+ambiguous case above.
+
+> [!NOTE]
+> Still to come with the `ISymbolResolver` static-semantics pass: ordering referenced projects and
+> libraries by their `.rdproj` reference priority within the global scope (the ordering is already
+> carried on `IRuntimeSession.References`; nothing consults it yet), and reporting an ambiguous name
+> as a coded compile-time error rather than an unresolved lookup.
 
 
 ---

@@ -1,5 +1,4 @@
-﻿using RDCore.SDK.Model;
-using RDCore.SDK.Model.Symbols;
+﻿using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Runtime;
@@ -45,7 +44,7 @@ public interface IRuntimeSession
     /// exactly as the language server provides it; empty when the session was composed without a
     /// project (e.g. a bare REPL).
     /// </summary>
-    IReadOnlyList<ProjectReference> References { get; }
+    IReadOnlyList<ReferencePriorityInfo> References { get; }
 }
 
 /// <summary>
@@ -63,6 +62,12 @@ public interface ISessionSymbols
     /// Resolves <paramref name="name"/> visible from <paramref name="scope"/>.
     /// </summary>
     bool TryResolve(string name, Symbol scope, out Symbol? symbol);
+
+    /// <summary>
+    /// The compile-time read face over this table — resolves a name visible from a scope by walking
+    /// the scope tree the currently-defined symbols form. Tracks later <see cref="TryDefine"/> calls.
+    /// </summary>
+    ISymbolResolver Resolver { get; }
 }
 
 /// <summary>

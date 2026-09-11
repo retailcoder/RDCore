@@ -1,5 +1,4 @@
-﻿using RDCore.SDK.Model;
-using RDCore.SDK.Model.Symbols;
+﻿using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Runtime;
@@ -15,13 +14,13 @@ internal sealed class RuntimeSession(
     ISessionMemoryAllocator memory,
     ISessionSymbols symbols,
     ISessionObjects objects,
-    IReadOnlyList<ProjectReference> references) : IRuntimeSession
+    IReadOnlyList<ReferencePriorityInfo> references) : IRuntimeSession
 {
     public IRuntimeEnvironmentProfile Environment { get; init; } = environment;
     public ISessionMemoryAllocator Memory { get; init; } = memory;
     public ISessionSymbols Symbols { get; init; } = symbols;
     public ISessionObjects Objects { get; init; } = objects;
-    public IReadOnlyList<ProjectReference> References { get; init; } = references;
+    public IReadOnlyList<ReferencePriorityInfo> References { get; init; } = references;
 }
 
 internal sealed class SessionObjects : ISessionObjects
@@ -77,76 +76,40 @@ internal sealed class SessionObjects : ISessionObjects
 
 internal sealed class SessionSymbols : ISessionSymbols
 {
+    // one bucket per RD-VBAL §2.3.1.2 heap: global, workspace (module), instance, and the local
+    // frame. TryDefine keeps the first symbol of a colliding uri; the scope tree walks all four.
     private readonly HashSet<Symbol> _globalSymbols = [];
     private readonly HashSet<Symbol> _workspaceSymbols = [];
-    private readonly HashSet<Symbol> _staticLocalSymbols = [];
+    private readonly HashSet<Symbol> _instanceSymbols = [];
+    private readonly HashSet<Symbol> _localSymbols = [];
 
-    private readonly Dictionary<Uri, Symbol> _idMap = [];
-    private readonly Dictionary<string, string> _nameTable = [];
+    private ScopeTree? _scopeTree;
+    private ISymbolResolver? _resolver;
 
     public bool TryDefine(Symbol symbol, ScopeKind scope)
     {
-        _nameTable[symbol.Name.ToLowerInvariant()] = symbol.Name;
-        _idMap[symbol.Uri] = symbol;
+        _scopeTree = null;  // resolution rebuilds the tree, and the resolver over it, on next use
+        _resolver = null;
 
-        var symbolTable = scope switch
+        var table = scope switch
         {
-            ScopeKind.Global => _globalSymbols,
             ScopeKind.Module => _workspaceSymbols,
-            ScopeKind.Instance => _staticLocalSymbols,
-            _ => default
+            ScopeKind.Instance => _instanceSymbols,
+            ScopeKind.Local or ScopeKind.External => _localSymbols,
+            _ => _globalSymbols,
         };
-        return symbolTable?.Add(symbol) ?? false;
+        return table.Add(symbol);
     }
 
-    private bool IsAccessibleFrom(AccessibleTypedSymbol? symbol, Symbol scope)
-    {
-        if (symbol is null)
-        {
-            return false;
-        }
-
-        if (symbol.ParentUri == scope.Uri)
-        {
-            // local scope
-            return true;
-        }
-
-        var scopingParent = _idMap[scope.ParentUri];
-        if (scopingParent.Children.Any(c => c == symbol.Uri))
-        {
-            // same module
-            return true;
-        }
-
-        var scopingProject = _idMap[scopingParent.ParentUri];
-        if (scopingProject.Children.Any(c => c == symbol.Uri))
-        {
-            // same project
-            return symbol.AccessModifier != AccessModifier.Private;
-        }
-
-        if (_globalSymbols.Contains(symbol))
-        {
-            return symbol.AccessModifier != AccessModifier.Private;
-        }
-
-        return false;
-    }
+    public ISymbolResolver Resolver => _resolver ??= new ScopeTreeSymbolResolver(EnsureScopeTree());
 
     public bool TryResolve(string name, Symbol scope, out Symbol? symbol)
     {
-        symbol = FindCandidates(name, _staticLocalSymbols).SingleOrDefault(s => s.ParentUri == scope.Uri)
-            ?? FindCandidates(name, _workspaceSymbols).OfType<AccessibleTypedSymbol>()
-                .SingleOrDefault(s => IsAccessibleFrom(s, scope))
-            ?? FindCandidates(name, _globalSymbols).OfType<AccessibleTypedSymbol>()
-                .FirstOrDefault(s => IsAccessibleFrom(s, scope))
-            // precompiler constants, intrinsic globals, module symbols — not AccessibleTypedSymbol
-            ?? FindCandidates(name, _globalSymbols).FirstOrDefault()
-            ?? FindCandidates(name, _workspaceSymbols).FirstOrDefault();
-        return symbol != default;
+        symbol = Resolver.Resolve(name, ScopeKind.Unallocated, scope.Uri).Symbol;
+        return symbol is not null;
     }
 
-    private static Symbol[] FindCandidates(string name, HashSet<Symbol> symbolTable) 
-        => [.. symbolTable.Where(s => s.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase))];
+    private ScopeTree EnsureScopeTree()
+        => _scopeTree ??= ScopeTreeBuilder.Build(
+            [.. _globalSymbols, .. _workspaceSymbols, .. _instanceSymbols, .. _localSymbols]);
 }
