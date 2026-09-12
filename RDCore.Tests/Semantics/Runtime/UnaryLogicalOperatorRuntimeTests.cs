@@ -33,4 +33,18 @@ public sealed class UnaryLogicalOperatorRuntimeTests : OperatorLogicalRuntimeSem
     [TestCategory("MS-VBAL 5.6.9.8.1 'Not' Operator")]
     public void Not_LongLong()
         => AssertResult<VBLongLongValue>(Evaluate(Not(), VBLongLongType.TypeInfo, new VBLongLongValue(0)), -1L);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.8.1 'Not' Operator")]
+    public void Not_Byte()
+        => AssertResult<VBByteValue>(Evaluate(Not(), VBByteType.TypeInfo, new VBByteValue(0)), (byte)255);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.8.1 'Not' Operator")]
+    public void Not_Null_IsNull()
+    {
+        var result = Evaluate(Not(), VBNullType.TypeInfo, VBNullValue.Null);
+        Assert.IsNull(result.ErrorInfo);
+        Assert.IsInstanceOfType<VBNullValue>(result.Result);
+    }
 }
