@@ -25,9 +25,7 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
     : BinaryRelationalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
     protected override bool ComparisonOp(string lhs, string rhs, StringComparison comparison) => throw new NotSupportedException();
-    protected override bool ComparisonOp(double lhs, double rhs) => throw new NotSupportedException();
-    protected override bool ComparisonOp(decimal lhs, decimal rhs) => throw new NotSupportedException();
-    protected override bool ComparisonOp(long lhs, long rhs) => throw new NotSupportedException();
+    protected override bool ComparisonOp<T>(T lhs, T rhs) => throw new NotSupportedException();
 
     protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
         ISymbolResolver resolver,
@@ -44,24 +42,17 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
         var lhs = frame[InputIndex.BinaryLeftOperand];
         var rhs = frame[InputIndex.BinaryRightOperand];
 
-        // just to read like MS-VBAL: VBNothingValue is a VBObjectValue (similar w/ string & fixedString)
-        if (lhs is not VBObjectValue and not VBNothingValue)
+        // an operand is comparable by reference identity when it is currently bound to one — true of
+        // VBObjectValue/VBNothingValue always, and of a VBVariantValue currently holding an object.
+        if (lhs.RuntimeValue is not VBRuntimeReference lhsReference)
         {
             return OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
         }
-        if (rhs is not VBObjectValue and not VBNothingValue)
+        if (rhs.RuntimeValue is not VBRuntimeReference rhsReference)
         {
             return OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
         }
 
-        if (lhs.ResolvedSymbol != null && lhs is VBObjectValue or VBVariantValue &&
-            rhs.ResolvedSymbol != null && rhs is VBObjectValue or VBVariantValue)
-        {
-            return RuntimeSemanticsEvaluationResult.Success(
-                new VBBooleanValue(
-                    Equals(((VBRuntimeReference)lhs.RuntimeValue).Value.Value, ((VBRuntimeReference)rhs.RuntimeValue).Value.Value)));
-        }
-
-        return RuntimeSemanticsEvaluationResult.InternalError();
+        return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(Equals(lhsReference.Value.Value, rhsReference.Value.Value)));
     }
 }

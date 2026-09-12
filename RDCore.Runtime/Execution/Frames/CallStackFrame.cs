@@ -19,20 +19,21 @@ public record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol StaticSymbo
     public VBTypedValue this[Symbol symbol] => _localHeap[symbol];
 
     /// <summary>
-    /// Pushes a value onto this <em>stack frame</em>.
+    /// Pushes a value onto this <em>stack frame</em>, allocated under <paramref name="symbol"/>.
     /// </summary>
+    /// <param name="symbol">The local <see cref="Symbol"/> <paramref name="value"/> is allocated under.</param>
     /// <param name="value">A <see cref="VBTypedValue"/> to be allocated locally in this frame.</param>
-    public void Push(VBTypedValue value)
+    public void Push(Symbol symbol, VBTypedValue value)
     {
-        if (_localSymbols.Contains(value.ResolvedSymbol!))
+        if (_localSymbols.Contains(symbol))
         {
             // something went very wrong.
             throw new InvalidOperationException();
         }
-        _localSymbols.Push(value.ResolvedSymbol!);
+        _localSymbols.Push(symbol);
 
-        _localHeap[value.ResolvedSymbol!] = value;
-        _localSymbolTable[value.ResolvedSymbol!.Uri] = value.ResolvedSymbol;
+        _localHeap[symbol] = value;
+        _localSymbolTable[symbol.Uri] = symbol;
     }
 
     /// <summary>
