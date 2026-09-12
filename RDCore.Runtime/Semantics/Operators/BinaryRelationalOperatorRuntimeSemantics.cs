@@ -18,18 +18,22 @@ using RDCore.SDK.Semantics.Builders;
 using RDCore.SDK.Semantics.Context;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Services.VerboseMessages;
+using System.Numerics;
 
 namespace RDCore.Runtime.Semantics.Operators;
 
 public abstract record class BinaryRelationalOperatorRuntimeSemantics(
     ILetCoercionRuntimeSemanticsProvider LetCoercionSemanticsProvider,
-    IVerboseMessageBuilder FormatterService) 
+    IVerboseMessageBuilder FormatterService)
     : BinaryOperatorRuntimeSemantics<BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags>, ComparisonOperatorSemanticFlags>(LetCoercionSemanticsProvider, FormatterService)
 {
     protected abstract bool ComparisonOp(string lhs, string rhs, StringComparison comparison);
-    protected abstract bool ComparisonOp(decimal lhs, decimal rhs);
-    protected abstract bool ComparisonOp(double lhs, double rhs);
-    protected abstract bool ComparisonOp(long lhs, long rhs);
+
+    /// <summary>
+    /// Compares two operands already let-coerced to the same numeric effective type, in that type's
+    /// own CLR representation — generic math (<see cref="INumber{TSelf}"/>), no widening or boxing.
+    /// </summary>
+    protected abstract bool ComparisonOp<T>(T lhs, T rhs) where T : INumber<T>;
 
     protected override OperatorAnalysisContext<ComparisonOperatorSemanticFlags> CreateAnalysisContext(
         SyntaxNode node,
@@ -194,19 +198,29 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
         var lhs = frame.Operands[(int)InputIndex.BinaryLeftOperand];
         var rhs = frame.Operands[(int)InputIndex.BinaryRightOperand];
 
-        // operands have been let-coerced to the effective type by the pipeline; the comparison is
-        // exact in that type's own representation (Long is lossless for every integral effective type).
-        if (frame.EffectiveType is VBByteType or VBIntegerType or VBLongType or VBLongLongType)
+        // operands have been let-coerced to the effective type by the pipeline; each numeric
+        // effective type compares in its own CLR representation via generic math (INumber<T>) —
+        // no widening, no boxing through BoxedValue.
+        if (frame.EffectiveType is VBByteType)
         {
-            var result = ComparisonOp(
-                Convert.ToInt64(((VBNumericTypedValue)lhs).RuntimeValue.BoxedValue),
-                Convert.ToInt64(((VBNumericTypedValue)rhs).RuntimeValue.BoxedValue));
-            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(result));
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(((VBByteValue)lhs).Value, ((VBByteValue)rhs).Value)));
+        }
+        else if (frame.EffectiveType is VBIntegerType)
+        {
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(((VBIntegerValue)lhs).Value, ((VBIntegerValue)rhs).Value)));
+        }
+        else if (frame.EffectiveType is VBLongType)
+        {
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(((VBLongValue)lhs).Value, ((VBLongValue)rhs).Value)));
+        }
+        else if (frame.EffectiveType is VBLongLongType)
+        {
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(((VBLongLongValue)lhs).Value, ((VBLongLongValue)rhs).Value)));
         }
         else if (frame.EffectiveType is VBBooleanType)
         {
             // Boolean compares over its -1/0 representation (RD-VBAL §5.0.2.1, same convention the
-            // logical operators use); not a VBNumericTypedValue, so BoxedValue is read directly.
+            // logical operators use); bool is not itself an INumber<T>, so it widens to long.
             var result = ComparisonOp(
                 Convert.ToInt64(lhs.RuntimeValue.BoxedValue),
                 Convert.ToInt64(rhs.RuntimeValue.BoxedValue));
@@ -222,28 +236,34 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
         }
         else if (frame.EffectiveType is VBCurrencyType)
         {
-            var result = ComparisonOp(((VBCurrencyValue)lhs).Value.Value, ((VBCurrencyValue)rhs).Value.Value);
-            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(result));
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(((VBCurrencyValue)lhs).Value.Value, ((VBCurrencyValue)rhs).Value.Value)));
         }
         else if (frame.EffectiveType is VBDecimalType)
         {
-            var result = ComparisonOp(((VBDecimalValue)lhs).Value, ((VBDecimalValue)rhs).Value);
-            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(result));
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(((VBDecimalValue)lhs).Value, ((VBDecimalValue)rhs).Value)));
         }
-        else if (frame.EffectiveType is VBSingleType or VBDoubleType)
+        else if (frame.EffectiveType is VBSingleType)
         {
-            var lhsDouble = ((VBNumericTypedValue)lhs).AsDouble;
-            var rhsDouble = ((VBNumericTypedValue)rhs).AsDouble;
-            if (double.IsNaN(lhsDouble) || double.IsNaN(rhsDouble))
+            var lhsValue = ((VBSingleValue)lhs).Value;
+            var rhsValue = ((VBSingleValue)rhs).Value;
+            if (float.IsNaN(lhsValue) || float.IsNaN(rhsValue))
             {
                 return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.Overflow, expression,
                     Exceptions.LetCoercionRuntimeErrorExceptionOverflow_Verbose));
             }
-
-            var result = ComparisonOp(lhsDouble, rhsDouble);
-            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(result));
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(lhsValue, rhsValue)));
         }
-
+        else if (frame.EffectiveType is VBDoubleType)
+        {
+            var lhsValue = ((VBDoubleValue)lhs).Value;
+            var rhsValue = ((VBDoubleValue)rhs).Value;
+            if (double.IsNaN(lhsValue) || double.IsNaN(rhsValue))
+            {
+                return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.Overflow, expression,
+                    Exceptions.LetCoercionRuntimeErrorExceptionOverflow_Verbose));
+            }
+            return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(lhsValue, rhsValue)));
+        }
         else if (frame.EffectiveType is VBNullType)
         {
             return RuntimeSemanticsEvaluationResult.Success(VBNullValue.Null);
