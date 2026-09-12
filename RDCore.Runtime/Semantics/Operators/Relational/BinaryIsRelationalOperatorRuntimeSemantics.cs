@@ -47,11 +47,11 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
         // just to read like MS-VBAL: VBNothingValue is a VBObjectValue (similar w/ string & fixedString)
         if (lhs is not VBObjectValue and not VBNothingValue)
         {
-            OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
+            return OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
         }
         if (rhs is not VBObjectValue and not VBNothingValue)
         {
-            OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
+            return OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
         }
 
         if (lhs.ResolvedSymbol != null && lhs is VBObjectValue or VBVariantValue &&
