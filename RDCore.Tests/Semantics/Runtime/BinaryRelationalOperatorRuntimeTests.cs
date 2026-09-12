@@ -96,4 +96,41 @@ public sealed class BinaryRelationalOperatorRuntimeTests : OperatorRelationalRun
         Assert.IsNull(result.ErrorInfo);
         Assert.IsInstanceOfType<VBNullValue>(result.Result);
     }
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.1 Binary '=' Operator")]
+    public void Equal_String_True()
+        => AssertResult<VBBooleanValue>(Evaluate(Eq(), VBStringType.TypeInfo, new VBStringValue("abc"), new VBStringValue("abc")), true);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.1 Binary '=' Operator")]
+    public void Equal_String_CaseSensitive_False()
+        // Binary compare (this module's default, absent Option Compare Text) is case-sensitive.
+        => AssertResult<VBBooleanValue>(Evaluate(Eq(), VBStringType.TypeInfo, new VBStringValue("abc"), new VBStringValue("ABC")), false);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.3 Binary '<' Operator")]
+    public void LessThan_String_LexicographicallyBefore_True()
+        => AssertResult<VBBooleanValue>(Evaluate(Lt(), VBStringType.TypeInfo, new VBStringValue("abc"), new VBStringValue("abd")), true);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.2 Binary '<>' Operator")]
+    public void NotEqual_String_DifferentValues_True()
+        => AssertResult<VBBooleanValue>(Evaluate(Neq(), VBStringType.TypeInfo, new VBStringValue("abc"), new VBStringValue("xyz")), true);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.1 Binary '=' Operator")]
+    public void Equal_Boolean_SameValue_True()
+        => AssertResult<VBBooleanValue>(Evaluate(Eq(), VBBooleanType.TypeInfo, new VBBooleanValue(true), new VBBooleanValue(true)), true);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.1 Binary '=' Operator")]
+    public void Equal_Boolean_DifferentValues_False()
+        => AssertResult<VBBooleanValue>(Evaluate(Eq(), VBBooleanType.TypeInfo, new VBBooleanValue(true), new VBBooleanValue(false)), false);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.5.3 Binary '<' Operator")]
+    public void LessThan_Boolean_FalseIsGreaterThanTrue()
+        // Boolean compares over its -1 (True) / 0 (False) representation: True < False.
+        => AssertResult<VBBooleanValue>(Evaluate(Lt(), VBBooleanType.TypeInfo, new VBBooleanValue(true), new VBBooleanValue(false)), true);
 }
