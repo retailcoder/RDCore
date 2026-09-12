@@ -32,8 +32,7 @@ public interface IVBTypedValue<VBTValue, TValue> : IEquatable<IVBTypedValue<VBTV
 /// </remarks>
 /// <param name="TypeInfo">The <c>VBType</c> of the value.</param>
 [JsonConverter(typeof(VBTypedValueJsonConverter))]
-public abstract record class VBTypedValue(VBType TypeInfo) 
-    : VBRuntimeEntity(TypeInfo)
+public abstract record class VBTypedValue(VBType TypeInfo)
 {
     protected VBTypedValue(VBType typeInfo, VBRuntimeReference reference) : this(typeInfo)
     {
@@ -86,7 +85,7 @@ public abstract record class VBTypedValue(VBType TypeInfo)
     /// 👉 <see cref="IBindingHandle"/> is a <em>storage</em> concern, not <em>identity</em>: two typed
     /// values of the same type holding the same managed value are equal regardless of how (or whether)
     /// each is currently bound. Equality and hashing therefore key on the exact value type and this
-    /// managed value only — never on <see cref="Handle"/> (which is mutable) or <c>ResolvedSymbol</c>.
+    /// managed value only — never on <see cref="Handle"/>, which is mutable.
     /// </remarks>
     private object? BoundManagedValue
         => Handle.BindingCapabilities.HasFlag(BindingCapabilities.GetValue) ? Handle.Value.BoxedValue : null;
