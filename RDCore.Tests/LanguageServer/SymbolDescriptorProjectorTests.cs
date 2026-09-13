@@ -144,6 +144,35 @@ public sealed class SymbolDescriptorProjectorTests
             [new VBClassModuleSymbol(WorkspaceRoot, ModuleUri, "Whatever")], ModuleUri));
 
     [TestMethod]
+    public void ProcedureWithALocalVariable_DoesNotThrow_AndTheLocalIsNotProjectedAsAMember()
+        // regression: KindOf's throwing default (post-#204) had no arm for VBLocalVariableSymbol, so
+        // any procedure declaring a local Dim aborted projection for the whole module.
+    {
+        var descriptor = Project("""
+            Public Sub DoWork()
+                Dim total As Long
+            End Sub
+            """).Single();
+
+        Assert.AreEqual(SymbolDescriptorKind.Procedure, descriptor.Kind);
+        Assert.AreEqual(0, descriptor.Members.Length);
+    }
+
+    [TestMethod]
+    public void ProcedureWithALocalConstant_DoesNotThrow_AndTheLocalIsNotProjectedAsAMember()
+        // same regression, VBLocalConstantSymbol has no KindOf arm either.
+    {
+        var descriptor = Project("""
+            Public Sub DoWork()
+                Const Max As Long = 10
+            End Sub
+            """).Single();
+
+        Assert.AreEqual(SymbolDescriptorKind.Procedure, descriptor.Kind);
+        Assert.AreEqual(0, descriptor.Members.Length);
+    }
+
+    [TestMethod]
     public void ConditionalCompilation_ProjectsOneDescriptorCarryingEveryBranch()
     {
         var descriptors = Project("""
