@@ -30,4 +30,15 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
 
     public bool TryDeallocate(MemoryAddress address)
         => _handleByAddress.Remove(address) && allocator.TryDeallocate(address, out _);
+
+    public bool TryRebind(MemoryAddress address, IBindingHandle handle)
+    {
+        if (!_handleByAddress.ContainsKey(address))
+        {
+            return false;
+        }
+
+        _handleByAddress[address] = handle;
+        return true;
+    }
 }
