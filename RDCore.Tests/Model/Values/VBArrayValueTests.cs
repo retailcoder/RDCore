@@ -1,8 +1,13 @@
-﻿using RDCore.SDK.Model.Types;
+﻿using NSubstitute;
+using RDCore.Runtime.Execution;
+using RDCore.Runtime.Execution.Memory;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Runtime;
+using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.Shared;
 
 namespace RDCore.Tests.Model.Values;
 
@@ -136,4 +141,41 @@ public sealed class VBArrayValueTests
     }
 
     private static ValueBindingHandle Handle(int value) => new(new VBRuntimeValue<int>(value));
+
+    [TestMethod]
+    public void TryAllocateIn_BindsTheAllocatedAddressAsItsOwnValue_AndPreservesDerivedType()
+    {
+        var array = Fixed([(1, 3)], VBLongType.TypeInfo);
+        var storage = new SessionStorage(new SessionMemory(new(), PointerSize.x86));
+
+        Assert.IsTrue(array.TryAllocateIn(storage, out var allocated));
+
+        Assert.IsInstanceOfType<VBFixedSizeArrayValue>(allocated);
+        var address = ((VBRuntimeReference)allocated.RuntimeValue).Value;
+        Assert.IsTrue(storage.TryRead(address, out var bound));
+        Assert.AreSame(allocated.Handle, bound);
+    }
+
+    [TestMethod]
+    public void TryAllocateIn_KeepsTheSameCells()
+    {
+        var array = Fixed([(1, 3)], VBLongType.TypeInfo);
+        array.TrySetElement(Handle(42), 2);
+        var storage = new SessionStorage(new SessionMemory(new(), PointerSize.x86));
+
+        array.TryAllocateIn(storage, out var allocated);
+
+        Assert.AreEqual(42, ((VBLongValue)allocated![2]!).Value);
+    }
+
+    [TestMethod]
+    public void TryAllocateIn_OutOfMemory_ReturnsFalse()
+    {
+        var array = Fixed([(1, 3)], VBLongType.TypeInfo);
+        var storage = Substitute.For<ISessionStorage>();
+        storage.TryAllocate(Arg.Any<int>(), Arg.Any<IBindingHandle>(), out Arg.Any<MemoryAddress>()).Returns(false);
+
+        Assert.IsFalse(array.TryAllocateIn(storage, out var allocated));
+        Assert.IsNull(allocated);
+    }
 }

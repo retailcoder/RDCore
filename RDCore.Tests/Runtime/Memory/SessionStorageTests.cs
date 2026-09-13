@@ -64,4 +64,25 @@ public class SessionStorageTests
 
         Assert.IsFalse(sut.TryDeallocate(new MemoryAddress(42)));
     }
+
+    [TestMethod]
+    public void TryRebind_ReplacesTheBoundHandle()
+    {
+        var sut = new SessionStorage(new SessionMemory(new(), PointerSize.x86));
+        Assert.IsTrue(sut.TryAllocate(4, Handle(1), out var address));
+        var replacement = Handle(2);
+
+        Assert.IsTrue(sut.TryRebind(address, replacement));
+
+        Assert.IsTrue(sut.TryRead(address, out var bound));
+        Assert.AreSame(replacement, bound);
+    }
+
+    [TestMethod]
+    public void TryRebind_UnallocatedAddress_ReturnsFalse()
+    {
+        var sut = new SessionStorage(new SessionMemory(new(), PointerSize.x86));
+
+        Assert.IsFalse(sut.TryRebind(new MemoryAddress(42), Handle(1)));
+    }
 }

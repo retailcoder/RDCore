@@ -34,4 +34,12 @@ public interface ISessionStorage
     /// </summary>
     /// <returns><c>true</c> if a binding existed at <paramref name="address"/> and was released.</returns>
     bool TryDeallocate(MemoryAddress address);
+
+    /// <summary>
+    /// Replaces the <see cref="IBindingHandle"/> currently bound at <paramref name="address"/>, e.g. to
+    /// let a location-identified value (a UDT, an array) bind itself to the very address that was just
+    /// reserved for it.
+    /// </summary>
+    /// <returns><c>true</c> if <paramref name="address"/> was already allocated and its binding was replaced.</returns>
+    bool TryRebind(MemoryAddress address, IBindingHandle handle);
 }
