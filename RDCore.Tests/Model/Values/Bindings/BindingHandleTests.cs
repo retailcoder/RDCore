@@ -99,6 +99,59 @@ public sealed class BindingHandleTests
             new ReferenceBindingHandle(new VBRuntimeReference(new MemoryAddress(42))).GetValue(Resolver));
 
     [TestMethod]
+    public void ReferenceBindingHandle_GetValue_SelfReference_StopsInsteadOfOverflowing()
+        // VBA "Set x = x": x's own storage holds a reference to its own address.
+    {
+        var address = new MemoryAddress(1);
+        var sut = new ReferenceBindingHandle(new VBRuntimeReference(address));
+        var resolver = Substitute.For<ISymbolResolver>();
+        resolver.TryRead(address, out Arg.Any<IBindingHandle?>()).Returns(call =>
+        {
+            call[1] = sut;
+            return true;
+        });
+
+        var result = sut.GetValue(resolver);
+
+        Assert.AreEqual(new VBRuntimeReference(address), result);
+    }
+
+    [TestMethod]
+    public void ReferenceBindingHandle_GetValue_TwoCycle_StopsInsteadOfOverflowing()
+        // VBA "Set a = b : Set b = a": each variable's storage references the other's address.
+    {
+        var addressA = new MemoryAddress(1);
+        var addressB = new MemoryAddress(2);
+        var a = new ReferenceBindingHandle(new VBRuntimeReference(addressB));
+        var b = new ReferenceBindingHandle(new VBRuntimeReference(addressA));
+        var resolver = Substitute.For<ISymbolResolver>();
+        resolver.TryRead(addressA, out Arg.Any<IBindingHandle?>()).Returns(call => { call[1] = a; return true; });
+        resolver.TryRead(addressB, out Arg.Any<IBindingHandle?>()).Returns(call => { call[1] = b; return true; });
+
+        var result = a.GetValue(resolver);
+
+        Assert.AreEqual(new VBRuntimeReference(addressA), result);
+    }
+
+    [TestMethod]
+    public void ReferenceBindingHandle_GetValue_NonCyclicChain_StillFollowsThroughToTheFinalValue()
+        // a reference to a reference to a real value is not a cycle and must still resolve correctly.
+    {
+        var addressA = new MemoryAddress(1);
+        var addressB = new MemoryAddress(2);
+        var final = Substitute.For<IBindingHandle>();
+        final.GetValue(Arg.Any<ISymbolResolver>()).Returns(new VBRuntimeValue<int>(9));
+        var a = new ReferenceBindingHandle(new VBRuntimeReference(addressB));
+        var resolver = Substitute.For<ISymbolResolver>();
+        resolver.TryRead(addressA, out Arg.Any<IBindingHandle?>()).Returns(call => { call[1] = a; return true; });
+        resolver.TryRead(addressB, out Arg.Any<IBindingHandle?>()).Returns(call => { call[1] = final; return true; });
+
+        var result = new ReferenceBindingHandle(new VBRuntimeReference(addressA)).GetValue(resolver);
+
+        Assert.AreEqual(9, ((VBRuntimeValue<int>)result).StoredValue);
+    }
+
+    [TestMethod]
     public void ReferenceBindingHandle_SetValue_AcceptsAVBRuntimeReference()
     {
         var sut = new ReferenceBindingHandle(new VBRuntimeReference(new MemoryAddress(1)));

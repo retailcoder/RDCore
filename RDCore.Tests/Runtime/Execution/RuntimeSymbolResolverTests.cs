@@ -120,4 +120,44 @@ public sealed class RuntimeSymbolResolverTests
     [TestMethod]
     public void TryDeallocate_UnallocatedSymbol_ReturnsFalse()
         => Assert.IsFalse(Sut(out _, out _).TryDeallocate(Symbol("Foo")));
+
+    [TestMethod]
+    public void TryAllocate_SameSymbolTwice_FreesThePreviousBlock_NoLeakNoStaleRead()
+    {
+        var sut = Sut(out _, out var storage);
+        var symbol = Symbol("Foo");
+        var first = new VBLongValue(1);
+        var second = new VBLongValue(2);
+        Assert.IsTrue(sut.TryAllocate(symbol, first, out var firstAddress));
+
+        Assert.IsTrue(sut.TryAllocate(symbol, second, out var secondAddress));
+
+        Assert.AreSame(second.Handle, sut.GetValue(symbol));
+        // the first block was genuinely freed (not leaked): a same-size re-allocation reuses it
+        // immediately, per SessionMemory's free-list fast path (SessionMemoryTests.TryAllocate_ReusesFreeMemory).
+        Assert.AreEqual(firstAddress, secondAddress);
+        // and reading it returns the CURRENT handle, not a stale leftover from the first allocation.
+        Assert.IsTrue(storage.TryRead(secondAddress, out var bound));
+        Assert.AreSame(second.Handle, bound);
+    }
+
+    [TestMethod]
+    public void TryAllocate_SameSymbolTwice_OutOfMemoryOnSecondAllocation_RemovesTheMapping()
+    {
+        var names = Substitute.For<ISymbolResolver>();
+        var allocator = Substitute.For<ISessionMemoryAllocator>();
+        allocator.TryAllocate(Arg.Any<int>(), out Arg.Any<MemoryAddress>()).Returns(
+            call => { call[1] = new MemoryAddress(1); return true; },
+            call => { call[1] = default(MemoryAddress); return false; });
+        allocator.TryDeallocate(Arg.Any<MemoryAddress>(), out Arg.Any<SessionMemoryBlock>()).Returns(true);
+        var storage = new SessionStorage(allocator);
+        var sut = new RuntimeSymbolResolver(names, storage);
+        var symbol = Symbol("Foo");
+        Assert.IsTrue(sut.TryAllocate(symbol, new VBLongValue(1), out _));
+
+        Assert.IsFalse(sut.TryAllocate(symbol, new VBLongValue(2), out _));
+
+        // freed on the way to the failed re-allocation, and not left pointing at a freed block.
+        Assert.ThrowsExactly<KeyNotFoundException>(() => sut.GetValue(symbol));
+    }
 }
