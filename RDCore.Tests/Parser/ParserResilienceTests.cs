@@ -72,6 +72,19 @@ public sealed class ParserResilienceTests
     }
 
     [TestMethod]
+    public void SyntaxError_LocatesToTheZeroBasedPhysicalLine()
+        // regression: ErrorListener.SyntaxError passed ANTLR's 1-based line straight through, landing
+        // every diagnostic one line below the token that actually caused it.
+    {
+        var result = Parse("Option Explicit\r\nPublic Sub Foo(\r\n");
+
+        Assert.IsFalse(result.IsSuccess);
+        Assert.IsNotEmpty(result.SyntaxErrors);
+        // "Public Sub Foo(" is physical line 2 (1-based) -> zero-based line 1.
+        Assert.AreEqual(1, result.SyntaxErrors[0].Location.Range.Start.Line);
+    }
+
+    [TestMethod]
     // valid VBA the declaration pass used to reject — casing, culture, empty forms.
     [DataRow("public Sub Foo()\r\nEnd Sub", DisplayName = "lowercase visibility keyword")]
     [DataRow("PRIVATE Function F() As Long\r\nEnd Function", DisplayName = "uppercase visibility keyword")]
