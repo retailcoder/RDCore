@@ -38,7 +38,8 @@ public sealed class RuntimeSymbolResolver(ISymbolResolver names, ISessionStorage
     /// <summary>
     /// Reserves storage sized for <paramref name="value"/> and binds it to <paramref name="symbol"/>,
     /// reachable afterwards through both <see cref="GetValue"/> (by symbol) and <see cref="TryRead"/>
-    /// (by <paramref name="address"/>).
+    /// (by <paramref name="address"/>). A symbol already allocated has its previous storage freed
+    /// first, so re-allocating never leaks the old block or leaves it readable with a stale handle.
     /// </summary>
     /// <returns>
     /// <c>false</c> if the session's memory space is exhausted; the caller is responsible for reporting
@@ -47,8 +48,14 @@ public sealed class RuntimeSymbolResolver(ISymbolResolver names, ISessionStorage
     /// </returns>
     public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address)
     {
+        if (_addressBySymbol.TryGetValue(symbol.SemanticId, out var previous))
+        {
+            storage.TryDeallocate(previous);
+        }
+
         if (!storage.TryAllocate(value.Size, value.Handle, out address))
         {
+            _addressBySymbol.Remove(symbol.SemanticId);
             return false;
         }
 

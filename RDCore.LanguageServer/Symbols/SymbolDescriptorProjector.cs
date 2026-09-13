@@ -52,10 +52,16 @@ internal static class SymbolDescriptorProjector
             SelectionRange = accessible?.SelectionRange ?? default,
             Definitions = DefinitionsOf(symbol),
             Parameters = ParametersOf(symbol),
-            Members = [.. children.Select(child => Describe(child, KindOf(child), []))],
+            Members = [.. children.Where(IsNestableMember).Select(child => Describe(child, KindOf(child), []))],
             External = ExternalOf(symbol),
         };
     }
+
+    // only Enum constants and UDT fields are meant to nest under their owner (see this class's own
+    // remarks); a procedure's locals (VBLocalVariableSymbol/VBLocalConstantSymbol) share the same
+    // childrenByParent lookup by virtue of their ParentUri, but were never meant to project into the
+    // descriptor tree — KindOf has no arm for them, and none is wanted here.
+    private static bool IsNestableMember(Symbol symbol) => symbol is VBEnumConstMemberSymbol or VBUserDefinedTypeFieldSymbol;
 
     // carried only for a multi-branch symbol; the common single-declaration descriptor stays lean and
     // consumers read Range/SelectionRange.
