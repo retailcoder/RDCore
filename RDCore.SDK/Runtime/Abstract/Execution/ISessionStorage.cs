@@ -5,7 +5,11 @@ using System.Diagnostics.CodeAnalysis;
 namespace RDCore.SDK.Runtime.Abstract.Execution;
 
 /// <summary>
-/// Holds the actual <see cref="IBindingHandle"/> bound at each address in a session's memory space.
+/// Holds the actual value bound at each address in a session's memory space, as either a typed
+/// <see cref="IBindingHandle"/> or, for the handful of MS-VBAL constructs that operate on raw storage
+/// (<c>LSet</c> between two UDT variables; MS-VBAL only ever allows this and the already-value-level
+/// fixed-length <c>String</c> form), a plain byte buffer. An address is one kind or the other, never
+/// both.
 /// </summary>
 /// <remarks>
 /// <see cref="ISessionMemoryAllocator"/> deliberately does not cover this: it only accounts for
@@ -42,4 +46,24 @@ public interface ISessionStorage
     /// </summary>
     /// <returns><c>true</c> if <paramref name="address"/> was already allocated and its binding was replaced.</returns>
     bool TryRebind(MemoryAddress address, IBindingHandle handle);
+
+    /// <summary>
+    /// Reserves <paramref name="size"/> bytes through the underlying <see cref="ISessionMemoryAllocator"/>
+    /// as a raw byte buffer, zero-initialized, at the resulting address.
+    /// </summary>
+    /// <returns><c>false</c> if the underlying memory space is exhausted.</returns>
+    bool TryAllocateBytes(int size, out MemoryAddress address);
+
+    /// <summary>
+    /// Gets a copy of the byte buffer at <paramref name="address"/>.
+    /// </summary>
+    /// <returns><c>false</c> if <paramref name="address"/> is not a byte-backed allocation.</returns>
+    bool TryReadBytes(MemoryAddress address, [NotNullWhen(true)][MaybeNullWhen(false)] out byte[]? bytes);
+
+    /// <summary>
+    /// Replaces the byte buffer at <paramref name="address"/> with a copy of <paramref name="bytes"/>.
+    /// The new buffer's length need not match the original allocation's.
+    /// </summary>
+    /// <returns><c>false</c> if <paramref name="address"/> is not a byte-backed allocation.</returns>
+    bool TryWriteBytes(MemoryAddress address, ReadOnlySpan<byte> bytes);
 }
