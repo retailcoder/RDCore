@@ -23,14 +23,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Antlr4" Version="4.6.6">
+    <PackageReference Include="Antlr4BuildTasks" Version="12.14.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Antlr4.Runtime" Version="4.6.6" />
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Antlr4 Include="Syntax\*.g4" />
   </ItemGroup>
 
   <ItemGroup>
