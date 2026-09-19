@@ -421,8 +421,7 @@ public sealed class LetCoercionAnalysisTests : LetCoercionRuntimeSemanticsTests
     [TestMethod]
     [Ignore("DateSerial is documented as 'a DateSerial conversion from a Date' but is never issued: only the Date strategy has that " +
         "logic, and the provider dispatches by destination type, so a Date coerced to a numeric type is the numeric strategy's, " +
-        "which does not flag it. The Date strategy's own Date-source branches are unreachable. Conversions should be able to issue it; " +
-        "kept noted until that is picked up.")]
+        "which does not flag it, and the Date strategy's own Date-source branches are never reached. A conversion should be able to issue it.")]
     public void ADateToANumericType_IsADateSerialConversion()
         => Assert.IsTrue(Analyze(new VBDateValue(2), VBLongType.TypeInfo).Flags.HasFlag(ConversionSemanticFlags.DateSerial));
 

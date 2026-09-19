@@ -197,7 +197,7 @@ public sealed class ConversionOperatorAnalysisTests : LetCoercionRuntimeSemantic
         => Assert.IsFalse(Coerce(new VBLongValue(5), VBDoubleType.TypeInfo).Flags.HasFlag(ConversionSemanticFlags.Implicit));
 
     [TestMethod]
-    public void ARedundantExplicitLetCoercion_IsStillExplicit_AndConvertsNothing()
+    public void ARedundantExplicitLetCoercion_IsExplicit_AndConvertsNothing()
         => Assert.AreEqual(
             Coerced | ConversionSemanticFlags.Explicit | ConversionSemanticFlags.BinaryLeftOperand,
             Coerce(new VBLongValue(5), VBLongType.TypeInfo).Flags);
