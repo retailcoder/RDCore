@@ -172,7 +172,7 @@ public sealed class CallableBindingHandleTests
     }
 
     [TestMethod]
-    public void Invoke_OfAProcedureThatRaisedAnErrorAndStillHasAValue_ThrowsTheError()
+    public void Invoke_OfAProcedureThatRaisedAnErrorAlongWithAValue_ThrowsTheError()
     {
         var invoker = Substitute.For<IProcedureInvoker>();
         invoker.Invoke(default!, default!, default!).ReturnsForAnyArgs(RuntimeSemanticsEvaluationResult.Error(Error(), new VBLongValue(1)));

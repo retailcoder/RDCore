@@ -13,9 +13,6 @@ namespace RDCore.SDK.Runtime.Abstract.Execution;
 /// it takes an activation of the procedure, a <see cref="ICallStackFrame"/> pushed on the session's call stack, and the executor that
 /// steps through the procedure's statements. An invoker is what a runtime provides for that, once, for the procedures of a session.
 /// </para>
-/// <para>
-/// ⚖️<strong>RDCore</strong> provides an implementation of this interface <strong>licensed under GPLv3</strong>.
-/// </para>
 /// </remarks>
 public interface IProcedureInvoker
 {

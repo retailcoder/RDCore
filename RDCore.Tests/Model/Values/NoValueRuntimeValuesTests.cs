@@ -62,10 +62,10 @@ public sealed class NoValueRuntimeValuesTests
 
     #endregion
 
-    #region what they still are to the language
+    #region what they are to the language
 
     [TestMethod]
-    public void TheSemanticSurface_IsUnchanged()
+    public void TheSemanticSurface_IsThatOfTheLanguageValues()
     {
         Assert.AreEqual(VBNullType.TypeInfo, VBNullValue.Null.TypeInfo);
         Assert.AreEqual(VBEmptyType.TypeInfo, VBEmptyValue.Empty.TypeInfo);
@@ -75,11 +75,11 @@ public sealed class NoValueRuntimeValuesTests
     }
 
     [TestMethod]
-    public void TwoNullValues_AreEqual_AsTheyAlwaysWere()
+    public void TwoNullValues_AreEqual()
         => Assert.AreEqual(VBNullValue.Null, new VBNullValue());
 
     [TestMethod]
-    public void TwoEmptyValues_AreEqual_AsTheyAlwaysWere()
+    public void TwoEmptyValues_AreEqual()
         => Assert.AreEqual(VBEmptyValue.Empty, new VBEmptyValue());
 
     [TestMethod]
@@ -87,7 +87,7 @@ public sealed class NoValueRuntimeValuesTests
         => Assert.AreNotEqual<object>(VBNullValue.Null, VBEmptyValue.Empty);
 
     [TestMethod]
-    public void AValueCanStillBeGivenAnotherHandle()
+    public void AValueCanBeGivenAnotherHandle()
     {
         var handle = new ConstantBindingHandle(new VBRuntimeNullValue());
 
@@ -125,7 +125,7 @@ public sealed class NoValueRuntimeValuesTests
     }
 
     [TestMethod]
-    public void ACodeThatIsNotNegativeButNotZero_IsStillASuccess()
+    public void ACodeThatIsNotNegativeButNotZero_IsASuccess()
         => Assert.IsTrue(new VBRuntimeHResult(1).IsSuccess, "S_FALSE");
 
     [TestMethod]

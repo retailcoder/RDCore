@@ -74,9 +74,7 @@ public interface IBindingHandle
     /// </summary>
     /// <remarks>
     /// 👉 Verify that the binding supports <see cref="BindingCapabilities.Invoke"/>.<br/>
-    /// A binding to code that runs on a call stack (<see cref="CallableBindingHandle"/>) does not push the frame itself: it hands the call to
-    /// the <see cref="IProcedureInvoker"/> of the execution engine, and offers a non-throwing alternative to this method for the
-    /// errors of the running program.
+    /// A handle to code that runs on a call stack does not push the frame itself: it hands the call to an <see cref="IProcedureInvoker"/>.
     /// </remarks>
     /// <exception cref="NotSupportedException">The binding does not support <see cref="BindingCapabilities.Invoke"/>.</exception>
     /// <exception cref="Errors.VBRuntimeErrorException">A run-time error was raised by the invoked entity and nothing handled it.</exception>
