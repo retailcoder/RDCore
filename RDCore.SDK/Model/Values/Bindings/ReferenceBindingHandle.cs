@@ -45,5 +45,5 @@ public record class ReferenceBindingHandle : IBindingHandle
     public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => _value = value is VBRuntimeReference reference
         ? reference : throw new ArgumentException($"Expected {nameof(VBRuntimeReference)} value", nameof(value));
 
-    public VBTypedValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
+    public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 }

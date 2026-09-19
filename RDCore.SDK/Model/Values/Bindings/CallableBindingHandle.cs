@@ -1,6 +1,5 @@
 ﻿using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols.Abstract;
-using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -43,16 +42,17 @@ public record class CallableBindingHandle(VBTypeMemberSymbol Procedure, IProcedu
         => Invoker.Invoke(Procedure, resolver, Receiver is null ? args : [Receiver, .. args]);
 
     /// <summary>
-    /// Invokes the procedure and returns the value it returns - the <c>Void</c> value, for a <c>Sub</c>.
+    /// Invokes the procedure and returns the runtime value it returns - the <c>HRESULT</c> <c>S_OK</c>, for a <c>Sub</c>.
     /// </summary>
     /// <param name="resolver">A read-only interface over the current execution context.</param>
     /// <param name="args">The arguments of the call, without the <c>Me</c> of a member of a class, which the handle passes itself.</param>
     /// <remarks>
-    /// 👉 A caller that handles the errors of the program uses <see cref="Call"/>, which returns them instead of throwing.
+    /// 👉 A caller that handles the errors of the program, or needs the <em>typed</em> value of the call, uses <see cref="Call"/>, which
+    /// returns them instead of throwing.
     /// </remarks>
     /// <exception cref="VBRuntimeErrorException">A run-time error was raised in the procedure and nothing handled it.</exception>
     /// <exception cref="InvalidOperationException">The invoker could not run the procedure, and has no error to say why.</exception>
-    public VBTypedValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args)
+    public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args)
     {
         var result = Call(resolver, args);
         if (result.ErrorInfo is { } error)
@@ -60,7 +60,7 @@ public record class CallableBindingHandle(VBTypeMemberSymbol Procedure, IProcedu
             throw new VBRuntimeErrorException(error);
         }
 
-        return result.Result
+        return result.Result?.RuntimeValue
             ?? throw new InvalidOperationException($"The invocation of '{Procedure.Name}' yielded neither a value nor an error.");
     }
 

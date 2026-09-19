@@ -70,7 +70,7 @@ public interface IBindingHandle
     /// <exception cref="NotSupportedException"></exception>
     void SetValue(ISymbolResolver resolver, IRuntimeValue value);
     /// <summary>
-    /// Invokes the callable entity associated to this handle, and returns the value it yields - the <c>Void</c> value, for one that yields none.
+    /// Invokes the callable entity associated to this handle, and returns the runtime value it yields - an <c>HRESULT</c> (<c>S_OK</c>), for one that yields no value.
     /// </summary>
     /// <remarks>
     /// 👉 Verify that the binding supports <see cref="BindingCapabilities.Invoke"/>.<br/>
@@ -80,7 +80,7 @@ public interface IBindingHandle
     /// </remarks>
     /// <exception cref="NotSupportedException">The binding does not support <see cref="BindingCapabilities.Invoke"/>.</exception>
     /// <exception cref="Errors.VBRuntimeErrorException">A run-time error was raised by the invoked entity and nothing handled it.</exception>
-    VBTypedValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args);
+    IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args);
 
     /// <summary>
     /// The bound runtime value, read without a resolver.

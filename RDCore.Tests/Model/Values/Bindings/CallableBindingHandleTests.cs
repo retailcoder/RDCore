@@ -128,33 +128,34 @@ public sealed class CallableBindingHandleTests
     }
 
     [TestMethod]
-    public void Invoke_ReturnsTheValueTheProcedureReturned()
+    public void Invoke_ReturnsTheRuntimeValueTheProcedureReturned()
     {
         var invoker = Substitute.For<IProcedureInvoker>();
-        var returned = new VBLongValue(7);
-        invoker.Invoke(default!, default!, default!).ReturnsForAnyArgs(RuntimeSemanticsEvaluationResult.Success(returned));
+        invoker.Invoke(default!, default!, default!).ReturnsForAnyArgs(RuntimeSemanticsEvaluationResult.Success(new VBLongValue(7)));
 
         var value = new CallableBindingHandle(Sub("Compute"), invoker).Invoke(Resolver, [Number(1)]);
 
-        Assert.AreSame(returned, value);
+        Assert.AreEqual(7, value.BoxedValue);
     }
 
     [TestMethod]
-    public void Invoke_OfASub_YieldsTheVoidValue()
-        => Assert.AreSame(VBVoidValue.Void, Handle().Handle.Invoke(Resolver, []));
+    public void Invoke_OfASub_YieldsTheHResultUnderTheVoidValue_S_OK()
+        => Assert.AreEqual<object>(VBRuntimeHResult.Ok, Handle().Handle.Invoke(Resolver, []));
 
     [TestMethod]
-    [DataRow("Null")]
-    [DataRow("Empty")]
-    public void Invoke_OfAFunctionThatReturnsAValueOfNoRuntimeRepresentation_StillYieldsIt(string returns)
+    public void Invoke_OfAFunctionThatReturnsNull_YieldsTheRuntimeValueOfNull()
+        => Assert.IsInstanceOfType<VBRuntimeNullValue>(ReturnedBy(VBNullValue.Null));
+
+    [TestMethod]
+    public void Invoke_OfAFunctionThatReturnsEmpty_YieldsTheRuntimeValueOfEmpty()
+        => Assert.IsInstanceOfType<VBRuntimeEmptyValue>(ReturnedBy(VBEmptyValue.Empty));
+
+    private static IRuntimeValue ReturnedBy(VBTypedValue returned)
     {
-        // Null and Empty carry no runtime value of their own (their handle is not a valid binding): a call that returned one is the reason
-        // the value a call yields is a typed value, not a runtime value.
-        VBTypedValue returned = returns == "Null" ? VBNullValue.Null : VBEmptyValue.Empty;
         var invoker = Substitute.For<IProcedureInvoker>();
         invoker.Invoke(default!, default!, default!).ReturnsForAnyArgs(RuntimeSemanticsEvaluationResult.Success(returned));
 
-        Assert.AreSame(returned, new CallableBindingHandle(Sub("Compute"), invoker).Invoke(Resolver, []));
+        return new CallableBindingHandle(Sub("Compute"), invoker).Invoke(Resolver, []);
     }
 
     [TestMethod]

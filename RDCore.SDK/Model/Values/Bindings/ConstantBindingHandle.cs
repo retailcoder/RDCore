@@ -24,5 +24,5 @@ public record class ConstantBindingHandle : IBindingHandle
 
     public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => throw new NotSupportedException();
 
-    public VBTypedValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
+    public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 }
