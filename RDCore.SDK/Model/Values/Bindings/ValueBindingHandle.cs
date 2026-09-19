@@ -1,4 +1,5 @@
 ﻿using RDCore.SDK.Model.Values.Runtime;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
 
 namespace RDCore.SDK.Model.Values.Bindings;
@@ -23,5 +24,5 @@ public record class ValueBindingHandle : IBindingHandle
 
     public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => _value = value;
 
-    public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
+    public VBTypedValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 }

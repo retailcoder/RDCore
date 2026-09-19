@@ -70,15 +70,17 @@ public interface IBindingHandle
     /// <exception cref="NotSupportedException"></exception>
     void SetValue(ISymbolResolver resolver, IRuntimeValue value);
     /// <summary>
-    /// Invokes the callable entity associated to this handle.
+    /// Invokes the callable entity associated to this handle, and returns the value it yields - the <c>Void</c> value, for one that yields none.
     /// </summary>
     /// <remarks>
-    /// 👉 Verify that the binding supports <see cref="BindingCapabilities.Invoke"/>.
+    /// 👉 Verify that the binding supports <see cref="BindingCapabilities.Invoke"/>.<br/>
+    /// A binding to code that runs on a call stack (<see cref="CallableBindingHandle"/>) does not push the frame itself: it hands the call to
+    /// the <see cref="IProcedureInvoker"/> of the execution engine, and offers a non-throwing alternative to this method for the
+    /// errors of the running program.
     /// </remarks>
-    /// <exception cref="NotSupportedException"></exception>
-    // TODO an invocable binding also needs call-stack access to push a frame — that likely belongs on
-    // a dedicated callable abstraction, not on every IBindingHandle.
-    IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args);
+    /// <exception cref="NotSupportedException">The binding does not support <see cref="BindingCapabilities.Invoke"/>.</exception>
+    /// <exception cref="Errors.VBRuntimeErrorException">A run-time error was raised by the invoked entity and nothing handled it.</exception>
+    VBTypedValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args);
 
     /// <summary>
     /// The bound runtime value, read without a resolver.
