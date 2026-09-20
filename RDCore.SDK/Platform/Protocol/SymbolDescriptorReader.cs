@@ -1,4 +1,3 @@
-using RDCore.SDK.Model;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
@@ -57,7 +56,7 @@ public static class SymbolDescriptorReader
     // primary site the ctor already set.
     private static Symbol WithDefinitions(Symbol symbol, SymbolDescriptor descriptor)
     {
-        if (descriptor.Definitions.Length <= 1 || symbol is not BoundSymbol bound)
+        if (descriptor.Definitions.Length <= 1 || symbol is not WorkspaceSymbol bound)
         {
             return symbol;
         }
@@ -77,105 +76,105 @@ public static class SymbolDescriptorReader
         switch (node.Kind)
         {
             case SymbolDescriptorKind.Procedure:
-            {
-                var symbol = new VBProcedureMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Procedure,
-                    VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return symbol with { Parameters = Parameters(symbol.Uri) };
-                break;
-            }
-            case SymbolDescriptorKind.Function:
-            {
-                var symbol = new VBFunctionMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Function,
-                    Declared(node.DeclaredTypeName), node.Range, node.SelectionRange, node.AccessModifier);
-                yield return symbol with { Parameters = Parameters(symbol.Uri) };
-                break;
-            }
-            case SymbolDescriptorKind.PropertyGet:
-            {
-                var symbol = new VBPropertyGetMemberSymbol(
-                    workspaceRoot, parentUri, node.Scope, node.Name, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return symbol with
                 {
-                    ResolvedType = Declared(node.DeclaredTypeName),
-                    Parameters = Parameters(symbol.Uri),
-                };
-                break;
-            }
+                    var symbol = new VBProcedureMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Procedure,
+                        VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return symbol with { Parameters = Parameters(symbol.Uri) };
+                    break;
+                }
+            case SymbolDescriptorKind.Function:
+                {
+                    var symbol = new VBFunctionMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Function,
+                        Declared(node.DeclaredTypeName), node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return symbol with { Parameters = Parameters(symbol.Uri) };
+                    break;
+                }
+            case SymbolDescriptorKind.PropertyGet:
+                {
+                    var symbol = new VBPropertyGetMemberSymbol(
+                        workspaceRoot, parentUri, node.Scope, node.Name, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return symbol with
+                    {
+                        ResolvedType = Declared(node.DeclaredTypeName),
+                        Parameters = Parameters(symbol.Uri),
+                    };
+                    break;
+                }
             case SymbolDescriptorKind.PropertyLet:
-            {
-                var symbol = new VBPropertyLetMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Property,
-                    VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return symbol with { Parameters = Parameters(symbol.Uri) };
-                break;
-            }
+                {
+                    var symbol = new VBPropertyLetMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Property,
+                        VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return symbol with { Parameters = Parameters(symbol.Uri) };
+                    break;
+                }
             case SymbolDescriptorKind.PropertySet:
-            {
-                var symbol = new VBPropertySetMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Property,
-                    VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return symbol with { Parameters = Parameters(symbol.Uri) };
-                break;
-            }
+                {
+                    var symbol = new VBPropertySetMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Property,
+                        VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return symbol with { Parameters = Parameters(symbol.Uri) };
+                    break;
+                }
             case SymbolDescriptorKind.ExternalProcedure:
-            {
-                var external = node.External ?? new ExternalDescriptor();
-                var symbol = new VBExternalSubMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Procedure,
-                    VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier,
-                    external.IsPtrSafe, external.Library, external.Alias);
-                yield return symbol with { Parameters = Parameters(symbol.Uri) };
-                break;
-            }
+                {
+                    var external = node.External ?? new ExternalDescriptor();
+                    var symbol = new VBExternalSubMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Procedure,
+                        VBVoidType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier,
+                        external.IsPtrSafe, external.Library, external.Alias);
+                    yield return symbol with { Parameters = Parameters(symbol.Uri) };
+                    break;
+                }
             case SymbolDescriptorKind.ExternalFunction:
-            {
-                var external = node.External ?? new ExternalDescriptor();
-                var symbol = new VBExternalFunctionMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Function,
-                    Declared(node.DeclaredTypeName), node.Range, node.SelectionRange, node.AccessModifier,
-                    external.IsPtrSafe, external.Library, external.Alias);
-                yield return symbol with { Parameters = Parameters(symbol.Uri) };
-                break;
-            }
+                {
+                    var external = node.External ?? new ExternalDescriptor();
+                    var symbol = new VBExternalFunctionMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Function,
+                        Declared(node.DeclaredTypeName), node.Range, node.SelectionRange, node.AccessModifier,
+                        external.IsPtrSafe, external.Library, external.Alias);
+                    yield return symbol with { Parameters = Parameters(symbol.Uri) };
+                    break;
+                }
             case SymbolDescriptorKind.Event:
-            {
-                var evt = new VBEventMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return evt with { Parameters = Parameters(evt.Uri) };
-                break;
-            }
+                {
+                    var evt = new VBEventMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return evt with { Parameters = Parameters(evt.Uri) };
+                    break;
+                }
 
             case SymbolDescriptorKind.UserDefinedType:
-            {
-                var udt = new VBUserDefinedTypeMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return udt;
-                foreach (var field in node.Members.Where(m => m.Kind == SymbolDescriptorKind.UserDefinedTypeField))
                 {
-                    yield return ReadUserDefinedTypeField(field, workspaceRoot, udt.Uri, resolveType);
+                    var udt = new VBUserDefinedTypeMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return udt;
+                    foreach (var field in node.Members.Where(m => m.Kind == SymbolDescriptorKind.UserDefinedTypeField))
+                    {
+                        yield return ReadUserDefinedTypeField(field, workspaceRoot, udt.Uri, resolveType);
+                    }
+                    break;
                 }
-                break;
-            }
             case SymbolDescriptorKind.UserDefinedTypeField:
                 yield return ReadUserDefinedTypeField(node, workspaceRoot, parentUri, resolveType);
                 break;
 
             case SymbolDescriptorKind.Enum:
-            {
-                var enumSymbol = new VBEnumMemberSymbol(
-                    workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Enum,
-                    VBUnknownType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
-                yield return enumSymbol;
-                foreach (var member in node.Members.Where(m => m.Kind == SymbolDescriptorKind.EnumMember))
                 {
-                    yield return new VBEnumConstMemberSymbol(
-                        workspaceRoot, enumSymbol.Uri, member.Name, member.Scope, SymbolKindExt.EnumMember,
-                        member.Range, member.SelectionRange);
+                    var enumSymbol = new VBEnumMemberSymbol(
+                        workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.Enum,
+                        VBUnknownType.TypeInfo, node.Range, node.SelectionRange, node.AccessModifier);
+                    yield return enumSymbol;
+                    foreach (var member in node.Members.Where(m => m.Kind == SymbolDescriptorKind.EnumMember))
+                    {
+                        yield return new VBEnumConstMemberSymbol(
+                            workspaceRoot, enumSymbol.Uri, member.Name, member.Scope, SymbolKindExt.EnumMember,
+                            member.Range, member.SelectionRange);
+                    }
+                    break;
                 }
-                break;
-            }
             case SymbolDescriptorKind.EnumMember:
                 yield return new VBEnumConstMemberSymbol(
                     workspaceRoot, parentUri, node.Name, node.Scope, SymbolKindExt.EnumMember,
@@ -196,7 +195,7 @@ public static class SymbolDescriptorReader
         }
     }
 
-    private static Symbol ReadUserDefinedTypeField(
+    private static VBUserDefinedTypeFieldSymbol ReadUserDefinedTypeField(
         SymbolDescriptor field, Uri workspaceRoot, Uri userDefinedTypeUri, Func<string, VBType?> resolveType)
     {
         var type = field.DeclaredTypeName is not null && resolveType(field.DeclaredTypeName) is { } resolved

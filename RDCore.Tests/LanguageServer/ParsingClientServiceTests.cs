@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using RDCore.LanguageServer;
@@ -10,6 +11,7 @@ using RDCore.SDK.Client;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Server.Configuration;
 
 namespace RDCore.Tests.LanguageServer;
 
@@ -31,8 +33,9 @@ public sealed class ParsingClientServiceTests
         orchestration.ParsingService.Returns(parser);
 
         var documents = Substitute.For<IWorkspaceDocumentService>();
+        var options = Substitute.For<IOptions<SdkServerOptions>>();
 
-        return (new ParsingClientService(orchestration, documents, NullLogger<ParsingClientService>.Instance), parser, documents);
+        return (new ParsingClientService(options, orchestration, documents, NullLogger<ParsingClientService>.Instance), parser, documents);
     }
 
     // NSubstitute's out-parameter support: the callback writes the out value via the call's argument index.
@@ -158,6 +161,6 @@ public sealed class ParsingClientServiceTests
         var result = PlatformJsonEnvelope.Of(original).Unwrap<ModuleParseResult>();
 
         Assert.IsTrue(result.IsSuccess);
-        Assert.AreEqual(original.SyntaxTree!.Children.Length, result.SyntaxTree!.Children.Length);
+        Assert.HasCount(original.SyntaxTree!.Children.Length, result.SyntaxTree!.Children);
     }
 }

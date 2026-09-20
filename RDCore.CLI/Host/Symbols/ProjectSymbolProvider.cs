@@ -33,7 +33,7 @@ public sealed class ProjectSymbolProvider(Uri workspaceRoot, RDCoreProject proje
 
             // kind is the source's business: a VERSION header makes it a class/designer module.
             // .doccls modules carry no VBE header and are out of scope for now.
-            yield return ModuleHeader.IsClassModule(source) ?? false
+            yield return ModuleHeader.IsClassModule(source)
                 ? new VBClassModuleSymbol(workspaceRoot, workspaceRoot, name)
                 : new VBStandardModuleSymbol(workspaceRoot, workspaceRoot, name);
         }

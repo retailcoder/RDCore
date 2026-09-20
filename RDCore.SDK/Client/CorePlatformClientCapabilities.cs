@@ -1,5 +1,4 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Serialization;
+﻿using OmniSharp.Extensions.LanguageServer.Protocol.Serialization;
 using System.Text.Json.Serialization;
 
 namespace RDCore.SDK.Client;
@@ -31,6 +30,10 @@ public class ParserCapabilities
     /// If supported, enables the language server to request a parse result containing the full syntax tree of a specified workspace document.
     /// </summary>
     public ParseFullDocument ParseFullDocument { get; set; } = new();
+    /// <summary>
+    /// If supported, enables the language server to request a parse result containing a partial syntax tree for a fragment at a specific document location.
+    /// </summary>
+    public ParseFragment ParseFragment { get; set; } = new();
 }
 
 /// <summary>
@@ -50,6 +53,10 @@ public static class RDCorePlatformProtocol
     /// Requests an AST from the parser for a full document.
     /// </summary>
     public const string ParseFullDocument = "rdcore/parser/document";
+    /// <summary>
+    /// Request an AST from the parser for a fragment at a specific document location.
+    /// </summary>
+    public const string ParseFragment = "rdcore/parser/fragment";
 
     /// <summary>
     /// Sends a module's member symbol descriptors to the environment host to define in its runtime session.
@@ -62,6 +69,7 @@ public static class RDCorePlatformProtocol
     public const string DiagnoseDocument = "rdcore/diagnostics/document";
 }
 
+[JsonDerivedType(typeof(ParseFragment))]
 [JsonDerivedType(typeof(ParseFullDocument))]
 [JsonDerivedType(typeof(DefineSymbols))]
 [JsonDerivedType(typeof(CliCommand))]
@@ -73,6 +81,10 @@ public abstract record class CorePlatformClientCapability(bool IsSupported = tru
 /// Enables the language server to request a parse result containing the full syntax tree of a specified workspace document.
 /// </summary>
 public record class ParseFullDocument(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+/// <summary>
+/// Enables the language server to request a parse result containing a partial syntax tree for a fragment at a specific document location.
+/// </summary>
+public record class ParseFragment(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
 
 /// <summary>
 /// Enables the language server to send module member symbol descriptors to the environment host over

@@ -63,7 +63,8 @@ internal sealed class CoreLanguageServerApp(
                     {
                         Parsing = new ParserCapabilities
                         {
-                            ParseFullDocument = new ParseFullDocument(true)
+                            ParseFullDocument = new ParseFullDocument(true),
+                            ParseFragment = new ParseFragment(true)
                         }
                     }))
             .RegisterCoreComponent(factory =>

@@ -33,6 +33,6 @@ public sealed class ModuleHeaderTests
     [TestMethod]
     [DataRow(null)]
     [DataRow("")]
-    public void IsClassModule_Null_WhenThereIsNoSource(string? source)
-        => Assert.IsNull(ModuleHeader.IsClassModule(source));
+    public void IsClassModule_False_WhenThereIsNoSource(string? source)
+        => Assert.IsFalse(ModuleHeader.IsClassModule(source));
 }

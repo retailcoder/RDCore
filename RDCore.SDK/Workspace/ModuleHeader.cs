@@ -21,11 +21,11 @@ public static partial class ModuleHeader
 {
     /// <summary>
     /// Whether <paramref name="source"/> carries a module <c>VERSION</c> header — i.e. it is a class
-    /// or designer module. <c>null</c> when there is no source to inspect.
+    /// or designer module. <c>false</c> when there is no source to inspect.
     /// </summary>
     /// <param name="source">The raw module source, or <c>null</c> when it could not be read.</param>
-    public static bool? IsClassModule(string? source)
-        => string.IsNullOrEmpty(source) ? null : VersionHeader().IsMatch(source);
+    public static bool IsClassModule(string? source)
+        => string.IsNullOrEmpty(source) ? false : VersionHeader().IsMatch(source);
 
     // the `VERSION <n>[.<n>][ CLASS]` line VBA writes as the first physical line of a class or
     // designer module, on its own line. `\r?` so a CRLF ending does not defeat the end anchor; the

@@ -82,13 +82,13 @@ public sealed class AnchoredFragmentParseTests
     }
 
     [TestMethod]
-    public async Task ParseFullDocumentHandler_ForwardsTheRequestsAnchorOffset_ToTheParser()
+    public async Task ParseFragmentHandler_ForwardsTheRequestsAnchorOffset_ToTheParser()
     {
         const string content = "Public Sub Foo()\r\nEnd Sub";
         var zero = new ModuleParser().Parse(Uri, content);
 
-        var handler = new ParseFullDocumentHandler(
-            new ModuleParser(), NullLogger<ParseFullDocumentHandler>.Instance,
+        var handler = new ParseFragmentHandler(
+            new ModuleParser(), NullLogger<ParseFragmentHandler>.Instance,
             Options.Create(new SdkServerOptions()));
         var request = new ParseDocumentParams { DocumentUri = Uri, Fragment = content, AnchorOffset = Anchor };
 

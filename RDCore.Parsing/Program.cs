@@ -21,6 +21,7 @@ using System.Runtime.CompilerServices;
 
 // list all the platform capabilities provided by this server here:
 [assembly: ProvidesCorePlatformClientCapability<ParseFullDocument>]
+[assembly: ProvidesCorePlatformClientCapability<ParseFragment>]
 
 
 namespace RDCore.Parsing;
@@ -87,6 +88,7 @@ public class RDCoreParserApp(
     protected override void ConfigureHandlers(IRDCoreLSPHandlerConfigurationBuilder builder)
     {
         builder.WithHandler<ParseFullDocumentHandler>();
+        builder.WithHandler<ParseFragmentHandler>();
     }
 
     protected override void ConfigureServices(IServiceCollection services)

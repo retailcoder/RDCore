@@ -10,10 +10,10 @@ using RDCore.SDK.Server.Configuration;
 
 namespace RDCore.Parsing.Handlers;
 
-[Method(RDCorePlatformProtocol.ParseFullDocument)]
-public class ParseFullDocumentHandler(
+[Method(RDCorePlatformProtocol.ParseFragment)]
+public class ParseFragmentHandler(
     IModuleParser moduleParser,
-    ILogger<ParseFullDocumentHandler> logger,
+    ILogger<ParseFragmentHandler> logger,
     IOptions<SdkServerOptions> serverOptions)
     : RDCoreRequestHandler<ParseDocumentParams, PlatformJsonEnvelope>
 {
@@ -21,24 +21,24 @@ public class ParseFullDocumentHandler(
     {
         if (request?.DocumentUri is not Uri uri)
         {
-            logger.LogWarning("{method}: request had no DocumentUri.", RDCorePlatformProtocol.ParseFullDocument);
+            logger.LogWarning("{method}: request had no DocumentUri.", RDCorePlatformProtocol.ParseFragment);
             throw new InvalidParametersException(request);
         }
         if (request.Fragment is not string content)
         {
-            logger.LogWarning("{method}: request for {uri} had no Fragment.", RDCorePlatformProtocol.ParseFullDocument, uri);
+            logger.LogWarning("{method}: request for {uri} had no Fragment.", RDCorePlatformProtocol.ParseFragment, uri);
             throw new InvalidParametersException(request);
         }
 
-        logger.LogInformation("{method}: {uri}", RDCorePlatformProtocol.ParseFullDocument, uri);
+        logger.LogInformation("{method}: {uri}", RDCorePlatformProtocol.ParseFragment, uri);
         try
         {
-            var result = moduleParser.Parse(uri, content);
-            logger.LogInformation("{uri}: {status}", uri,
+            var result = moduleParser.Parse(uri, content, request.AnchorOffset);
+            logger.LogInformation(" > {uri}: {status}", uri,
                 result.IsSuccess ? "✅" : $"❌ {result.SyntaxErrors.Length} syntax error(s)");
 
-            // the AST is polymorphic; the transport serializer can't round-trip it. Wrap a
-            // System.Text.Json string the transport carries verbatim.
+            // the AST is polymorphic; the transport serializer can't round-trip it,
+            // so we wrap a System.Text.Json string the transport carries verbatim:
             return PlatformJsonEnvelope.Of(result);
         }
         catch (Exception exception)

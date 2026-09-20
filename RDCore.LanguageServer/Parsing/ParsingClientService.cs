@@ -1,12 +1,14 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RDCore.LanguageServer.Workspace;
 using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Workspace;
+using System.Collections.Concurrent;
 
 namespace RDCore.LanguageServer.Parsing;
 
@@ -27,6 +29,7 @@ internal interface IParsingClientService
     /// contacting the parser.
     /// </remarks>
     Task<ModuleParseResult> ParseDocumentAsync(Uri documentUri, CancellationToken token);
+    Task<ModuleParseResult> ParseFragmentAsync(SourceLocation location, string content, CancellationToken token);
 
     /// <summary>
     /// Parses every currently-loaded workspace source document. Failures are logged, not thrown.
@@ -40,6 +43,7 @@ internal interface IParsingClientService
 }
 
 internal sealed class ParsingClientService(
+    IOptions<SdkServerOptions> options,
     IPlatformOrchestrationService orchestration,
     IWorkspaceDocumentService documents,
     ILogger<ParsingClientService> logger) : IParsingClientService
@@ -49,35 +53,49 @@ internal sealed class ParsingClientService(
     public bool TryGetCached(Uri documentUri, out ModuleParseResult result)
         => _cache.TryGetValue(documentUri, out result!);
 
+    private bool ValidateWorkspaceUri(Uri documentUri, out WorkspaceDocument document, out ModuleParseResult failedParseResult)
+    {
+        if (!documents.TryGetDocument(documentUri, out document))
+        {
+            var message = "No workspace document is loaded for the specified URI.";
+            failedParseResult = ModuleParseResult.Failed(new SourceLocation(documentUri, SourceRange.Empty), message);
+            _cache[documentUri] = failedParseResult;
+            logger.LogWarning("❌ Parse request skipped: {message} {uri}", message,
+                (options.Value?.Verbose ?? false) ? documentUri : string.Empty);
+            return false;
+        }
+
+        failedParseResult = null!;
+        return true;
+    }
+
     public async Task<ModuleParseResult> ParseDocumentAsync(Uri documentUri, CancellationToken token)
     {
-        if (!documents.TryGetDocument(documentUri, out var document))
+        if (!ValidateWorkspaceUri(documentUri, out var document, out var failedParseResult))
         {
-            var error = ModuleParseResult.Failed(new SourceLocation(documentUri, SourceRange.Empty),
-                "no workspace document is loaded for this URI");
-            _cache[documentUri] = error;
-            logger.LogWarning("❌ Parse skipped for {uri}: no workspace document is loaded for it.", documentUri);
-            return error;
+            return failedParseResult;
         }
 
         await orchestration.ParsingService.WaitForReadyAsync(token);
 
         var envelope = await orchestration.ParsingService.SendRequestAsync<ParseDocumentParams, PlatformJsonEnvelope>(
-            new ParseDocumentParams { DocumentUri = documentUri, Fragment = document.Text }, token);
+            new ParseDocumentParams
+            {
+                DocumentUri = documentUri,
+                Fragment = document.Text
+            }, token);
 
-        // an error response from the parser comes back as a null envelope; degrade this one document
-        // rather than abort the whole workspace parse.
         var result = envelope is not null
             ? envelope.Unwrap<ModuleParseResult>()
-            : ModuleParseResult.Failed(new SourceLocation(documentUri, SourceRange.Empty), "the parser returned no result");
+            : ModuleParseResult.Failed(new SourceLocation(documentUri, SourceRange.Empty), "Parser returned no result");
 
         _cache[documentUri] = result;
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation("📄 Parsed {uri}: {status}", documentUri,
-                result.IsSuccess ? "ok" : $"{result.SyntaxErrors.Length} syntax error(s)");
+                result.IsSuccess ? "✅" : $"❌ {result.SyntaxErrors.Length} syntax error(s)");
         }
-        if (!result.IsSuccess && logger.IsEnabled(LogLevel.Warning))
+        if (!result.IsSuccess && (options.Value?.Verbose ?? false) && logger.IsEnabled(LogLevel.Warning))
         {
             foreach (var error in result.SyntaxErrors)
             {
@@ -85,6 +103,42 @@ internal sealed class ParsingClientService(
             }
         }
         return result;
+    }
+
+    public async Task<ModuleParseResult> ParseFragmentAsync(SourceLocation location, string content, CancellationToken token)
+    {
+        var documentUri = location.Uri;
+        if (!ValidateWorkspaceUri(documentUri, out _, out var failedParseResult))
+        {
+            return failedParseResult;
+        }
+
+        await orchestration.ParsingService.WaitForReadyAsync(token);
+
+        var envelope = await orchestration.ParsingService.SendRequestAsync<ParseDocumentParams, PlatformJsonEnvelope>(
+            new ParseDocumentParams
+            {
+                DocumentUri = documentUri,
+                Fragment = content,
+                AnchorOffset = location.Range.Start
+            }, token);
+
+        var result = envelope is not null
+            ? envelope.Unwrap<ModuleParseResult>()
+            : ModuleParseResult.Failed(location, "Parser returned no result");
+
+        SynchronizeAstFragment(location, result);
+        return result;
+    }
+
+    private void SynchronizeAstFragment(SourceLocation location, ModuleParseResult result)
+    {
+        if (!result.IsSuccess)
+        {
+            return;
+        }
+
+        // TODO locate and replace the AST node at the specified location with the fragment AST result.
     }
 
     public async Task ParseWorkspaceAsync(CancellationToken token)
@@ -128,12 +182,8 @@ internal sealed class ParsingClientService(
         }
     }
 
-    // review #170: fixed. The file extension was a stopgap; module kind is a fact of the source
-    // (the VERSION header), not the file name — RD-VBA determines it the same way regardless of
-    // extension (see ModuleHeader). No longer sent to the parser: it never derived the kind from
-    // this hint, only echoed it onto the AST root, which was itself the wrong layer to carry it.
     internal static ModuleType ModuleTypeOf(WorkspaceDocument document)
-        => ModuleHeader.IsClassModule(document.Text) == true ? ModuleType.ClassModule : ModuleType.StdModule;
+        => ModuleHeader.IsClassModule(document.Text) ? ModuleType.ClassModule : ModuleType.StdModule;
 
     private void LogIfEnabled(LogLevel level, string message)
     {

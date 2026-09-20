@@ -73,7 +73,7 @@ internal static class SymbolDescriptorProjector
     // carried only for a multi-branch symbol; the common single-declaration descriptor stays lean and
     // consumers read Range/SelectionRange.
     private static ImmutableArray<DefinitionDescriptor> DefinitionsOf(Symbol symbol)
-        => symbol is BoundSymbol { Definitions.IsDefaultOrEmpty: false } bound
+        => symbol is WorkspaceSymbol { Definitions.IsDefaultOrEmpty: false } bound
             ? [.. bound.Definitions.Select(definition => new DefinitionDescriptor
             {
                 Range = definition.Range,
