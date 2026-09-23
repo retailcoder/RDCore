@@ -35,6 +35,13 @@ public interface ICallStackFrame : IStackFrame
     ModuleDirectives Directives { get; }
 
     /// <summary>
+    /// The offset, into this activation's own <c>InstructionList</c>, of the next instruction to fetch
+    /// (<strong>RD-VBAL §3.5.1</strong>). Read-only here: only the interpreter's executor (RDCore.Runtime)
+    /// advances it, through the concrete frame type it constructs.
+    /// </summary>
+    int Pc { get; }
+
+    /// <summary>
     /// Declares <paramref name="symbol"/> on this frame and reserves storage sized for
     /// <paramref name="value"/>, its initial value — the caller's argument for a parameter, the
     /// declared type's default value for a fresh <c>Dim</c>. MS-VBAL draws no distinction between a

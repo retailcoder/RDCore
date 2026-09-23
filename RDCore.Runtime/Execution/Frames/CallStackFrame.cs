@@ -24,6 +24,9 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     private readonly SymbolAddressTable _addresses = new(Storage);
     private readonly HashSet<SemanticId> _declared = [];
 
+    /// <inheritdoc/>
+    public int Pc { get; set; }
+
     /// <summary>
     /// Declares <paramref name="symbol"/> on this frame and reserves storage sized for
     /// <paramref name="value"/>, its initial value.

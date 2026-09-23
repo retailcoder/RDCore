@@ -122,13 +122,34 @@ language ever sees it (**MS-VBAL §3.4.2**).
 dedicated shape.
 
 ---
-## 3.5.4 Placement and licensing
+## 3.5.4 Execution
+
+`RDCore.Runtime.Execution.ProcedureExecutor.Run` is the fetch/decode loop **MS-VBAL §2.3.1** describes
+("sequentially evaluate each instruction in the frame"): given a session, an activation, and its
+`InstructionList`, it reads the instruction at the activation's `Pc` (`ICallStackFrame.Pc`, read-only on
+the SDK interface, mutated only by the executor through the concrete `CallStackFrame`), reacts to what
+running it produced, and repeats. A `Simple` instruction's statement is dispatched by its own C# type
+through `RDCore.Runtime.Semantics.Statements.IStatementRuntimeSemanticsProvider` — the statement analogue
+of `RuntimeExpressionEvaluator`'s expression dispatch — every other `InstructionKind`'s control effect is
+already pre-resolved on the `Instruction` itself, so the loop decides *whether* to branch without any
+statement semantics needing to know about the program counter at all.
+
+Wired today: `Simple` (dispatches to the statement provider — Let-assignment is the one statement kind
+currently handled; anything else the provider doesn't recognize reports `InternalError`, the run stops),
+`Jump` (unconditional `GoTo`), `ExitProcedure`, `Halt` (`End`), `Break` (`Stop`), and falling off the end
+of the list (**MS-VBAL §5.4.2.17**'s "completes as if execution had reached the end of the body" — the
+same outcome as an explicit `Exit`). `ConditionalBranch`, `JumpTable`, the loop kinds, `With`, and `Select`
+are not dispatched by the loop yet and report `InternalError` when reached.
+
+---
+## 3.5.5 Placement and licensing
 
 `InstructionList`/`Instruction`/`InstructionKind`/`InstructionListLowering` live in **RDCore.SDK** (MIT):
 lowering is pure — no symbol resolver, no runtime session — and the SDK's static-analysis consumers
-(unreachable code, unused label, a flow-based inspection) want the same flattened list a future
-interpreter drives. The interpreter's executor, activation state, and hidden per-loop/per-`Select`/per-`With`
-storage are **RDCore.Runtime** (GPLv3).
+(unreachable code, unused label, a flow-based inspection) want the same flattened list the interpreter
+drives. `ICallStackFrame.Pc` is likewise on the SDK interface (read-only there, for a future debugger
+surface) but only ever mutated by the executor. `ProcedureExecutor`, its statement dispatch, activation
+state, and hidden per-loop/per-`Select`/per-`With` storage are **RDCore.Runtime** (GPLv3).
 
 ---
 > ⏮️ [**RD-VBAL §3.4** Statements](rd-vbal.3.4.0.statements.html) | ⏭️ [**RD-VBAL §4.0** Program Structure](rd-vbal.4.0.program-structure.html)
