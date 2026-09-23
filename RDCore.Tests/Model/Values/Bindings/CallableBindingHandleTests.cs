@@ -4,6 +4,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values;
 using RDCore.SDK.Model.Values.Abstract;
@@ -204,33 +205,193 @@ public sealed class CallableBindingHandleTests
 
     #endregion
 
-    #region what it is not
+    #region a Sub or a Function is not a value
+
+    private static VBFunctionMemberSymbol Function(string name = "Compute")
+        => new(Root, Root, name, ScopeKind.Module, SymbolKindExt.Function, VBLongType.TypeInfo, SourceRange.Empty, SourceRange.Empty, AccessModifier.Public);
+
+    public static IEnumerable<object[]> SubAndFunction()
+    {
+        yield return [Sub()];
+        yield return [Function()];
+    }
 
     [TestMethod]
-    public void AProcedureHasNoValueToRead()
+    [DynamicData(nameof(SubAndFunction))]
+    public void ASubOrAFunction_CanBeInvoked_AndNothingElse(VBTypeMemberSymbol procedure)
+        => Assert.AreEqual(BindingCapabilities.Invoke, new CallableBindingHandle(procedure, Substitute.For<IProcedureInvoker>()).BindingCapabilities);
+
+    [TestMethod]
+    [DynamicData(nameof(SubAndFunction))]
+    public void ASubOrAFunction_HasNoValueToRead(VBTypeMemberSymbol procedure)
     {
-        var (handle, _) = Handle();
+        var handle = new CallableBindingHandle(procedure, Substitute.For<IProcedureInvoker>());
 
         var thrown = Assert.ThrowsExactly<NotSupportedException>(() => handle.GetValue(Resolver));
-        Assert.Contains("DoWork", thrown.Message);
-        Assert.ThrowsExactly<NotSupportedException>(() => _ = handle.Value);
+        Assert.Contains(procedure.Name, thrown.Message);
     }
 
     [TestMethod]
-    public void AProcedureCannotBeAssigned()
-    {
-        var (handle, _) = Handle();
-
-        Assert.ThrowsExactly<NotSupportedException>(() => handle.SetValue(Resolver, Number(1)));
-    }
+    [DynamicData(nameof(SubAndFunction))]
+    public void ASubOrAFunction_CannotBeAssigned(VBTypeMemberSymbol procedure)
+        => Assert.ThrowsExactly<NotSupportedException>(() => new CallableBindingHandle(procedure, Substitute.For<IProcedureInvoker>()).SetValue(Resolver, Number(1)));
 
     [TestMethod]
-    public void ReadingOrAssigningAProcedure_NeverReachesTheInvoker()
+    public void ReadingOrAssigningWhatCannotBe_NeverReachesTheInvoker()
     {
         var (handle, invoker) = Handle();
 
         Assert.ThrowsExactly<NotSupportedException>(() => handle.GetValue(Resolver));
         Assert.ThrowsExactly<NotSupportedException>(() => handle.SetValue(Resolver, Number(1)));
+
+        invoker.DidNotReceiveWithAnyArgs().Invoke(default!, default!, default!);
+    }
+
+    #endregion
+
+    #region a property is read and written through its accessors
+
+    private static VBParameterSymbol Parameter(string name, bool optional = false)
+        => new(Root, Root, name, SourceRange.Empty, SourceRange.Empty, ParameterKind.ExplicitByVal, VBLongType.TypeInfo, optional);
+
+    private static VBPropertyGetMemberSymbol Get(params VBParameterSymbol[] parameters)
+        => new VBPropertyGetMemberSymbol(Root, Root, ScopeKind.Module, "Total", SourceRange.Empty, SourceRange.Empty, AccessModifier.Public) { Parameters = [.. parameters] };
+
+    private static VBPropertyLetMemberSymbol Let(params VBParameterSymbol[] parameters)
+        => new VBPropertyLetMemberSymbol(Root, Root, "Total", ScopeKind.Module, SymbolKindExt.Property, VBVoidType.TypeInfo, SourceRange.Empty, SourceRange.Empty, AccessModifier.Public) { Parameters = [.. parameters] };
+
+    private static VBPropertySetMemberSymbol Set(params VBParameterSymbol[] parameters)
+        => new VBPropertySetMemberSymbol(Root, Root, "Total", ScopeKind.Module, SymbolKindExt.Property, VBVoidType.TypeInfo, SourceRange.Empty, SourceRange.Empty, AccessModifier.Public) { Parameters = [.. parameters] };
+
+    private static (CallableBindingHandle Handle, IProcedureInvoker Invoker) HandleOf(VBTypeMemberSymbol accessor, IRuntimeValue? receiver = null, VBTypedValue? returns = null)
+    {
+        var invoker = Substitute.For<IProcedureInvoker>();
+        invoker.Invoke(default!, default!, default!).ReturnsForAnyArgs(RuntimeSemanticsEvaluationResult.Success(returns ?? VBVoidValue.Void));
+        return (new CallableBindingHandle(accessor, invoker, receiver), invoker);
+    }
+
+    [TestMethod]
+    public void APropertyGet_ThatAsksForNoArguments_CanBeReadAndInvoked_NotWritten()
+        => Assert.AreEqual(BindingCapabilities.Invoke | BindingCapabilities.GetValue, HandleOf(Get()).Handle.BindingCapabilities);
+
+    [TestMethod]
+    public void APropertyLet_ThatAsksForTheValueOnly_CanBeWrittenAndInvoked_NotRead()
+        => Assert.AreEqual(BindingCapabilities.Invoke | BindingCapabilities.SetValue, HandleOf(Let(Parameter("value"))).Handle.BindingCapabilities);
+
+    [TestMethod]
+    public void APropertySet_ThatAsksForTheValueOnly_CanBeWrittenAndInvoked_NotRead()
+        => Assert.AreEqual(BindingCapabilities.Invoke | BindingCapabilities.SetValue, HandleOf(Set(Parameter("value"))).Handle.BindingCapabilities);
+
+    [TestMethod]
+    public void ReadingAProperty_InvokesItsGetWithNoArguments_AndYieldsWhatItReturned()
+    {
+        var (handle, invoker) = HandleOf(Get(), returns: new VBLongValue(7));
+
+        var value = handle.GetValue(Resolver);
+
+        Assert.AreEqual(7, value.BoxedValue);
+        invoker.Received(1).Invoke(handle.Procedure, Resolver, Arg.Is<IRuntimeValue[]>(passed => passed.Length == 0));
+    }
+
+    [TestMethod]
+    public void ReadingAPropertyOfAnObject_PassesTheObjectAsMe()
+    {
+        var me = Number(42);
+        var (handle, invoker) = HandleOf(Get(), receiver: me, returns: new VBLongValue(7));
+
+        handle.GetValue(Resolver);
+
+        invoker.Received(1).Invoke(handle.Procedure, Resolver, Arg.Is<IRuntimeValue[]>(passed => passed.Length == 1 && Equals(passed[0], me)));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void WritingAProperty_InvokesItsLetOrSet_WithTheValueAsTheOnlyArgument(bool set)
+    {
+        var accessor = set ? (VBTypeMemberSymbol)Set(Parameter("value")) : Let(Parameter("value"));
+        var (handle, invoker) = HandleOf(accessor);
+        var value = Number(5);
+
+        handle.SetValue(Resolver, value);
+
+        invoker.Received(1).Invoke(accessor, Resolver, Arg.Is<IRuntimeValue[]>(passed => passed.Length == 1 && Equals(passed[0], value)));
+    }
+
+    [TestMethod]
+    public void WritingAPropertyOfAnObject_PassesTheObjectAsMe_BeforeTheValue()
+    {
+        var me = Number(42);
+        var (handle, invoker) = HandleOf(Let(Parameter("value")), receiver: me);
+
+        handle.SetValue(Resolver, Number(5));
+
+        invoker.Received(1).Invoke(handle.Procedure, Resolver, Arg.Is<IRuntimeValue[]>(passed => passed.Length == 2 && Equals(passed[0], me) && Equals(passed[1], Number(5))));
+    }
+
+    [TestMethod]
+    public void APropertyGet_CannotBeWritten_AndALetOrSet_CannotBeRead()
+    {
+        var (get, _) = HandleOf(Get());
+        var (let, _) = HandleOf(Let(Parameter("value")));
+        var (set, _) = HandleOf(Set(Parameter("value")));
+
+        Assert.ThrowsExactly<NotSupportedException>(() => get.SetValue(Resolver, Number(1)));
+        Assert.ThrowsExactly<NotSupportedException>(() => let.GetValue(Resolver));
+        Assert.ThrowsExactly<NotSupportedException>(() => set.GetValue(Resolver));
+    }
+
+    [TestMethod]
+    public void AnIndexedPropertyGet_CannotBeReadWithoutItsIndex_ButCanBeInvokedWithIt()
+    {
+        var (handle, invoker) = HandleOf(Get(Parameter("index")), returns: new VBLongValue(3));
+
+        Assert.AreEqual(BindingCapabilities.Invoke, handle.BindingCapabilities);
+        Assert.ThrowsExactly<NotSupportedException>(() => handle.GetValue(Resolver));
+
+        handle.Invoke(Resolver, [Number(1)]);
+        invoker.Received(1).Invoke(handle.Procedure, Resolver, Arg.Is<IRuntimeValue[]>(passed => passed.Length == 1));
+    }
+
+    [TestMethod]
+    public void AnIndexedPropertyLet_CannotBeWrittenWithOnlyAValue()
+        => Assert.AreEqual(BindingCapabilities.Invoke, HandleOf(Let(Parameter("index"), Parameter("value"))).Handle.BindingCapabilities);
+
+    [TestMethod]
+    public void AnOptionalIndex_DoesNotStopAPropertyFromBeingReadOrWritten()
+    {
+        Assert.IsTrue(HandleOf(Get(Parameter("index", optional: true))).Handle.BindingCapabilities.HasFlag(BindingCapabilities.GetValue));
+        Assert.IsTrue(HandleOf(Let(Parameter("index", optional: true), Parameter("value"))).Handle.BindingCapabilities.HasFlag(BindingCapabilities.SetValue));
+    }
+
+    [TestMethod]
+    public void AParamArray_DoesNotStopAPropertyGetFromBeingRead()
+    {
+        var paramArray = new ParamArrayParameterSymbol(Root, Root, "rest", SourceRange.Empty, SourceRange.Empty, ParameterKind.ExplicitByRef);
+
+        Assert.IsTrue(HandleOf(Get(paramArray)).Handle.BindingCapabilities.HasFlag(BindingCapabilities.GetValue));
+    }
+
+    [TestMethod]
+    public void APropertyLetWithNoParameterToTakeTheValue_CannotBeWritten()
+        => Assert.AreEqual(BindingCapabilities.Invoke, HandleOf(Let()).Handle.BindingCapabilities);
+
+    [TestMethod]
+    public void AnErrorRaisedByAnAccessor_IsThrownByTheReadOrTheWrite()
+    {
+        var invoker = Substitute.For<IProcedureInvoker>();
+        invoker.Invoke(default!, default!, default!).ReturnsForAnyArgs(RuntimeSemanticsEvaluationResult.Error(Error()));
+
+        Assert.ThrowsExactly<VBRuntimeErrorException>(() => new CallableBindingHandle(Get(), invoker).GetValue(Resolver));
+        Assert.ThrowsExactly<VBRuntimeErrorException>(() => new CallableBindingHandle(Let(Parameter("value")), invoker).SetValue(Resolver, Number(1)));
+    }
+
+    [TestMethod]
+    public void TheValueOfAProperty_IsNeverReadWithoutAResolver()
+    {
+        var (handle, invoker) = HandleOf(Get());
+
+        Assert.ThrowsExactly<NotSupportedException>(() => _ = handle.Value);
 
         invoker.DidNotReceiveWithAnyArgs().Invoke(default!, default!, default!);
     }
