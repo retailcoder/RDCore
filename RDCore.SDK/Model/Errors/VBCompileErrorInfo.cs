@@ -77,5 +77,6 @@ public record class VBCompileErrorInfo : VBErrorInfo
         [VBCompileErrorId.DuplicateDeclaration] = Exceptions.VBCompilationError_DuplicateDeclaration,
         [VBCompileErrorId.MethodOrDataMemberNotFound] = Exceptions.VBCompileError_MethodOrDataMemberNotFound,
         [VBCompileErrorId.WithExpressionOutsideWithBlock] = Exceptions.VBCompileError_WithExpressionOutsideWithBlock,
+        [VBCompileErrorId.DuplicateLabelDefinition] = Exceptions.VBCompileError_DuplicateLabelDefinition,
     };
 }

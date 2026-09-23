@@ -125,4 +125,4 @@ a `;`/`,` separator), [PrintSpcClauseNode](../api/RDCore.SDK.Model.AST.Expressio
 
 
 ---
-> ⏮️ [**RD-VBAL §3.3** Operators](rd-vbal.3.3.0.operators.html) | ⏭️ [**RD-VBAL §4.0** Program Structure](rd-vbal.4.0.program-structure.html)
+> ⏮️ [**RD-VBAL §3.3** Operators](rd-vbal.3.3.0.operators.html) | ⏭️ [**RD-VBAL §3.5** Instructions](rd-vbal.3.5.0.instructions.html)

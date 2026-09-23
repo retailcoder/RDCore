@@ -439,6 +439,15 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Label already defined in this procedure.
+        /// </summary>
+        public static string VBCompileError_DuplicateLabelDefinition {
+            get {
+                return ResourceManager.GetString("VBCompileError_DuplicateLabelDefinition", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Numeric literal overflow.
         /// </summary>
         public static string VBCompileError_NumericLiteralOverflow {

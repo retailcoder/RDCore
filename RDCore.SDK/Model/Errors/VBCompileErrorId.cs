@@ -193,6 +193,15 @@ public enum VBCompileErrorId
     /// ℹ️ Unable to find an official <c>learn.microsoft.com</c> documentation link for this error.
     /// </remarks>
     WithExpressionOutsideWithBlock = 9318,
+    /// <summary>
+    /// A procedure declaration contains more than one <em>statement label definition</em> with the same
+    /// label value.<br/>
+    /// <strong>MS-VBAL §5.4.1.1</strong> Statement Labels.
+    /// </summary>
+    /// <remarks>
+    /// ℹ️ Unable to find an official <c>learn.microsoft.com</c> documentation link for this error.
+    /// </remarks>
+    DuplicateLabelDefinition = 9319,
 
 
     /***********************************************************************************************
