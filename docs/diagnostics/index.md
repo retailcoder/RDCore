@@ -36,6 +36,7 @@ token, which literal, which type — travel in the diagnostic's verbose detail, 
 |Code|Condition|
 |---|---|
 |[VBC09309](vbc09309.md)|Label not defined — a jump names a line label or line number the procedure does not define|
+|[VBC09319](vbc09319.md)|Duplicate label definition — a procedure defines the same line label or line number more than once|
 
 ---
 > ⏭️ [**VBC00001** Syntax error](vbc00001.md)
