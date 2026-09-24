@@ -20,6 +20,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract;
@@ -81,7 +82,8 @@ public sealed class ProcedureExecutorTests
         var withTargets = new WithTargetEvaluator(expressionEvaluator, withStatement);
         var cases = new CaseMatchEvaluator(expressionEvaluator, letCoercion, formatter);
         var forLoop = new ForLoopEvaluator(expressionEvaluator, letCoercion, formatter);
-        return new ProcedureExecutor(statements, conditions, withTargets, cases, forLoop);
+        var forEach = new ForEachEvaluator(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), formatter);
+        return new ProcedureExecutor(statements, conditions, withTargets, cases, forLoop, forEach);
     }
 
     // VBNumericLetCoercionTypeRuntimeSemantics needs itself back to coerce a numeric operand recursively;
@@ -103,6 +105,29 @@ public sealed class ProcedureExecutorTests
 
         var member = parse.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
         var result = InstructionListLowering.Lower(new StatementBlock([.. member.Children]));
+        Assert.IsEmpty(result.Errors, string.Join("; ", result.Errors.Select(error => error.Verbose)));
+        return result.InstructionList;
+    }
+
+    // Parses a real "For Each item In placeholder" (the identifier is never resolved - lowering is pure
+    // syntax, no symbol resolver involved) then swaps CollectionExpression for a LiteralExpressionNode
+    // wrapping `collection` directly. Array-variable storage round-tripping (VBArrayType.CreateValue) is
+    // fixed now - most ForEach-over-array tests push a real "Dim arr(...) As Long" local instead (see
+    // LongArray + PushFrame below). This helper still earns its keep for the empty-array case: an empty
+    // array's Size is 0, and CallStackFrame.Push/SymbolAddressTable.TryAllocate has a separate, still-open
+    // gap with zero-size values (task_e8956b5b) that has nothing to do with array storage specifically.
+    private static InstructionList LowerForEachOverLiteralCollection(VBTypedValue collection, params string[] bodyLines)
+    {
+        var source = $"Sub Foo()\r\nFor Each item In placeholder\r\n{string.Join("\r\n", bodyLines)}\r\nNext\r\nEnd Sub\r\n";
+        var parse = new ModuleParser().Parse(new Uri("file:///c:/ws/Mod1.bas"), source);
+        Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
+
+        var member = parse.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        var forEach = member.Children.OfType<ForEachStatementNode>().Single();
+        var literalCollection = new LiteralExpressionNode(forEach.CollectionExpression.Identity, forEach.CollectionExpression.Location, collection);
+        var patched = forEach with { CollectionExpression = literalCollection };
+
+        var result = InstructionListLowering.Lower(new StatementBlock([patched]));
         Assert.IsEmpty(result.Errors, string.Join("; ", result.Errors.Select(error => error.Verbose)));
         return result.InstructionList;
     }
@@ -387,6 +412,179 @@ public sealed class ProcedureExecutorTests
     {
         var forNext = new Instruction(0, null, InstructionKind.ForNext, 0, [], null, null, 999, null);
         var list = new InstructionList([forNext], new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase), new Dictionary<SyntaxNodeId, int>());
+        var session = ComposeSession();
+        var frame = PushFrame(session);
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
+        Assert.AreEqual((int)VBRuntimeErrorId.ForLoopNotInitialized, outcome.ErrorInfo!.ErrorId);
+    }
+
+    private static VBFixedSizeArrayValue LongArray(params int[] values)
+    {
+        var array = new VBFixedSizeArrayValue([(0, values.Length - 1)], VBLongType.TypeInfo);
+        for (var i = 0; i < values.Length; i++)
+        {
+            array.TrySetElement(new ValueBindingHandle(new VBLongValue(values[i]).RuntimeValue), i);
+        }
+        return array;
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAnArray_VisitsEveryElementInOrder()
+        // Dim arr(0 To 2) As Long: arr(0)=10, arr(1)=20, arr(2)=30 - a real array LOCAL, round-tripped
+        // through Push/GetValue like any other symbol (VBArrayType.CreateValue no longer throws).
+    {
+        var list = Lower("For Each item In arr", "s = s + item", "Next");
+        var item = Local("item", VBLongType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var arr = Local("arr", new VBFixedSizeArrayType(VBLongType.TypeInfo));
+        var session = ComposeSession(item, s, arr);
+        var frame = PushFrame(session, (item, new VBLongValue(0)), (s, new VBLongValue(0)), (arr, LongArray(10, 20, 30)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(60, session.Symbols.Resolver.GetValue(s).Value.BoxedValue);
+        Assert.AreEqual(30, session.Symbols.Resolver.GetValue(item).Value.BoxedValue); // holds the last element
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAnEmptyArray_NeverEntersTheBody()
+        // An empty array's Size is 0 - pushing it as a real frame local hits the separate, still-open
+        // zero-size-value storage gap (task_e8956b5b), so this still goes through the literal-collection
+        // workaround rather than a real "Dim arr() As Long" local.
+    {
+        var list = LowerForEachOverLiteralCollection(LongArray(), "s = 999");
+        var item = Local("item", VBLongType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var session = ComposeSession(item, s);
+        var frame = PushFrame(session, (item, new VBLongValue(0)), (s, new VBLongValue(0)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(0, session.Symbols.Resolver.GetValue(s).Value.BoxedValue);
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAnUninitializedArray_ReportsForLoopNotInitialized()
+        // Dim arr() As Long, never ReDim'd: no dimensions at all, not merely a declared-empty one -
+        // real VBA raises error 92 here (the collection was never properly set up), it doesn't silently
+        // skip the body the way MS-VBAL §5.4.2.4's "array has no elements" wording covers a zero-length
+        // declared array.
+    {
+        var list = LowerForEachOverLiteralCollection(new VBFixedSizeArrayValue([]), "s = 999");
+        var item = Local("item", VBLongType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var session = ComposeSession(item, s);
+        var frame = PushFrame(session, (item, new VBLongValue(0)), (s, new VBLongValue(0)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
+        Assert.AreEqual((int)VBRuntimeErrorId.ForLoopNotInitialized, outcome.ErrorInfo!.ErrorId);
+    }
+
+    [TestMethod]
+    public void ExitForEach_FromANestedIf_BreaksOutCleanly()
+    {
+        var list = Lower("For Each item In arr", "If item = 20 Then Exit For", "s = item", "Next");
+        var item = Local("item", VBLongType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var arr = Local("arr", new VBFixedSizeArrayType(VBLongType.TypeInfo));
+        var session = ComposeSession(item, s, arr);
+        var frame = PushFrame(session, (item, new VBLongValue(0)), (s, new VBLongValue(0)), (arr, LongArray(10, 20, 30)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(20, session.Symbols.Resolver.GetValue(item).Value.BoxedValue);
+        Assert.AreEqual(10, session.Symbols.Resolver.GetValue(s).Value.BoxedValue); // last completed iteration
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverNothing_ReportsObjectVariableNotSet()
+        // enumerating an object collection means invoking its _NewEnum member - on Nothing, that
+        // invocation itself is MS-VBAL error 91.
+    {
+        var list = Lower("For Each item In coll", "s = 999", "Next");
+        var item = Local("item", VBObjectType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var coll = Local("coll", VBObjectType.TypeInfo);
+        var session = ComposeSession(item, s, coll);
+        var frame = PushFrame(session, (item, VBObjectValue.Nothing), (s, new VBLongValue(0)), (coll, VBObjectValue.Nothing));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
+        Assert.AreEqual((int)VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, outcome.ErrorInfo!.ErrorId);
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAnObjectWithNoNewEnumMember_ReportsObjectDoesNotSupportThisPropertyOrMethod()
+    {
+        var list = Lower("For Each item In coll", "s = 999", "Next");
+        var widget = new VBClassModuleSymbol(Root, Root, "Widget");
+        var item = Local("item", VBObjectType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var coll = Local("coll", VBObjectType.TypeInfo);
+        var session = ComposeSession(widget, item, s, coll);
+        var instance = session.Symbols.CreateInstance(session.Objects.CreateObject(), widget);
+        var frame = PushFrame(session, (item, VBObjectValue.Nothing), (s, new VBLongValue(0)), (coll, new VBObjectValue(instance.ObjectId)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
+        Assert.AreEqual((int)VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, outcome.ErrorInfo!.ErrorId);
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAnObjectWithANewEnumMember_IsRecognized_ButDefersAsInternalError()
+        // VB_UserMemId = -4 ("_NewEnum") is structurally recognized, but actually enumerating it means
+        // invoking it and then the COM IEnumVARIANT-shaped methods on whatever it returns - real
+        // procedure invocation, which doesn't exist yet.
+    {
+        var list = Lower("For Each item In coll", "s = 999", "Next");
+        var newEnum = (VBTypeMemberSymbol)new VBFunctionMemberSymbol(Root, Root, "_NewEnum", ScopeKind.Module, SymbolKindExt.Function, VBObjectType.TypeInfo, R, R, AccessModifier.Public)
+            .With(SymbolProperties.UserMemId, WellKnownDispIds.NewEnum);
+        var widget = new VBClassModuleSymbol(Root, Root, "Widget") { Members = [newEnum] };
+        var item = Local("item", VBObjectType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var coll = Local("coll", VBObjectType.TypeInfo);
+        var session = ComposeSession(widget, newEnum, item, s, coll);
+        var instance = session.Symbols.CreateInstance(session.Objects.CreateObject(), widget);
+        var frame = PushFrame(session, (item, VBObjectValue.Nothing), (s, new VBLongValue(0)), (coll, new VBObjectValue(instance.ObjectId)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.InternalError, outcome.Kind);
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAScalarValue_ReportsTypeMismatch()
+    {
+        var list = Lower("For Each item In n", "s = 999", "Next");
+        var item = Local("item", VBLongType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var n = Local("n", VBLongType.TypeInfo);
+        var session = ComposeSession(item, s, n);
+        var frame = PushFrame(session, (item, new VBLongValue(0)), (s, new VBLongValue(0)), (n, new VBLongValue(5)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
+        Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, outcome.ErrorInfo!.ErrorId);
+    }
+
+    [TestMethod]
+    public void ForEachNext_WithNoEnclosingForEachOpener_ReportsForLoopNotInitialized()
+        // Same shape as ForNext_WithNoEnclosingForOpener_ReportsForLoopNotInitialized - a GoTo landing
+        // directly on the closer without its own opener having run is error 92 for For Each too.
+    {
+        var forEachNext = new Instruction(0, null, InstructionKind.ForEachNext, 0, [], null, null, 999, null);
+        var list = new InstructionList([forEachNext], new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase), new Dictionary<SyntaxNodeId, int>());
         var session = ComposeSession();
         var frame = PushFrame(session);
 
