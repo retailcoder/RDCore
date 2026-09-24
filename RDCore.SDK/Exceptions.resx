@@ -231,6 +231,9 @@
   <data name="VBForEach_ArrayNotInitialized_Verbose" xml:space="preserve">
     <value>This For Each loop's collection expression is an array with no dimensions - it was never initialized by a Dim with bounds or a ReDim, so there is nothing to enumerate.</value>
   </data>
+  <data name="VBProcedureCall_OutOfStackSpace_Verbose" xml:space="preserve">
+    <value>This call would push the session's call stack past its own maximum depth - most likely unbounded recursion.</value>
+  </data>
   <data name="LanguageServerProtocolSdkException_ClientNotInitialized" xml:space="preserve">
     <value>Language client was not initialized.</value>
   </data>
