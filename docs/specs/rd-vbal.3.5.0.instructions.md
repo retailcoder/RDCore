@@ -134,12 +134,16 @@ of `RuntimeExpressionEvaluator`'s expression dispatch — every other `Instructi
 already pre-resolved on the `Instruction` itself, so the loop decides *whether* to branch without any
 statement semantics needing to know about the program counter at all.
 
-Wired today: `Simple` (dispatches to the statement provider — Let-assignment is the one statement kind
-currently handled; anything else the provider doesn't recognize reports `InternalError`, the run stops),
-`Jump` (unconditional `GoTo`), `ExitProcedure`, `Halt` (`End`), `Break` (`Stop`), and falling off the end
-of the list (**MS-VBAL §5.4.2.17**'s "completes as if execution had reached the end of the body" — the
-same outcome as an explicit `Exit`). `ConditionalBranch`, `JumpTable`, the loop kinds, `With`, and `Select`
-are not dispatched by the loop yet and report `InternalError` when reached.
+Wired today: `Simple` (dispatches to the statement provider — Let-assignment and Set-assignment are the
+statement kinds currently handled; Set-coercion (**MS-VBAL §5.5.2.2**) goes through the same direct entry
+point `RDCore.Runtime.Semantics.Statements.WithStatementRuntimeSemantics` already uses for its own
+`With`-target coercion, not the operator pipeline Let-assignment reuses — Set-coercion has no
+per-destination-type strategy fan-out to need one; anything the provider doesn't recognize reports
+`InternalError`, the run stops), `Jump` (unconditional `GoTo`), `ExitProcedure`, `Halt` (`End`), `Break`
+(`Stop`), and falling off the end of the list (**MS-VBAL §5.4.2.17**'s "completes as if execution had
+reached the end of the body" — the same outcome as an explicit `Exit`). `ConditionalBranch`, `JumpTable`,
+the loop kinds, and `With`/`Select` themselves are not dispatched by the loop yet and report
+`InternalError` when reached.
 
 ---
 ## 3.5.5 Placement and licensing

@@ -3,6 +3,7 @@ using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Operators;
+using RDCore.Runtime.Semantics.SetCoercion;
 using RDCore.Runtime.Semantics.Statements;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
@@ -63,7 +64,7 @@ public sealed class StatementRuntimeSemanticsProviderTests
 
     private static SimpleNameExpressionNode SimpleName(string name) => new(NodeId, TestLocations.TestLocation, name);
 
-    private static AssignmentStatementNode LetAssignment(AssignmentKind kind, ExpressionNode target, ExpressionNode value)
+    private static AssignmentStatementNode Assignment(AssignmentKind kind, ExpressionNode target, ExpressionNode value)
         => new(NodeId, TestLocations.TestLocation, kind, target, value);
 
     private static StatementRuntimeSemanticsProvider Provider_()
@@ -71,7 +72,7 @@ public sealed class StatementRuntimeSemanticsProviderTests
         var formatter = Substitute.For<IVerboseMessageBuilder>();
         var letCoercion = new LetCoercionRuntimeSemanticsProvider([new VBNumericLetCoercionTypeRuntimeSemantics(formatter, new ProviderHandle())], formatter);
         var expressionEvaluator = new RuntimeExpressionEvaluator(new OperatorRuntimeSemanticsProvider(letCoercion, formatter));
-        return new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, formatter);
+        return new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), formatter);
     }
 
     private sealed class ProviderHandle : ILetCoercionRuntimeSemanticsProvider
@@ -92,7 +93,7 @@ public sealed class StatementRuntimeSemanticsProviderTests
         var session = ComposeSession(x);
         PushFrame(session, (x, new VBLongValue(0)));
 
-        var statement = LetAssignment(kind, SimpleName("x"), new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(42)));
+        var statement = Assignment(kind, SimpleName("x"), new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(42)));
         var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
 
         Assert.AreEqual(RuntimeExecutionOutcomeKind.Next, outcome.Kind);
@@ -104,7 +105,7 @@ public sealed class StatementRuntimeSemanticsProviderTests
     {
         var session = ComposeSession();
 
-        var statement = LetAssignment(AssignmentKind.ImplicitLet, SimpleName("Nowhere"), new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(1)));
+        var statement = Assignment(AssignmentKind.ImplicitLet, SimpleName("Nowhere"), new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(1)));
         var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
 
         Assert.AreEqual(RuntimeExecutionOutcomeKind.InternalError, outcome.Kind);
@@ -118,7 +119,7 @@ public sealed class StatementRuntimeSemanticsProviderTests
         var session = ComposeSession();
         var target = new MemberAccessExpressionNode(NodeId, TestLocations.TestLocation, SimpleName("obj"), SimpleName("Prop"));
 
-        var statement = LetAssignment(AssignmentKind.ImplicitLet, target, new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(1)));
+        var statement = Assignment(AssignmentKind.ImplicitLet, target, new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(1)));
         var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
 
         Assert.AreEqual(RuntimeExecutionOutcomeKind.InternalError, outcome.Kind);
@@ -130,6 +131,49 @@ public sealed class StatementRuntimeSemanticsProviderTests
         var session = ComposeSession();
         var statement = new KeywordStatementNode(NodeId, TestLocations.TestLocation, Tokens.Stop, []);
 
+        var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.InternalError, outcome.Kind);
+    }
+
+    [TestMethod]
+    public void SetAssignment_ANewObjectReference_WritesThroughTheHandle_ReturnsNext()
+    {
+        var classModule = new VBClassModuleSymbol(Root, Root, "Widget");
+        var obj = Local("obj", VBObjectType.TypeInfo);
+        var session = ComposeSession(classModule, obj);
+        PushFrame(session, (obj, VBObjectValue.Nothing));
+
+        var statement = Assignment(AssignmentKind.Set, SimpleName("obj"), new NewExpressionNode(NodeId, TestLocations.TestLocation, SimpleName("Widget")));
+        var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Next, outcome.Kind);
+        Assert.AreNotEqual(VBObjectValue.Nothing.RuntimeValue.BoxedValue, session.Symbols.Resolver.GetValue(obj).Value.BoxedValue,
+            "Set should have written a live object reference, not left the target as Nothing");
+    }
+
+    [TestMethod]
+    public void SetAssignment_ANonObjectSource_IsAnError_NotAnInternalError()
+        // MS-VBAL §5.5.2.2.2: Set-coercion requires an object reference source - a real, reportable
+        // run-time error (Object required / Type mismatch), not this pass defeing to something unwired.
+    {
+        var obj = Local("obj", VBObjectType.TypeInfo);
+        var session = ComposeSession(obj);
+        PushFrame(session, (obj, VBObjectValue.Nothing));
+
+        var statement = Assignment(AssignmentKind.Set, SimpleName("obj"), new LiteralExpressionNode(NodeId, TestLocations.TestLocation, new VBLongValue(1)));
+        var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
+        Assert.IsNotNull(outcome.ErrorInfo);
+    }
+
+    [TestMethod]
+    public void SetAssignment_AnUndefinedTarget_DefersAsInternalError()
+    {
+        var session = ComposeSession();
+
+        var statement = Assignment(AssignmentKind.Set, SimpleName("Nowhere"), new NewExpressionNode(NodeId, TestLocations.TestLocation, SimpleName("Widget")));
         var outcome = Provider_().Execute(session, new(ProcedureUri), statement);
 
         Assert.AreEqual(RuntimeExecutionOutcomeKind.InternalError, outcome.Kind);

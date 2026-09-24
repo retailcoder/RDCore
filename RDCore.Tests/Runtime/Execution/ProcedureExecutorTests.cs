@@ -4,6 +4,7 @@ using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Operators;
+using RDCore.Runtime.Semantics.SetCoercion;
 using RDCore.Runtime.Semantics.Statements;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
@@ -69,7 +70,7 @@ public sealed class ProcedureExecutorTests
         var formatter = Substitute.For<IVerboseMessageBuilder>();
         var letCoercion = new LetCoercionRuntimeSemanticsProvider([new VBNumericLetCoercionTypeRuntimeSemantics(formatter, new ProviderHandle())], formatter);
         var expressionEvaluator = new RuntimeExpressionEvaluator(new OperatorRuntimeSemanticsProvider(letCoercion, formatter));
-        var statements = new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, formatter);
+        var statements = new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), formatter);
         return new ProcedureExecutor(statements);
     }
 
@@ -113,6 +114,22 @@ public sealed class ProcedureExecutorTests
         Assert.AreEqual(1, session.Symbols.Resolver.GetValue(x).Value.BoxedValue);
         Assert.AreEqual(2, session.Symbols.Resolver.GetValue(y).Value.BoxedValue);
         Assert.AreEqual(3, session.Symbols.Resolver.GetValue(z).Value.BoxedValue);
+    }
+
+    [TestMethod]
+    public void ASetAssignment_CreatesALiveObject_AndWritesItThroughTheHandle()
+        // Sub Foo(): Set obj = New Widget: End Sub
+    {
+        var list = Lower("Set obj = New Widget");
+        var classModule = new VBClassModuleSymbol(Root, Root, "Widget");
+        var obj = Local("obj", VBObjectType.TypeInfo);
+        var session = ComposeSession(classModule, obj);
+        var frame = PushFrame(session, (obj, VBObjectValue.Nothing));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreNotEqual(VBObjectValue.Nothing.RuntimeValue.BoxedValue, session.Symbols.Resolver.GetValue(obj).Value.BoxedValue);
     }
 
     [TestMethod]

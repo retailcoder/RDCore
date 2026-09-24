@@ -9,7 +9,9 @@ using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.Operators;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Meta;
+using RDCore.SDK.Runtime.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Services.VerboseMessages;
 
@@ -33,11 +35,13 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
 {
     private readonly RuntimeExpressionEvaluator _expressionEvaluator;
     private readonly BinaryLetAssignmentOperatorRuntimeSemantics _letAssignment;
+    private readonly ISetCoercionRuntimeSemantics _setCoercion;
 
-    public StatementRuntimeSemanticsProvider(RuntimeExpressionEvaluator expressionEvaluator, ILetCoercionRuntimeSemanticsProvider letCoercionProvider, IVerboseMessageBuilder formatterService)
+    public StatementRuntimeSemanticsProvider(RuntimeExpressionEvaluator expressionEvaluator, ILetCoercionRuntimeSemanticsProvider letCoercionProvider, ISetCoercionRuntimeSemantics setCoercion, IVerboseMessageBuilder formatterService)
     {
         _expressionEvaluator = expressionEvaluator;
         _letAssignment = new(letCoercionProvider, formatterService);
+        _setCoercion = setCoercion;
     }
 
     /// <inheritdoc/>
@@ -45,6 +49,7 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         => statement switch
         {
             AssignmentStatementNode { Kind: AssignmentKind.ImplicitLet or AssignmentKind.ExplicitLet } assignment => ExecuteLetAssignment(session, context, assignment),
+            AssignmentStatementNode { Kind: AssignmentKind.Set } assignment => ExecuteSetAssignment(session, context, assignment),
             _ => RuntimeExecutionOutcome.InternalError,
         };
 
@@ -80,5 +85,46 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         return result.IsSuccess ? RuntimeExecutionOutcome.Next
             : result.IsInternalError ? RuntimeExecutionOutcome.InternalError
             : RuntimeExecutionOutcome.Error(result.ErrorInfo!);
+    }
+
+    // MS-VBAL §5.4.3.9. Same target scope limitation as Let: a member-access or indexed target needs
+    // procedure-invocation machinery (a Property Set call) that doesn't exist yet.
+    private RuntimeExecutionOutcome ExecuteSetAssignment(IRuntimeSession session, RuntimeEvaluationContext context, AssignmentStatementNode assignment)
+    {
+        if (assignment.Target is not SimpleNameExpressionNode simpleName)
+        {
+            return RuntimeExecutionOutcome.InternalError;
+        }
+
+        var targetResult = session.Symbols.Resolver.ResolveValue(simpleName.IdentifierName, ScopeKind.Local, context.Scope);
+        if (targetResult.Symbol is not ITypedSymbol target)
+        {
+            return RuntimeExecutionOutcome.InternalError;
+        }
+
+        var valueResult = _expressionEvaluator.Evaluate(session, assignment.Value, context);
+        if (!valueResult.IsSuccess)
+        {
+            return valueResult.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(valueResult.ErrorInfo!);
+        }
+
+        // Set-coercion (MS-VBAL §5.5.2.2) is not an operator - the same direct entry point
+        // WithStatementRuntimeSemantics already uses for its own With-target coercion.
+        var coercionResult = _setCoercion.EvaluateSetCoercion(session, assignment.Value, valueResult.Result!, target.ResolvedType);
+        if (!coercionResult.IsSuccess)
+        {
+            return RuntimeExecutionOutcome.Error(coercionResult.ErrorInfo!);
+        }
+
+        var handle = session.Symbols.Resolver.GetValue((Symbol)target);
+        if (!handle.BindingCapabilities.HasFlag(BindingCapabilities.SetValue))
+        {
+            // MS-VBAL static semantics should already have rejected an assignment to a read-only
+            // target (a Const, chiefly) at compile time - reaching here means that check was skipped.
+            return RuntimeExecutionOutcome.InternalError;
+        }
+
+        handle.SetValue(session.Symbols.Resolver, coercionResult.Result!.RuntimeValue);
+        return RuntimeExecutionOutcome.Next;
     }
 }
