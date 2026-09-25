@@ -86,6 +86,15 @@ fixed-point in `decimal`) and yield a [VBBooleanValue](../api/RDCore.SDK.Model.V
 a `NaN` operand raises [Overflow](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html). Logical
 operators compute bitwise in the effective integral type (`Boolean` over its `-1`/`0` representation).
 
+**The `Variant` String/Numeric comparison exception (MS-VBAL §5.6.9.5).** When both relational
+operands are `Variant`, one originally holding a `String` value and the other a numeric value, the
+numeric operand is always considered less than the `String` operand — regardless of their actual
+values, and without ever attempting to coerce the `String` to a number (which would fail, or succeed
+incorrectly, depending on its content). `BinaryRelationalOperatorRuntimeSemantics` detects this before
+normal effective-type determination and coercion ever run, reducing it to a synthetic `Integer` rank
+(`0` for the numeric side, `1` for the `String` side) that the operator's own ordinary `Integer`
+evaluation branch then compares for real — no bespoke evaluation path needed.
+
 
 ### 5.0.2.2 Let-Coercion
 > [!NOTE]
@@ -121,6 +130,29 @@ source value is within the destination's representable range (`Overflow` otherwi
 > kind (obvious copy/paste and transcription errors in the MS specification, and anything that
 > implicitly depends on the Windows Registry, ActiveX, or MSForms — all out of scope for the
 > run-time) are resolved in favour of the evident intent.
+
+**`Variant` let-coercion and storage (MS-VBAL §5.5.1.2.12).** Any value except a class or `Nothing`
+Let-coerces to `Variant` as a copy, wrapped in a
+[VBVariantValue](../api/RDCore.SDK.Model.Values.Intrinsic.VBVariantValue.html). A `VBVariantValue`'s
+own `TypeInfo` deliberately mirrors its wrapped value's — so ordinary destination-type dispatch (both
+here and in operator/effective-type determination) picks the same strategy it would for the
+unwrapped value — but its runtime *instance* stays a `VBVariantValue`, wrapping the whole value, not
+just a scalar. Storage round-trips it as a
+[VBRuntimeVariantValue](../api/RDCore.SDK.Model.Values.Runtime.VBRuntimeVariantValue.html) box (the
+same pattern a
+[VBArrayValue](../api/RDCore.SDK.Model.Values.Abstract.VBArrayValue.html) uses via
+`VBRuntimeArrayValue`), so a `Variant` read back from a variable, array element, or field carries the
+exact value that was stored — never a fresh, unrelated `Empty`.
+
+Because `TypeInfo` mirrors the wrapped value, any code that short-circuits on a `TypeInfo` match, or
+pattern-matches a `VBTypedValue` operand against a concrete value type directly, must unwrap a
+`VBVariantValue` first (recursively — a `Variant` may wrap another `Variant`) or it will see the box
+instead of the value. `LetCoercionRuntimeSemanticsProvider.EvaluateLetCoercionSemantics` does this
+once, centrally, for every let-coercion; `OperatorRuntimeSemantics.LetCoerceNonNullOperand` never
+skips its own "already the right type" short-circuit for a `Variant` operand;
+`SetCoercionRuntimeSemantics` unwraps before its own object pattern-match; and
+`RuntimeExpressionEvaluator.EvaluateIndex`, `ProcedureExecutor.ExecuteForEachOpener`, and
+`BinaryConcatOperatorRuntimeSemantics.IsByteArray` each unwrap before matching a wrapped array.
 
 ### 5.0.2.3 Statement Evaluation
 > [!NOTE]
