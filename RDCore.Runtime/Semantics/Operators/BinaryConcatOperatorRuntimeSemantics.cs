@@ -112,7 +112,14 @@ public record class BinaryConcatOperatorRuntimeSemantics(
         };
     }
 
-    private static bool IsByteArray(VBTypedValue value) => value is VBArrayValue { ItemType: VBByteType };
+    // a Variant holding a Byte array reports its own TypeInfo as the array's, but stays a VBVariantValue
+    // instance - unwrap it (recursively) the same way every other Variant-holding-a-complex-value site does.
+    private static bool IsByteArray(VBTypedValue value) => value switch
+    {
+        VBVariantValue { TypedValue: var wrapped } => IsByteArray(wrapped),
+        VBArrayValue { ItemType: VBByteType } => true,
+        _ => false,
+    };
 
     protected override RuntimeSemanticsEvaluationResult EvaluateBinaryOperatorExpressionResult(
         ISymbolResolver resolver,

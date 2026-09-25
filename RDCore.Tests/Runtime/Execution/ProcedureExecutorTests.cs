@@ -73,8 +73,9 @@ public sealed class ProcedureExecutorTests
         var handle = new ProviderHandle();
         var booleanCoercion = new VBBooleanLetCoercionRuntimeSemantics(handle, formatter);
         var numericCoercion = new VBNumericLetCoercionTypeRuntimeSemantics(formatter, handle);
+        var variantCoercion = new VBVariantTypeLetCoercionRuntimeSemantics(handle, formatter);
         var letCoercion = new LetCoercionRuntimeSemanticsProvider(
-            [numericCoercion, booleanCoercion], formatter);
+            [numericCoercion, booleanCoercion, variantCoercion], formatter);
         handle.Inner = letCoercion;
         var expressionEvaluator = new RuntimeExpressionEvaluator(new OperatorRuntimeSemanticsProvider(letCoercion, formatter));
         var statements = new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), formatter);
@@ -428,6 +429,61 @@ public sealed class ProcedureExecutorTests
         Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
         Assert.AreEqual(60, session.Symbols.Resolver.GetValue(s).Value.BoxedValue);
         Assert.AreEqual(30, session.Symbols.Resolver.GetValue(item).Value.BoxedValue); // holds the last element
+    }
+
+    [TestMethod]
+    public void LetAssigningAnArrayIntoAVariant_ThenIndexingIt_ReadsTheElement()
+        // Dim arr(...) As Long: Dim v As Variant: v = arr: x = v(1) - the full real path, not a
+        // pre-built VBVariantValue: Let-assignment itself must wrap the array (MS-VBAL 5.5.1.2.12,
+        // "any type except a class or Nothing" - an array is neither), round-trip it through storage,
+        // and EvaluateIndex must unwrap it back out again.
+    {
+        var list = Lower("v = arr", "x = v(1)");
+        var x = Local("x", VBLongType.TypeInfo);
+        var v = Local("v", VBVariantType.TypeInfo);
+        var arr = Local("arr", new VBFixedSizeArrayType(VBLongType.TypeInfo));
+        var session = ComposeSession(x, v, arr);
+        var frame = PushFrame(session, (x, new VBLongValue(0)), (v, VBVariantType.TypeInfo.DefaultValue), (arr, LongArray(10, 20, 30)));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(20, session.Symbols.Resolver.GetValue(x).Value.BoxedValue);
+    }
+
+    [TestMethod]
+    public void IndexingIntoAVariantHoldingAnArray_ReadsTheElement()
+        // x = v(1) - same unwrap EvaluateIndex needs for a Variant-typed array as ForEach does.
+    {
+        var list = Lower("x = v(1)");
+        var x = Local("x", VBLongType.TypeInfo);
+        var v = Local("v", VBVariantType.TypeInfo);
+        var session = ComposeSession(x, v);
+        var frame = PushFrame(session, (x, new VBLongValue(0)), (v, new VBVariantValue(LongArray(10, 20, 30))));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(20, session.Symbols.Resolver.GetValue(x).Value.BoxedValue);
+    }
+
+    [TestMethod]
+    public void ForEachLoop_OverAVariantHoldingAnArray_VisitsEveryElementInOrder()
+        // Dim v As Variant: v = arr - v's own declared type is Variant, but its bound VALUE is a
+        // VBVariantValue wrapping the same array LongArray builds for the declared-array test above;
+        // ExecuteForEachOpener must unwrap it to reach the real VBArrayValue underneath.
+    {
+        var list = Lower("For Each item In v", "s = s + item", "Next");
+        var item = Local("item", VBLongType.TypeInfo);
+        var s = Local("s", VBLongType.TypeInfo);
+        var v = Local("v", VBVariantType.TypeInfo);
+        var session = ComposeSession(item, s, v);
+        var frame = PushFrame(session, (item, new VBLongValue(0)), (s, new VBLongValue(0)), (v, new VBVariantValue(LongArray(10, 20, 30))));
+
+        var outcome = Executor().Run(session, frame, list, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(60, session.Symbols.Resolver.GetValue(s).Value.BoxedValue);
     }
 
     [TestMethod]

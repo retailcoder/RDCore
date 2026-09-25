@@ -601,7 +601,16 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             return ToFailureOutcome(collectionResult);
         }
 
-        switch (collectionResult.Result)
+        // a Variant holding an array (or an object) reports its own TypeInfo as the wrapped value's,
+        // but stays a VBVariantValue instance - unwrap it here (recursively) so "For Each x In v" on a
+        // Variant works the same as on a declared array/object collection.
+        var collection = collectionResult.Result;
+        while (collection is VBVariantValue { TypedValue: var wrapped })
+        {
+            collection = wrapped;
+        }
+
+        switch (collection)
         {
             case VBArrayValue { IsInitialized: false }:
                 // A Dim'd-but-never-ReDim'd array has no SAFEARRAY behind it at all - not "an array with
