@@ -87,8 +87,9 @@ public sealed class RuntimeProcedureInvokerTests
         var handle = new ProviderHandle();
         var booleanCoercion = new VBBooleanLetCoercionRuntimeSemantics(handle, formatter);
         var numericCoercion = new VBNumericLetCoercionTypeRuntimeSemantics(formatter, handle);
+        var variantCoercion = new VBVariantTypeLetCoercionRuntimeSemantics(handle, formatter);
         var letCoercion = new LetCoercionRuntimeSemanticsProvider(
-            [numericCoercion, booleanCoercion], formatter);
+            [numericCoercion, booleanCoercion, variantCoercion], formatter);
         handle.Inner = letCoercion;
         var expressionEvaluator = new RuntimeExpressionEvaluator(new OperatorRuntimeSemanticsProvider(letCoercion, formatter));
         var statements = new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), formatter);
@@ -562,6 +563,55 @@ public sealed class RuntimeProcedureInvokerTests
 
         Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
         Assert.AreEqual((int)VBRuntimeErrorId.NamedArgumentNotFound, outcome.ErrorInfo!.ErrorId);
+    }
+
+    [TestMethod]
+    public void ParamArray_CollectsTheTrailingPositionalArguments_IntoAFreshArray()
+        // rest(0)/rest(1) round-trip through a real Variant array cell - collection, storage, and
+        // reading an element's own VALUE back all have to work together for 12 (100 + 5 + 7) to come out.
+    {
+        var calleeStub = new VBProcedureMemberSymbol(Root, ModuleUri, "Callee", ScopeKind.Module, SymbolKindExt.Procedure, VBVoidType.TypeInfo, R, R, AccessModifier.Public);
+        var prefix = new VBParameterSymbol(Root, calleeStub.Uri, "prefix", R, R, ParameterKind.ExplicitByVal, VBLongType.TypeInfo);
+        var rest = new ParamArrayParameterSymbol(Root, calleeStub.Uri, "rest", R, R, ParameterKind.ExplicitByRef);
+        var callee = calleeStub with { Parameters = [prefix, rest] };
+
+        var calleeBody = Lower("counter = prefix + rest(0) + rest(1)");
+        var callerList = Lower("Call Callee(100, 5, 7)");
+        var counter = new VBModuleFieldVariableMemberSymbol(Root, ModuleUri, "counter", ScopeKind.Module, VBLongType.TypeInfo, R, R, AccessModifier.Implicit);
+        var bodies = new Dictionary<SemanticId, InstructionList> { [callee.SemanticId] = calleeBody };
+
+        var (executor, session) = Compose(bodies, counter, callee);
+        var frame = PushCallerFrame(session);
+
+        var outcome = executor.Run(session, frame, callerList, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(112, session.Symbols.Resolver.GetValue(counter).Value.BoxedValue);
+    }
+
+    [TestMethod]
+    public void ParamArray_WithNoTrailingArguments_BindsAnEmptyArray_WithoutCrashing()
+        // Call Callee(100), nothing left over for rest - the single most common ParamArray call shape,
+        // and the one that used to crash outright: an empty array's Size is 0, which SessionStorage now
+        // mints a synthetic address for instead of asking the allocator for zero bytes.
+    {
+        var calleeStub = new VBProcedureMemberSymbol(Root, ModuleUri, "Callee", ScopeKind.Module, SymbolKindExt.Procedure, VBVoidType.TypeInfo, R, R, AccessModifier.Public);
+        var prefix = new VBParameterSymbol(Root, calleeStub.Uri, "prefix", R, R, ParameterKind.ExplicitByVal, VBLongType.TypeInfo);
+        var rest = new ParamArrayParameterSymbol(Root, calleeStub.Uri, "rest", R, R, ParameterKind.ExplicitByRef);
+        var callee = calleeStub with { Parameters = [prefix, rest] };
+
+        var calleeBody = Lower("counter = prefix");
+        var callerList = Lower("Call Callee(100)");
+        var counter = new VBModuleFieldVariableMemberSymbol(Root, ModuleUri, "counter", ScopeKind.Module, VBLongType.TypeInfo, R, R, AccessModifier.Implicit);
+        var bodies = new Dictionary<SemanticId, InstructionList> { [callee.SemanticId] = calleeBody };
+
+        var (executor, session) = Compose(bodies, counter, callee);
+        var frame = PushCallerFrame(session);
+
+        var outcome = executor.Run(session, frame, callerList, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(100, session.Symbols.Resolver.GetValue(counter).Value.BoxedValue);
     }
 
     [TestMethod]
