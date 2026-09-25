@@ -1,8 +1,11 @@
-﻿using RDCore.SDK.Model.Values.Bindings;
-using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Model.Values.Abstract;
 
 namespace RDCore.SDK.Model.Values.Runtime;
 
+/// <summary>
+/// A Variant's own value-type tag — a deliberately partial slice of the COM <c>VARIANT</c> <c>VT_*</c>
+/// tag space; only the shapes an actual caller needs so far are represented.
+/// </summary>
 public enum VBVariantValueType
 {
     Empty,
@@ -12,8 +15,14 @@ public enum VBVariantValueType
 }
 
 /// <summary>
-/// Represents the <em>managed value</em> of a <see cref="VBVariantValue"/>
+/// Wraps a <see cref="VBVariantValue"/>'s own wrapped <see cref="VBTypedValue"/> for storage inside an
+/// <see cref="IRuntimeValue"/>, so a Variant round-trips through <c>ISessionStorage</c> like any other
+/// value — the same pattern <see cref="VBRuntimeArrayValue"/> uses for an array.
 /// </summary>
-/// <param name="ValueType">The variant <em>value type</em>.</param>
-/// <param name="Handle">A handle to the value in the specified memory space.</param>
-public readonly record struct VBRuntimeVariantValue(VBVariantValueType ValueType, IBindingHandle Handle);
+/// <param name="ValueType">The variant <em>value type</em> tag.</param>
+/// <param name="WrappedValue">The Variant's own wrapped value, cells/type info intact.</param>
+public sealed record class VBRuntimeVariantValue(VBVariantValueType ValueType, VBTypedValue WrappedValue) : IRuntimeValue
+{
+    /// <inheritdoc/>
+    public object BoxedValue => WrappedValue.RuntimeValue.BoxedValue;
+}

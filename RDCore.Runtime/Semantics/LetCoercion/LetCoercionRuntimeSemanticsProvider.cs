@@ -170,10 +170,20 @@ public class LetCoercionRuntimeSemanticsProvider(
     };
 
     public LetCoercionResult EvaluateLetCoercionSemantics(
-        ISymbolResolver resolver, 
-        ExpressionNode expression, 
+        ISymbolResolver resolver,
+        ExpressionNode expression,
         LetCoercionStackFrame frame)
     {
+        // a Variant source's own TypeInfo already mirrors its wrapped value's (so dispatch above still
+        // picks the right destination strategy), but every strategy casts frame.SourceValue directly to
+        // its own concrete value type - unwrap here, once, so that cast sees the real wrapped value
+        // instead of the VBVariantValue box around it. VBVariantValue's own ctor allows wrapping another
+        // Variant, so this unwraps all the way down rather than assuming a single level of nesting.
+        while (frame.SourceValue is VBVariantValue { TypedValue: var wrapped })
+        {
+            frame = frame with { SourceValue = wrapped };
+        }
+
         if (!TryGetStrategy(frame.DestinationTypeDesc.Target, out var strategy))
         {
             // in-and-out: no need to push the coercion frame for this

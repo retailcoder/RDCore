@@ -71,6 +71,19 @@ public sealed class LetCoercionRuntimeProviderTests : LetCoercionRuntimeSemantic
     }
 
     [TestMethod]
+    public void Dispatch_AVariantWrappedSource_UnwrapsBeforeTheStrategySeesIt()
+        // regression: a Variant source's own TypeInfo mirrors its wrapped value's (so dispatch above
+        // still picks VBNumericLetCoercionTypeRuntimeSemantics), but that strategy casts frame.SourceValue
+        // directly to VBNumericTypedValue - handed the VBVariantValue box itself, that cast threw
+        // InvalidCastException instead of coercing.
+    {
+        var result = Coerce(new VBVariantValue(new VBDoubleValue(2.67)), VBIntegerType.TypeInfo);
+        Assert.IsTrue(result.IsSuccess, result.ErrorInfo is null ? "" : ((VBRuntimeErrorId)result.ErrorInfo.ErrorId).ToString());
+        Assert.IsInstanceOfType<VBIntegerValue>(result.Result);
+        Assert.AreEqual((short)3, ((VBIntegerValue)result.Result!).Value);
+    }
+
+    [TestMethod]
     public void Dispatch_UnknownDestination_IsTypeMismatch()
         => Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch,
             Coerce(new VBDoubleValue(1), VBStringType.TypeInfo).ErrorInfo!.ErrorId);

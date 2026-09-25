@@ -88,12 +88,24 @@ public sealed class IntrinsicValueConstructorTests
     {
         var handle = InvalidBindingHandle.Default;
         (int, int)[] dims = [(0, 2)];
-        // item type kept to a numeric to avoid the pre-existing VBVariant default-value materialization
-        // bug in VBArrayDimension's ctor (out of scope — complex-value follow-up).
         Assert.AreSame(handle, new VBFixedSizeArrayValue(handle, dims, VBIntegerType.TypeInfo).Handle);
         Assert.AreSame(handle, new VBResizableArrayValue(handle, dims, VBIntegerType.TypeInfo).Handle);
         Assert.AreSame(handle, new VBResizableByteArrayValue(handle, dims).Handle);
         Assert.AreSame(handle, new VBVariantValue(handle, new VBLongValue(1)).Handle);
         // VBUserDefinedTypeValue(IBindingHandle, VBUserDefinedType) compiles; a UDT fixture needs a Symbol.
+    }
+
+    [TestMethod]
+    public void VariantItemArray_DefaultCell_MaterializesReadably()
+        // regression: VBVariantType.DefaultValue's own Handle used to be InvalidBindingHandle.Default
+        // (BindingCapabilities.None), so CreateDefaultCell's own GetValue capability check always failed
+        // for a Variant item type and every cell fell back to an inert, unreadable default - fixed by
+        // VBVariantValue's own constructor now self-consistently binding its own Handle.
+    {
+        var array = new VBFixedSizeArrayValue([(0, 2)], VBVariantType.TypeInfo);
+
+        var element = array[0];
+
+        Assert.IsNotNull(element);
     }
 }

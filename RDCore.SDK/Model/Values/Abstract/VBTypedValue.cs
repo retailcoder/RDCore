@@ -43,10 +43,6 @@ public abstract record class VBTypedValue(VBType TypeInfo)
     {
         Handle = new ValueBindingHandle(value);
     }
-    protected VBTypedValue(VBType typeInfo, VBRuntimeVariantValue variant) : this(typeInfo)
-    {
-        Handle = variant.Handle;
-    }
 
 
     /// <summary>
