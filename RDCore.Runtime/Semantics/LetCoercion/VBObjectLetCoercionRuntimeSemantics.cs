@@ -1,14 +1,17 @@
-﻿using RDCore.Runtime.Semantics.Abstract;
+﻿using RDCore.Runtime.Execution;
+using RDCore.Runtime.Semantics.Abstract;
 using RDCore.SDK;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Meta;
+using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Builders;
@@ -19,44 +22,98 @@ namespace RDCore.Runtime.Semantics.LetCoercion;
 /// <summary>
 /// MS-VBAL 5.5.1.2.13 Let-coercion to and from <c>VBObjectValue</c>
 /// </summary>
+/// <remarks>
+/// The coercion provider dispatches this strategy centrally whenever the SOURCE is an object
+/// (<see cref="LetCoercionRuntimeSemanticsProvider.EvaluateLetCoercionSemantics"/>), not just when the
+/// destination happens to be one too - MS-VBAL's "Any class -&gt; Any type" and "Nothing -&gt; Any type"
+/// rules don't key off the destination at all.
+/// </remarks>
 public record class VBObjectLetCoercionRuntimeSemantics(
     ILetCoercionRuntimeSemanticsProvider LetCoercionProvider,
-    IVerboseMessageBuilder FormatterService) 
+    IVerboseMessageBuilder FormatterService)
     : LetCoercionRuntimeSemantics<VBObjectType>(FormatterService)
 {
-    private VBTypedValue? GetObjectSimpleDataValue(
-        ISymbolResolver resolver, 
-        VBObjectValue value) 
-    { 
-        if (value.TypeInfo is VBClassType classType && classType.DefaultMember is VBTypeMemberSymbol defaultMember)
+    /// <summary>
+    /// The invoker a default-member call runs through. Settable rather than a constructor parameter,
+    /// for the same construction-order reason as <c>RuntimeExpressionEvaluator.ProcedureInvoker</c>:
+    /// building an invoker needs a <c>ProcedureExecutor</c>, which is built from providers like this
+    /// one - so this strategy has to exist first, and this gets assigned once every other collaborator
+    /// is composed. <c>null</c> until then; a default-member resolution then reports <c>InternalError</c>
+    /// rather than throwing.
+    /// </summary>
+    public IProcedureInvoker? ProcedureInvoker { get; set; }
+
+    /// <summary>
+    /// The session a default member is looked up against. Settable for the same construction-order
+    /// reason as <see cref="ProcedureInvoker"/> — needed because, per
+    /// <c>SetCoercionRuntimeSemantics</c>'s own remarks, a <see cref="VBObjectValue"/>'s own
+    /// <c>TypeInfo</c> is always the generic <see cref="VBObjectType"/>: a live object's actual class
+    /// is only known by looking up its <see cref="IObjectInstance.ClassModule"/> through
+    /// <see cref="IRuntimeSession.TryGetInstance"/>.
+    /// </summary>
+    public IRuntimeSession? Session { get; set; }
+
+    // MS-VBAL 5.5.1.2.13's own "simple data value" definition: invoke the source's public default
+    // Property Get/Function with no arguments (Me alone, at parameter index 0), then let-coerce
+    // WHATEVER it returns - object or not - to the frame's real destination by routing back through
+    // the provider. That single recursive call handles both outcomes: a non-object result dispatches
+    // straight to the destination's own strategy; another object re-enters this same strategy (the
+    // provider's central override still applies), and LetCoercionStackManager's existing recursion
+    // guard (keyed on NodeId+SourceValue+DestinationTypeDesc) catches a cyclic default-member chain
+    // (e.g. an object whose default member returns itself) as OutOfStackSpace.
+    private LetCoercionResult GetObjectSimpleDataValue(
+        ISymbolResolver resolver,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame,
+        VBObjectValue value)
+    {
+        if (Session is not { } session || !session.Symbols.TryGetInstance(value.Value, out var instance))
         {
-            VBTypedValue resolvedValue = value;
-            if (defaultMember.ResolvedType is VBVariantType variantType)
-            {
-                // late bound variant - the runtime would know, but we know its subtype and we can use it.
-                // however if we unwrap another variant, we could be missing the bigger picture: let the coercion provider handle this.
-
-                // ⚠️ FIXME two consecutive VBVariant/VBVariant->VBVariant/VBVariant frames would be deemed recursive and stop resolution, which is a problem:
-                // we're resolving to VBUnknownType (so.. *not* resolving then), and this will inevitably end with an InternalError stack trace.
-                if (variantType.Subtype != VBVariantType.TypeInfo)
-                {
-                }
-            }
-
-            if (defaultMember.ResolvedType is VBObjectType)
-            {
-                // late bound call - the runtime knows what we're looking at.
-                // 👉 ISymbolResolver.GetValue yields in O(1) the VBTypedValue of any symbol loaded in the global heap.
-            }
-
-            if (defaultMember.ResolvedType is VBClassType)
-            {
-                // early bound call - everything is statically defined.
-            }
-
+            return LetCoercionResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.InternalError, expression.Location,
+                Exceptions.VBRuntimeInternalError_LetCoercionStrategyWasNotApplicable));
         }
 
-        return default;
+        if (VBClassType.FromClassModule(instance.ClassModule).DefaultMember is not VBReturningMemberSymbol defaultMember)
+        {
+            return LetCoercionResult.Error(OnLetCoercionObjectDoesntSupportThisPropertyOrMethod(expression, frame));
+        }
+
+        // SymbolBuilder.BuildParameters synthesizes an implicit Me at slot 0 of every class-instance
+        // member (rdcore-me-implicit-parameter-design); anything beyond that is the member's own
+        // declared parameter list. MS-VBAL 5.5.1.2.13 only needs that declared list "compatible with an
+        // argument list containing 0 parameters" - every declared parameter is Optional or a ParamArray,
+        // not that there are none at all.
+        var parameters = RuntimeProcedureInvoker.GetParameters(defaultMember);
+        if (parameters.Length == 0 || parameters.Skip(1).Any(parameter => parameter is not ParamArrayParameterSymbol && !parameter.IsOptional))
+        {
+            return LetCoercionResult.Error(OnLetCoercionObjectDoesntSupportThisPropertyOrMethod(expression, frame));
+        }
+
+        if (ProcedureInvoker is not { } invoker)
+        {
+            return LetCoercionResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.InternalError, expression.Location,
+                Exceptions.VBRuntimeInternalError_LetCoercionStrategyWasNotApplicable));
+        }
+
+        // IProcedureInvoker.Invoke itself has no default-argument filling - the call site is expected to
+        // supply a full, parameters.Length-sized array (RuntimeExpressionEvaluator.InvokeProcedure's own
+        // MapArguments already does exactly this before calling Invoke) - so every omitted argument
+        // beyond Me is filled in here: a ParamArray gets a fresh zero-element array (MS-VBAL §5.3.1.11,
+        // same shape RuntimeExpressionEvaluator.CollectParamArrayArguments builds for zero elements), an
+        // Optional gets its own declared default, or its type's default when it declared none.
+        var arguments = new IRuntimeValue[parameters.Length];
+        arguments[0] = value.RuntimeValue;
+        for (var i = 1; i < parameters.Length; i++)
+        {
+            arguments[i] = parameters[i] is ParamArrayParameterSymbol
+                ? new VBRuntimeValue<VBRuntimeArrayValue>(new VBRuntimeArrayValue(new VBFixedSizeArrayValue([])))
+                : (parameters[i].DefaultValue ?? parameters[i].ResolvedType.DefaultValue).RuntimeValue;
+        }
+
+        var invocation = invoker.Invoke(defaultMember, resolver, arguments);
+        return invocation.IsSuccess
+            ? LetCoercionProvider.EvaluateLetCoercionSemantics(resolver, expression, frame with { SourceValue = invocation.Result! })
+            : LetCoercionResult.Error(invocation.ErrorInfo!);
     }
 
     /// <summary>
@@ -68,25 +125,26 @@ public record class VBObjectLetCoercionRuntimeSemantics(
         => LetCoercionResult.Error(VBRuntimeErrorInfo.For(
             VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, expression.Location, verbose));
 
+    private VBRuntimeErrorInfo OnLetCoercionObjectDoesntSupportThisPropertyOrMethod(ExpressionNode expression, LetCoercionStackFrame frame) =>
+        VBRuntimeErrorInfo.For(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, expression.Location,
+            FormatterService.Format(Exceptions.LetCoercionRuntimeErrorExceptionObjectDoesntSupportThisPropertyOrMethod_Verbose, expression, [frame]));
+
     public override LetCoercionResult EvaluateLetCoercion(
-        ISymbolResolver resolver, 
-        ExpressionNode expression, 
-        LetCoercionStackFrame frame) 
+        ISymbolResolver resolver,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame)
         => frame.SourceValue switch
         {
             // IMPLEMENTATION NOTE: moved before VBObjectValue because the inheritance hierarchy would make this case unreachable otherwise.
-            VBNothingValue when frame.SourceValue is VBTypedValue 
+            VBNothingValue when frame.SourceValue is VBTypedValue
                 => OnLetCoercionObjectVariableNotSet(expression, Exceptions.LetCoercionRuntimeErrorExceptionObjectVariableNotSet),
-        
-            VBObjectValue objectValue when frame.SourceValue.TypeInfo is VBClassType 
-                =>  GetObjectSimpleDataValue(resolver, objectValue) is VBTypedValue result 
-                        ? LetCoercionResult.Success(result, frame)
-                        : LetCoercionResult.Error(OnLetCoercionTypeMismatch(expression, frame)),
 
-            not VBObjectValue and not VBNothingValue 
-                => LetCoercionResult.Error(OnLetCoercionObjectRequired(expression, frame)),
+            // a VBObjectValue's own TypeInfo is always the generic VBObjectType (never a VBClassType) -
+            // GetObjectSimpleDataValue resolves the real class itself, via Session.
+            VBObjectValue objectValue
+                => GetObjectSimpleDataValue(resolver, expression, frame, objectValue),
 
-            _ => LetCoercionResult.NotApplicable(frame)
+            _ => LetCoercionResult.Error(OnLetCoercionObjectRequired(expression, frame))
         };
 
     protected override ILetCoercionSemanticContextBuilder AnalyzeLetCoercionOperation(
