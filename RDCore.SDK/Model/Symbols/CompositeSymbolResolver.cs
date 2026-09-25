@@ -1,4 +1,5 @@
 ﻿using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -58,6 +59,13 @@ public sealed class CompositeSymbolResolver(params ISymbolResolver[] resolvers) 
 
     /// <inheritdoc/>
     public bool TryGetAddress(Symbol symbol, out MemoryAddress address)
+    {
+        address = default;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address)
     {
         address = default;
         return false;

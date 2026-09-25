@@ -4,6 +4,7 @@ using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Types.Complex;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -345,6 +346,13 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
 
     /// <inheritdoc/>
     public bool TryGetAddress(Symbol symbol, out MemoryAddress address)
+    {
+        address = default;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address)
     {
         address = default;
         return false;

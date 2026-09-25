@@ -4,6 +4,7 @@ using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -231,6 +232,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         }
 
         public bool TryGetAddress(Symbol symbol, out MemoryAddress address)
+        {
+            address = default;
+            return false;
+        }
+
+        public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address)
         {
             address = default;
             return false;

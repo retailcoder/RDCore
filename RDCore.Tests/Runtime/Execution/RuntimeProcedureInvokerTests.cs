@@ -383,6 +383,58 @@ public sealed class RuntimeProcedureInvokerTests
     }
 
     [TestMethod]
+    public void DimLocal_IsHoistedFresh_EveryCall()
+        // MS-VBAL §5.4.3.1: a plain Dim has PROCEDURE extent - x resets to its declared type's own
+        // default (0) at the start of every call, never carrying the previous call's value forward. If
+        // hoisting didn't happen at all, "x" wouldn't resolve by name and this would report
+        // InternalError instead; if Dim were mistakenly given module extent, counter would end up 3
+        // (1 + 2) instead of 2 (1 + 1) - the exact same body shape the Static test below uses, so the
+        // two tests together prove the PC extent/module extent distinction, not just "some value flows".
+    {
+        var counter = new VBModuleFieldVariableMemberSymbol(Root, ModuleUri, "counter", ScopeKind.Module, VBLongType.TypeInfo, R, R, AccessModifier.Implicit);
+        var calleeStub = new VBProcedureMemberSymbol(Root, ModuleUri, "Callee", ScopeKind.Module, SymbolKindExt.Procedure, VBVoidType.TypeInfo, R, R, AccessModifier.Public);
+        var x = new VBLocalVariableSymbol(Root, calleeStub.Uri, "x", ScopeKind.Local, R, R, IsStatic: false, ResolvedType: VBLongType.TypeInfo);
+        var callee = calleeStub with { Locals = [x] };
+
+        var calleeBody = Lower("x = x + 1", "counter = counter + x");
+        var callerList = Lower("Call Callee", "Call Callee");
+        var bodies = new Dictionary<SemanticId, InstructionList> { [callee.SemanticId] = calleeBody };
+
+        var (executor, session) = Compose(bodies, counter, callee);
+        var frame = PushCallerFrame(session);
+
+        var outcome = executor.Run(session, frame, callerList, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(2, session.Symbols.Resolver.GetValue(counter).Value.BoxedValue);
+    }
+
+    [TestMethod]
+    public void StaticLocal_PersistsItsValue_AcrossCalls()
+        // MS-VBAL §5.4.3.1: a Static local has MODULE extent - x keeps whatever the previous call left
+        // it at. Same body shape as the Dim test above, only IsStatic flipped: counter ends up 3 (1 + 2)
+        // here instead of 2 (1 + 1), proving x itself accumulated across the two calls rather than
+        // resetting.
+    {
+        var counter = new VBModuleFieldVariableMemberSymbol(Root, ModuleUri, "counter", ScopeKind.Module, VBLongType.TypeInfo, R, R, AccessModifier.Implicit);
+        var calleeStub = new VBProcedureMemberSymbol(Root, ModuleUri, "Callee", ScopeKind.Module, SymbolKindExt.Procedure, VBVoidType.TypeInfo, R, R, AccessModifier.Public);
+        var x = new VBLocalVariableSymbol(Root, calleeStub.Uri, "x", ScopeKind.Local, R, R, IsStatic: true, ResolvedType: VBLongType.TypeInfo);
+        var callee = calleeStub with { Locals = [x] };
+
+        var calleeBody = Lower("x = x + 1", "counter = counter + x");
+        var callerList = Lower("Call Callee", "Call Callee");
+        var bodies = new Dictionary<SemanticId, InstructionList> { [callee.SemanticId] = calleeBody };
+
+        var (executor, session) = Compose(bodies, counter, callee);
+        var frame = PushCallerFrame(session);
+
+        var outcome = executor.Run(session, frame, callerList, new RuntimeEvaluationContext(ProcedureUri));
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind);
+        Assert.AreEqual(3, session.Symbols.Resolver.GetValue(counter).Value.BoxedValue);
+    }
+
+    [TestMethod]
     public void ACalleeRaisingAnError_PropagatesToTheCaller()
         // Proves the round trip a nested call takes through RuntimeProcedureInvoker.Invoke: the callee's
         // own Run() produces an Error outcome, Invoke turns it into a RuntimeSemanticsEvaluationResult

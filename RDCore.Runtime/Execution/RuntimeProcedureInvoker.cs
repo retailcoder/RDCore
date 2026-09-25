@@ -97,6 +97,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             }
         }
 
+        HoistLocals(Session, frame, GetLocals(procedure));
+
         var outcome = Executor.Run(Session, frame, body, new RuntimeEvaluationContext(procedure.Uri));
         Session.CallStack.TryPop(out _);
 
@@ -113,12 +115,64 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         };
     }
 
+    // MS-VBAL §5.4.3: "Create the function result variable and any procedure extent local variables
+    // declared within the procedure" is step 4 of procedure invocation, after parameters (steps 1-2)
+    // and the error-handling policy reset (step 3, already free - CallStackFrame.ErrorHandler defaults
+    // to Disabled on every freshly-constructed frame) and the return-value seed (also already done).
+    // A Dim (procedure extent) gets a fresh Push every call, seeded to its declared type's own default,
+    // freed with the rest of the frame when this call returns. A Static (module extent) instead needs
+    // storage that OUTLIVES this call - ISymbolResolver.TryAllocate reserves it in the session's own
+    // module-level heap, the same tier a module field uses, deliberately NOT via ISessionSymbols.TryDefine:
+    // TryDefine's own bucket-add would register the SAME symbol a second time, since a procedure's own
+    // Locals (ScopeTreeBuilder.LocalsOf, mirroring how Parameters already "ride on" their own procedure
+    // symbol) already makes it resolvable by name on its own - a real ambiguous-name risk, not just
+    // redundant work. CallStackAwareSymbolResolver already falls through to this same session-level
+    // storage for any Local-scoped symbol the current frame doesn't itself declare, so a Static local
+    // never needs a frame binding at all. TryAllocate itself is safe to call every time (a symbol
+    // already allocated just gets a fresh, independent copy of the same default value - see its own
+    // xmldoc), but only the FIRST call should actually happen: every later call must see whatever the
+    // previous call's own body last wrote, not get reset back to the default.
+    private static void HoistLocals(IRuntimeSession session, CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals)
+    {
+        foreach (var local in locals)
+        {
+            if (local is not VBLocalVariableSymbol variable)
+            {
+                // VBLocalConstantSymbol (a local Const): MS-VBAL's own value is a compile-time
+                // substitution, never a runtime address - nothing yet threads a local Const's own
+                // initializer expression to where the runtime could evaluate it. A documented,
+                // deliberate gap, not a silent misread: reading one still resolves to InternalError,
+                // exactly as it already does today.
+                continue;
+            }
+
+            if (variable.IsStatic)
+            {
+                if (!session.Symbols.Resolver.TryGetAddress(variable, out _))
+                {
+                    session.Symbols.Resolver.TryAllocate(variable, ((ITypedSymbol)variable).ResolvedType.DefaultValue, out _);
+                }
+            }
+            else
+            {
+                frame.Push(variable, ((ITypedSymbol)variable).ResolvedType.DefaultValue);
+            }
+        }
+    }
+
     internal static bool IsByRef(ParameterKind kind) => kind is ParameterKind.ImplicitByRef or ParameterKind.ExplicitByRef;
 
     internal static ImmutableArray<VBParameterSymbol> GetParameters(VBTypeMemberSymbol procedure) => procedure switch
     {
         VBProcedureMemberSymbol sub => sub.Parameters,
         VBReturningMemberSymbol returning => returning.Parameters,
+        _ => [],
+    };
+
+    internal static ImmutableArray<BoundTypedSymbol> GetLocals(VBTypeMemberSymbol procedure) => procedure switch
+    {
+        VBProcedureMemberSymbol sub => sub.Locals,
+        VBReturningMemberSymbol returning => returning.Locals,
         _ => [],
     };
 }

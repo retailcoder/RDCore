@@ -1,5 +1,6 @@
 ﻿using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Runtime.Shared;
 using System.Diagnostics.CodeAnalysis;
@@ -94,5 +95,20 @@ public interface ISymbolResolver
     /// <param name="symbol">The <see cref="Symbol"/> whose address to look up.</param>
     /// <param name="address">The reserved address, if <paramref name="symbol"/> is currently allocated.</param>
     bool TryGetAddress(Symbol symbol, out MemoryAddress address);
+
+    /// <summary>
+    /// Reserves storage sized for <paramref name="value"/> and binds it to <paramref name="symbol"/> —
+    /// a <c>Static</c> local's own first-call allocation (<strong>MS-VBAL §5.4.3.1</strong>: module
+    /// extent, so it must persist past its own frame popping) chiefly. This is a storage-only
+    /// operation: it never affects name resolution, so it is never how a symbol's name itself becomes
+    /// resolvable — that rides on its own declaring symbol instead (a procedure's own
+    /// <c>Locals</c>/<c>Parameters</c>), the same way calling this twice for an already-allocated
+    /// symbol is safe (a fresh allocation, the previous one freed first) but never necessary.
+    /// </summary>
+    /// <param name="symbol">The symbol to reserve storage for.</param>
+    /// <param name="value">The value to seed the new storage with.</param>
+    /// <param name="address">The reserved address, on success.</param>
+    /// <returns><c>false</c> if the underlying memory space is exhausted.</returns>
+    bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address);
 }
 

@@ -129,4 +129,26 @@ public sealed class CallStackAwareSymbolResolverTests
         Assert.IsTrue(sut.TryRead(address, out var value));
         Assert.AreSame(expected, value);
     }
+
+    [TestMethod]
+    public void TryAllocate_AlwaysDelegatesToTheInnerResolver()
+        // Allocating NEW storage is a session-level concern even for a Local-scoped symbol (a Static
+        // local's own first-call allocation, chiefly) - an ordinary frame-local's own storage is a
+        // completely separate mechanism (ICallStackFrame.Push), never reachable through this method, so
+        // there's no frame-awareness to test here either way - an active frame is present just to prove
+        // it's genuinely ignored, the same shape GetValue_ModuleScopedSymbol_... already uses.
+    {
+        var storage = new SessionStorage(new SessionMemory(new FreeListManager(), PointerSize.x86));
+        var callStack = new RuntimeCallStack();
+        callStack.TryPush(new CallStackFrame(NodeId, Procedure, [], storage));
+        var local = Local("i");
+        var value = new VBLongValue(5);
+        var expectedAddress = new MemoryAddress(3);
+        var inner = Substitute.For<ISymbolResolver>();
+        inner.TryAllocate(local, value, out Arg.Any<MemoryAddress>()).Returns(call => { call[2] = expectedAddress; return true; });
+        var sut = new CallStackAwareSymbolResolver(callStack, inner);
+
+        Assert.IsTrue(sut.TryAllocate(local, value, out var address));
+        Assert.AreEqual(expectedAddress, address);
+    }
 }

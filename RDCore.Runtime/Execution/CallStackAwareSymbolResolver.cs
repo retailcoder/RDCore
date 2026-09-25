@@ -1,5 +1,6 @@
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -53,4 +54,13 @@ public sealed class CallStackAwareSymbolResolver(ICallStack callStack, ISymbolRe
 
         return inner.TryGetAddress(symbol, out address);
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Always the session-wide <paramref name="inner"/> resolver, never the current frame: allocating
+    /// NEW storage is a session-level concern (a <c>Static</c> local's own first-call allocation,
+    /// chiefly) — an ordinary frame-local's own storage is a completely separate mechanism
+    /// (<see cref="ICallStackFrame.Push"/>), not reachable through this method at all.
+    /// </remarks>
+    public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address) => inner.TryAllocate(symbol, value, out address);
 }

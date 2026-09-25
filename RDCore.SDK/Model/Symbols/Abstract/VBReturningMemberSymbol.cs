@@ -1,4 +1,5 @@
-﻿using RDCore.SDK.Model.Symbols.VBProject;
+﻿using RDCore.SDK.Model.Symbols;
+using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Types.Abstract;
 using System.Collections.Immutable;
@@ -27,6 +28,14 @@ public abstract record class VBReturningMemberSymbol(Uri WorkspaceRoot, Uri Pare
     /// An <em>immutable array</em> containing the parameters of this procedure member.
     /// </summary>
     public ImmutableArray<VBParameterSymbol> Parameters { get; init; } = [];
+
+    /// <summary>
+    /// An <em>immutable array</em> containing the <c>Dim</c>/<c>Static</c>/<c>Const</c> local
+    /// declarations of this procedure member (<strong>MS-VBAL §5.4.3</strong>) — a
+    /// <see cref="VBLocalVariableSymbol"/> per <c>Dim</c>/<c>Static</c>, a
+    /// <see cref="VBLocalConstantSymbol"/> per <c>Const</c>.
+    /// </summary>
+    public ImmutableArray<BoundTypedSymbol> Locals { get; init; } = [];
 }
 
 /// <summary>

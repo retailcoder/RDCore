@@ -41,12 +41,12 @@ public sealed class RuntimeSymbolResolver(ISymbolResolver names, ISessionStorage
     /// <inheritdoc/>
     public bool TryGetAddress(Symbol symbol, out MemoryAddress address) => _addresses.TryGetAddress(symbol, out address);
 
-    /// <summary>
-    /// Reserves storage sized for <paramref name="value"/> and binds it to <paramref name="symbol"/>,
-    /// reachable afterwards through both <see cref="GetValue"/> (by symbol) and <see cref="TryRead"/>
+    /// <inheritdoc cref="ISymbolResolver.TryAllocate"/>
+    /// <remarks>
+    /// Reachable afterwards through both <see cref="GetValue"/> (by symbol) and <see cref="TryRead"/>
     /// (by <paramref name="address"/>). A symbol already allocated has its previous storage freed
     /// first, so re-allocating never leaks the old block or leaves it readable with a stale handle.
-    /// </summary>
+    /// </remarks>
     /// <returns>
     /// <c>false</c> if the session's memory space is exhausted; the caller is responsible for reporting
     /// this as a coded <c>VBRuntimeErrorId.OutOfMemory</c> runtime error once it has a source location

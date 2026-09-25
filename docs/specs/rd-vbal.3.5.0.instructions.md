@@ -392,6 +392,31 @@ reads `frame.ReturnValue` back once `ExitProcedure` is reached — however it wa
 `Exit Function`/`Exit Property` or falling off the end of the body alike — instead of always reporting
 `VBVoidValue`.
 
+**Hoisted locals (MS-VBAL §5.4.3).** Procedure invocation's own step 4 — "create the function result
+variable and any procedure extent local variables declared within the procedure" — is now real for
+`Dim`/`Static` too, not just the function result variable above. A procedure's own NEW
+`VBProcedureMemberSymbol.Locals`/`VBReturningMemberSymbol.Locals` (mirroring `Parameters` exactly, down to
+`ScopeTreeBuilder` extracting both the same way — "a procedure's parameters and its own Dim/Static/Const
+locals ride on the member symbol, not as separate entries" — so a local never needs a second, flat
+registration of its own to resolve by name) lists every `Dim`/`Static`/`Const` declared in the body;
+`RuntimeProcedureInvoker.HoistLocals` walks it right after parameter binding, before the body ever runs. A
+`Dim` (§5.4.3.1, procedure extent) gets a fresh `CallStackFrame.Push`, seeded to its declared type's own
+default, every single call — freed with the rest of the frame when that call returns, so it never sees a
+previous call's value. A `Static` (module extent) instead needs storage that OUTLIVES the call: the NEW
+`ISymbolResolver.TryAllocate` reserves it in the session's own module-level heap, the same tier a module
+field already uses — deliberately NOT through `ISessionSymbols.TryDefine`, whose own bucket-add would
+register the SAME symbol a second time (a real ambiguous-name risk, not just redundant work), since
+`Locals`-riding already covers the name. Nothing about *reading* a `Static` local needs to change at all:
+`CallStackAwareSymbolResolver` already falls through to session-level storage for any Local-scoped symbol
+the current frame doesn't itself declare, so the one-time `TryAllocate` (guarded by `TryGetAddress` so only
+the FIRST call actually allocates — every later call must see whatever the previous call's own body last
+wrote) is the entire mechanism. **Deliberately not modeled by this slice:** a local `Const` — MS-VBAL's own
+value is a compile-time substitution, never a runtime address, and nothing yet threads a local `Const`'s
+own initializer expression to where the runtime could evaluate it; reading one still resolves to
+`InternalError`, the same documented gap as before, not a silent misread. Also not modeled: a whole
+procedure declared `Static` (MS-VBAL §5.3.1.2 — every one of ITS OWN locals gets module extent, not just
+the ones with an explicit `Static` keyword) — narrower than full spec, not wrong for what it does cover.
+
 ---
 ## 3.5.5 Placement and licensing
 
@@ -414,11 +439,19 @@ its own `ForEachState`. Each gets its own parallel `TryGetXState`/`SetXState` pa
 error, fault-statement offset) is different again — like `Pc`, it's a single mutable value per activation
 rather than per-offset hidden state, since an `On Error` statement changes the policy going forward rather
 than scoping it to one block — so it gets a plain `ErrorHandler { get; }`/`{ get; set; }` property pair,
-the same shape `Pc` itself uses, rather than a `TryGetXState`/`SetXState` pair. `ISymbolResolver.TryGetAddress`
-is the same read-only/SDK-interface split applied to name resolution itself: `CallStackAwareSymbolResolver`/
-`RuntimeSymbolResolver` (**RDCore.Runtime**) are its only two resolvers with a real answer; every
-compile-time-only resolver (`CompositeSymbolResolver`, `ScopeTreeSymbolResolver`, `IntrinsicSymbolResolver`)
-returns `false`, mirroring `TryRead`'s own existing pattern. `ProcedureExecutor`, its statement dispatch,
+the same shape `Pc` itself uses, rather than a `TryGetXState`/`SetXState` pair. `ISymbolResolver.TryGetAddress`/
+`TryAllocate` are the same read-only(ish)/SDK-interface split applied to name resolution itself:
+`CallStackAwareSymbolResolver`/`RuntimeSymbolResolver` (**RDCore.Runtime**) are the only two resolvers with a
+real answer for either — `TryAllocate` genuinely mutates (a `Static` local's own storage), unlike every
+other SDK-interface member here, because allocating session-level storage was never something only the
+executor needed a hook for; every compile-time-only resolver (`CompositeSymbolResolver`,
+`ScopeTreeSymbolResolver`, `IntrinsicSymbolResolver`) returns `false` for both, mirroring `TryRead`'s own
+existing pattern. `VBProcedureMemberSymbol.Locals`/`VBReturningMemberSymbol.Locals` (**RDCore.SDK**, MIT) —
+a `Dim`/`Static`/`Const` local "riding on" its own declaring procedure symbol, exactly like `Parameters`
+already does — is what `ScopeTreeBuilder` (also **RDCore.SDK**) extracts for name resolution and what
+`RuntimeProcedureInvoker.HoistLocals` (**RDCore.Runtime**) walks for storage; nothing about the STATIC
+side's own scope-tree machinery needed to change for the split between the two, only to learn about the
+new property. `ProcedureExecutor`, its statement dispatch,
 and activation state are **RDCore.Runtime** (GPLv3). `IProcedureInvoker`/`CallableBindingHandle` (the call
 *contract*: given a procedure symbol, a resolver, and arguments, run it) predate S9a and live in
 **RDCore.SDK** (MIT); `RuntimeProcedureInvoker` (the call's own real implementation — frame setup,
