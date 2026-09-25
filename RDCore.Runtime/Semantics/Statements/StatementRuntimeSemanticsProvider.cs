@@ -1,4 +1,5 @@
 using RDCore.Runtime.Execution;
+using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Operators;
 using RDCore.SDK;
@@ -9,10 +10,13 @@ using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.Operators;
+using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics;
 using RDCore.SDK.Services.VerboseMessages;
 
 namespace RDCore.Runtime.Semantics.Statements;
@@ -50,8 +54,27 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         {
             AssignmentStatementNode { Kind: AssignmentKind.ImplicitLet or AssignmentKind.ExplicitLet } assignment => ExecuteLetAssignment(session, context, assignment),
             AssignmentStatementNode { Kind: AssignmentKind.Set } assignment => ExecuteSetAssignment(session, context, assignment),
+            CallStatementNode call => ExecuteCall(session, context, call),
             _ => RuntimeExecutionOutcome.InternalError,
         };
+
+    // MS-VBAL §5.4.2.1: both the explicit Call Foo(...) form and the bare Foo(...)/Foo form evaluate
+    // Callee (its own argument list, if any, already part of its tree - see CallStatementNode's own
+    // doc) and discard whatever it returns; a Sub's own Void result discards just as cleanly as a real
+    // one would. The bare, unparenthesized multi-argument form (Foo 1, 2, populating Arguments directly
+    // instead) isn't wired yet - S9a's own scope is the parenthesized/no-argument shapes only.
+    private RuntimeExecutionOutcome ExecuteCall(IRuntimeSession session, RuntimeEvaluationContext context, CallStatementNode call)
+    {
+        if (!call.Arguments.IsEmpty)
+        {
+            return RuntimeExecutionOutcome.InternalError;
+        }
+
+        var result = _expressionEvaluator.Evaluate(session, call.Callee, context);
+        return result.IsSuccess ? RuntimeExecutionOutcome.Next
+            : result.IsInternalError ? RuntimeExecutionOutcome.InternalError
+            : RuntimeExecutionOutcome.Error(result.ErrorInfo!);
+    }
 
     // MS-VBAL §5.4.3.8. Scoped to a target that already resolves to a plain Symbol, same as
     // BinaryLetAssignmentOperatorRuntimeSemantics itself documents - a member-access or indexed target
@@ -73,6 +96,32 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         if (!valueResult.IsSuccess)
         {
             return valueResult.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(valueResult.ErrorInfo!);
+        }
+
+        if (target is VBFunctionMemberSymbol or VBPropertyGetMemberSymbol
+            && target.Uri.AbsoluteUri == context.Scope.AbsoluteUri && session.CallStack.Current is { } enclosing)
+        {
+            // MS-VBAL §5.3.1: "Foo = value" inside Foo's own body Let-assigns its function result
+            // variable, not the general symbol table - the read-side mirror of this check is
+            // RuntimeExpressionEvaluator.EvaluateSimpleName's own self-reference check. The function
+            // result variable isn't a real addressable Symbol, so this can't go through the same
+            // "__let_op" operator every other target does (it needs a real IBindingHandle) - Let-coerce
+            // directly instead, the same lower-level call ByVal/ByRef-fallback parameter passing already
+            // makes for the identical reason.
+            var returnCoercionFrame = new LetCoercionStackFrame(assignment.Identity, InputIndex.CoercionSourceValue,
+                valueResult.Result!, new VBTypeDescValue(((ITypedSymbol)target).ResolvedType));
+            var returnCoercionResult = _letAssignment.LetCoercionProvider.EvaluateLetCoercionSemantics(session.Symbols.Resolver, assignment.Value, returnCoercionFrame);
+            if (!returnCoercionResult.IsApplicable)
+            {
+                return RuntimeExecutionOutcome.InternalError;
+            }
+            if (!returnCoercionResult.IsSuccess)
+            {
+                return RuntimeExecutionOutcome.Error(returnCoercionResult.ErrorInfo!);
+            }
+
+            ((CallStackFrame)enclosing).ReturnValue = returnCoercionResult.Result!;
+            return RuntimeExecutionOutcome.Next;
         }
 
         // the reserved synthetic "__let_op" binary operator - the same shape its own test suite
