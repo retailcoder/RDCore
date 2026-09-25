@@ -355,7 +355,7 @@ where TFlags : struct, Enum
         // the same operands ValidateOperand exempts, and the same destination it coerces the others to.
         var destinationType = CoercionDestinationOf(frame);
         return operand is VBNullValue or VBTypeDescValue || frame.EffectiveType is VBNullType
-            || destinationType.Equals(operand.TypeInfo) // no coercion occurs
+            || (destinationType.Equals(operand.TypeInfo) && operand is not VBVariantValue) // no coercion occurs
             ? new LetCoercionAnalysisContext(frame.NodeId, LetCoercionResult.Success(operand, []))
             : AnalyzeOperandCoercion(resolver, builder, expression, operand, operandIndex, destinationType);
     }
@@ -416,8 +416,11 @@ where TFlags : struct, Enum
 
         var destinationType = CoercionDestinationOf(frame);
 
-        return destinationType.Equals(operand.TypeInfo)
+        return destinationType.Equals(operand.TypeInfo) && operand is not VBVariantValue
             // if the type of the operand is the destination type, the result is the unchanged operand (no coercion occurs).
+            // A VBVariantValue's own TypeInfo mirrors its wrapped value's, so this equality holds even though the
+            // operand itself is still the box, not the wrapped value a downstream direct cast expects - never
+            // short-circuit for one, always route it through the coercion below to unwrap it.
             ? LetCoercionResult.Success(operand)
             : LetCoercionSemanticsProvider.EvaluateLetCoercionSemantics(resolver, expression, new() {
                 NodeId = expression.Identity,

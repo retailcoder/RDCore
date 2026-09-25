@@ -29,6 +29,13 @@ public sealed class BinaryConcatOperatorRuntimeTests : OperatorConcatRuntimeSema
         => AssertResult<VBStringValue>(Evaluate(Concat(), new VBStringValue("x"), new VBLongValue(5)), "x5");
 
     [TestMethod]
+    public void VariantWrappingString_UnwrapsBeforeConcatenating()
+        // same short-circuit bug as the arithmetic/relational operators: concat's own destination type
+        // is always String, so a Variant operand whose own wrapped value already is a String is the one
+        // shape that hits LetCoerceNonNullOperand's TypeInfo-equality short-circuit here.
+        => AssertResult<VBStringValue>(Evaluate(Concat(), new VBVariantValue(new VBStringValue("x")), new VBStringValue("y")), "xy");
+
+    [TestMethod]
     public void DateAndString_CoercesDateOperandToString()
     {
         var date = new VBDateValue(2);

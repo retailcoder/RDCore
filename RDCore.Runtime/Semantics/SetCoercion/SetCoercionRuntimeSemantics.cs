@@ -32,6 +32,15 @@ public sealed record class SetCoercionRuntimeSemantics(IVerboseMessageBuilder Fo
 {
     public SetCoercionResult EvaluateSetCoercion(IRuntimeSession session, ExpressionNode expression, VBTypedValue source, VBType destinationType)
     {
+        // a Variant source's own TypeInfo mirrors its wrapped value's, but the object pattern-match
+        // below needs the real wrapped value, not the box around it - unwrap here, once (recursively -
+        // a Variant may wrap another Variant), before anything else runs. Same fix as LetCoercion's own
+        // (LetCoercionRuntimeSemanticsProvider.EvaluateLetCoercionSemantics).
+        while (source is VBVariantValue { TypedValue: var wrapped })
+        {
+            source = wrapped;
+        }
+
         if (source is not VBObjectValue sourceObject)
         {
             // MS-VBAL 5.5.2.2.2: source isn't an object reference at all.
