@@ -66,9 +66,11 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
             builder.AddFlags(ComparisonOperatorSemanticFlags.HasNaNOperand);
         }
 
-        // only Variant operands have a subtype to look at.
-        var variantSubTypes = operands.Select(operand => operand.TypeInfo).OfType<VBVariantType>().Select(variant => variant.SubType).ToArray();
-        if (operands.All(operand => operand is VBVariantValue)
+        // only Variant operands have a subtype to look at. A VBVariantValue's own TypeInfo mirrors its
+        // wrapped value's (see VBVariantValue's own remarks), never VBVariantType itself - read the
+        // subtype off the actual wrapped value, not off TypeInfo.
+        var variantSubTypes = operands.OfType<VBVariantValue>().Select(variant => variant.TypedValue.TypeInfo).ToArray();
+        if (operands.Length == operands.OfType<VBVariantValue>().Count()
             && variantSubTypes.Any(subType => subType is VBStringType)
             && variantSubTypes.Any(subType => subType is VBNumericType))
         {
@@ -96,12 +98,63 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
         });
     }
 
+    // MS-VBAL 5.6.9.5's own exception to the effective-type table below: when BOTH operands have a
+    // declared type of Variant, one originally holding a String value and the other a numeric value,
+    // the numeric operand is considered less than (and never equal to) the String operand, regardless
+    // of their actual values - the String need not even look like a number, so this must be detected
+    // and handled BEFORE normal coercion ever runs (coercing a non-numeric-looking String to a number
+    // to compare it is exactly what this exception exists to avoid). Both DetermineBinaryOperatorEffectiveType
+    // and ValidateOperand check this, short-circuiting to a synthetic Integer rank (0 = numeric side,
+    // 1 = String side) that the existing VBIntegerType evaluation branch below then compares for real,
+    // via the concrete operator's own ComparisonOp - no new evaluation code needed.
+    private static bool IsVariantStringNumericException(OperatorEvaluationFrame frame, out bool leftIsNumeric)
+    {
+        leftIsNumeric = false;
+        if (frame[InputIndex.BinaryLeftOperand] is not VBVariantValue left || frame[InputIndex.BinaryRightOperand] is not VBVariantValue right)
+        {
+            return false;
+        }
+
+        var leftType = left.TypedValue.TypeInfo;
+        var rightType = right.TypedValue.TypeInfo;
+
+        if (leftType is VBStringType && rightType is VBNumericType)
+        {
+            return true;
+        }
+
+        if (leftType is VBNumericType && rightType is VBStringType)
+        {
+            leftIsNumeric = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    protected override LetCoercionResult ValidateOperand(
+        ISymbolResolver resolver, ExpressionNode expression, OperatorEvaluationFrame frame, InputIndex index)
+    {
+        if (IsVariantStringNumericException(frame, out var leftIsNumeric))
+        {
+            var isNumericSide = index == InputIndex.BinaryLeftOperand ? leftIsNumeric : !leftIsNumeric;
+            return LetCoercionResult.Success(new VBIntegerValue(isNumericSide ? (short)0 : (short)1));
+        }
+
+        return base.ValidateOperand(resolver, expression, frame, index);
+    }
+
     protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
         ISymbolResolver resolver,
-        BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags> context, 
-        ExpressionNode expression, 
+        BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags> context,
+        ExpressionNode expression,
         OperatorEvaluationFrame frame)
     {
+        if (IsVariantStringNumericException(frame, out _))
+        {
+            return DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo);
+        }
+
         var lhs = frame.Operands[(int)InputIndex.BinaryLeftOperand].GetTargetType();
         var rhs = frame.Operands[(int)InputIndex.BinaryRightOperand].GetTargetType();
         return lhs switch
