@@ -85,10 +85,12 @@ public static class ScopeTreeBuilder
             }
         }
 
-        // a procedure's parameters ride on the member symbol, not as separate entries in `all`.
+        // a procedure's parameters and its own Dim/Static/Const locals ride on the member symbol, not
+        // as separate entries in `all`.
         foreach (var (uri, symbol) in procedures)
         {
             procedureDeclarations[uri].AddRange(ParametersOf(symbol));
+            procedureDeclarations[uri].AddRange(LocalsOf(symbol));
         }
 
         // pass 3 — materialize global -> project -> modules -> procedures, wiring each parent scope.
@@ -182,6 +184,13 @@ public static class ScopeTreeBuilder
         VBReturningMemberSymbol member => member.Parameters,
         VBProcedureMemberSymbol member => member.Parameters,
         VBEventMemberSymbol member => member.Parameters,
+        _ => [],
+    };
+
+    private static ImmutableArray<BoundTypedSymbol> LocalsOf(Symbol symbol) => symbol switch
+    {
+        VBReturningMemberSymbol member => member.Locals,
+        VBProcedureMemberSymbol member => member.Locals,
         _ => [],
     };
 }

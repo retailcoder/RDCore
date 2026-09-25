@@ -76,6 +76,23 @@ public sealed class ScopeTreeBuilderTests
     }
 
     [TestMethod]
+    public void LocalsOnTheProcedureSymbol_AlsoLandInItsProcedureScope()
+        // A procedure's own Locals property (Dim/Static/Const, mirroring how Parameters already "rides
+        // on" the member symbol rather than needing a separate flat entry in the input set) resolves
+        // the same way the test above proves for a flat-entry local.
+    {
+        var module = Module("Mod1");
+        var declared = Procedure(module.Uri, "DoWork");
+        var local = Local(declared.Uri, "temp");
+        var procedure = declared with { Locals = [local] };
+
+        var tree = ScopeTreeBuilder.Build([module, procedure]);
+        var procedureScope = tree.ScopeFor(procedure.Uri);
+
+        Assert.AreSame(local, procedureScope.DeclaredAs("temp").Single());
+    }
+
+    [TestMethod]
     public void ScopeFor_MapsAContainedSymbol_ToItsDeclaringScope()
     {
         var module = Module("Mod1");
