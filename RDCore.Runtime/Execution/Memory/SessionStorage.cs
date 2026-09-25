@@ -15,8 +15,24 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
     private readonly Dictionary<MemoryAddress, IBindingHandle> _handleByAddress = [];
     private readonly Dictionary<MemoryAddress, byte[]> _bytesByAddress = [];
 
+    // A value whose declared Size is 0 (Nothing, Null, Empty, an uninitialized array, a UDT with no
+    // resolvable fields, an empty ParamArray) still needs a resolvable-by-name binding, but genuinely
+    // has nothing to write byte-for-byte - the allocator correctly refuses it (SessionMemorySegment's
+    // own guard: a 0-byte bump-pointer/free-list "allocation" would hand the same address to the next
+    // real caller). It never needs real memory, only a dictionary key distinct from every other one -
+    // minted from this counter instead, walking negative so it can never collide with an allocator
+    // address (those only ever grow from a non-negative offset).
+    private int _nextInertAddress = -1;
+
     public bool TryAllocate(int size, IBindingHandle handle, out MemoryAddress address)
     {
+        if (size <= 0)
+        {
+            address = new MemoryAddress(_nextInertAddress--);
+            _handleByAddress[address] = handle;
+            return true;
+        }
+
         if (!allocator.TryAllocate(size, out address))
         {
             return false;
@@ -30,7 +46,14 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
         => _handleByAddress.TryGetValue(address, out handle);
 
     public bool TryDeallocate(MemoryAddress address)
-        => (_handleByAddress.Remove(address) || _bytesByAddress.Remove(address)) && allocator.TryDeallocate(address, out _);
+    {
+        if (address.Value < 0)
+        {
+            return _handleByAddress.Remove(address);
+        }
+
+        return (_handleByAddress.Remove(address) || _bytesByAddress.Remove(address)) && allocator.TryDeallocate(address, out _);
+    }
 
     public bool TryRebind(MemoryAddress address, IBindingHandle handle)
     {
