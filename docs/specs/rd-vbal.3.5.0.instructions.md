@@ -433,12 +433,38 @@ on the parameter being `Variant` is `IsMissing`: the omitted value is a `VT_ERRO
 an error — since nothing else can hold that sentinel. RDCore doesn't flag this yet; a design-time diagnostic
 for it is planned.
 
-**Deliberately not modeled:** `ParamArray`. Collecting the trailing extra arguments needs a real array
-value, but `RuntimeProcedureInvoker`'s `ByVal` push can't pass an array-typed argument at all yet
-(`VBArrayType.CreateValue` needs its handle `VBRuntimeArrayValue`-boxed, which it never is) — a pre-existing
-gap, not specific to `ParamArray`, that needs closing first. Until then a trailing `ParamArrayParameterSymbol`
-isn't special-cased: an extra positional argument still reports 450, and omitting it reports 449 instead of
-defaulting to an empty array.
+**`ParamArray` (MS-VBAL §5.3.1.11).** A trailing `ParamArrayParameterSymbol` collects every positional
+argument from its own position onward into a fresh, 0-based `Variant` array (`RuntimeExpressionEvaluator.
+CollectParamArrayArguments`) instead of mapping 1:1 — never targetable by name, and always considered
+satisfied even with nothing collected (an empty array, not error 449). Each collected argument is
+Let-coerced to `Variant` the same way any other `ByVal` argument is coerced to its own parameter's
+declared type.
+
+Two prerequisite gaps had to close first, both root-caused rather than worked around:
+
+- **Zero-size storage.** `Call Callee(100)` against `ParamArray rest()` with nothing left over collects
+  an empty array — `Size` 0 — which `ISessionMemoryAllocator` correctly refuses (a real, adversarially-
+  hardened invariant: a 0-byte bump-pointer/free-list "allocation" would hand the same address to the
+  next caller). `SessionStorage.TryAllocate` now mints its own address for a non-positive size instead of
+  ever reaching the allocator — a `Nothing`/`Null`/`Empty`/uninitialized-array/empty-`ParamArray` value
+  still gets a resolvable-by-name binding, just never real memory (negative addresses, so they can never
+  collide with or be mistaken for an allocator one). This was the single most common `ParamArray` call
+  shape, so it isn't a corner this slice could leave for later.
+- **`Variant` handle handling.** `VBVariantValue`'s own `Handle` used to be left at the base
+  `InvalidBindingHandle.Default` on construction (`.RuntimeValue` threw `NotSupportedException` the
+  instant anything touched it), and `VBVariantType.CreateValue` unconditionally reconstructed `Empty`
+  regardless of what was actually stored — so a `Variant` never round-tripped through storage intact,
+  silently or otherwise. Fixed the same way `VBArrayType.CreateValue`/`VBRuntimeArrayValue` already fixed
+  it for arrays: `VBRuntimeVariantValue` now boxes the wrapped `VBTypedValue` itself, `VBVariantValue`'s
+  constructor binds itself to that box on construction, and `SymbolAddressTable.FreshBinding` re-boxes it
+  fresh on every store. Fixing the round-trip surfaced a second, previously-unreachable bug: every
+  `LetCoercionRuntimeSemantics` strategy casts `frame.SourceValue` directly to its own concrete value
+  type, which broke the instant a real (not always-`Empty`) `Variant` source reached one — a `Variant`'s
+  own `TypeInfo` mirrors its wrapped value's (so destination-keyed dispatch still picks the right
+  strategy), but the C# instance stayed `VBVariantValue`. `LetCoercionRuntimeSemanticsProvider.
+  EvaluateLetCoercionSemantics` now unwraps a `Variant` source (recursively — a `Variant` may wrap
+  another `Variant`) once, centrally, before dispatch, so every strategy's cast sees the real wrapped
+  value.
 
 ---
 ## 3.5.5 Placement and licensing

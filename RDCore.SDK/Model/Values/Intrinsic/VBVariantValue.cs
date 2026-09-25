@@ -1,4 +1,4 @@
-﻿using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Runtime;
@@ -9,34 +9,50 @@ namespace RDCore.SDK.Model.Values.Intrinsic;
 /// Represents a <c>Variant</c> value.
 /// </summary>
 /// <remarks>
-/// 👉 The <em>managed type</em> of this value is a <see cref="VBRuntimeVariantValue"/>
+/// 👉 The <em>managed type</em> of this value is a <see cref="VBRuntimeVariantValue"/>, which boxes
+/// <see cref="TypedValue"/> itself so a fresh Variant round-trips through <c>ISessionStorage</c> intact:
+/// reading one back (<see cref="VBVariantType.CreateValue"/>) unboxes the very same wrapped value,
+/// never a fresh, unrelated <c>Empty</c>.
 /// </remarks>
-/// <param name="TypedValue">The wrapped typed value (may be another <c>Variant</c>).</param>
-public record class VBVariantValue(VBTypedValue TypedValue)
-    : VBTypedValue(TypedValue.TypeInfo), IVBTypedValue<VBVariantValue, VBRuntimeVariantValue>
+public record class VBVariantValue : VBTypedValue, IVBTypedValue<VBVariantValue, VBRuntimeVariantValue>
 {
     /// <summary>
-    /// Creates a Variant wrapping <paramref name="typedValue"/> and bound to <paramref name="handle"/>.
-    /// The <see cref="Value"/> / subtype plumbing is unchanged (see the complex-value follow-up).
+    /// The wrapped typed value (may be another <c>Variant</c>).
+    /// </summary>
+    public VBTypedValue TypedValue { get; init; }
+
+    /// <summary>
+    /// Creates a Variant wrapping <paramref name="typedValue"/>, self-consistently bound: its own
+    /// <see cref="VBTypedValue.Handle"/> boxes <paramref name="typedValue"/> directly, so reading this
+    /// value straight back through <see cref="VBTypedValue.RuntimeValue"/> never throws.
+    /// </summary>
+    public VBVariantValue(VBTypedValue typedValue) : base(typedValue.TypeInfo)
+    {
+        TypedValue = typedValue;
+        Handle = new ValueBindingHandle(new VBRuntimeVariantValue(VBVariantValueType.Empty, typedValue));
+    }
+
+    /// <summary>
+    /// Creates a Variant wrapping <paramref name="typedValue"/> and bound to <paramref name="handle"/>
+    /// directly — used when unboxing one already read back from storage.
     /// </summary>
     public VBVariantValue(IBindingHandle handle, VBTypedValue typedValue) : this(typedValue)
     {
         Handle = handle;
     }
 
-    public VBRuntimeVariantValue Value { get; init; } = new(VBVariantValueType.Empty, new ValueBindingHandle(VBRuntimeValue<int>.Int32ZeroValue));
+    public VBRuntimeVariantValue Value { get; init; } = new(VBVariantValueType.Empty, VBEmptyValue.Empty);
 
     public override int Size => sizeof(long); // the size of VBVariantInteropValue.ValuePtr... probably not what MS-VBA would report
 
-    public VBVariantValue WithValue(VBTypedValue value)
+    public VBVariantValue WithValue(VBTypedValue value) => this with
     {
-        return this with
-        {
-            TypedValue = value,
-            Value = new VBRuntimeVariantValue(VBVariantValueType.Dispatch, Value.Handle),
-            TypeInfo = VBVariantType.TypeInfo with { SubType = value.TypeInfo }
-        };
-    }
+        TypedValue = value,
+        // ValueType stays Empty here - a real VT_* tag per value shape is future work (see
+        // VBVariantValueType's own remarks), nothing reads it yet.
+        Value = new VBRuntimeVariantValue(VBVariantValueType.Empty, value),
+        TypeInfo = VBVariantType.TypeInfo with { SubType = value.TypeInfo }
+    };
 
     public bool Equals(IVBTypedValue<VBVariantValue, VBRuntimeVariantValue>? other) => Value == other?.Value;
 }

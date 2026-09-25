@@ -293,8 +293,6 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             : null;
     }
 
-    // ParamArray isn't collected here - RuntimeProcedureInvoker's ByVal push can't pass an array-typed
-    // argument yet, a separate pre-existing gap.
     private RuntimeSemanticsEvaluationResult InvokeProcedure(IRuntimeSession session, RuntimeEvaluationContext context, VBTypeMemberSymbol procedure, ImmutableArray<ExpressionNode> argumentNodes)
     {
         var parameters = RuntimeProcedureInvoker.GetParameters(procedure);
@@ -314,6 +312,19 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
+
+            if (parameter is ParamArrayParameterSymbol)
+            {
+                var collected = CollectParamArrayArguments(session, context, mapResult.ParamArrayArguments);
+                if (collected.Error is { } collectError)
+                {
+                    return collectError;
+                }
+
+                arguments[i] = collected.Value!;
+                continue;
+            }
+
             var argumentNode = mapped[i];
 
             if (argumentNode is null or MissingArgumentNode)
@@ -365,12 +376,57 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         return ProcedureInvoker.Invoke(procedure, session.Symbols.Resolver, arguments);
     }
 
-    private readonly record struct ArgumentMapResult(ExpressionNode?[]? Mapped, RuntimeSemanticsEvaluationResult? Error);
+    private readonly record struct ParamArrayCollectResult(IRuntimeValue? Value, RuntimeSemanticsEvaluationResult? Error);
 
-    // MS-VBAL §5.3.1.11 argument mapping. A trailing ParamArray isn't special-cased (see InvokeProcedure).
+    // MS-VBAL §5.3.1.11: the trailing extra positional arguments become a fresh, 0-based Variant array
+    // bound to the ParamArray parameter - never an alias onto anything the caller passed, since there's
+    // no single caller variable the whole collection could reference. Each element is Let-coerced to
+    // Variant, the same rule any other ByVal argument follows. Boxed as VBRuntimeArrayValue (matching
+    // SymbolAddressTable.FreshBinding's own shape for an array value) so VBArrayType.CreateValue can
+    // unbox it correctly once RuntimeProcedureInvoker pushes it onto the callee's frame.
+    private ParamArrayCollectResult CollectParamArrayArguments(IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<ExpressionNode> argumentNodes)
+    {
+        var array = new VBFixedSizeArrayValue(argumentNodes.IsEmpty ? [] : [(0, argumentNodes.Length - 1)]);
+        for (var i = 0; i < argumentNodes.Length; i++)
+        {
+            var argumentResult = EvaluateIndexArgument(session, argumentNodes[i], context);
+            if (argumentResult is { } evaluated && !evaluated.IsSuccess)
+            {
+                return new ParamArrayCollectResult(null, evaluated);
+            }
+            if (argumentResult is null)
+            {
+                return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.InternalError());
+            }
+
+            var coercionFrame = new LetCoercionStackFrame(argumentNodes[i].Identity, InputIndex.CoercionSourceValue,
+                argumentResult.Value.Result!, new VBTypeDescValue(VBVariantType.TypeInfo));
+            var coercionResult = LetCoercionProvider!.EvaluateLetCoercionSemantics(session.Symbols.Resolver, argumentNodes[i], coercionFrame);
+            if (!coercionResult.IsApplicable)
+            {
+                return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.InternalError());
+            }
+            if (!coercionResult.IsSuccess)
+            {
+                return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.Error(coercionResult.ErrorInfo!));
+            }
+
+            array.TrySetElement(new ValueBindingHandle(coercionResult.Result!.RuntimeValue), i);
+        }
+
+        return new ParamArrayCollectResult(new VBRuntimeValue<VBRuntimeArrayValue>(new VBRuntimeArrayValue(array)), null);
+    }
+
+    private readonly record struct ArgumentMapResult(ExpressionNode?[]? Mapped, ImmutableArray<ExpressionNode> ParamArrayArguments, RuntimeSemanticsEvaluationResult? Error);
+
+    // MS-VBAL §5.3.1.11 argument mapping. A trailing ParamArray parameter collects every positional
+    // argument from its own position onward instead of mapping 1:1 - never targetable by name, and
+    // always considered satisfied even with nothing collected (an empty array, not error 449).
     private static ArgumentMapResult MapArguments(ImmutableArray<VBParameterSymbol> parameters, ImmutableArray<ExpressionNode> argumentNodes)
     {
+        var paramArrayIndex = parameters.Length > 0 && parameters[^1] is ParamArrayParameterSymbol ? parameters.Length - 1 : -1;
         var mapped = new ExpressionNode?[parameters.Length];
+        var paramArrayArguments = ImmutableArray.CreateBuilder<ExpressionNode>();
         var positionalIndex = 0;
 
         foreach (var argument in argumentNodes)
@@ -378,9 +434,9 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             if (argument is NamedArgumentNode named)
             {
                 var index = IndexOfParameter(parameters, named.Name);
-                if (index < 0 || mapped[index] is not null)
+                if (index < 0 || index == paramArrayIndex || mapped[index] is not null)
                 {
-                    return new ArgumentMapResult(null, RuntimeSemanticsEvaluationResult.Error(
+                    return new ArgumentMapResult(null, [], RuntimeSemanticsEvaluationResult.Error(
                         VBRuntimeErrorInfo.For(VBRuntimeErrorId.NamedArgumentNotFound, argument.Location, Exceptions.VBNamedArgumentNotFound_UnknownOrDuplicate_Verbose)));
                 }
 
@@ -388,16 +444,23 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 continue;
             }
 
+            if (paramArrayIndex >= 0 && positionalIndex >= paramArrayIndex)
+            {
+                paramArrayArguments.Add(argument);
+                positionalIndex++;
+                continue;
+            }
+
             if (positionalIndex >= parameters.Length)
             {
-                return new ArgumentMapResult(null, RuntimeSemanticsEvaluationResult.Error(
+                return new ArgumentMapResult(null, [], RuntimeSemanticsEvaluationResult.Error(
                     VBRuntimeErrorInfo.For(VBRuntimeErrorId.WrongNumberOfArgumentsOrInvalidPropertyAssignment, argument.Location, Exceptions.VBWrongNumberOfArguments_Verbose)));
             }
 
             if (argument is MissingArgumentNode && !parameters[positionalIndex].IsOptional)
             {
                 // Error 448, not 449 - MS-VBAL calls this out as checked here, not in the sweep below.
-                return new ArgumentMapResult(null, RuntimeSemanticsEvaluationResult.Error(
+                return new ArgumentMapResult(null, [], RuntimeSemanticsEvaluationResult.Error(
                     VBRuntimeErrorInfo.For(VBRuntimeErrorId.NamedArgumentNotFound, argument.Location, Exceptions.VBNamedArgumentNotFound_MissingRequiredPositional_Verbose)));
             }
 
@@ -407,14 +470,19 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
 
         for (var i = 0; i < parameters.Length; i++)
         {
+            if (i == paramArrayIndex)
+            {
+                continue; // always satisfied, even with nothing collected - an empty array, not error 449.
+            }
+
             if (mapped[i] is null && !parameters[i].IsOptional)
             {
-                return new ArgumentMapResult(null, RuntimeSemanticsEvaluationResult.Error(
+                return new ArgumentMapResult(null, [], RuntimeSemanticsEvaluationResult.Error(
                     VBRuntimeErrorInfo.For(VBRuntimeErrorId.ArgumentNotOptional, default, Exceptions.VBArgumentNotOptional_Verbose)));
             }
         }
 
-        return new ArgumentMapResult(mapped, null);
+        return new ArgumentMapResult(mapped, paramArrayArguments.ToImmutable(), null);
     }
 
     private static int IndexOfParameter(ImmutableArray<VBParameterSymbol> parameters, string name)

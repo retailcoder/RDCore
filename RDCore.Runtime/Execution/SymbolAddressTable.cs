@@ -71,11 +71,15 @@ internal sealed class SymbolAddressTable(ISessionStorage storage)
     /// <c>int</c>, a <see cref="VBRuntimeReference"/>, …) has nowhere to hold. It gets its own fresh
     /// <see cref="ValueBindingHandle"/> boxing a <see cref="VBRuntimeArrayValue"/> around the array
     /// itself, so <see cref="RDCore.SDK.Model.Types.VBArrayType.CreateValue"/> can hand back the very
-    /// same instance — cells intact — on every subsequent read.
+    /// same instance — cells intact — on every subsequent read. A <see cref="VBVariantValue"/> has the
+    /// same problem one level up: its own wrapped <see cref="VBVariantValue.TypedValue"/> is a whole
+    /// <c>VBTypedValue</c>, not a bare <c>IRuntimeValue</c> a scalar handle could hold, so it gets the
+    /// same treatment, boxed as a fresh <see cref="VBRuntimeVariantValue"/>.
     /// </remarks>
     private static IBindingHandle FreshBinding(VBTypedValue value) => value switch
     {
         VBArrayValue array => new ValueBindingHandle(new VBRuntimeValue<VBRuntimeArrayValue>(new VBRuntimeArrayValue(array))),
+        VBVariantValue variant => new ValueBindingHandle(new VBRuntimeVariantValue(variant.Value.ValueType, variant.TypedValue)),
         _ => value.Handle switch
         {
             ValueBindingHandle => new ValueBindingHandle(value.Handle.Value),

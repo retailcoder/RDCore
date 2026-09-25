@@ -37,14 +37,58 @@ public class SessionStorageTests
 
     [TestMethod]
     // a value whose declared Size is 0 (Nothing, Null, Empty, an uninitialized array, a UDT with no
-    // resolvable fields) is a static/global symbol with no session storage of its own - it must never
-    // reach a real allocation. SessionStorage is a thin pass-through here; the actual rejection lives
-    // in the allocator (SessionMemory/SessionMemorySegment), asserted directly in their own tests.
-    public void TryAllocate_ZeroSize_ReturnsFalse()
+    // resolvable fields) still needs a resolvable-by-name binding, but has nothing to write byte-for-byte -
+    // the allocator correctly refuses a 0-byte reservation (SessionMemory/SessionMemorySegment's own
+    // guard, asserted directly in their own tests), so SessionStorage mints its own address instead of
+    // ever asking the allocator for one.
+    public void TryAllocate_ZeroSize_BindsTheHandleWithoutConsultingTheAllocator()
+    {
+        var allocator = Substitute.For<ISessionMemoryAllocator>();
+        var sut = new SessionStorage(allocator);
+        var handle = Handle(1);
+
+        Assert.IsTrue(sut.TryAllocate(0, handle, out var address));
+
+        Assert.IsTrue(sut.TryRead(address, out var bound));
+        Assert.AreSame(handle, bound);
+        allocator.DidNotReceive().TryAllocate(Arg.Any<int>(), out Arg.Any<MemoryAddress>());
+    }
+
+    [TestMethod]
+    public void TryAllocate_ZeroSize_EveryCallGetsItsOwnDistinctAddress()
+        // two different zero-size symbols (e.g. two uninitialized array locals) must never collide on
+        // the same dictionary key - that would alias one's binding onto the other's.
     {
         var sut = new SessionStorage(new SessionMemory(new(), PointerSize.x86));
 
-        Assert.IsFalse(sut.TryAllocate(0, Handle(1), out _));
+        Assert.IsTrue(sut.TryAllocate(0, Handle(1), out var first));
+        Assert.IsTrue(sut.TryAllocate(0, Handle(2), out var second));
+
+        Assert.AreNotEqual(first, second);
+    }
+
+    [TestMethod]
+    public void TryAllocate_ZeroSize_NeverCollidesWithARealAllocation()
+    {
+        var sut = new SessionStorage(new SessionMemory(new(), PointerSize.x86));
+
+        Assert.IsTrue(sut.TryAllocate(0, Handle(1), out var inert));
+        Assert.IsTrue(sut.TryAllocate(4, Handle(2), out var real));
+
+        Assert.AreNotEqual(inert, real);
+    }
+
+    [TestMethod]
+    public void TryDeallocate_AZeroSizeAddress_RemovesTheBinding_WithoutTouchingTheAllocator()
+    {
+        var allocator = Substitute.For<ISessionMemoryAllocator>();
+        var sut = new SessionStorage(allocator);
+        sut.TryAllocate(0, Handle(1), out var address);
+
+        Assert.IsTrue(sut.TryDeallocate(address));
+
+        Assert.IsFalse(sut.TryRead(address, out _));
+        allocator.DidNotReceive().TryDeallocate(Arg.Any<MemoryAddress>(), out Arg.Any<SessionMemoryBlock>());
     }
 
     [TestMethod]
