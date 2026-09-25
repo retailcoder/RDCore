@@ -173,6 +173,23 @@ public sealed class SetCoercionRuntimeSemanticsTests
     }
 
     [TestMethod]
+    public void VariantWrappingAnObjectSource_ObjectDestination_Succeeds()
+        // regression: a Variant source's own TypeInfo mirrors its wrapped value's, but the `is
+        // VBObjectValue` pattern-match at the top of EvaluateSetCoercion needs the real wrapped value,
+        // not the box around it - Set x = variantHoldingObject used to fall into "not an object at all"
+        // (Object required) instead of recognizing the object it actually held.
+    {
+        var widget = new VBClassModuleSymbol(Root, Root, "Widget");
+        var session = ComposeSession(widget);
+        var instance = CreateInstance(session, widget);
+
+        var result = Sut().EvaluateSetCoercion(session, ThrowawayExpression, new VBVariantValue(instance), VBObjectType.TypeInfo);
+
+        Assert.IsTrue(result.IsSuccess, result.ErrorInfo?.Description);
+        Assert.AreEqual(instance.Value, ((VBObjectValue)result.Result!).Value);
+    }
+
+    [TestMethod]
     public void NonObjectSource_VariantDestination_IsTypeMismatch()
         // MS-VBAL 5.5.2.2.2's own table: unlike Object/Class (Object required), a Variant destination
         // for a non-object source is specifically a Type mismatch - counterintuitive, verified directly

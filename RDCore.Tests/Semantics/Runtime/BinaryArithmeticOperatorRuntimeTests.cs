@@ -84,6 +84,17 @@ public sealed class BinaryArithmeticOperatorRuntimeTests : OperatorArithmeticRun
             new VBLongValue(5), VBEmptyValue.Empty), 5);
 
     [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3.2 Binary '+' Operator")]
+    public void Addition_VariantWrappingLong_UnwrapsBeforeEvaluating()
+        // regression: a Variant operand's own TypeInfo mirrors its wrapped value's, so when the
+        // effective/destination type happened to equal that same wrapped type, LetCoerceNonNullOperand
+        // short-circuited coercion entirely and handed the still-boxed VBVariantValue straight to the
+        // arithmetic evaluator, which crashed on its own direct cast to VBLongValue.
+        => AssertResult<VBLongValue>(Evaluate(
+            new BinaryAdditionOperatorRuntimeSemantics(RealCoercionProvider(), Formatter()),
+            new VBVariantValue(new VBLongValue(20_000)), new VBIntegerValue(20_000)), 40_000);
+
+    [TestMethod]
     [TestCategory("MS-VBAL 5.6.9.3.3 Binary '-' Operator")]
     public void Subtraction_Long()
         => AssertResult<VBLongValue>(

@@ -252,7 +252,16 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             return calleeResult;
         }
 
-        if (calleeResult.Result is not VBArrayValue array)
+        // a Variant holding an array reports its own TypeInfo as the array's, but stays a VBVariantValue
+        // instance - unwrap it here (recursively) so "v(0)" on a Variant-typed array works the same as
+        // on a declared one.
+        var calleeValue = calleeResult.Result;
+        while (calleeValue is VBVariantValue { TypedValue: var wrapped })
+        {
+            calleeValue = wrapped;
+        }
+
+        if (calleeValue is not VBArrayValue array)
         {
             // any other Callee shape is a function/property call, not an element read.
             return RuntimeSemanticsEvaluationResult.InternalError();

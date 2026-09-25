@@ -29,6 +29,13 @@ public sealed class BinaryConcatOperatorRuntimeTests : OperatorConcatRuntimeSema
         => AssertResult<VBStringValue>(Evaluate(Concat(), new VBStringValue("x"), new VBLongValue(5)), "x5");
 
     [TestMethod]
+    public void VariantWrappingString_UnwrapsBeforeConcatenating()
+        // same short-circuit bug as the arithmetic/relational operators: concat's own destination type
+        // is always String, so a Variant operand whose own wrapped value already is a String is the one
+        // shape that hits LetCoerceNonNullOperand's TypeInfo-equality short-circuit here.
+        => AssertResult<VBStringValue>(Evaluate(Concat(), new VBVariantValue(new VBStringValue("x")), new VBStringValue("y")), "xy");
+
+    [TestMethod]
     public void DateAndString_CoercesDateOperandToString()
     {
         var date = new VBDateValue(2);
@@ -71,4 +78,10 @@ public sealed class BinaryConcatOperatorRuntimeTests : OperatorConcatRuntimeSema
     public void ByteArrayAndByteArray_UninitializedArrays_ConcatenateToEmptyString()
         // MS-VBAL 5.5.1.2.6: "If the byte array is uninitialized, the result is a 0-length string."
         => AssertResult<VBStringValue>(Evaluate(Concat(), VBResizableByteArrayValue.Empty, VBResizableByteArrayValue.Empty), "");
+
+    [TestMethod]
+    public void VariantWrappingAByteArray_AndByteArray_ConcatenateToEmptyString()
+        // regression: IsByteArray's own pattern match needs the real wrapped array, not the
+        // VBVariantValue box around it - a Variant holding a Byte array used to fail the check entirely.
+        => AssertResult<VBStringValue>(Evaluate(Concat(), new VBVariantValue(VBResizableByteArrayValue.Empty), VBResizableByteArrayValue.Empty), "");
 }
