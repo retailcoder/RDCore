@@ -1,8 +1,15 @@
 ﻿using System.Runtime.CompilerServices;
 using RDCore.SDK.Server;
+using RDCore.SDK.Client;
 
 [assembly: InternalsVisibleTo("RDCore.Tests")]
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
+
+// platform capabilities the language server provides to a connected client:
+[assembly: ProvidesCorePlatformClientCapability<SessionStatus>]
+[assembly: ProvidesCorePlatformClientCapability<SessionExecute>]
+[assembly: ProvidesCorePlatformClientCapability<SessionAnalyze>]
+[assembly: ProvidesCorePlatformClientCapability<SessionMemoryAccess>]
 namespace RDCore.LanguageServer;
 
 public class Program

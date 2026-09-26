@@ -20,6 +20,19 @@ public class CorePlatformClientCapabilities
     /// </summary>
     [Optional]
     public EnvironmentHostCapabilities? EnvironmentHost { get; set; }
+
+    /// <summary>
+    /// The core platform capabilities of the language server — what a <em>client</em> (an IDE
+    /// extension, <c>rdc.exe</c>'s interactive shell) expects the platform coordinator itself to
+    /// serve beyond LSP.
+    /// </summary>
+    /// <remarks>
+    /// A client never talks to the environment host, the parser or an extension: it talks to the
+    /// language server, which owns them. So the capabilities a client asks for are the language
+    /// server's, even where servicing one means fanning the work out to a child component.
+    /// </remarks>
+    [Optional]
+    public LanguageServerCapabilities? LanguageServer { get; set; }
 }
 
 /// <summary>
@@ -42,10 +55,103 @@ public class EnvironmentHostCapabilities
     /// If supported, the environment host accepts module member symbol descriptors and defines them in its runtime session.
     /// </summary>
     public DefineSymbols DefineSymbols { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the environment host reports the state of the runtime session it owns.
+    /// </summary>
+    public SessionStatus SessionStatus { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the environment host lowers and runs a parsed module in its runtime session.
+    /// </summary>
+    public SessionExecute SessionExecute { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the environment host reads and writes single bytes of the runtime session it owns.
+    /// </summary>
+    public SessionMemoryAccess SessionMemoryAccess { get; set; } = new();
+}
+
+/// <summary>
+/// Regroups all core platform <c>LanguageServer</c> capabilities — the non-LSP requests a client can
+/// make of the platform coordinator.
+/// </summary>
+public class LanguageServerCapabilities
+{
+    /// <summary>
+    /// If supported, the language server answers <c>rdcore/session/status</c> with the state of the
+    /// platform's runtime session, including its memory.
+    /// </summary>
+    public SessionStatus SessionStatus { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the language server runs a procedure of a module the client supplies, over
+    /// <c>rdcore/session/execute</c>, and reports what it printed.
+    /// </summary>
+    public SessionExecute SessionExecute { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the language server analyzes a module the client supplies, over
+    /// <c>rdcore/session/analyze</c>, and reports the diagnostics its providers found.
+    /// </summary>
+    public SessionAnalyze SessionAnalyze { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the language server reads and writes single bytes of the runtime session's
+    /// memory, over <c>rdcore/session/memory/peek</c> and <c>.../poke</c>.
+    /// </summary>
+    public SessionMemoryAccess SessionMemoryAccess { get; set; } = new();
 }
 
 public static class RDCorePlatformProtocol
 {
+    /// <summary>
+    /// Asks the language server for the state of the platform's runtime session.
+    /// </summary>
+    public const string SessionStatus = "rdcore/session/status";
+
+    /// <summary>
+    /// Asks the environment host for the state of the runtime session it owns. The language-server
+    /// side of <see cref="SessionStatus"/>; never sent by a client.
+    /// </summary>
+    public const string HostSessionStatus = "rdcore/host/session/status";
+
+    /// <summary>
+    /// Asks the language server to run one procedure of a module the client supplies.
+    /// </summary>
+    public const string SessionExecute = "rdcore/session/execute";
+
+    /// <summary>
+    /// Asks the environment host to lower and run a parsed module in its runtime session. The
+    /// language-server side of <see cref="SessionExecute"/>; never sent by a client.
+    /// </summary>
+    public const string HostExecute = "rdcore/host/execute";
+
+    /// <summary>
+    /// Asks the language server to analyze a module the client supplies.
+    /// </summary>
+    public const string SessionAnalyze = "rdcore/session/analyze";
+
+    /// <summary>
+    /// Reads one byte of the runtime session's memory.
+    /// </summary>
+    public const string SessionPeek = "rdcore/session/memory/peek";
+
+    /// <summary>
+    /// Writes one byte of the runtime session's memory.
+    /// </summary>
+    public const string SessionPoke = "rdcore/session/memory/poke";
+
+    /// <summary>
+    /// The language-server side of <see cref="SessionPeek"/>; never sent by a client.
+    /// </summary>
+    public const string HostPeek = "rdcore/host/memory/peek";
+
+    /// <summary>
+    /// The language-server side of <see cref="SessionPoke"/>; never sent by a client.
+    /// </summary>
+    public const string HostPoke = "rdcore/host/memory/poke";
+
     /// <summary>
     /// Requests an AST from the parser for a full document.
     /// </summary>
@@ -66,6 +172,10 @@ public static class RDCorePlatformProtocol
 [JsonDerivedType(typeof(DefineSymbols))]
 [JsonDerivedType(typeof(CliCommand))]
 [JsonDerivedType(typeof(DiagnoseDocument))]
+[JsonDerivedType(typeof(SessionStatus))]
+[JsonDerivedType(typeof(SessionExecute))]
+[JsonDerivedType(typeof(SessionAnalyze))]
+[JsonDerivedType(typeof(SessionMemoryAccess))]
 [JsonPolymorphic]
 public abstract record class CorePlatformClientCapability(bool IsSupported = true);
 
@@ -79,6 +189,37 @@ public record class ParseFullDocument(bool IsSupported = false) : CorePlatformCl
 /// <c>rdcore/host/symbols/define</c> for definition in the runtime session.
 /// </summary>
 public record class DefineSymbols(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+
+/// <summary>
+/// Advertises that the declaring component answers <c>rdcore/session/status</c> — the state of the
+/// runtime session, including how much of its memory is reserved, allocated and free.
+/// </summary>
+/// <remarks>
+/// Provided by the language server to its client, and by the environment host to the language server
+/// (as <c>rdcore/host/session/status</c>): one capability, both hops, because a client asking the
+/// platform coordinator for the session and the coordinator asking the host that actually owns it are
+/// the same question at two levels.
+/// </remarks>
+public record class SessionStatus(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+
+/// <summary>
+/// Advertises that the declaring component runs a procedure of a supplied module and reports what it
+/// printed — <c>rdcore/session/execute</c> to a client, <c>rdcore/host/execute</c> between the
+/// language server and the component that owns the runtime session.
+/// </summary>
+public record class SessionExecute(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+
+/// <summary>
+/// Advertises that the declaring component analyzes a supplied module and reports diagnostics —
+/// <c>rdcore/session/analyze</c>, the editor-less counterpart to LSP's own diagnostics pull.
+/// </summary>
+public record class SessionAnalyze(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+
+/// <summary>
+/// Advertises that the declaring component reads and writes single bytes of a live runtime session's
+/// memory — <c>PEEK</c> and <c>POKE</c>, unchecked.
+/// </summary>
+public record class SessionMemoryAccess(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
 
 /// <summary>
 /// Advertises that the declaring extension answers <c>rdcore/diagnostics/document</c> — it is a

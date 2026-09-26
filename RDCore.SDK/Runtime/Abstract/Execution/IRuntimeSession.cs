@@ -29,6 +29,23 @@ public interface IRuntimeSession
     ISessionMemoryAllocator Memory { get; }
 
     /// <summary>
+    /// Where this session's <c>Print</c> output goes (<strong>MS-VBAL §5.4.5.8</strong>) — the
+    /// <c>Immediate</c> window's analogue. <see cref="NullRuntimeOutput"/> when the session was
+    /// composed without one, so a <c>Debug.Print</c> is a no-op rather than an error.
+    /// </summary>
+    IRuntimeOutput Output { get; }
+
+    /// <summary>
+    /// The session's value storage — what is bound at each address its allocator handed out.
+    /// </summary>
+    /// <remarks>
+    /// Reachable from the session because direct, byte-level access to a session's memory is a
+    /// session-level operation: a debugger reading a variable's bytes, a <c>PEEK</c>, a <c>POKE</c>.
+    /// Ordinary name-based reads and writes go through <see cref="ISessionSymbols.Resolver"/> instead.
+    /// </remarks>
+    ISessionStorage Storage { get; }
+
+    /// <summary>
     /// The session's symbol table.
     /// </summary>
     ISessionSymbols Symbols { get; }
@@ -82,6 +99,20 @@ public interface ISessionSymbols
     /// </summary>
     /// <returns><c>true</c> if the symbol was added; <c>false</c> if it was already defined in that scope.</returns>
     bool TryDefine(Symbol symbol, ScopeKind scope);
+
+    /// <summary>
+    /// Removes <paramref name="symbol"/> from <paramref name="scope"/>, freeing whatever storage its
+    /// definition allocated.
+    /// </summary>
+    /// <remarks>
+    /// What makes a definition replaceable, which a live session needs: a module the user edits is
+    /// defined again, and the second definition is the one that is true. Undefining a symbol whose
+    /// storage held a value discards that value — it is a redefinition, not a rename.
+    /// </remarks>
+    /// <param name="symbol">The symbol to remove.</param>
+    /// <param name="scope">The scope it was defined in.</param>
+    /// <returns><c>false</c> if no such symbol was defined in that scope.</returns>
+    bool TryUndefine(Symbol symbol, ScopeKind scope);
 
     /// <summary>
     /// Resolves <paramref name="name"/> visible from <paramref name="scope"/> in the default binding

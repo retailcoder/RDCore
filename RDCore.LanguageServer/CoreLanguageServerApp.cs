@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using RDCore.LanguageServer.Diagnostics;
 using RDCore.LanguageServer.Folding;
 using RDCore.LanguageServer.Parsing;
+using RDCore.LanguageServer.Runtime;
 using RDCore.LanguageServer.Symbols;
 using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Client;
@@ -72,7 +73,10 @@ internal sealed class CoreLanguageServerApp(
                     {
                         EnvironmentHost = new EnvironmentHostCapabilities
                         {
-                            DefineSymbols = new DefineSymbols(true)
+                            DefineSymbols = new DefineSymbols(true),
+                            SessionStatus = new SessionStatus(true),
+                            SessionExecute = new SessionExecute(true),
+                            SessionMemoryAccess = new SessionMemoryAccess(true),
                         }
                     }));
 
@@ -100,6 +104,11 @@ internal sealed class CoreLanguageServerApp(
         builder.WithHandler<DocumentDiagnosticHandler>();
         builder.WithHandler<DocumentSymbolHandler>();
         builder.WithHandler<FoldingRangeHandler>();
+        builder.WithHandler<SessionStatusHandler>();
+        builder.WithHandler<SessionExecuteHandler>();
+        builder.WithHandler<SessionAnalyzeHandler>();
+        builder.WithHandler<SessionPeekHandler>();
+        builder.WithHandler<SessionPokeHandler>();
     }
 
     protected override void ConfigureServices(IServiceCollection services)
@@ -110,6 +119,9 @@ internal sealed class CoreLanguageServerApp(
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IParsingClientService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceDocumentService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<ISymbolResolver>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IPlatformOrchestrationService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<ISymbolSyncService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IOptions<SdkAppOptions>>());
     }
 
     protected override void RegisterServerCapabilities(ILanguageServer server, ClientCapabilities clientCapabilities)

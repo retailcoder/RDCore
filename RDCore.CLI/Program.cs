@@ -9,6 +9,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using RDCore.CLI.App.Commands;
+using RDCore.CLI.App.Repl;
+using RDCore.CLI.App.Repl.Commands;
 using RDCore.CLI.App.Console;
 using RDCore.CLI.Host;
 using RDCore.CLI.Host.Handlers;
@@ -22,6 +24,7 @@ using RDCore.SDK.Server;
 using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Server.Services;
 using RDCore.SDK.Server.Services.States;
+using RDCore.SDK.Services.VerboseMessages;
 using RDCore.SDK.Workspace;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
@@ -32,6 +35,10 @@ using System.Runtime.CompilerServices;
 
 // platform capabilities provided by rdc.exe in environment-host mode:
 [assembly: ProvidesCorePlatformClientCapability<DefineSymbols>]
+// the environment host owns the runtime session, so it answers for its state:
+[assembly: ProvidesCorePlatformClientCapability<SessionStatus>]
+[assembly: ProvidesCorePlatformClientCapability<SessionExecute>]
+[assembly: ProvidesCorePlatformClientCapability<SessionMemoryAccess>]
 // native command-mode verbs provided by rdc.exe:
 [assembly: ProvidesCorePlatformClientCapability<CliCommand>]
 
@@ -59,7 +66,17 @@ public class Program
                 return await commandHost.RunAsync(args);
             }
 
-            using var clientHost = new RDCoreConsoleClientHost();
+            // rdc.exe with no arguments: the interactive shell. It is an LSP client like any other,
+            // so it needs a workspace to attach to - it scaffolds a private, scratch one of its own.
+            ReplWorkspace? scratchWorkspace = null;
+            if (args.Length == 0)
+            {
+                var fileSystem = new FileSystem();
+                scratchWorkspace = await ReplWorkspace.CreateAsync(fileSystem, new ProjectFileWriter(fileSystem));
+                args = ["--workspace", scratchWorkspace.Root];
+            }
+
+            using var clientHost = new RDCoreConsoleClientHost(scratchWorkspace);
             return await clientHost.RunAsync(args);
         }
         catch (Exception exception)
@@ -70,22 +87,16 @@ public class Program
     }
 }
 
-internal class RDCoreConsoleClientHost() : RDCoreLanguageClientHost<RDCoreConsoleClientApp>()
+/// <summary>
+/// <c>rdc.exe</c> in client mode: brings the platform up against a workspace, then drops into the
+/// interactive RD-VBA shell (see <see cref="ReplShell"/>).
+/// </summary>
+/// <param name="scratchWorkspace">
+/// The private workspace the shell scaffolded for itself when it was given none, which this host then
+/// owns and deletes; <c>null</c> when the shell attached to a real workspace.
+/// </param>
+internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) : RDCoreLanguageClientHost<RDCoreConsoleClientApp>()
 {
-    protected async override Task BuildAndRunAsync(HostApplicationBuilder builder, string[] args)
-    {
-        if (args.Length == 0)
-        {
-            // TODO REPL / command/program mode
-            throw new NotSupportedException("This mode is not supported yet; workspace root uri argument is not optional.");
-        }
-        else
-        {
-            // we can only build and run the protocol client if we have a workspace.
-            await base.BuildAndRunAsync(builder, args);
-        }
-    }
-
     protected override IEnumerable<(string, string?)> ConfigureOverrides(string[] initialArgs, SdkAppCommandLineArgs baseArgs) 
         => [
             ("CLI:UnsafeDevMode", baseArgs.UnsafeDevMode?.ToString() ?? false.ToString()),
@@ -100,7 +111,25 @@ internal class RDCoreConsoleClientHost() : RDCoreLanguageClientHost<RDCoreConsol
             .AddSingleton<IAppThemeLoaderService, AppThemeLoaderService>()
             .AddSingleton(Spectre.Console.AnsiConsole.Console)
             .AddSingleton<IConsoleMessageWriter, SpectreConsoleMessageWriter>()
-            .AddSingleton<ShowSplashCommand>();
+            .AddSingleton<IConsoleShellFrame, ConsoleShellFrame>()
+            .AddSingleton<ShowSplashCommand>()
+            // the interactive shell and everything it acts on:
+            .AddSingleton<ReplProgram>()
+            .AddSingleton<IReplConsole, ReplConsole>()
+            .AddSingleton<IReplPlatformClient>(provider => new ReplPlatformClient(provider.GetRequiredService<RDCoreConsoleClientApp>()))
+            .AddSingleton<IReplCommand, HelpReplCommand>()
+            .AddSingleton<IReplCommand, ListReplCommand>()
+            .AddSingleton<IReplCommand, RunReplCommand>()
+            .AddSingleton<IReplCommand, AnalyzeReplCommand>()
+            .AddSingleton<IReplCommand, PeekReplCommand>()
+            .AddSingleton<IReplCommand, PokeReplCommand>()
+            .AddSingleton<IReplCommand, NewReplCommand>()
+            .AddSingleton<IReplCommand, ExitReplCommand>()
+            .AddSingleton<IReplCommandDispatcher, ReplCommandDispatcher>()
+            .AddSingleton<ReplShell>()
+            // the shell owns the break keys - Ctrl+C is BREAK, not quit - so the default console
+            // lifetime must not be listening for them too. EXIT is how a session ends.
+            .AddSingleton<IHostLifetime, ReplHostLifetime>();
     }
 
     // client mode renders its logs through the same Spectre-backed writer; framework lifetime
@@ -111,8 +140,12 @@ internal class RDCoreConsoleClientHost() : RDCoreLanguageClientHost<RDCoreConsol
         services.AddSingleton<ILoggerProvider, RDCoreConsoleLoggerProvider>();
         builder.AddFilter("Microsoft", LogLevel.Warning);
         // the CLI host's own bootstrap narration ("application resolved", "host started") is noise
-        // for an interactive shell; connection/platform logs (RDCore.SDK.Client.*) stay visible.
+        // for an interactive shell.
         builder.AddFilter("RDCore.CLI", LogLevel.Warning);
+        // so is the connection state machine narrating its own bring-up: an interactive shell shows a
+        // banner when the platform is up, not a running commentary on how it got there. A warning or
+        // an error still surfaces, and the language server keeps the full trace in its own log file.
+        builder.AddFilter("RDCore.SDK.Client", LogLevel.Warning);
         base.ConfigureExternalLogging(services, builder, configuration);
     }
 
@@ -120,23 +153,48 @@ internal class RDCoreConsoleClientHost() : RDCoreLanguageClientHost<RDCoreConsol
     {
         var themes = provider.GetRequiredService<IAppThemeService>();
         await themes.InitializeAsync(CancellationToken.None);
-        ApplyShellFrame(themes.Theme);
+
+        // the C64-style deep-blue shell frame, in the theme's own 24-bit colours. Restored on the way
+        // out — including on Ctrl+C, which never reaches the host's own teardown.
+        var frame = provider.GetRequiredService<IConsoleShellFrame>();
+        frame.Apply(themes.Theme.ShellBackground, themes.Theme.ShellForeground);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => frame.Restore();
 
         provider.GetRequiredService<ShowSplashCommand>().Execute(new() { Show = true });
     }
 
-    // the C64-style deep-blue shell frame — nearest ConsoleColor of the theme's 24-bit shell colours.
-    private static void ApplyShellFrame(AppTheme theme)
+    /// <summary>
+    /// Runs the interactive shell for the lifetime of the connection.
+    /// </summary>
+    /// <remarks>
+    /// The base implementation parks until a Ctrl+C or a SIGTERM, which is what a client with no user
+    /// interface wants; the shell is that wait, with a prompt. It is not called: its own log line tells
+    /// the user to press Ctrl+C to exit, which is exactly what Ctrl+C no longer does here, and the
+    /// graceful LSP shutdown it performs afterwards is two lines this does itself.
+    /// </remarks>
+    protected override async Task AfterAppRunAsync(IServiceProvider provider)
     {
+        var lifetime = provider.GetRequiredService<IHostApplicationLifetime>();
         try
         {
-            System.Console.BackgroundColor = theme.ShellBackground;
-            System.Console.ForegroundColor = theme.ShellForeground;
-            System.Console.Clear();
+            await provider.GetRequiredService<ReplShell>().RunAsync(lifetime.ApplicationStopping);
         }
-        catch (System.IO.IOException)
+        finally
         {
+            lifetime.StopApplication();
+            provider.GetRequiredService<IConsoleShellFrame>().Restore();
+            // graceful LSP shutdown/exit of the language server before the host tears down.
+            await provider.GetRequiredService<RDCoreConsoleClientApp>().ShutdownAsync();
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            scratchWorkspace?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
 
@@ -147,6 +205,20 @@ internal class RDCoreConsoleClientApp(
     : RDCoreClientApp(options, connectionFactory, logger)
 {
     public override CoreServerComponent PlatformComponent => CoreServerComponent.ClientApp;
+
+    // what rdc.exe asks the language server to serve beyond LSP. The language server records these
+    // and refuses a request family the client never advertised, so the negotiation is real in both
+    // directions: PlatformInfo tells us back what it actually provides.
+    protected override CorePlatformClientCapabilities GetExpectedCapabilities() => new()
+    {
+        LanguageServer = new LanguageServerCapabilities
+        {
+            SessionStatus = new SessionStatus(true),
+            SessionExecute = new SessionExecute(true),
+            SessionAnalyze = new SessionAnalyze(true),
+            SessionMemoryAccess = new SessionMemoryAccess(true),
+        },
+    };
 
     protected override void ConfigureServices(IServiceCollection services)
     {
@@ -262,7 +334,10 @@ internal class RDCoreConsoleEnvironmentHost : RDCorePlatformServerHost<RDCoreCon
 
         // the runtime session this host owns for the workspace it was launched against; composed on
         // the LSP initialize handshake, then populated as the language server sends symbol descriptors.
-        services.AddSingleton<IEnvironmentSessionProvider, EnvironmentSessionProvider>();
+        services
+            .Configure<VerboseMessageOptions>(configuration.GetSection("Configuration:VerboseMessages"))
+            .AddVerboseMessages()
+            .AddSingleton<IEnvironmentSessionProvider, EnvironmentSessionProvider>();
     }
 
     protected override void ConfigureExternalLogging(IServiceCollection services, ILoggingBuilder builder, IConfiguration configuration)
@@ -287,12 +362,19 @@ internal class RDCoreConsoleEnvironmentHostApp(
     public override CoreServerComponent PlatformComponent => CoreServerComponent.EnvironmentHost;
 
     protected override void ConfigureHandlers(IRDCoreLSPHandlerConfigurationBuilder builder)
-        => builder.WithHandler<DefineSymbolsHandler>();
+        => builder
+            .WithHandler<DefineSymbolsHandler>()
+            .WithHandler<HostSessionStatusHandler>()
+            .WithHandler<HostExecuteHandler>()
+            .WithHandler<HostPeekHandler>()
+            .WithHandler<HostPokeHandler>();
 
     // bridge the outer-container singleton into the language-server handler container so a handler
     // resolves the same session provider the app composes on initialize.
     protected override void ConfigureServices(IServiceCollection services)
-        => services.AddSingleton(sessionProvider);
+        => services
+            .AddSingleton(sessionProvider)
+            .AddSingleton(_ => ExternalServices.GetRequiredService<IVerboseMessageBuilder>());
 
     protected override void RegisterServerCapabilities(ILanguageServer server, ClientCapabilities clientCapabilities) { }
 

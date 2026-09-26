@@ -26,6 +26,23 @@ public interface IEnvironmentSessionProvider
     /// </summary>
     bool IsComposed { get; }
 
+    /// The name of the project the session was composed from; an empty string before <see cref="Compose"/>
+    /// has run, or when the project declares no name.
+    /// </summary>
+    string ProjectName { get; }
+
+    /// <summary>
+    /// The number of modules the project the session was composed from declares; <c>0</c> before
+    /// <see cref="Compose"/> has run.
+    /// </summary>
+    int ModuleCount { get; }
+
+    /// <summary>
+    /// The session's output channel, routed: each run points it at its own buffer for the duration,
+    /// so the output of one run never reaches the caller of another.
+    /// </summary>
+    RuntimeOutputRouter Output { get; }
+
     /// <summary>
     /// The composed runtime session.
     /// </summary>
@@ -55,6 +72,15 @@ public sealed class EnvironmentSessionProvider(
     public bool IsComposed => _session is not null;
 
     /// <inheritdoc/>
+    public string ProjectName { get; private set; } = string.Empty;
+
+    /// <inheritdoc/>
+    public int ModuleCount { get; private set; }
+
+    /// <inheritdoc/>
+    public RuntimeOutputRouter Output { get; } = new();
+
+    /// <inheritdoc/>
     public IRuntimeSession Session => _session ?? throw new InvalidOperationException(
         "The runtime session has not been composed yet; it is composed on the LSP initialize handshake.");
 
@@ -64,7 +90,9 @@ public sealed class EnvironmentSessionProvider(
         var configuration = new ConfigurationSymbolProvider(environment, project);
         var modules = new ProjectSymbolProvider(workspaceRoot, project, fileSystem);
 
-        _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, modules]);
+        _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, modules], Output);
+        ProjectName = project.Name;
+        ModuleCount = project.Modules.Length;
 
         if (logger.IsEnabled(LogLevel.Information))
         {
