@@ -53,13 +53,13 @@ public record class VBStringValue : VBTypedValue, IVBTypedValue<VBStringValue, s
 
     private static readonly Lazy<VBStringValue> _vbNullString = new(() => new VBStringValue((string)null!), LazyThreadSafetyMode.PublicationOnly);
     /// <summary>
-    /// Gets the <em>static value</em> associated with <see cref="GlobalSymbols.StaticSymbols.VBNullString"/>.
+    /// Gets the <em>static value</em> of <c>vbNullString</c>.
     /// </summary>
     public static VBStringValue VBNullString => _vbNullString.Value;
 
     private static readonly Lazy<VBStringValue> _zeroString = new(() => new VBStringValue(string.Empty), LazyThreadSafetyMode.PublicationOnly);
     /// <summary>
-    /// Gets the <em>static value</em> associated with <see cref="GlobalSymbols.StaticSymbols.VBEmptyString"/>.
+    /// Gets the <em>static value</em> of the zero-length empty string.
     /// </summary>
     public static VBStringValue ZeroLengthString => _zeroString.Value;
 

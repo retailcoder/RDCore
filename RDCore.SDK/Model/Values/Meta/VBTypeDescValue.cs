@@ -14,7 +14,7 @@ namespace RDCore.SDK.Model.Values.Meta;
 /// <param name="Symbol">The symbol associated with this value.</param>
 public record class VBTypeDescValue(VBType Target) : VBTypedValue(VBTypeDesc.TypeInfo)
 {
-    private static readonly Lazy<VBTypeDescValue> _defaultValue = new(() => new(GlobalSymbols.StaticSymbols.VBUnknown.ResolvedType), LazyThreadSafetyMode.PublicationOnly);
+    private static readonly Lazy<VBTypeDescValue> _defaultValue = new(() => new(VBVoidType.TypeInfo), LazyThreadSafetyMode.PublicationOnly);
     /// <summary>
     /// Gets a <c>VBTypeDescValue</c> describing a <c>VBUnknownType</c>.
     /// </summary>

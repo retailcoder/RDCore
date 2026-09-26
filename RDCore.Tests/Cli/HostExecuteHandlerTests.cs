@@ -75,8 +75,12 @@ public sealed class HostExecuteHandlerTests
         var parse = new ModuleParser().Parse(new Uri(Path.Combine(Root, $"{ModuleName}.bas")), source);
         Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
 
+        // the same resolver the language server composes, so the test sees what the platform sees -
+        // including the standard library and the environment's own globals.
+        var workspaceResolver = WorkspaceSymbolResolver.Compose(
+            workspaceRoot, [(moduleUri, ModuleType.StdModule, parse)], new IntrinsicSymbolResolver());
         var symbols = new SyntaxTreeSymbolProvider(
-            workspaceRoot, moduleUri, ModuleType.StdModule, parse, new IntrinsicSymbolResolver()).ProvideSymbols();
+            workspaceRoot, moduleUri, ModuleType.StdModule, parse, workspaceResolver).ProvideSymbols();
 
         var defined = await new DefineSymbolsHandler(sessionProvider, NullLogger<DefineSymbolsHandler>.Instance)
             .Handle(new DefineSymbolsParams

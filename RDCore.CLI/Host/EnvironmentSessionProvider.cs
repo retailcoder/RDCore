@@ -3,6 +3,7 @@ using RDCore.CLI.Host.Symbols;
 using RDCore.Runtime.Execution;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.StdLib;
 using RDCore.SDK.Workspace;
 using System.IO.Abstractions;
 
@@ -89,8 +90,11 @@ public sealed class EnvironmentSessionProvider(
     {
         var configuration = new ConfigurationSymbolProvider(environment, project);
         var modules = new ProjectSymbolProvider(workspaceRoot, project, fileSystem);
+        // the standard library and the environment's own globals resolve in the session too, so a name
+        // the language server bound to one of them binds to the same symbol here.
+        var stdLib = new StdLibSymbolProvider(workspaceRoot);
 
-        _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, modules], Output);
+        _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, stdLib, modules], Output);
         ProjectName = project.Name;
         ModuleCount = project.Modules.Length;
 

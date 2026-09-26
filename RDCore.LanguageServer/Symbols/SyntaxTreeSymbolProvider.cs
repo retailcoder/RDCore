@@ -22,8 +22,16 @@ namespace RDCore.LanguageServer.Symbols;
 /// declarations — and the dynamic-array local an unresolved <c>ReDim</c> target implicitly declares —
 /// are yielded as children of their procedure symbol.
 /// </remarks>
+/// <param name="withImplicitDeclarations">
+/// Whether a reference to an undeclared name declares it (<strong>MS-VBAL §5.6.10</strong>). Only a
+/// pass whose <paramref name="resolver"/> can actually answer "does this name resolve anywhere" may
+/// do that: a workspace composition's first pass runs with the intrinsics alone, where nothing
+/// resolves and every reference would declare a local, so it passes <c>false</c> and exists only to
+/// discover what the workspace declares.
+/// </param>
 internal sealed class SyntaxTreeSymbolProvider(
-    Uri workspaceRoot, Uri moduleUri, ModuleType moduleType, ModuleParseResult parseResult, ISymbolResolver resolver) : ISymbolProvider
+    Uri workspaceRoot, Uri moduleUri, ModuleType moduleType, ModuleParseResult parseResult, ISymbolResolver resolver,
+    bool withImplicitDeclarations = true) : ISymbolProvider
 {
     public IEnumerable<Symbol> ProvideSymbols()
     {
@@ -101,7 +109,7 @@ internal sealed class SyntaxTreeSymbolProvider(
                     break;
 
                 case MemberDeclarationNode member:
-                    foreach (var symbol in FromMember(builder, member, moduleScopeNames, directives))
+                    foreach (var symbol in FromMember(builder, member, moduleScopeNames, directives, withImplicitDeclarations))
                     {
                         yield return symbol;
                     }
@@ -119,7 +127,8 @@ internal sealed class SyntaxTreeSymbolProvider(
     }
 
     private static IEnumerable<Symbol> FromMember(
-        SymbolBuilder builder, MemberDeclarationNode member, IReadOnlySet<string> moduleScopeNames, ModuleDirectives directives)
+        SymbolBuilder builder, MemberDeclarationNode member, IReadOnlySet<string> moduleScopeNames,
+        ModuleDirectives directives, bool withImplicitDeclarations)
     {
         switch (member.MemberKind)
         {
@@ -148,7 +157,7 @@ internal sealed class SyntaxTreeSymbolProvider(
                 }
 
                 // procedure-local Dim/Static/Const + ReDim-introduced symbols parent to the procedure symbol.
-                foreach (var local in builder.BuildLocals(member, procedure.Uri, outerScopeNames, directives))
+                foreach (var local in builder.BuildLocals(member, procedure.Uri, outerScopeNames, directives, withImplicitDeclarations))
                 {
                     yield return local;
                 }

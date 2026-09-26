@@ -18,7 +18,7 @@ public enum StringTokenSemanticFlags
     /// The <em>string token</em> has a length of zero (empty string).
     /// </summary>
     /// <remarks>
-    /// The <em>data value</em> of the string is the <em>zero-length empty string</em>, a statically allocated symbol (<c>GlobalSymbols.StaticSymbols.VBEmptyString</c>).
+    /// The <em>data value</em> of the string is the <em>zero-length empty string</em>.
     /// </remarks>
     ZeroLength = 1 << 2,
 

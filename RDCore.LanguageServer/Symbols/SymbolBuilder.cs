@@ -280,7 +280,8 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
     // re-dimension rather than an implicit declaration. <paramref name="directives"/> decides whether
     // this module has an implicit declaration mode at all.
     public IEnumerable<Symbol> BuildLocals(
-        MemberDeclarationNode member, Uri procedureUri, IReadOnlySet<string> outerScopeNames, ModuleDirectives directives = default)
+        MemberDeclarationNode member, Uri procedureUri, IReadOnlySet<string> outerScopeNames,
+        ModuleDirectives directives = default, bool withImplicitDeclarations = true)
     {
         var results = new List<Symbol>();
         var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -329,7 +330,7 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
         // says otherwise. A module that declares Option Explicit has no implicit declaration mode at
         // all: there the same expression is a compile error, which
         // SimpleNameExpressionStaticSemantics reports.
-        if (!directives.Explicit)
+        if (!directives.Explicit && withImplicitDeclarations)
         {
             foreach (var reference in body.SelectMany(ValueContextSimpleNames))
             {
@@ -358,11 +359,14 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
         return results;
     }
 
-    // A workspace resolver is composed over the symbols a previous extraction pass produced, so an
-    // implicit local this method declared last time round resolves now — and would suppress its own
-    // re-declaration, leaving the final symbol set without it. A match that is this procedure's own
-    // local is therefore no match at all: its parameters and explicit declarations were already
-    // ruled out above, so whatever is left can only be a previous pass's own output.
+    // A resolver is composed over the symbols an earlier extraction pass produced, and that pass
+    // declares implicit locals too - so a local this method declared last time round resolves now, and
+    // would suppress its own re-declaration, leaving the final symbol set without it. A match that is
+    // this procedure's own local is therefore no match at all: its parameters and explicit declarations
+    // were ruled out above, so whatever is left can only be an earlier pass's own output.
+    //
+    // This is not the same guard as withImplicitDeclarations, which keeps the FIRST pass - the one whose
+    // resolver knows only the intrinsics - from inventing locals for names it could never resolve.
     private static bool IsOwnLocal(SymbolResolutionResult resolved, Uri procedureUri)
         => resolved.Symbol is VBLocalVariableSymbol local
             && local.ParentUri.AbsoluteUri == procedureUri.AbsoluteUri;

@@ -4,6 +4,7 @@ using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.StdLib;
 using System.Collections.Immutable;
 
 namespace RDCore.LanguageServer.Symbols;
@@ -57,7 +58,10 @@ internal static class WorkspaceSymbolResolver
     {
         var parsed = modules.ToList();
 
-        var declared = BuildSymbols(workspaceRoot, parsed, fallback, projectName);
+        // the discovery pass runs with the intrinsics alone, where no workspace or library name
+        // resolves — so it must not do implicit declaration, which would take every reference in every
+        // procedure for an undeclared name.
+        var declared = BuildSymbols(workspaceRoot, parsed, fallback, projectName, withImplicitDeclarations: false);
         var declaredResolver = new CompositeSymbolResolver(new ScopeTreeSymbolResolver(ScopeTreeBuilder.Build(declared)), fallback);
 
         var bound = BuildSymbols(workspaceRoot, parsed, declaredResolver, projectName);
@@ -69,13 +73,17 @@ internal static class WorkspaceSymbolResolver
     // through typeResolver.
     private static List<Symbol> BuildSymbols(
         Uri workspaceRoot, IReadOnlyList<(Uri ModuleUri, ModuleType ModuleType, ModuleParseResult Parse)> modules,
-        ISymbolResolver typeResolver, string? projectName)
+        ISymbolResolver typeResolver, string? projectName, bool withImplicitDeclarations = true)
     {
         var symbols = new List<Symbol>();
         if (projectName is not null)
         {
             symbols.Add(new VBProjectSymbol(workspaceRoot, projectName));
         }
+
+        // the standard library and the globals the environment provides itself, so a reference to one
+        // resolves instead of being taken for an undeclared name (MS-VBAL 5.6.10 would then declare it).
+        symbols.AddRange(new StdLibSymbolProvider(workspaceRoot).ProvideSymbols());
 
         foreach (var (moduleUri, moduleType, parseResult) in modules)
         {
@@ -99,7 +107,7 @@ internal static class WorkspaceSymbolResolver
             // so they're only known once the member provider below has run.
             // tagged here, once, before the ownMembers/symbols split below - both need the same tagged
             // instances, not just whichever one applied the attribute.
-            var members = new SyntaxTreeSymbolProvider(workspaceRoot, moduleUri, moduleType, parseResult, typeResolver).ProvideSymbols()
+            var members = new SyntaxTreeSymbolProvider(workspaceRoot, moduleUri, moduleType, parseResult, typeResolver, withImplicitDeclarations).ProvideSymbols()
                 .Select(member => member is VBTypeMemberSymbol typeMember && parseResult.SyntaxTree?.GetMemberUserMemId(typeMember.Name) is { } userMemId
                     ? (Symbol)typeMember.With(SymbolProperties.UserMemId, userMemId)
                     : member)
