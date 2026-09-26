@@ -75,6 +75,32 @@ public interface ISymbolResolver
     SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle);
 
     /// <summary>
+    /// Resolves the specified <em>identifier name</em> as a reference to a <em>conditional compilation
+    /// constant</em>, as seen from the scope the symbol at <paramref name="handle"/> belongs to.
+    /// </summary>
+    /// <remarks>
+    /// Its own binding context, and the reason is <strong>MS-VBAL §3.4.1</strong>: a <c>#Const</c> "defines
+    /// a constant binding <em>accessible to &lt;cc-expression&gt; elements</em> of the containing module",
+    /// and <strong>§5.6.16.2</strong> is the only place a reference to one is defined at all. So a
+    /// conditional compilation constant is <em>not</em> a name in the default binding context — <c>x = Win64</c>
+    /// in ordinary source does not bind it, and <see cref="ResolveValue"/> never returns one — while a
+    /// <c>#If Win64 Then</c> resolves it only here.
+    /// <para>
+    /// §3.4.1 also gives the shadowing rule this follows: a module's own <c>#Const</c> shadows a
+    /// project-level constant of the same name.
+    /// </para>
+    /// </remarks>
+    /// <param name="name">The name of the constant to resolve.</param>
+    /// <param name="scope">A memory-scope hint; the compile-time resolver does not consult it.</param>
+    /// <param name="handle">The <see cref="Uri"/> of the symbol the lookup originates from.</param>
+    /// <returns>
+    /// A <see cref="SymbolResolutionResult"/> carrying the bound constant, or an unbound result — which
+    /// <strong>§5.6.16.2</strong> gives a meaning of its own: a conditional compilation constant that
+    /// names nothing evaluates to <c>0</c>, not to an error.
+    /// </returns>
+    SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle);
+
+    /// <summary>
     /// Gets the <see cref="IBindingHandle"/> currently associated with the specified <see cref="Symbol"/>.
     /// </summary>
     /// <param name="symbol">The <see cref="Symbol"/> to retrieve the currently associated binding for.</param>

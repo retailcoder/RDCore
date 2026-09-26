@@ -125,6 +125,31 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
             : SymbolResolutionResult.Unbound;
     }
 
+    /// <summary>
+    /// Resolves <paramref name="name"/> as a conditional compilation constant. The tiers are §3.4.1's own
+    /// shadowing rule: the enclosing module's own <c>#Const</c> declarations, then the project-level ones,
+    /// which the global scope carries. <paramref name="scope"/> is not consulted.
+    /// </summary>
+    public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
+    {
+        var origin = scopeTree.ScopeFor(handle).SelfAndAncestors().ToArray();
+        (LexicalScope? Tier, Func<Symbol, bool> IsCandidate)[] tiers =
+        [
+            (origin.FirstOrDefault(lexicalScope => lexicalScope.Kind == LexicalScopeKind.Module), IsConditionalConstant),
+            (origin.FirstOrDefault(lexicalScope => lexicalScope.Kind == LexicalScopeKind.Global), IsConditionalConstant),
+        ];
+
+        foreach (var (tier, isCandidate) in tiers)
+        {
+            if (tier is not null && SelectTier(tier, tier.DeclaredAs(name).Where(isCandidate)) is { } result)
+            {
+                return result;
+            }
+        }
+
+        return SymbolResolutionResult.Unbound;
+    }
+
     // the first tier with at least one candidate is the selected tier (MS-VBAL §5.6.10): null when this
     // tier has none, so the caller moves on to the next one.
     private static SymbolResolutionResult? SelectTier(LexicalScope lexicalScope, IEnumerable<Symbol> candidates)
@@ -157,7 +182,12 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
 
     // MS-VBAL §5.6.10 lists no user-defined type and no class module among the default binding context's
     // candidates: a class is a name there only through its predeclared instance (5.2.4.1.2).
-    private static bool IsValueDeclaration(Symbol symbol) => symbol is not (VBUserDefinedTypeMemberSymbol or VBClassModuleSymbol);
+    // MS-VBAL §3.4.1: a conditional compilation constant is accessible to cc-expressions only, so it is
+    // never a candidate here however the name ranks - `x = Win64` in ordinary source binds nothing.
+    private static bool IsValueDeclaration(Symbol symbol)
+        => symbol is not (VBUserDefinedTypeMemberSymbol or VBClassModuleSymbol or PrecompilerConstantSymbol);
+
+    private static bool IsConditionalConstant(Symbol symbol) => symbol is PrecompilerConstantSymbol;
 
     private static bool IsProjectOrProceduralModule(Symbol symbol) => symbol is VBProjectSymbol or VBStandardModuleSymbol;
 

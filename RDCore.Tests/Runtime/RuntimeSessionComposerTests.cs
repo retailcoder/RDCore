@@ -6,6 +6,7 @@ using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.StdLib;
 using RDCore.SDK.Workspace;
 
 namespace RDCore.Tests.Runtime;
@@ -23,6 +24,27 @@ public sealed class RuntimeSessionComposerTests
             environment,
             new ConfigurationSymbolProvider(environment, project, defines),
             new ProjectSymbolProvider(WorkspaceRoot, project, new MockFileSystem()));
+    }
+
+    [TestMethod]
+    public void ADebugConditionalConstant_DoesNotCollideWithTheDebugObject()
+    {
+        // the collision this fix is for: both are global, both are named Debug, and before conditional
+        // compilation constants had a binding context of their own the name resolved to neither of them.
+        // MS-VBAL §3.4.1 keeps them apart - the #Const is accessible to cc-expressions, the object is a
+        // value - so a project can define DEBUG and still write Debug.Print.
+        var project = new RDCoreProject { PrecompilerConstants = { ["DEBUG"] = "-1" } };
+        var environment = new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false);
+        var session = RuntimeSessionComposer.Compose(
+            environment,
+            new ConfigurationSymbolProvider(environment, project),
+            new StdLibSymbolProvider(WorkspaceRoot));
+
+        Assert.IsTrue(session.Symbols.TryResolveValue("Debug", GlobalScope, out var debugObject));
+        Assert.IsInstanceOfType<VBPredeclaredInstanceSymbol>(debugObject);
+
+        Assert.IsTrue(session.Symbols.TryResolveConditionalConstant("DEBUG", GlobalScope, out var debugConstant));
+        Assert.IsInstanceOfType<PrecompilerConstantSymbol>(debugConstant);
     }
 
     [TestMethod]
@@ -52,11 +74,17 @@ public sealed class RuntimeSessionComposerTests
 
         var session = Compose(is64Bit: true, project);
 
-        Assert.IsTrue(session.Symbols.TryResolveValue("Win64", GlobalScope, out var win64));
+        Assert.IsTrue(session.Symbols.TryResolveConditionalConstant("Win64", GlobalScope, out var win64));
         Assert.AreEqual((short)-1, ((VBIntegerValue)((PrecompilerConstantSymbol)win64!).Value).Value);
 
-        Assert.IsTrue(session.Symbols.TryResolveValue("RDDEBUG", GlobalScope, out var rdDebug));
+        Assert.IsTrue(session.Symbols.TryResolveConditionalConstant("RDDEBUG", GlobalScope, out var rdDebug));
         Assert.AreEqual((short)1, ((VBIntegerValue)((PrecompilerConstantSymbol)rdDebug!).Value).Value);
+
+        // ...and only there. MS-VBAL §3.4.1: a #Const is accessible to cc-expressions, so `x = Win64`
+        // in ordinary source binds nothing - which is also what keeps a DEBUG constant from colliding
+        // with the Debug object.
+        Assert.IsFalse(session.Symbols.TryResolveValue("Win64", GlobalScope, out _));
+        Assert.IsFalse(session.Symbols.TryResolveValue("RDDEBUG", GlobalScope, out _));
     }
 
     [TestMethod]
@@ -67,7 +95,7 @@ public sealed class RuntimeSessionComposerTests
 
         var session = Compose(is64Bit: true, project, defines);
 
-        Assert.IsTrue(session.Symbols.TryResolveValue("RDDEBUG", GlobalScope, out var rdDebug));
+        Assert.IsTrue(session.Symbols.TryResolveConditionalConstant("RDDEBUG", GlobalScope, out var rdDebug));
         Assert.AreEqual((short)1, ((VBIntegerValue)((PrecompilerConstantSymbol)rdDebug!).Value).Value);
     }
 

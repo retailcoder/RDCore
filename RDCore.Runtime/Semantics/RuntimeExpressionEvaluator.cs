@@ -160,7 +160,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     // compile error, and Option Explicit (a variable-declaration concern) has no bearing on it.
     private static RuntimeSemanticsEvaluationResult EvaluatePrecompilerConstant(IRuntimeSession session, PrecompilerNameExpressionNode name)
     {
-        var result = session.Symbols.Resolver.ResolveValue(name.Name, ScopeKind.Global, StaticSymbol.GlobalUri);
+        var result = session.Symbols.Resolver.ResolveConditionalConstant(name.Name, ScopeKind.Global, StaticSymbol.GlobalUri);
         return RuntimeSemanticsEvaluationResult.Success(result.Symbol is PrecompilerConstantSymbol constant ? constant.Value : new VBIntegerValue(0));
     }
 

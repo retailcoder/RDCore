@@ -136,6 +136,15 @@ public interface ISessionSymbols
     bool TryResolveType(string name, Symbol scope, out Symbol? symbol);
 
     /// <summary>
+    /// Resolves <paramref name="name"/> visible from <paramref name="scope"/> as a conditional
+    /// compilation constant (<see cref="ISymbolResolver.ResolveConditionalConstant"/>) — the context of a
+    /// <c>#If</c> directive's expression, and the only one such a constant is accessible to
+    /// (<strong>MS-VBAL §3.4.1</strong>).
+    /// </summary>
+    /// <returns><c>true</c> if the name bound to exactly one constant.</returns>
+    bool TryResolveConditionalConstant(string name, Symbol scope, out Symbol? symbol);
+
+    /// <summary>
     /// The read face over this table — resolves a name visible from a scope by walking the scope tree
     /// the currently-defined symbols form (tracks later <see cref="TryDefine"/> calls), and reads the
     /// live run-time binding a defined symbol was allocated, if any.
