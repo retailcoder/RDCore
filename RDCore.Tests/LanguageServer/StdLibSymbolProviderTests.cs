@@ -101,7 +101,9 @@ public sealed class StdLibSymbolProviderTests
             .OfType<VBLocalVariableSymbol>()
             .ToArray();
 
-        Assert.IsEmpty(locals, $"declared: [{string.Join(", ", locals.Select(local => local.Name))}]");
+        // `o` is undeclared and becomes an implicit local; `Debug` resolves, so it does not.
+        Assert.IsEmpty(locals.Where(local => local.Name == "Debug"),
+            $"declared: [{string.Join(", ", locals.Select(local => local.Name))}]");
     }
 
     private static (Uri Uri, ModuleType ModuleType, ModuleParseResult Parse) Module(string body)

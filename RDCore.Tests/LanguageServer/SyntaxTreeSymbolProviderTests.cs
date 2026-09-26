@@ -499,15 +499,19 @@ public sealed class SyntaxTreeSymbolProviderTests
     [TestMethod]
     public void AMemberName_IsNotAnImplicitDeclaration()
     {
-        // Debug.Print: the member half of a member access resolves against the owner's type, not
-        // against the enclosing scope, so only the owner is a simple name in 5.6.10's sense.
+        // the member half of a member access resolves against the owner's type, not against the
+        // enclosing scope, so only the owner is a simple name in 5.6.10's sense. Deliberately not
+        // Debug.Print, which the parser gives a statement of its own and which therefore has no simple
+        // name in it at all - this has to exercise a real member access to test the rule it names.
         var symbols = Provide("""
             Public Sub Foo()
-                Debug.Print 1
+                Widget.Frobnicate 1
             End Sub
             """, new IntrinsicSymbolResolver());
 
-        Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>().Where(local => local.Name == "Print"));
+        Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>().Where(local => local.Name == "Frobnicate"));
+        // ...and the owner IS one, so it declares itself.
+        Assert.AreEqual(LocalDeclarationKind.Implicit, Named<VBLocalVariableSymbol>(symbols, "Widget").DeclaredBy);
     }
 
     [TestMethod]
