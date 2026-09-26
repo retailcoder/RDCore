@@ -1,6 +1,7 @@
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values;
+using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Workspace;
 
@@ -47,6 +48,9 @@ public sealed class ConfigurationSymbolProvider(
             yield return (entry.Key, entry.Value);
         }
 
+        // RDCore's own, lowest precedence like the rest: a .rdproj #Const or a --define turns it off.
+        // A dev tool defaults to a debug build.
+        yield return (RuntimeSessionExtensions.DebugConstantName, "-1");
         yield return ("Win16", "0");
         yield return ("Win32", environment.Is64Bit ? "0" : "-1");
         yield return ("Win64", environment.Is64Bit ? "-1" : "0");

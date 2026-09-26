@@ -56,6 +56,12 @@ public interface IRuntimeSession
     ISessionObjects Objects { get; }
 
     /// <summary>
+    /// The session's error state — what the <c>Err</c> object reports
+    /// (<strong>MS-VBAL §6.1.3.2</strong>), and what outlives the activation that raised it.
+    /// </summary>
+    ISessionErrorState Errors { get; }
+
+    /// <summary>
     /// The session's call stack — pushing and popping an <see cref="ICallStackFrame"/> per procedure
     /// activation is what makes a procedure's locals and parameters visible through
     /// <see cref="ISessionSymbols"/>'s <see cref="ISessionSymbols.Resolver"/> (<strong>RD-VBAL
@@ -128,6 +134,15 @@ public interface ISessionSymbols
     /// </summary>
     /// <returns><c>true</c> if the name bound to exactly one symbol.</returns>
     bool TryResolveType(string name, Symbol scope, out Symbol? symbol);
+
+    /// <summary>
+    /// Resolves <paramref name="name"/> visible from <paramref name="scope"/> as a conditional
+    /// compilation constant (<see cref="ISymbolResolver.ResolveConditionalConstant"/>) — the context of a
+    /// <c>#If</c> directive's expression, and the only one such a constant is accessible to
+    /// (<strong>MS-VBAL §3.4.1</strong>).
+    /// </summary>
+    /// <returns><c>true</c> if the name bound to exactly one constant.</returns>
+    bool TryResolveConditionalConstant(string name, Symbol scope, out Symbol? symbol);
 
     /// <summary>
     /// The read face over this table — resolves a name visible from a scope by walking the scope tree

@@ -47,10 +47,11 @@ public sealed class EnvironmentSessionProviderTests
         Assert.IsTrue(session.Symbols.TryResolveValue("MyModule", GlobalScope, out var module));
         Assert.IsInstanceOfType<VBStandardModuleSymbol>(module);
 
-        Assert.IsTrue(session.Symbols.TryResolveValue("RDDEBUG", GlobalScope, out var rdDebug));
+        // a #Const resolves in its own binding context and in no other (MS-VBAL §3.4.1).
+        Assert.IsTrue(session.Symbols.TryResolveConditionalConstant("RDDEBUG", GlobalScope, out var rdDebug));
         Assert.AreEqual((short)1, ((VBIntegerValue)((PrecompilerConstantSymbol)rdDebug!).Value).Value);
 
-        Assert.IsTrue(session.Symbols.TryResolveValue("Win64", GlobalScope, out var win64));
+        Assert.IsTrue(session.Symbols.TryResolveConditionalConstant("Win64", GlobalScope, out var win64));
         Assert.AreEqual((short)-1, ((VBIntegerValue)((PrecompilerConstantSymbol)win64!).Value).Value);
     }
 

@@ -682,8 +682,45 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             return;
         }
         var arguments = CaptureIsolated(context.argumentList()).Cast<ExpressionNode>().ToImmutableArray();
-        CurrentBuilder.AddChild(new CallStatementNode(GetCurrentNodeId(), context.GetSourceLocation(_rootUri), callee, arguments, context.CALL() is not null));
+        var location = context.GetSourceLocation(_rootUri);
+
+        CurrentBuilder.AddChild(
+            AsDebugStatement(GetCurrentNodeId(), location, callee, arguments)
+            ?? new CallStatementNode(GetCurrentNodeId(), location, callee, arguments, context.CALL() is not null));
     }
+
+    // A call against the Debug object is its own statement, not a call to anything nameable. It has to
+    // be told apart here rather than left to a later pass, because lowering leaves these out entirely
+    // in a build where the DEBUG conditional compilation constant is false - and a qualified call that
+    // looks like every other qualified call cannot be left out that way. See DebugStatementNode.
+    //
+    // Debug.Print arrives as an objectPrintExpr (its output list is not an argument list). Debug.Assert
+    // is an ordinary call, so its argument arrives one of two ways: parenthesized, it rides inside the
+    // callee's own IndexExpressionNode; bare, it is the statement's own argument list.
+    private static StatementNode? AsDebugStatement(
+        SyntaxNodeId identity, SourceLocation location, ExpressionNode callee, ImmutableArray<ExpressionNode> arguments)
+        => callee switch
+        {
+            ObjectPrintExpressionNode print when IsDebugObject(print.Owner)
+                => new DebugPrintStatementNode(identity, location, print.Items),
+
+            IndexExpressionNode { Callee: MemberAccessExpressionNode member, Arguments: [var argument] }
+                when IsDebugMember(member, Tokens.Assert)
+                => new DebugAssertStatementNode(identity, location, argument),
+
+            MemberAccessExpressionNode member when IsDebugMember(member, Tokens.Assert) && arguments is [var argument]
+                => new DebugAssertStatementNode(identity, location, argument),
+
+            _ => null,
+        };
+
+    private static bool IsDebugMember(MemberAccessExpressionNode member, string name)
+        => IsDebugObject(member.Owner)
+            && string.Equals(member.Member.IdentifierName, name, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDebugObject(ExpressionNode? owner)
+        => owner is SimpleNameExpressionNode simpleName
+            && string.Equals(simpleName.IdentifierName, Tokens.Debug, StringComparison.OrdinalIgnoreCase);
 
     public override void ExitSeekStmt([NotNull] VBAParser.SeekStmtContext context)
         => OnKeywordStatement(Tokens.Seek, context, CaptureFileNumber(context.fileNumber()), CaptureIsolatedExpression(context.position()?.expression()));

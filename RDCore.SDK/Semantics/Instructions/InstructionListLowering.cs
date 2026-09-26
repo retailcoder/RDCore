@@ -59,13 +59,14 @@ public static class InstructionListLowering
     /// <see cref="StatementBlock"/>. A label is scoped to the whole procedure, so passing a nested
     /// block on its own would under-resolve every jump into or out of it.
     /// </param>
-    /// <param name="deadRanges">
-    /// The source ranges of every <c>#If</c>/<c>#ElseIf</c>/<c>#Else</c> branch that is not live. Empty
-    /// (the default) when the body has no <c>#If</c> at all.
+    /// <param name="options">
+    /// What the build being lowered for decides: which conditional-compilation branches are dead, and
+    /// whether <c>Debug</c> statements are lowered at all. The default is a debug build of a body with
+    /// no conditional compilation in it.
     /// </param>
-    public static InstructionListLoweringResult Lower(StatementBlock body, ImmutableArray<SourceRange> deadRanges = default)
+    public static InstructionListLoweringResult Lower(StatementBlock body, InstructionLoweringOptions options = default)
     {
-        var state = new LoweringState(deadRanges.IsDefault ? [] : deadRanges);
+        var state = new LoweringState(options.Dead, options.IncludeDebugStatements);
         LowerBlock(body, state, default);
 
         // Every label in the procedure is now known, however deeply nested its definition was, so every
@@ -126,6 +127,12 @@ public static class InstructionListLowering
     {
         switch (statement)
         {
+            // MS-VBAL has no Debug object; RDCore's own build configuration decides whether these exist
+            // at run time. Leaving them out means exactly that - no instruction, not a no-op one - so a
+            // release build pays nothing at all for a Debug.Print left in the source.
+            case DebugStatementNode when !state.IncludeDebugStatements:
+                break;
+
             case GoToStatementNode goTo:
                 state.PendingJumps.Add((Emit(state, scope, statement, InstructionKind.Jump), goTo.LabelExpression));
                 break;
@@ -478,7 +485,7 @@ public static class InstructionListLowering
     }
 
     // Shared, mutable across the whole recursive lowering of one procedure body.
-    private sealed class LoweringState(ImmutableArray<SourceRange> deadRanges)
+    private sealed class LoweringState(ImmutableArray<SourceRange> deadRanges, bool includeDebugStatements)
     {
         public List<Instruction> Items { get; } = [];
         public Dictionary<string, int> Labels { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -487,6 +494,7 @@ public static class InstructionListLowering
         public List<(int Index, ExpressionNode Operand)> PendingJumps { get; } = [];
         public List<(int Index, ImmutableArray<ExpressionNode> Operands)> PendingJumpTables { get; } = [];
         public ImmutableArray<SourceRange> DeadRanges { get; } = deadRanges;
+        public bool IncludeDebugStatements { get; } = includeDebugStatements;
     }
 
     // The offsets of every Exit For/Exit Do instruction found inside one loop, patched once that loop's

@@ -22,6 +22,7 @@ internal sealed class RuntimeSession(
     ISessionStorage storage,
     ISessionSymbols symbols,
     ISessionObjects objects,
+    ISessionErrorState errors,
     ICallStack callStack,
     IReadOnlyList<ReferencePriorityInfo> references,
     IRuntimeOutput output) : IRuntimeSession
@@ -31,6 +32,7 @@ internal sealed class RuntimeSession(
     public ISessionStorage Storage { get; init; } = storage;
     public ISessionSymbols Symbols { get; init; } = symbols;
     public ISessionObjects Objects { get; init; } = objects;
+    public ISessionErrorState Errors { get; init; } = errors;
     public ICallStack CallStack { get; init; } = callStack;
     public IReadOnlyList<ReferencePriorityInfo> References { get; init; } = references;
     public IRuntimeOutput Output { get; init; } = output;
@@ -204,6 +206,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         return symbol is not null;
     }
 
+    public bool TryResolveConditionalConstant(string name, Symbol scope, out Symbol? symbol)
+    {
+        symbol = Resolver.ResolveConditionalConstant(name, ScopeKind.Unallocated, scope.Uri).Symbol;
+        return symbol is not null;
+    }
+
     public ICallStackFrame CreateFrame(SyntaxNodeId nodeId, StaticSymbol procedure, ModuleDirectives directives = default)
         => new CallStackFrame(nodeId, procedure, [], storage, directives);
 
@@ -261,6 +269,9 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
         public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle)
             => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveQualifier(name, scope, handle);
+
+        public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
+            => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveConditionalConstant(name, scope, handle);
 
         public IBindingHandle GetValue(Symbol symbol)
             => throw new NotSupportedException("The scope-tree resolver binds names only; it holds no run-time bindings.");

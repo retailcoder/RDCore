@@ -6,6 +6,7 @@ using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Runtime.Shared;
@@ -64,7 +65,11 @@ internal sealed class HostExecuteHandler(
                 continue;
             }
 
-            var lowering = InstructionListLowering.Lower(new StatementBlock([.. member.Children]));
+            // the build decides whether Debug statements exist at all, and the build is what the DEBUG
+            // conditional compilation constant says it is.
+            var lowering = InstructionListLowering.Lower(
+                new StatementBlock([.. member.Children]),
+                new InstructionLoweringOptions(IsReleaseBuild: !session.IsDebugBuild()));
             if (lowering.Errors.Length > 0)
             {
                 return Task.FromResult(new ExecuteSessionResult

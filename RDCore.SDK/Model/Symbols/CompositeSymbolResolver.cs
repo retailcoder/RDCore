@@ -32,6 +32,10 @@ public sealed class CompositeSymbolResolver(params ISymbolResolver[] resolvers) 
     public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle)
         => FirstBound(resolver => resolver.ResolveQualifier(name, scope, handle));
 
+    /// <inheritdoc/>
+    public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
+        => FirstBound(resolver => resolver.ResolveConditionalConstant(name, scope, handle));
+
     private SymbolResolutionResult FirstBound(Func<ISymbolResolver, SymbolResolutionResult> resolve)
     {
         foreach (var resolver in resolvers)

@@ -58,13 +58,29 @@ public sealed class HostExecuteHandlerTests
     /// </summary>
     private static async Task<ExecuteSessionResult> ExecuteAsync(string source, string entryPoint = "Main", CancellationToken token = default)
     {
-        var (handler, sessionProvider, workspaceRoot, moduleUri) = Compose(source);
+        var composed = Compose(source);
+        return await ExecuteAsync(composed, source, entryPoint, token);
+    }
+
+    /// <summary>
+    /// Runs one module against an already-composed session, so a test can run more than once against
+    /// the same one — which is what a live client does, and the only way a redefinition is exercised.
+    /// </summary>
+    private static async Task<ExecuteSessionResult> ExecuteAsync(
+        (HostExecuteHandler Handler, EnvironmentSessionProvider Session, Uri WorkspaceRoot, Uri ModuleUri) composed,
+        string source, string entryPoint = "Main", CancellationToken token = default)
+    {
+        var (handler, sessionProvider, workspaceRoot, moduleUri) = composed;
 
         var parse = new ModuleParser().Parse(new Uri(Path.Combine(Root, $"{ModuleName}.bas")), source);
         Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
 
+        // the same resolver the language server composes, so the test sees what the platform sees -
+        // including the standard library and the environment's own globals.
+        var workspaceResolver = WorkspaceSymbolResolver.Compose(
+            workspaceRoot, [(moduleUri, ModuleType.StdModule, parse)], new IntrinsicSymbolResolver());
         var symbols = new SyntaxTreeSymbolProvider(
-            workspaceRoot, moduleUri, ModuleType.StdModule, parse, new IntrinsicSymbolResolver()).ProvideSymbols();
+            workspaceRoot, moduleUri, ModuleType.StdModule, parse, workspaceResolver).ProvideSymbols();
 
         var defined = await new DefineSymbolsHandler(sessionProvider, NullLogger<DefineSymbolsHandler>.Instance)
             .Handle(new DefineSymbolsParams
@@ -73,8 +89,9 @@ public sealed class HostExecuteHandlerTests
                 ModuleUri = moduleUri,
                 ModuleName = ModuleName,
                 Symbols = SymbolDescriptorProjector.Project(symbols, moduleUri),
+                Replace = true,
             }, CancellationToken.None);
-        Assert.IsGreaterThan(0, defined.Defined, "no symbols were defined in the session");
+        Assert.IsGreaterThan(0, defined.Defined + defined.Replaced, "no symbols were defined in the session");
 
         return await handler.Handle(new HostExecuteParams
         {
@@ -108,6 +125,51 @@ public sealed class HostExecuteHandlerTests
 
         Assert.AreEqual(ExecutionOutcome.Completed, result.Outcome, result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { " 42 " }, result.Output.ToArray());
+    }
+
+    [TestMethod]
+    public async Task AnUndeclaredLocal_IsImplicitlyDeclared_AndRuns()
+    {
+        // MS-VBAL 5.6.10, all the way through: the declaration pass declares Counter because something
+        // referred to it, the descriptor carries it to the host, and the activation allocates frame
+        // storage for it — so a program that never says Dim runs, which is how BASIC is written.
+        var result = await ExecuteAsync(Module(
+            "10 Counter = 21",
+            "20 Debug.Print Counter * 2"));
+
+        Assert.AreEqual(ExecutionOutcome.Completed, result.Outcome, result.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { " 42 " }, result.Output.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ASecondRunAgainstTheSameSession_RedefinesTheModuleAndRuns()
+    {
+        // what a live client does every time: the module is defined again, then run again. The second
+        // definition replaces the first, and both runs have to work.
+        var composed = Compose(Module("10 Counter = 1", "20 Debug.Print Counter"));
+
+        var first = await ExecuteAsync(composed, Module("10 Counter = 1", "20 Debug.Print Counter"));
+        Assert.AreEqual(ExecutionOutcome.Completed, first.Outcome, first.ErrorMessage);
+
+        // the shell's own shape: a second module with an extra procedure, run by that procedure's name.
+        var second = await ExecuteAsync(
+            composed,
+            $"{Module("10 Counter = 1", "20 Debug.Print Counter")}\r\nPublic Sub Immediate()\r\nDebug.Print 1 + 1\r\nEnd Sub\r\n",
+            entryPoint: "Immediate");
+
+        Assert.AreEqual(ExecutionOutcome.Completed, second.Outcome, second.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { " 2 " }, second.Output.ToArray());
+    }
+
+    [TestMethod]
+    public async Task AnImplicitLocalThatIsOnlyEverRead_IsEmpty()
+    {
+        // an implicit declaration is a declaration with no initializer, so its value is its type's
+        // default — a Variant's Empty, which prints as nothing at all.
+        var result = await ExecuteAsync(Module("10 Debug.Print Untouched"));
+
+        Assert.AreEqual(ExecutionOutcome.Completed, result.Outcome, result.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "" }, result.Output.ToArray());
     }
 
     [TestMethod]

@@ -1,6 +1,7 @@
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Directives;
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
@@ -21,8 +22,16 @@ namespace RDCore.LanguageServer.Symbols;
 /// declarations — and the dynamic-array local an unresolved <c>ReDim</c> target implicitly declares —
 /// are yielded as children of their procedure symbol.
 /// </remarks>
+/// <param name="withImplicitDeclarations">
+/// Whether a reference to an undeclared name declares it (<strong>MS-VBAL §5.6.10</strong>). Only a
+/// pass whose <paramref name="resolver"/> can actually answer "does this name resolve anywhere" may
+/// do that: a workspace composition's first pass runs with the intrinsics alone, where nothing
+/// resolves and every reference would declare a local, so it passes <c>false</c> and exists only to
+/// discover what the workspace declares.
+/// </param>
 internal sealed class SyntaxTreeSymbolProvider(
-    Uri workspaceRoot, Uri moduleUri, ModuleType moduleType, ModuleParseResult parseResult, ISymbolResolver resolver) : ISymbolProvider
+    Uri workspaceRoot, Uri moduleUri, ModuleType moduleType, ModuleParseResult parseResult, ISymbolResolver resolver,
+    bool withImplicitDeclarations = true) : ISymbolProvider
 {
     public IEnumerable<Symbol> ProvideSymbols()
     {
@@ -71,6 +80,10 @@ internal sealed class SyntaxTreeSymbolProvider(
         var implicitType = module.Children.OfType<TypeDefDirectiveNode>().Any() ? VBUnknownType.TypeInfo : VBVariantType.TypeInfo;
         var builder = new SymbolBuilder(workspaceRoot, moduleUri, memberScope, resolver, implicitType);
 
+        // MS-VBAL 5.2.1.3: Option Explicit sets the module's variable declaration mode. Without it the
+        // module is in implicit mode, where a reference to an undeclared name declares it (5.6.10).
+        var directives = new ModuleDirectives(Explicit: module.HasOptionExplicit());
+
         // module-level names are order-independent, so collect them before walking the members — a
         // ReDim in one procedure may re-dimension a field declared further down the module.
         var moduleScopeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -96,7 +109,7 @@ internal sealed class SyntaxTreeSymbolProvider(
                     break;
 
                 case MemberDeclarationNode member:
-                    foreach (var symbol in FromMember(builder, member, moduleScopeNames))
+                    foreach (var symbol in FromMember(builder, member, moduleScopeNames, directives, withImplicitDeclarations))
                     {
                         yield return symbol;
                     }
@@ -113,7 +126,9 @@ internal sealed class SyntaxTreeSymbolProvider(
         }
     }
 
-    private static IEnumerable<Symbol> FromMember(SymbolBuilder builder, MemberDeclarationNode member, IReadOnlySet<string> moduleScopeNames)
+    private static IEnumerable<Symbol> FromMember(
+        SymbolBuilder builder, MemberDeclarationNode member, IReadOnlySet<string> moduleScopeNames,
+        ModuleDirectives directives, bool withImplicitDeclarations)
     {
         switch (member.MemberKind)
         {
@@ -142,7 +157,7 @@ internal sealed class SyntaxTreeSymbolProvider(
                 }
 
                 // procedure-local Dim/Static/Const + ReDim-introduced symbols parent to the procedure symbol.
-                foreach (var local in builder.BuildLocals(member, procedure.Uri, outerScopeNames))
+                foreach (var local in builder.BuildLocals(member, procedure.Uri, outerScopeNames, directives, withImplicitDeclarations))
                 {
                     yield return local;
                 }

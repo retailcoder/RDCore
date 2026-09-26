@@ -9,6 +9,45 @@ namespace RDCore.SDK.Runtime;
 public static class RuntimeSessionExtensions
 {
     /// <summary>
+    /// The name of the conditional compilation constant that says whether this is a debug build.
+    /// </summary>
+    /// <remarks>
+    /// RDCore's own, not MS-VBAL's — VBA has no such constant. It is a conditional compilation
+    /// constant rather than a setting of its own so that <c>#If DEBUG Then</c> and "does this
+    /// <c>Debug.Print</c> run" cannot disagree, and so that the precedence a project already has over
+    /// its constants (a <c>--define</c> beats the <c>.rdproj</c>, which beats the built-in) applies to
+    /// it unchanged.
+    /// </remarks>
+    public const string DebugConstantName = "DEBUG";
+
+    /// <summary>
+    /// Whether this session is running a debug build — whether <c>Debug.Print</c> and
+    /// <c>Debug.Assert</c> are lowered and executed at all.
+    /// </summary>
+    /// <remarks>
+    /// False only when <see cref="DebugConstantName"/> is defined <em>and</em> zero. A session
+    /// composed without the constant at all is a debug build: keeping the statements is the
+    /// recoverable answer, and silently dropping every <c>Debug.Print</c> because a symbol provider
+    /// was missing is not.
+    /// </remarks>
+    /// <param name="session">The session the code is executing in.</param>
+    public static bool IsDebugBuild(this IRuntimeSession session)
+        => !session.Symbols.TryResolveConditionalConstant(DebugConstantName, GlobalSymbols.UnresolvedSymbol, out var symbol)
+            || symbol is not PrecompilerConstantSymbol constant
+            || !IsZero(constant.Value);
+
+    private static bool IsZero(Model.Values.Abstract.VBTypedValue value)
+        => value.Handle.Value.BoxedValue switch
+        {
+            byte number => number == 0,
+            short number => number == 0,
+            int number => number == 0,
+            long number => number == 0,
+            double number => number == 0,
+            _ => false,
+        };
+
+    /// <summary>
     /// The mode the relational operators compare <c>String</c> values in, at the point of the session's execution
     /// (<strong>MS-VBAL §5.2.1.1</strong>): the comparison mode of the module declaring the procedure of the current call frame,
     /// <see cref="OptionCompare.Binary"/> if nothing is executing.
