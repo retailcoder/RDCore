@@ -1,68 +1,54 @@
-﻿using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Runtime.Shared;
 using System.Diagnostics.CodeAnalysis;
 
 namespace RDCore.Runtime.Execution.Memory;
 
+/// <summary>
+/// The free memory of a session's address space: what has been allocated and released, available for
+/// reuse before a new segment has to be reserved.
+/// </summary>
+/// <remarks>
+/// A thin face over a single coalescing, address-ordered <see cref="FreeBlocksList"/>. It used to keep
+/// two lists partitioned by block size, plus a dictionary mapping each free block to its segment —
+/// three structures that had to agree with each other and could not, because merging two adjacent
+/// free blocks changes the very key the dictionary was keyed by. Coalescing gets the fragmentation
+/// result the size partition was aiming at, and one structure cannot disagree with itself.
+/// </remarks>
 internal class FreeListManager
 {
-    private static readonly int _smallListSize = 8;
+    private readonly FreeBlocksList _free = new();
 
-    private readonly Dictionary<SessionMemoryBlock, SessionMemorySegment> _segmentMap = [];
-    private readonly FreeBlocksList _freeSmallBlocks = new();
-    private readonly FreeBlocksList _freeLargeBlocks = new();
+    /// <summary>
+    /// The largest single allocation the free list can satisfy without reserving a new segment.
+    /// </summary>
+    public int LargestFreeBlockSize => _free.LargestBlockSize;
 
-    public int LargestFreeBlockSize => Math.Max(_freeLargeBlocks.LargestBlockSize, _freeSmallBlocks.LargestBlockSize);
+    /// <summary>
+    /// Returns a released block to the free list.
+    /// </summary>
+    /// <param name="block">The block being released.</param>
+    /// <param name="segment">The segment it was reserved from.</param>
+    public void Add(SessionMemoryBlock block, SessionMemorySegment segment) => _free.Add(block, segment);
 
-    public void Add(SessionMemoryBlock block, SessionMemorySegment segment)
+    /// <summary>
+    /// Takes the smallest free block that fits <paramref name="size"/>, splitting it if it is larger.
+    /// </summary>
+    /// <param name="size">The number of bytes wanted.</param>
+    /// <param name="block">The block to allocate, exactly <paramref name="size"/> bytes long.</param>
+    /// <param name="segment">The segment it belongs to.</param>
+    /// <returns><c>false</c> if no free block is big enough.</returns>
+    public bool TryGetFreeListBlock(
+        int size,
+        [MaybeNullWhen(false)][NotNullWhen(true)] out SessionMemoryBlock? block,
+        [MaybeNullWhen(false)][NotNullWhen(true)] out SessionMemorySegment? segment)
     {
-        var list = block.Size <= _smallListSize 
-            ? _freeSmallBlocks 
-            : _freeLargeBlocks;
-        
-        list.Add(block);
-        _segmentMap.Add(block, segment);
-    }
-
-    public bool TryGetFreeListBlock(int size, [MaybeNullWhen(false)][NotNullWhen(true)] out SessionMemoryBlock? block, [MaybeNullWhen(false)][NotNullWhen(true)] out SessionMemorySegment? segment)
-    {
-        var freeList = size <= _smallListSize ? _freeSmallBlocks : _freeLargeBlocks;
-        if (freeList.Count > 0 && freeList[^1].Size >= size)
+        if (_free.TryTakeSmallestFit(size, out var found, out segment))
         {
-            // free-list is usable, so we use the smallest available block that fits
-            for (var i = 0; i < freeList.Count; i++)
-            {
-                if (freeList[i].Size >= size)
-                {
-                    block = freeList[i];  // ideal case: no fragmentation
-
-                    freeList.RemoveAt(i); // this block is no longer free
-                    _segmentMap.Remove(block.Value, out segment!);
-
-                    if (block.Value.Size > size)
-                    {
-                        // free block is larger than the size we need; this leaves a fragment block behind
-                        var fragment = new SessionMemoryBlock(block.Value.Address + size, block.Value.Size - size);
-                        block = new SessionMemoryBlock(block.Value.Address, size);
-
-                        // add the fragment as a new free block, move memory block to small list as needed
-                        if (fragment.Size <= _smallListSize)
-                        {
-                            _freeSmallBlocks.Add(fragment);
-                            _segmentMap.Add(fragment, segment);
-                        }
-                        else
-                        {
-                            _freeLargeBlocks.Add(fragment);
-                            _segmentMap.Add(fragment, segment);
-                        }
-                        // ...and fragmentation is practically inexistent since we leave no small block in the large free list.
-                    }
-                    return true;
-                }
-            }
+            block = found;
+            return true;
         }
-        block = default;
-        segment = default;
+
+        block = null;
         return false;
     }
 }
