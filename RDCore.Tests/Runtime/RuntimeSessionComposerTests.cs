@@ -27,6 +27,36 @@ public sealed class RuntimeSessionComposerTests
     }
 
     [TestMethod]
+    public void ASessionIsADebugBuild_ByDefault()
+    {
+        // the built-in DEBUG constant, lowest precedence like Win64 and the rest. A dev tool defaults
+        // to a debug build, and a session composed without the constant at all is one too - dropping
+        // every Debug.Print because a provider was missing is not a recoverable answer.
+        Assert.IsTrue(Compose(is64Bit: true, new RDCoreProject()).IsDebugBuild());
+        Assert.IsTrue(RuntimeSessionComposer.Compose(
+            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false)).IsDebugBuild());
+    }
+
+    [TestMethod]
+    public void AProjectThatDefinesDebugAsZero_IsAReleaseBuild()
+    {
+        var project = new RDCoreProject { PrecompilerConstants = { ["DEBUG"] = "0" } };
+
+        Assert.IsFalse(Compose(is64Bit: true, project).IsDebugBuild());
+    }
+
+    [TestMethod]
+    public void ACliDefine_DecidesTheBuild_OverTheProject()
+    {
+        // the precedence a project already has over its constants applies to this one unchanged, which
+        // is the whole reason the build is a conditional compilation constant rather than a setting.
+        var project = new RDCoreProject { PrecompilerConstants = { ["DEBUG"] = "-1" } };
+        var defines = new Dictionary<string, string> { ["DEBUG"] = "0" };
+
+        Assert.IsFalse(Compose(is64Bit: true, project, defines).IsDebugBuild());
+    }
+
+    [TestMethod]
     public void ADebugConditionalConstant_DoesNotCollideWithTheDebugObject()
     {
         // the collision this fix is for: both are global, both are named Debug, and before conditional

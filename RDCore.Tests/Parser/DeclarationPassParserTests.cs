@@ -2067,18 +2067,55 @@ End Sub
     [TestMethod]
     // Debug.Print "x" reaches mainBlockStmt through callStmt's bare form - the owner.Print shape is
     // captured as the callee of a CallStatementNode, same as any other bare call.
-    public void ObjectPrintExpression_DebugPrint_CapturesOwnerAndItems()
+    public void DebugPrint_IsItsOwnStatement_CapturingTheOutputList()
     {
+        // it parses as a qualified call and is recognized afterwards: a Debug statement has to be
+        // distinguishable, because lowering leaves it out entirely in a release build.
         var result = ParseInProcedure("""Debug.Print "x", "y" """.TrimEnd());
         var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
-        var call = member.Children.OfType<CallStatementNode>().Single();
+        var print = member.Children.OfType<DebugPrintStatementNode>().Single();
 
-        var objectPrint = (ObjectPrintExpressionNode)call.Callee;
-        Assert.AreEqual("Debug", ((SimpleNameExpressionNode)objectPrint.Owner).IdentifierName);
-        Assert.HasCount(3, objectPrint.Items);
-        Assert.AreEqual("x", ((VBStringValue)((LiteralExpressionNode)objectPrint.Items[0].Value!).StaticValue).Value);
-        Assert.AreEqual(",", objectPrint.Items[1].Separator);
-        Assert.AreEqual("y", ((VBStringValue)((LiteralExpressionNode)objectPrint.Items[2].Value!).StaticValue).Value);
+        Assert.IsEmpty(member.Children.OfType<CallStatementNode>());
+        Assert.HasCount(3, print.Items);
+        Assert.AreEqual("x", ((VBStringValue)((LiteralExpressionNode)print.Items[0].Value!).StaticValue).Value);
+        Assert.AreEqual(",", print.Items[1].Separator);
+        Assert.AreEqual("y", ((VBStringValue)((LiteralExpressionNode)print.Items[2].Value!).StaticValue).Value);
+    }
+
+    [TestMethod]
+    public void DebugAssert_Bare_IsItsOwnStatement()
+    {
+        // the bare form's argument is the statement's own argument list.
+        var result = ParseInProcedure("Debug.Assert x > 1");
+        var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        var assert = member.Children.OfType<DebugAssertStatementNode>().Single();
+
+        Assert.IsEmpty(member.Children.OfType<CallStatementNode>());
+        Assert.IsInstanceOfType<VBBinaryOperatorExpressionNode>(assert.Condition);
+    }
+
+    [TestMethod]
+    public void DebugAssert_Parenthesized_IsItsOwnStatement()
+    {
+        // ...and the parenthesized form's rides inside the callee's own index expression.
+        var result = ParseInProcedure("Debug.Assert (x > 1)");
+        var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        var assert = member.Children.OfType<DebugAssertStatementNode>().Single();
+
+        Assert.IsEmpty(member.Children.OfType<CallStatementNode>());
+        Assert.IsNotNull(assert.Condition);
+    }
+
+    [TestMethod]
+    public void AnObjectPrintOnAnythingElse_StaysACallStatement()
+    {
+        // MS-VBAL §5.6's object-print expression is not Debug-specific; only the Debug object gets a
+        // statement of its own, because only its statements are conditional on the build.
+        var result = ParseInProcedure("""Sheet1.Print "x" """.TrimEnd());
+        var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+
+        Assert.IsEmpty(member.Children.OfType<DebugStatementNode>());
+        Assert.IsInstanceOfType<ObjectPrintExpressionNode>(member.Children.OfType<CallStatementNode>().Single().Callee);
     }
 
     [TestMethod]

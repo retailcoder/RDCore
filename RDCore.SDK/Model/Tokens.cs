@@ -50,6 +50,7 @@ public static class Tokens
     public const string DateValue = "DateValue";
     public const string Day = "Day";
     public const string Debug = "Debug";
+    public const string Assert = "Assert";
     public const string Decimal = "Decimal";
     public const string Declare = "Declare";
     public const string DefBool = "DefBool";

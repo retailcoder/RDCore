@@ -42,8 +42,69 @@ public sealed class InstructionListLoweringTests
         return InstructionListLowering.Lower(new StatementBlock([.. member.Children]));
     }
 
+    private static InstructionListLoweringResult LowerForRelease(params string[] procedureBody)
+    {
+        var source = $"Sub Foo()\r\n{string.Join("\r\n", procedureBody)}\r\nEnd Sub\r\n";
+        var parse = new ModuleParser().Parse(new Uri("file:///c:/ws/Mod1.bas"), source);
+        Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
+
+        var member = parse.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        return InstructionListLowering.Lower(
+            new StatementBlock([.. member.Children]), new InstructionLoweringOptions(IsReleaseBuild: true));
+    }
+
     private static void AssertNoErrors(InstructionListLoweringResult result)
         => Assert.IsEmpty(result.Errors, string.Join("; ", result.Errors.Select(error => $"{error.VBCompileErrorId}: {error.Verbose}")));
+
+    // --- Debug statements and the build (RDCore's own DEBUG conditional compilation constant) ---
+
+    [TestMethod]
+    public void DebugStatements_InADebugBuild_AreLowered()
+    {
+        var result = Lower("Debug.Print 1", "Debug.Assert False");
+
+        AssertNoErrors(result);
+        Assert.HasCount(2, result.InstructionList.Items);
+    }
+
+    [TestMethod]
+    public void DebugStatements_InAReleaseBuild_LeaveNoInstructionAtAll()
+    {
+        // not a no-op instruction — nothing. A release build pays literally nothing for a Debug.Print
+        // left in the source, which is what makes leaving them in reasonable.
+        var result = LowerForRelease("Debug.Print 1", "Debug.Assert False");
+
+        AssertNoErrors(result);
+        Assert.IsEmpty(result.InstructionList.Items);
+    }
+
+    [TestMethod]
+    public void DebugStatements_InAReleaseBuild_DoNotDisturbTheOffsetsAroundThem()
+    {
+        // whatever remains has to be a coherent program: a jump over a dropped Debug.Print still has
+        // to land on the right instruction.
+        var result = LowerForRelease(
+            "10 GoTo 30",
+            "20 Debug.Print \"skipped\"",
+            "30 x = 1");
+
+        AssertNoErrors(result);
+        Assert.HasCount(2, result.InstructionList.Items);
+        Assert.AreEqual(1, result.InstructionList.Items[0].Target);
+    }
+
+    [TestMethod]
+    public void ALabelOnADroppedDebugStatement_StillResolves()
+    {
+        // dropping the statement must not drop its label with it, or a GoTo to it stops compiling in
+        // release only — the worst possible place to find out.
+        var result = LowerForRelease(
+            "10 GoTo 20",
+            "20 Debug.Print \"dropped\"",
+            "30 x = 1");
+
+        AssertNoErrors(result);
+    }
 
     private static void AssertSingleError(InstructionListLoweringResult result, VBCompileErrorId id, string verbose)
     {
@@ -667,7 +728,7 @@ public sealed class InstructionListLoweringTests
 
         var member = parse.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
         var deadRanges = PrecompilerLiveBranchEvaluator.GetDeadRanges(session, Evaluator(), new RuntimeEvaluationContext(StaticSymbol.GlobalUri), parse.PrecompilerTrivia);
-        return InstructionListLowering.Lower(new StatementBlock([.. member.Children]), deadRanges);
+        return InstructionListLowering.Lower(new StatementBlock([.. member.Children]), new InstructionLoweringOptions(deadRanges));
     }
 
     [TestMethod]

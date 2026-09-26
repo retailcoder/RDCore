@@ -12,6 +12,7 @@ using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Values.Bindings;
+using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -37,22 +38,19 @@ public interface IStatementRuntimeSemanticsProvider
 /// <inheritdoc cref="IStatementRuntimeSemanticsProvider"/>
 public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanticsProvider
 {
-    /// <summary>
-    /// The name of the intrinsic object whose <c>Print</c> member writes to the session's output.
-    /// </summary>
-    private const string DebugObjectName = "Debug";
-
     private readonly RuntimeExpressionEvaluator _expressionEvaluator;
     private readonly BinaryLetAssignmentOperatorRuntimeSemantics _letAssignment;
     private readonly ISetCoercionRuntimeSemantics _setCoercion;
     private readonly PrintOutputEvaluator _printOutput;
+    private readonly ConditionEvaluator _conditions;
 
-    public StatementRuntimeSemanticsProvider(RuntimeExpressionEvaluator expressionEvaluator, ILetCoercionRuntimeSemanticsProvider letCoercionProvider, ISetCoercionRuntimeSemantics setCoercion, PrintOutputEvaluator printOutput, IVerboseMessageBuilder formatterService)
+    public StatementRuntimeSemanticsProvider(RuntimeExpressionEvaluator expressionEvaluator, ILetCoercionRuntimeSemanticsProvider letCoercionProvider, ISetCoercionRuntimeSemantics setCoercion, PrintOutputEvaluator printOutput, ConditionEvaluator conditions, IVerboseMessageBuilder formatterService)
     {
         _expressionEvaluator = expressionEvaluator;
         _letAssignment = new(letCoercionProvider, formatterService);
         _setCoercion = setCoercion;
         _printOutput = printOutput;
+        _conditions = conditions;
     }
 
     /// <inheritdoc/>
@@ -61,18 +59,34 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         {
             AssignmentStatementNode { Kind: AssignmentKind.ImplicitLet or AssignmentKind.ExplicitLet } assignment => ExecuteLetAssignment(session, context, assignment),
             AssignmentStatementNode { Kind: AssignmentKind.Set } assignment => ExecuteSetAssignment(session, context, assignment),
-            // MS-VBAL §5.6: an object-print expression reaches a statement through a CallStatementNode
-            // and prints rather than invoking anything nameable. Only the Debug object has a Print
-            // member to invoke here - every other owner is a host object this runtime has no model of.
-            CallStatementNode { Callee: ObjectPrintExpressionNode { Owner: SimpleNameExpressionNode owner } print }
-                when string.Equals(owner.IdentifierName, DebugObjectName, StringComparison.OrdinalIgnoreCase)
-                => _printOutput.Execute(session, context, print.Items),
+            // Debug.Print: MS-VBAL §5.4.5.8's output rules, against the session's output rather than a
+            // file. The parser gives these a node of their own, so this is a type test rather than a
+            // match on the spelling of a call's owner - and a build that lowers them away never gets
+            // here at all.
+            DebugPrintStatementNode print => _printOutput.Execute(session, context, print.Items),
+            DebugAssertStatementNode assert => ExecuteAssert(session, context, assert),
             // MS-VBAL §5.4.5.8: Print to a file channel. File I/O does not exist yet; the bare
             // object-relative form needs an enclosing form or report, which does not either.
             PrintStatementNode => RuntimeExecutionOutcome.InternalError,
             CallStatementNode call => ExecuteCall(session, context, call),
             _ => RuntimeExecutionOutcome.InternalError,
         };
+
+    // Debug.Assert: suspends execution when its expression is False, which is what Break means here -
+    // the same outcome a Stop statement produces. An expression that cannot be coerced to Boolean is a
+    // real run-time error, reported as one.
+    private RuntimeExecutionOutcome ExecuteAssert(IRuntimeSession session, RuntimeEvaluationContext context, DebugAssertStatementNode assert)
+    {
+        var result = _conditions.EvaluateBoolean(session, assert.Condition, context);
+        if (!result.IsSuccess)
+        {
+            return result.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(result.ErrorInfo!);
+        }
+
+        return result.Result is VBBooleanValue { Value.StoredValue: 0 }
+            ? RuntimeExecutionOutcome.Break
+            : RuntimeExecutionOutcome.Next;
+    }
 
     // MS-VBAL §5.4.2.1: both the explicit Call Foo(...) form and the bare Foo(...)/Foo form evaluate
     // Callee (its own argument list, if any, already part of its tree - see CallStatementNode's own

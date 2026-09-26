@@ -79,7 +79,7 @@ public sealed class ProcedureExecutorTests
         handle.Inner = letCoercion;
         var expressionEvaluator = new RuntimeExpressionEvaluator(new OperatorRuntimeSemanticsProvider(letCoercion, formatter));
         var print = new PrintOutputEvaluator(expressionEvaluator, new VBStringLetCoercionRuntimeSemantics(formatter), numericCoercion);
-        var statements = new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), print, formatter);
+        var statements = new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), print, new ConditionEvaluator(expressionEvaluator, booleanCoercion), formatter);
         var conditions = new ConditionEvaluator(expressionEvaluator, booleanCoercion);
         var withStatement = new WithStatementRuntimeSemantics(new SetCoercionRuntimeSemantics(formatter), letCoercion);
         var withTargets = new WithTargetEvaluator(expressionEvaluator, withStatement);

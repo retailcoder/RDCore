@@ -28,6 +28,8 @@ namespace RDCore.SDK.Model.AST.Abstract;
 [JsonDerivedType(typeof(AssignmentStatementNode), "AssignmentStatement")]
 [JsonDerivedType(typeof(AttributeDirectiveNode), "AttributeDirective")]
 [JsonDerivedType(typeof(CallStatementNode), "CallStatement")]
+[JsonDerivedType(typeof(DebugPrintStatementNode), "DebugPrintStatement")]
+[JsonDerivedType(typeof(DebugAssertStatementNode), "DebugAssertStatement")]
 [JsonDerivedType(typeof(CaseComparisonRangeClauseNode), "CaseComparisonRangeClause")]
 [JsonDerivedType(typeof(CaseElseClauseStatementNode), "CaseElseClauseStatement")]
 [JsonDerivedType(typeof(CaseExpressionStatementNode), "CaseExpression")]
