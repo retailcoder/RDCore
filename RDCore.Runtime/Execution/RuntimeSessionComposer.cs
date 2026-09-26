@@ -44,6 +44,7 @@ public static class RuntimeSessionComposer
         var storage = new SessionStorage(memory);
         var symbols = new SessionSymbols(storage, callStack);
         var objects = new SessionObjects();
+        var errors = new SessionErrorState();
 
         foreach (var provider in providers)
         {
@@ -53,6 +54,6 @@ public static class RuntimeSessionComposer
             }
         }
 
-        return new RuntimeSession(environment, memory, storage, symbols, objects, callStack, references, output ?? NullRuntimeOutput.Instance);
+        return new RuntimeSession(environment, memory, storage, symbols, objects, errors, callStack, references, output ?? NullRuntimeOutput.Instance);
     }
 }

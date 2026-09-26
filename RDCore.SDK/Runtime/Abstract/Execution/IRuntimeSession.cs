@@ -56,6 +56,12 @@ public interface IRuntimeSession
     ISessionObjects Objects { get; }
 
     /// <summary>
+    /// The session's error state — what the <c>Err</c> object reports
+    /// (<strong>MS-VBAL §6.1.3.2</strong>), and what outlives the activation that raised it.
+    /// </summary>
+    ISessionErrorState Errors { get; }
+
+    /// <summary>
     /// The session's call stack — pushing and popping an <see cref="ICallStackFrame"/> per procedure
     /// activation is what makes a procedure's locals and parameters visible through
     /// <see cref="ISessionSymbols"/>'s <see cref="ISessionSymbols.Resolver"/> (<strong>RD-VBAL

@@ -115,7 +115,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                     var outcome = statements.Execute(session, instructionContext, instruction.Node!);
                     if (outcome.Kind != RuntimeExecutionOutcomeKind.Next)
                     {
-                        if (InterceptError(activation, instruction.Offset, outcome) is { } unhandledSimple)
+                        if (InterceptError(session, activation, instruction.Offset, outcome) is { } unhandledSimple)
                         {
                             return unhandledSimple;
                         }
@@ -138,7 +138,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.ConditionalBranch:
                     var branchOutcome = ExecuteConditionalBranch(session, instructionContext, instruction, activation);
-                    if (branchOutcome is { } stop && InterceptError(activation, instruction.Offset, stop) is { } unhandledBranch)
+                    if (branchOutcome is { } stop && InterceptError(session, activation, instruction.Offset, stop) is { } unhandledBranch)
                     {
                         return unhandledBranch;
                     }
@@ -146,7 +146,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.LoopBack:
                     var loopBackOutcome = ExecuteLoopBack(session, instructionContext, instruction, activation);
-                    if (loopBackOutcome is { } stopLoopBack && InterceptError(activation, instruction.Offset, stopLoopBack) is { } unhandledLoopBack)
+                    if (loopBackOutcome is { } stopLoopBack && InterceptError(session, activation, instruction.Offset, stopLoopBack) is { } unhandledLoopBack)
                     {
                         return unhandledLoopBack;
                     }
@@ -154,7 +154,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.With:
                     var withOutcome = ExecuteWith(session, instructionContext, instruction, activation);
-                    if (withOutcome is { } stopWith && InterceptError(activation, instruction.Offset, stopWith) is { } unhandledWith)
+                    if (withOutcome is { } stopWith && InterceptError(session, activation, instruction.Offset, stopWith) is { } unhandledWith)
                     {
                         return unhandledWith;
                     }
@@ -162,7 +162,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.Select:
                     var selectOutcome = ExecuteSelect(session, instructionContext, instruction, activation);
-                    if (selectOutcome is { } stopSelect && InterceptError(activation, instruction.Offset, stopSelect) is { } unhandledSelect)
+                    if (selectOutcome is { } stopSelect && InterceptError(session, activation, instruction.Offset, stopSelect) is { } unhandledSelect)
                     {
                         return unhandledSelect;
                     }
@@ -170,7 +170,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.ForOpener:
                     var forOpenerOutcome = ExecuteForOpener(session, instructionContext, instruction, activation);
-                    if (forOpenerOutcome is { } stopForOpener && InterceptError(activation, instruction.Offset, stopForOpener) is { } unhandledForOpener)
+                    if (forOpenerOutcome is { } stopForOpener && InterceptError(session, activation, instruction.Offset, stopForOpener) is { } unhandledForOpener)
                     {
                         return unhandledForOpener;
                     }
@@ -178,7 +178,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.ForNext:
                     var forNextOutcome = ExecuteForNext(session, instructionContext, instruction, activation);
-                    if (forNextOutcome is { } stopForNext && InterceptError(activation, instruction.Offset, stopForNext) is { } unhandledForNext)
+                    if (forNextOutcome is { } stopForNext && InterceptError(session, activation, instruction.Offset, stopForNext) is { } unhandledForNext)
                     {
                         return unhandledForNext;
                     }
@@ -186,7 +186,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.ForEachOpener:
                     var forEachOpenerOutcome = ExecuteForEachOpener(session, instructionContext, instruction, activation);
-                    if (forEachOpenerOutcome is { } stopForEachOpener && InterceptError(activation, instruction.Offset, stopForEachOpener) is { } unhandledForEachOpener)
+                    if (forEachOpenerOutcome is { } stopForEachOpener && InterceptError(session, activation, instruction.Offset, stopForEachOpener) is { } unhandledForEachOpener)
                     {
                         return unhandledForEachOpener;
                     }
@@ -194,7 +194,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.ForEachNext:
                     var forEachNextOutcome = ExecuteForEachNext(session, instructionContext, instruction, activation);
-                    if (forEachNextOutcome is { } stopForEachNext && InterceptError(activation, instruction.Offset, stopForEachNext) is { } unhandledForEachNext)
+                    if (forEachNextOutcome is { } stopForEachNext && InterceptError(session, activation, instruction.Offset, stopForEachNext) is { } unhandledForEachNext)
                     {
                         return unhandledForEachNext;
                     }
@@ -206,16 +206,22 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                         return RuntimeExecutionOutcome.InternalError;
                     }
                     activation.ErrorHandler = new ErrorHandlerState(ErrorHandlingMode.GoTo, handlerTarget, null, null);
+                    // MS-VBAL §6.1.3.2.1: an On Error statement clears the Err object.
+                    session.Errors.Clear();
                     activation.Pc = instruction.Offset + 1;
                     break;
 
                 case InstructionKind.OnErrorDisable:
                     activation.ErrorHandler = ErrorHandlerState.Disabled;
+                    // On Error GoTo 0 / On Error GoTo -1 is an On Error statement too, and §6.1.3.2.1
+                    // makes no exception for it.
+                    session.Errors.Clear();
                     activation.Pc = instruction.Offset + 1;
                     break;
 
                 case InstructionKind.OnErrorResumeNext:
                     activation.ErrorHandler = new ErrorHandlerState(ErrorHandlingMode.ResumeNext, null, null, null);
+                    session.Errors.Clear();
                     activation.Pc = instruction.Offset + 1;
                     break;
 
@@ -223,7 +229,12 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 case InstructionKind.ResumeNext:
                 case InstructionKind.ResumeLabel:
                     var resumeOutcome = ExecuteResume(instruction, activation);
-                    if (resumeOutcome is { } stopResume && InterceptError(activation, instruction.Offset, stopResume) is { } unhandledResume)
+                    if (resumeOutcome is null)
+                    {
+                        // a Resume that actually resumed; §6.1.3.2.1 clears Err with it.
+                        session.Errors.Clear();
+                    }
+                    if (resumeOutcome is { } stopResume && InterceptError(session, activation, instruction.Offset, stopResume) is { } unhandledResume)
                     {
                         return unhandledResume;
                     }
@@ -231,7 +242,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.RaiseError:
                     var raiseOutcome = ExecuteRaiseError(session, instructionContext, instruction);
-                    if (InterceptError(activation, instruction.Offset, raiseOutcome) is { } unhandledRaise)
+                    if (InterceptError(session, activation, instruction.Offset, raiseOutcome) is { } unhandledRaise)
                     {
                         return unhandledRaise;
                     }
@@ -239,7 +250,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.JumpTable:
                     var jumpTableOutcome = ExecuteJumpTable(session, instructionContext, instruction, activation, pushReturn: false);
-                    if (jumpTableOutcome is { } stopJumpTable && InterceptError(activation, instruction.Offset, stopJumpTable) is { } unhandledJumpTable)
+                    if (jumpTableOutcome is { } stopJumpTable && InterceptError(session, activation, instruction.Offset, stopJumpTable) is { } unhandledJumpTable)
                     {
                         return unhandledJumpTable;
                     }
@@ -247,7 +258,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.GoSubTable:
                     var goSubTableOutcome = ExecuteJumpTable(session, instructionContext, instruction, activation, pushReturn: true);
-                    if (goSubTableOutcome is { } stopGoSubTable && InterceptError(activation, instruction.Offset, stopGoSubTable) is { } unhandledGoSubTable)
+                    if (goSubTableOutcome is { } stopGoSubTable && InterceptError(session, activation, instruction.Offset, stopGoSubTable) is { } unhandledGoSubTable)
                     {
                         return unhandledGoSubTable;
                     }
@@ -265,13 +276,16 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
                 case InstructionKind.Return:
                     var returnOutcome = ExecuteReturn(instruction, activation);
-                    if (returnOutcome is { } stopReturn && InterceptError(activation, instruction.Offset, stopReturn) is { } unhandledReturn)
+                    if (returnOutcome is { } stopReturn && InterceptError(session, activation, instruction.Offset, stopReturn) is { } unhandledReturn)
                     {
                         return unhandledReturn;
                     }
                     break;
 
                 case InstructionKind.ExitProcedure:
+                    // Exit Sub / Exit Function / Exit Property clear Err too (§6.1.3.2.1). Falling off
+                    // the end of a procedure does not, which is why this is here and not after the loop.
+                    session.Errors.Clear();
                     return RuntimeExecutionOutcome.ExitProcedure;
 
                 case InstructionKind.Halt:
@@ -795,12 +809,17 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     // actually stop. Returns null when an active handler caught it (activation.Pc/ErrorHandler already
     // updated - the loop keeps running); returns `outcome` unchanged otherwise (no active handler, or a
     // non-Error outcome - propagate/stop exactly as if this interception point didn't exist).
-    private static RuntimeExecutionOutcome? InterceptError(CallStackFrame activation, int faultOffset, RuntimeExecutionOutcome outcome)
+    private static RuntimeExecutionOutcome? InterceptError(IRuntimeSession session, CallStackFrame activation, int faultOffset, RuntimeExecutionOutcome outcome)
     {
         if (outcome.Kind != RuntimeExecutionOutcomeKind.Error)
         {
             return outcome;
         }
+
+        // every run-time error reaches the session's error state, handled or not: MS-VBAL §6.1.3.2's
+        // Err is set by the error being raised, not by anything choosing to deal with it. This is the
+        // one place every error the interpreter can raise passes through, which is why it is here.
+        session.Errors.Raise(outcome.ErrorInfo!);
 
         var handler = activation.ErrorHandler;
         switch (handler.Mode)

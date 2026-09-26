@@ -22,6 +22,7 @@ internal sealed class RuntimeSession(
     ISessionStorage storage,
     ISessionSymbols symbols,
     ISessionObjects objects,
+    ISessionErrorState errors,
     ICallStack callStack,
     IReadOnlyList<ReferencePriorityInfo> references,
     IRuntimeOutput output) : IRuntimeSession
@@ -31,6 +32,7 @@ internal sealed class RuntimeSession(
     public ISessionStorage Storage { get; init; } = storage;
     public ISessionSymbols Symbols { get; init; } = symbols;
     public ISessionObjects Objects { get; init; } = objects;
+    public ISessionErrorState Errors { get; init; } = errors;
     public ICallStack CallStack { get; init; } = callStack;
     public IReadOnlyList<ReferencePriorityInfo> References { get; init; } = references;
     public IRuntimeOutput Output { get; init; } = output;
