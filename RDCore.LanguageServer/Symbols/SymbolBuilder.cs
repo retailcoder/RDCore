@@ -11,6 +11,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.Shared;
 using System.Collections.Immutable;
 
 namespace RDCore.LanguageServer.Symbols;
@@ -271,12 +272,15 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
             _ => VBUnknownType.TypeInfo,
         };
 
-    // Procedure-local Dim/Static/Const declarations, plus symbols a ReDim introduces. Locals parent
-    // to the procedure symbol (MS-VBAL 5.4.3.1-3), mirroring how enum members / UDT fields parent to
-    // their declaration. <paramref name="outerScopeNames"/> are the names already visible from
-    // outside the body — the procedure's parameters and this module's fields/consts — against which
-    // a ReDim target is a re-dimension rather than an implicit declaration.
-    public IEnumerable<Symbol> BuildLocals(MemberDeclarationNode member, Uri procedureUri, IReadOnlySet<string> outerScopeNames)
+    // Procedure-local Dim/Static/Const declarations, plus the symbols a ReDim or a reference to an
+    // undeclared name introduces. Locals parent to the procedure symbol (MS-VBAL 5.4.3.1-3),
+    // mirroring how enum members / UDT fields parent to their declaration.
+    // <paramref name="outerScopeNames"/> are the names already visible from outside the body — the
+    // procedure's parameters and this module's fields/consts — against which a ReDim target is a
+    // re-dimension rather than an implicit declaration. <paramref name="directives"/> decides whether
+    // this module has an implicit declaration mode at all.
+    public IEnumerable<Symbol> BuildLocals(
+        MemberDeclarationNode member, Uri procedureUri, IReadOnlySet<string> outerScopeNames, ModuleDirectives directives = default)
     {
         var results = new List<Symbol>();
         var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -318,7 +322,130 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
             results.Add(BuildRedimLocal(redim, procedureUri));
         }
 
+        // pass 3 — implicit declarations. MS-VBAL 5.6.10: a simple name expression in the default
+        // binding context that matches nothing on any tier implicitly declares a local variable in the
+        // current procedure, "as if by a local variable declaration statement immediately preceding
+        // this statement" — so with an implicit type, which is Variant unless a Def<Type> directive
+        // says otherwise. A module that declares Option Explicit has no implicit declaration mode at
+        // all: there the same expression is a compile error, which
+        // SimpleNameExpressionStaticSemantics reports.
+        if (!directives.Explicit)
+        {
+            foreach (var reference in body.SelectMany(ValueContextSimpleNames))
+            {
+                if (outerScopeNames.Contains(reference.IdentifierName) || declared.Contains(reference.IdentifierName))
+                {
+                    continue;
+                }
+
+                // "if all tiers have no matches". An ambiguous or otherwise erroneous lookup IS a
+                // match — one the reference has to qualify — so only a genuinely unbound name declares
+                // anything. NOTE the resolver's universe is smaller than VBA's until library symbols
+                // exist, so a standard-library name (Len, Now, vbCrLf) is unbound here and becomes an
+                // implicit Variant rather than resolving. That is this rule applied to an incomplete
+                // name universe, not a different rule; it corrects itself as the universe grows.
+                var resolved = resolver.ResolveValue(reference.IdentifierName, ScopeKind.Local, procedureUri);
+                if (!resolved.IsUnbound && !IsOwnLocal(resolved, procedureUri))
+                {
+                    continue;
+                }
+
+                declared.Add(reference.IdentifierName);
+                results.Add(BuildImplicitLocal(reference, procedureUri));
+            }
+        }
+
         return results;
+    }
+
+    // A workspace resolver is composed over the symbols a previous extraction pass produced, so an
+    // implicit local this method declared last time round resolves now — and would suppress its own
+    // re-declaration, leaving the final symbol set without it. A match that is this procedure's own
+    // local is therefore no match at all: its parameters and explicit declarations were already
+    // ruled out above, so whatever is left can only be a previous pass's own output.
+    private static bool IsOwnLocal(SymbolResolutionResult resolved, Uri procedureUri)
+        => resolved.Symbol is VBLocalVariableSymbol local
+            && local.ParentUri.AbsoluteUri == procedureUri.AbsoluteUri;
+
+    /// <summary>
+    /// The simple name expressions of <paramref name="node"/> that sit in the <em>default</em> binding
+    /// context (<strong>MS-VBAL §5.6.10</strong>) — the only ones an implicit declaration can come
+    /// from.
+    /// </summary>
+    /// <remarks>
+    /// Three kinds of name are deliberately not among them. A name in the <em>type</em> binding
+    /// context (<c>New Foo</c>, <c>TypeOf x Is Foo</c>) names a type, never a variable; an <c>As</c>
+    /// clause carries its type name as a string rather than an expression, so it never arrives here at
+    /// all. A statement label (<c>GoTo Done</c>, <c>Resume Done</c>) is not a name expression either,
+    /// however much it looks like one. And the member half of a member or dictionary access
+    /// (<c>Debug.Print</c>'s <c>Print</c>) is resolved against the owner's type, not against the
+    /// enclosing scope — only the owner is a simple name in this sense.
+    /// <para>
+    /// Like <c>DescendantsAndSelf</c>, this grows with the AST: a new node type that carries an
+    /// expression the walker does not know to skip would have its names treated as value references.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<SimpleNameExpressionNode> ValueContextSimpleNames(SyntaxNode node)
+    {
+        switch (node)
+        {
+            case SimpleNameExpressionNode simpleName:
+                yield return simpleName;
+                yield break;
+
+            // the member is resolved against the owner's type; the owner is the value reference.
+            case MemberAccessExpressionNode { Owner: { } accessOwner }:
+                foreach (var name in ValueContextSimpleNames(accessOwner))
+                {
+                    yield return name;
+                }
+                yield break;
+
+            case DictionaryAccessExpressionNode { Owner: { } dictionaryOwner }:
+                foreach (var name in ValueContextSimpleNames(dictionaryOwner))
+                {
+                    yield return name;
+                }
+                yield break;
+
+            // a with-relative access has no owner to walk, and a type name or a label is not a value.
+            case MemberAccessExpressionNode:
+            case DictionaryAccessExpressionNode:
+            case NewExpressionNode:
+            case GoToStatementNode:
+            case GoSubStatementNode:
+            case ResumeStatementNode:
+                yield break;
+
+            case TypeOfIsExpressionNode typeOfIs:
+                foreach (var name in ValueContextSimpleNames(typeOfIs.Operand))
+                {
+                    yield return name;
+                }
+                yield break;
+
+            // the selector is evaluated; the labels are branch targets.
+            case OnGoToStatementNode onGoTo:
+                foreach (var name in ValueContextSimpleNames(onGoTo.Selector))
+                {
+                    yield return name;
+                }
+                yield break;
+
+            case OnGoSubStatementNode onGoSub:
+                foreach (var name in ValueContextSimpleNames(onGoSub.Selector))
+                {
+                    yield return name;
+                }
+                yield break;
+
+            default:
+                foreach (var name in node.Children.SelectMany(ValueContextSimpleNames))
+                {
+                    yield return name;
+                }
+                yield break;
+        }
     }
 
     // yields a node and, for the statement shapes that carry a nested body today (If/ElseIf/Else,
@@ -480,6 +607,28 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
         var range = RangeOf(node);
         var type = DeclaredType(AsTypeOf(node), node.TypeHint, procedureUri);
         return new VBLocalConstantSymbol(workspaceRoot, procedureUri, node.Name, range, range, type);
+    }
+
+    /// <summary>
+    /// The local variable a reference to an undeclared name implicitly declares
+    /// (<strong>MS-VBAL §5.6.10</strong>).
+    /// </summary>
+    /// <remarks>
+    /// The spec's own wording is "as if by a local variable declaration statement ... with a
+    /// &lt;variable-declaration-list&gt; containing a single &lt;variable-dcl&gt; element consisting of
+    /// the text of &lt;name&gt;" — a declaration with no <c>As</c> clause and no type-declaration
+    /// character, whose type is therefore the module's implicit type. The reference's own location is
+    /// the declaration site, because it is the declaration: there is nowhere else to point.
+    /// </remarks>
+    /// <param name="node">The simple name expression that declared it.</param>
+    /// <param name="procedureUri">The procedure the variable is local to.</param>
+    public Symbol BuildImplicitLocal(SimpleNameExpressionNode node, Uri procedureUri)
+    {
+        var range = RangeOf(node);
+        return new VBLocalVariableSymbol(
+            workspaceRoot, procedureUri, node.IdentifierName, ScopeKind.Local, range, range,
+            ResolvedType: ImplicitOrDeclaredType(asType: null, typeHint: null, procedureUri),
+            DeclaredBy: LocalDeclarationKind.Implicit);
     }
 
     // A ReDim always targets a dynamic array (MS-VBAL 5.4.3.3); the new dimensions stay unresolved.

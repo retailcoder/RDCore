@@ -31,6 +31,12 @@ public sealed class SyntaxTreeSymbolProviderTests
     private static T Single<T>(IEnumerable<Symbol> symbols) where T : Symbol
         => symbols.OfType<T>().Single();
 
+    // the one symbol of that kind with that name. Needed wherever a source has more than one local,
+    // which — since MS-VBAL 5.6.10 makes a reference to an undeclared name a declaration — is every
+    // source that mentions a name it never declares.
+    private static T Named<T>(IEnumerable<Symbol> symbols, string name) where T : Symbol
+        => symbols.OfType<T>().Single(symbol => symbol.Name == name);
+
     [TestMethod]
     public void UnparsableModule_YieldsNothing()
         => Assert.IsEmpty(Provide("not a module"));
@@ -436,8 +442,12 @@ public sealed class SyntaxTreeSymbolProviderTests
     }
 
     [TestMethod]
-    public void AssignmentStatement_CreatesNoSymbol()
+    public void AssignmentToAnUndeclaredName_ImplicitlyDeclaresIt()
     {
+        // MS-VBAL 5.6.10: with no Option Explicit, a simple name that matches nothing on any tier is
+        // declared "as if by a local variable declaration statement immediately preceding this
+        // statement" — so assigning to a name IS how you declare it, which is the whole of how most
+        // BASIC ever got written.
         var symbols = Provide("""
             Public Sub Foo()
                 Dim Total As Long
@@ -446,7 +456,99 @@ public sealed class SyntaxTreeSymbolProviderTests
             End Sub
             """, new IntrinsicSymbolResolver());
 
-        Assert.AreEqual("Total", Single<VBLocalVariableSymbol>(symbols).Name);
+        Assert.AreEqual(LocalDeclarationKind.Dim, Named<VBLocalVariableSymbol>(symbols, "Total").DeclaredBy);
+
+        var implicitLocal = Named<VBLocalVariableSymbol>(symbols, "Undeclared");
+        Assert.AreEqual(LocalDeclarationKind.Implicit, implicitLocal.DeclaredBy);
+        Assert.AreEqual(ScopeKind.Local, implicitLocal.ScopeKind);
+        // a declaration that names no type is a Variant (MS-VBAL 5.2.3.1.5), and this one names none.
+        Assert.AreEqual(VBVariantType.TypeInfo, implicitLocal.ResolvedType);
+    }
+
+    [TestMethod]
+    public void AnUndeclaredNameUnderOptionExplicit_DeclaresNothing()
+    {
+        // MS-VBAL 5.2.1.3/5.6.10: Option Explicit sets the module to explicit-mode, which has no
+        // implicit declaration at all — the expression is invalid instead, which is
+        // SimpleNameExpressionStaticSemantics' report to make, not this pass's.
+        var symbols = Provide("""
+            Option Explicit
+            Public Sub Foo()
+                Undeclared = 1
+            End Sub
+            """, new IntrinsicSymbolResolver());
+
+        Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>());
+    }
+
+    [TestMethod]
+    public void AReadOfAnUndeclaredName_ImplicitlyDeclaresItToo()
+    {
+        // not only assignment targets: 5.6.10 is about every simple name in the default binding
+        // context, and a read of a name that was never declared is one.
+        var symbols = Provide("""
+            Public Sub Foo()
+                Dim Total As Long
+                Total = Undeclared + 1
+            End Sub
+            """, new IntrinsicSymbolResolver());
+
+        Assert.AreEqual(LocalDeclarationKind.Implicit, Named<VBLocalVariableSymbol>(symbols, "Undeclared").DeclaredBy);
+    }
+
+    [TestMethod]
+    public void AMemberName_IsNotAnImplicitDeclaration()
+    {
+        // Debug.Print: the member half of a member access resolves against the owner's type, not
+        // against the enclosing scope, so only the owner is a simple name in 5.6.10's sense.
+        var symbols = Provide("""
+            Public Sub Foo()
+                Debug.Print 1
+            End Sub
+            """, new IntrinsicSymbolResolver());
+
+        Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>().Where(local => local.Name == "Print"));
+    }
+
+    [TestMethod]
+    public void ALabelReference_IsNotAnImplicitDeclaration()
+    {
+        // a GoTo's operand looks like a name and is not one.
+        var symbols = Provide("""
+            Public Sub Foo()
+                GoTo Done
+            Done:
+            End Sub
+            """, new IntrinsicSymbolResolver());
+
+        Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>());
+    }
+
+    [TestMethod]
+    public void ATypeName_IsNotAnImplicitDeclaration()
+    {
+        // New Widget is the type binding context (MS-VBAL 5.6.4); Widget names a class, not a variable.
+        var symbols = Provide("""
+            Public Sub Foo()
+                Dim Thing As Object
+                Set Thing = New Widget
+            End Sub
+            """, new IntrinsicSymbolResolver());
+
+        Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>().Where(local => local.Name == "Widget"));
+    }
+
+    [TestMethod]
+    public void OneUndeclaredNameUsedTwice_IsOneDeclaration()
+    {
+        var symbols = Provide("""
+            Public Sub Foo()
+                Counter = 1
+                Counter = Counter + 1
+            End Sub
+            """, new IntrinsicSymbolResolver());
+
+        Assert.AreEqual("Counter", Single<VBLocalVariableSymbol>(symbols).Name);
     }
 
     // --- ReDim symbol discovery (MS-VBAL 5.4.3.3) ---
@@ -615,13 +717,15 @@ public sealed class SyntaxTreeSymbolProviderTests
     [TestMethod]
     public void Redim_NestedInAForLoop_IntroducesLocal()
     {
-        var local = Single<VBLocalVariableSymbol>(Provide("""
+        // the loop counter is an undeclared name too, so it declares itself (MS-VBAL 5.6.10) - name
+        // the one this test is about rather than asserting there is only one local.
+        var local = Named<VBLocalVariableSymbol>(Provide("""
             Public Sub Foo()
                 For i = 1 To 5
                     ReDim Buffer(5)
                 Next i
             End Sub
-            """, new IntrinsicSymbolResolver()));
+            """, new IntrinsicSymbolResolver()), "Buffer");
 
         Assert.AreEqual("Buffer", local.Name);
         Assert.AreEqual(LocalDeclarationKind.ReDim, local.DeclaredBy);
@@ -646,13 +750,13 @@ public sealed class SyntaxTreeSymbolProviderTests
     [TestMethod]
     public void Redim_NestedInAWithBlock_IntroducesLocal()
     {
-        var local = Single<VBLocalVariableSymbol>(Provide("""
+        var local = Named<VBLocalVariableSymbol>(Provide("""
             Public Sub Foo()
                 With Target
                     ReDim Buffer(5)
                 End With
             End Sub
-            """, new IntrinsicSymbolResolver()));
+            """, new IntrinsicSymbolResolver()), "Buffer");
 
         Assert.AreEqual("Buffer", local.Name);
         Assert.AreEqual(LocalDeclarationKind.ReDim, local.DeclaredBy);
@@ -702,11 +806,11 @@ public sealed class SyntaxTreeSymbolProviderTests
     [TestMethod]
     public void Dim_NestedInASingleLineIfElse_IntroducesLocal()
     {
-        var local = Single<VBLocalVariableSymbol>(Provide("""
+        var local = Named<VBLocalVariableSymbol>(Provide("""
             Public Sub Foo(ByVal Flag As Boolean)
                 If Flag Then y = 1 Else Dim BLocal As Long
             End Sub
-            """, new IntrinsicSymbolResolver()));
+            """, new IntrinsicSymbolResolver()), "BLocal");
 
         Assert.AreEqual("BLocal", local.Name);
     }
@@ -714,11 +818,11 @@ public sealed class SyntaxTreeSymbolProviderTests
     [TestMethod]
     public void Dim_NestedInASingleLineIfThen_AfterAColonSeparatedStatement_IntroducesLocal()
     {
-        var local = Single<VBLocalVariableSymbol>(Provide("""
+        var local = Named<VBLocalVariableSymbol>(Provide("""
             Public Sub Foo(ByVal Flag As Boolean)
                 If Flag Then y = 1 : Dim CLocal As Long
             End Sub
-            """, new IntrinsicSymbolResolver()));
+            """, new IntrinsicSymbolResolver()), "CLocal");
 
         Assert.AreEqual("CLocal", local.Name);
     }

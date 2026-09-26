@@ -1,6 +1,7 @@
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Directives;
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
@@ -71,6 +72,10 @@ internal sealed class SyntaxTreeSymbolProvider(
         var implicitType = module.Children.OfType<TypeDefDirectiveNode>().Any() ? VBUnknownType.TypeInfo : VBVariantType.TypeInfo;
         var builder = new SymbolBuilder(workspaceRoot, moduleUri, memberScope, resolver, implicitType);
 
+        // MS-VBAL 5.2.1.3: Option Explicit sets the module's variable declaration mode. Without it the
+        // module is in implicit mode, where a reference to an undeclared name declares it (5.6.10).
+        var directives = new ModuleDirectives(Explicit: module.HasOptionExplicit());
+
         // module-level names are order-independent, so collect them before walking the members — a
         // ReDim in one procedure may re-dimension a field declared further down the module.
         var moduleScopeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -96,7 +101,7 @@ internal sealed class SyntaxTreeSymbolProvider(
                     break;
 
                 case MemberDeclarationNode member:
-                    foreach (var symbol in FromMember(builder, member, moduleScopeNames))
+                    foreach (var symbol in FromMember(builder, member, moduleScopeNames, directives))
                     {
                         yield return symbol;
                     }
@@ -113,7 +118,8 @@ internal sealed class SyntaxTreeSymbolProvider(
         }
     }
 
-    private static IEnumerable<Symbol> FromMember(SymbolBuilder builder, MemberDeclarationNode member, IReadOnlySet<string> moduleScopeNames)
+    private static IEnumerable<Symbol> FromMember(
+        SymbolBuilder builder, MemberDeclarationNode member, IReadOnlySet<string> moduleScopeNames, ModuleDirectives directives)
     {
         switch (member.MemberKind)
         {
@@ -142,7 +148,7 @@ internal sealed class SyntaxTreeSymbolProvider(
                 }
 
                 // procedure-local Dim/Static/Const + ReDim-introduced symbols parent to the procedure symbol.
-                foreach (var local in builder.BuildLocals(member, procedure.Uri, outerScopeNames))
+                foreach (var local in builder.BuildLocals(member, procedure.Uri, outerScopeNames, directives))
                 {
                     yield return local;
                 }
