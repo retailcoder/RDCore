@@ -75,7 +75,8 @@ public sealed class StatementRuntimeSemanticsProviderTests
         var expressionEvaluator = new RuntimeExpressionEvaluator(new OperatorRuntimeSemanticsProvider(letCoercion, formatter));
         var print = new PrintOutputEvaluator(expressionEvaluator, new VBStringLetCoercionRuntimeSemantics(formatter), numericCoercion);
         var booleanCoercion = new VBBooleanLetCoercionRuntimeSemantics(new ProviderHandle(), formatter);
-        return new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), print, new ConditionEvaluator(expressionEvaluator, booleanCoercion), formatter);
+        return new StatementRuntimeSemanticsProvider(expressionEvaluator, letCoercion, new SetCoercionRuntimeSemantics(formatter), print, new ConditionEvaluator(expressionEvaluator, booleanCoercion),
+            new FileStatementRuntimeSemantics(expressionEvaluator, numericCoercion, new VBStringLetCoercionRuntimeSemantics(formatter)), formatter);
     }
 
     private sealed class ProviderHandle : ILetCoercionRuntimeSemanticsProvider

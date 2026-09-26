@@ -62,6 +62,15 @@ public interface IRuntimeSession
     ISessionErrorState Errors { get; }
 
     /// <summary>
+    /// The file numbers this session has open (<strong>MS-VBAL §5.4.5</strong>).
+    /// </summary>
+    /// <remarks>
+    /// Session-scoped because the association an <c>Open</c> makes "remains in effect until... explicitly
+    /// disassociated using a <c>close-statement</c>" - it outlives the procedure that opened it.
+    /// </remarks>
+    IFileChannels Files { get; }
+
+    /// <summary>
     /// The session's call stack — pushing and popping an <see cref="ICallStackFrame"/> per procedure
     /// activation is what makes a procedure's locals and parameters visible through
     /// <see cref="ISessionSymbols"/>'s <see cref="ISessionSymbols.Resolver"/> (<strong>RD-VBAL

@@ -43,14 +43,16 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
     private readonly ISetCoercionRuntimeSemantics _setCoercion;
     private readonly PrintOutputEvaluator _printOutput;
     private readonly ConditionEvaluator _conditions;
+    private readonly FileStatementRuntimeSemantics _files;
 
-    public StatementRuntimeSemanticsProvider(RuntimeExpressionEvaluator expressionEvaluator, ILetCoercionRuntimeSemanticsProvider letCoercionProvider, ISetCoercionRuntimeSemantics setCoercion, PrintOutputEvaluator printOutput, ConditionEvaluator conditions, IVerboseMessageBuilder formatterService)
+    public StatementRuntimeSemanticsProvider(RuntimeExpressionEvaluator expressionEvaluator, ILetCoercionRuntimeSemanticsProvider letCoercionProvider, ISetCoercionRuntimeSemantics setCoercion, PrintOutputEvaluator printOutput, ConditionEvaluator conditions, FileStatementRuntimeSemantics files, IVerboseMessageBuilder formatterService)
     {
         _expressionEvaluator = expressionEvaluator;
         _letAssignment = new(letCoercionProvider, formatterService);
         _setCoercion = setCoercion;
         _printOutput = printOutput;
         _conditions = conditions;
+        _files = files;
     }
 
     /// <inheritdoc/>
@@ -65,8 +67,11 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
             // here at all.
             DebugPrintStatementNode print => _printOutput.Execute(session, context, print.Items),
             DebugAssertStatementNode assert => ExecuteAssert(session, context, assert),
-            // MS-VBAL §5.4.5.8: Print to a file channel. File I/O does not exist yet; the bare
-            // object-relative form needs an enclosing form or report, which does not either.
+            // MS-VBAL §5.4.5.1/.2: the statements that associate and disassociate a file number.
+            OpenStatementNode open => _files.ExecuteOpen(session, context, open),
+            KeywordStatementNode { Token: Tokens.Close or Tokens.Reset } close => _files.ExecuteClose(session, context, close),
+            // MS-VBAL §5.4.5.8: Print to a file channel. The channel exists now; writing to one does not yet,
+            // and the bare object-relative form needs an enclosing form or report, which does not either.
             PrintStatementNode => RuntimeExecutionOutcome.InternalError,
             CallStatementNode call => ExecuteCall(session, context, call),
             _ => RuntimeExecutionOutcome.InternalError,

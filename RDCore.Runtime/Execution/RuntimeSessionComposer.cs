@@ -1,3 +1,5 @@
+using System.IO.Abstractions;
+using RDCore.Runtime.Execution.Files;
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Execution.Memory;
 using RDCore.SDK.Model.Symbols;
@@ -33,11 +35,16 @@ public static class RuntimeSessionComposer
     /// Where the session's <c>Print</c> output goes. Omitted, it is discarded — correct for a session
     /// nobody is watching, and for every caller that only defines and resolves symbols.
     /// </param>
+    /// <param name="fileSystem">
+    /// The file system the session's file statements act on. Omitted, the real one - a caller that wants file
+    /// I/O to go nowhere real passes a fake, which is how a test opens a file without one existing.
+    /// </param>
     public static IRuntimeSession Compose(
         IRuntimeEnvironmentProfile environment,
         IReadOnlyList<ReferencePriorityInfo> references,
         IEnumerable<ISymbolProvider> providers,
-        IRuntimeOutput? output = null)
+        IRuntimeOutput? output = null,
+        IFileSystem? fileSystem = null)
     {
         var memory = new SessionMemory(new FreeListManager(), environment.Is64Bit ? PointerSize.x64 : PointerSize.x86);
         var callStack = new RuntimeCallStack();
@@ -45,6 +52,9 @@ public static class RuntimeSessionComposer
         var symbols = new SessionSymbols(storage, callStack);
         var objects = new SessionObjects();
         var errors = new SessionErrorState(callStack);
+        // the file system is already abstracted platform-wide, so a session composed with a fake one does real
+        // VBA file I/O against nothing on disk - which is what a test and a CI run both want.
+        var files = new SessionFileChannels(fileSystem ?? new FileSystem());
 
         foreach (var provider in providers)
         {
@@ -54,6 +64,6 @@ public static class RuntimeSessionComposer
             }
         }
 
-        return new RuntimeSession(environment, memory, storage, symbols, objects, errors, callStack, references, output ?? NullRuntimeOutput.Instance);
+        return new RuntimeSession(environment, memory, storage, symbols, objects, errors, files, callStack, references, output ?? NullRuntimeOutput.Instance);
     }
 }
