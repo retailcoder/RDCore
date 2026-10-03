@@ -1,17 +1,14 @@
 ﻿using RDCore.Runtime.Execution.Frames;
-using RDCore.SDK.Model.Values.Meta;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK;
 using RDCore.SDK.Model.AST.Abstract;
-using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
-using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
-using RDCore.SDK.Model.Values;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -38,7 +35,7 @@ namespace RDCore.Runtime.Semantics.Abstract;
 /// Encapsulates the base runtime semantics of <em>operator expressions</em>.
 /// </remarks>
 public abstract record class OperatorRuntimeSemantics<TContext, TFlags>(
-    ILetCoercionRuntimeSemanticsProvider LetCoercionSemanticsProvider, 
+    ILetCoercionRuntimeSemanticsProvider LetCoercionSemanticsProvider,
     IVerboseMessageBuilder FormatterService)
     : RuntimeSemantics<TContext, TFlags>
 where TContext : SemanticContext<TFlags>, new()
@@ -59,11 +56,6 @@ where TFlags : struct, Enum
         ISemanticFlagsAccumulator<TFlags> builder,
         SyntaxNode node,
         params VBTypedValue[] inputs)
-        // NOTE: pre-existing bug found while widening this signature - this used to call itself
-        // recursively (its own argument shape didn't match the narrower 4-param Analyze(resolver,
-        // builder, expression, operands) overload below it was clearly meant to delegate to; it only
-        // compiled because both overloads' first parameter happened to be ISymbolResolver). Nothing
-        // calls this Analyze path yet (RDCore.Diagnostics isn't wired to it), so it was latent.
         => Analyze(session.Symbols.Resolver, (ISemanticContextContributor<TContext, TFlags>)builder, (ExpressionNode)node, session.CurrentStringComparison(), inputs);
 
     /// <summary>
@@ -85,7 +77,7 @@ where TFlags : struct, Enum
         // a context will do - one that also carries diagnostics is not required.
         var initialContext = ((ISemanticContextFlagsBuilder<TContext, TFlags>)builder).Build();
         var conversionContextBuilder = new LetCoercionSemanticContextFlagsBuilder();
-        var operandsInfo = operands.Select((operand, index) => (operand.TypeInfo, Index:(InputIndex)index)).ToArray();
+        var operandsInfo = operands.Select((operand, index) => (operand.TypeInfo, Index: (InputIndex)index)).ToArray();
 
         // 1. determine the effective type:
         var frame = new OperatorEvaluationFrame
@@ -125,7 +117,8 @@ where TFlags : struct, Enum
 
         // 4. ...profit:
         var analysisContext = CreateAnalysisContext(expression, effectiveTypeResult, coercionResult, evaluationResult, initialContext.Flags)
-            with { Comparison = comparison };
+            with
+        { Comparison = comparison };
         return Analyze(resolver, conversionContextBuilder.Build(), builder, expression, analysisContext, [.. frame.Operands]);
     }
 
@@ -138,7 +131,7 @@ where TFlags : struct, Enum
     /// <param name="evaluationResult">The result of the <em>evaluate result</em> (third/last) evaluation step.</param>
     /// <param name="semanticFlags">The <em>semantic flags</em> associated with this operation evaluation.</param>
     /// <returns></returns>
-    protected abstract OperatorAnalysisContext<TFlags> CreateAnalysisContext(SyntaxNode node, 
+    protected abstract OperatorAnalysisContext<TFlags> CreateAnalysisContext(SyntaxNode node,
         DetermineOperatorEffectiveTypeResult determineOperatorEffectiveTypeResult,
         LetCoercionAnalysisContext coercionResult,
         RuntimeSemanticsEvaluationResult evaluationResult,
@@ -162,11 +155,11 @@ where TFlags : struct, Enum
     /// </remarks>
     /// <returns>The <c>builder</c> parameter, or a reference to it returned by one of its methods.</returns>
     protected abstract ISemanticContextContributor<TContext, TFlags> Analyze(
-        ISymbolResolver resolver, 
-        ConversionOperationSemanticContext coercionContext, 
+        ISymbolResolver resolver,
+        ConversionOperationSemanticContext coercionContext,
         ISemanticContextContributor<TContext, TFlags> builder,
-        ExpressionNode expression, 
-        OperatorAnalysisContext<TFlags> analysisContext, 
+        ExpressionNode expression,
+        OperatorAnalysisContext<TFlags> analysisContext,
         params VBTypedValue[] operands);
 
     /// <summary>
@@ -176,8 +169,8 @@ where TFlags : struct, Enum
     /// <param name="node">The <em>expression node</em> to analyze.</param>
     /// <returns><strong>Does not throw exceptions.</strong> Returns <c>DetermineOperatorEffectiveTypeResult.NotApplicable</c> if no type is statically valid.</returns>
     public abstract DetermineOperatorEffectiveTypeResult DetermineOperatorEffectiveType(
-        ISymbolResolver resolver, 
-        TContext context, 
+        ISymbolResolver resolver,
+        TContext context,
         ExpressionNode expression,
         OperatorEvaluationFrame frame);
 
@@ -207,9 +200,9 @@ where TFlags : struct, Enum
     /// <param name="expression">The operator expression being evaluated.</param>
     /// <param name="frame">The evaluation frame encapsulating the operation inputs.</param>
     protected RuntimeSemanticsEvaluationResult Evaluate(
-        ISymbolResolver resolver, 
-        TContext context, 
-        ExpressionNode expression, 
+        ISymbolResolver resolver,
+        TContext context,
+        ExpressionNode expression,
         OperatorEvaluationFrame frame)
     {
         // 1. Determine the EFFECTIVE TYPE of the operation base on the type of its operands.
@@ -224,7 +217,7 @@ where TFlags : struct, Enum
             // IMPLEMENTATION NOTE: this block is defensive / just to be thorough - this type mismatch is normally already handled.
             Debug.Fail("⚠️ Broken assumption: DetermineEffectiveType was expected to yield a TypeMismatch error in this situation.");
             var operandTypeNames = string.Join(',', frame.Operands.Select(operand => operand.TypeInfo.Name));
-        
+
             return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
                 Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", operandTypeNames)));
         }
@@ -259,12 +252,12 @@ where TFlags : struct, Enum
             var evaluateResult = EvaluateExpressionResult(resolver, context, expression, frame with { Operands = [.. validOperands] });
             if (evaluateResult.IsInternalError)
             {
-                return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.InternalError, expression, 
+                return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.InternalError, expression,
                     Exceptions.VBRuntimeInternalError_EvaluateOperatorRuntimeSemanticsNullApplicableResult_Verbose));
             }
             return evaluateResult;
         }
-    
+
         // if we make it this far, something went horribly wrong.
         Debug.Fail("⚠️ Broken assumption: DetermineOperatorEffectiveTypeResult.Result was expected to yield a valid VBType value.");
         return RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.InternalError, expression,
@@ -280,8 +273,8 @@ where TFlags : struct, Enum
     /// <param name="expression">Any <c>ExpressionNode</c> to be evaluated.</param>
     /// <param name="frame">The <see cref="OperatorEvaluationFrame"/> holding the semantic evaluation inputs.</param>
     protected abstract RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
-        ISymbolResolver resolver, 
-        TContext context, ExpressionNode expression, 
+        ISymbolResolver resolver,
+        TContext context, ExpressionNode expression,
         OperatorEvaluationFrame frame);
 
     /// <summary>
@@ -421,7 +414,8 @@ where TFlags : struct, Enum
             // operand itself is still the box, not the wrapped value a downstream direct cast expects - never
             // short-circuit for one, always route it through the coercion below to unwrap it.
             ? LetCoercionResult.Success(operand)
-            : LetCoercionSemanticsProvider.EvaluateLetCoercionSemantics(resolver, expression, new() {
+            : LetCoercionSemanticsProvider.EvaluateLetCoercionSemantics(resolver, expression, new()
+            {
                 NodeId = expression.Identity,
                 OperandIndex = operandIndex,
                 SourceValue = operand,

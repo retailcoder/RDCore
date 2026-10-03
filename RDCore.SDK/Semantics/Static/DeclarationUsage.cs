@@ -43,7 +43,7 @@ public static class DeclarationUsage
         foreach (var fact in models.SelectMany(procedure => procedure.Expressions.Values).Where(fact => fact.Binding is not null))
         {
             var current = references.GetValueOrDefault(fact.Binding!.Value);
-            references[fact.Binding.Value] = fact.Flags switch
+            references[fact.Binding.Value] = fact.ExpressionFlags switch
             {
                 var flags when flags.HasFlag(ValueExpressionSemanticFlags.AssignmentTarget) => current with { Writes = current.Writes + 1 },
                 var flags when flags.HasFlag(ValueExpressionSemanticFlags.PassedAsArgument) => current with { PassedAsArguments = current.PassedAsArguments + 1 },

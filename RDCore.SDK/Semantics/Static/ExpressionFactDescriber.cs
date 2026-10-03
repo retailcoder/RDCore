@@ -33,12 +33,12 @@ internal static class ExpressionFactDescriber
                 return new(expression.Identity, expression.Location, type, ExpressionClassification.Value, null, ValueExpressionSemanticFlags.Literal, error);
 
             case SimpleNameExpressionNode name:
-            {
-                var symbol = context.Resolver.ResolveValue(name.IdentifierName, ScopeKind.Local, context.Scope.Uri).Symbol;
-                return symbol is null
-                    ? new(expression.Identity, expression.Location, type, ExpressionClassification.Unknown, null, 0, error)
-                    : new(expression.Identity, expression.Location, type, ClassificationOf(symbol), symbol.SemanticId, FlagsOf(symbol, name.IdentifierName), error);
-            }
+                {
+                    var symbol = context.Resolver.ResolveValue(name.IdentifierName, ScopeKind.Local, context.Scope.Uri).Symbol;
+                    return symbol is null
+                        ? new(expression.Identity, expression.Location, type, ExpressionClassification.Unknown, null, 0, error)
+                        : new(expression.Identity, expression.Location, type, ClassificationOf(symbol), symbol.SemanticId, FlagsOf(symbol, name.IdentifierName), error);
+                }
 
             case NewExpressionNode:
                 return new(expression.Identity, expression.Location, type, ExpressionClassification.Value, BoundClassOf(type)?.SemanticId, 0, error);
@@ -52,9 +52,45 @@ internal static class ExpressionFactDescriber
             case IndexExpressionNode index:
                 return DescribeIndex(context, facts, index, type, error);
 
+            case VBUnaryOperatorExpressionNode unaryOp:
+                return DescribeUnaryOperation(context, facts, unaryOp, type, error);
+
+            case VBBinaryOperatorExpressionNode binaryOp:
+                return DescribeBinaryOperation(context, facts, binaryOp, type, error);
+
             default:
                 return new(expression.Identity, expression.Location, type, ExpressionClassification.Value, null, 0, error);
         }
+    }
+
+    private static ExpressionFact DescribeUnaryOperation(
+        StaticEvaluationContext context, IExpressionFactSink facts, VBUnaryOperatorExpressionNode node, VBType? type, VBCompileErrorInfo? error)
+    {
+        // An operator expression that yields a value. Operand-specific semantic flags (conversion, operator-specific)
+        // are populated later during runtime analysis and threaded back into this fact via a separate enrichment pass.
+        return new ExpressionFact(
+            node.Identity, 
+            node.Location, 
+            type, 
+            ExpressionClassification.Operation, 
+            null, 
+            0,
+            error);
+    }
+
+    private static ExpressionFact DescribeBinaryOperation(
+        StaticEvaluationContext context, IExpressionFactSink facts, VBBinaryOperatorExpressionNode node, VBType? type, VBCompileErrorInfo? error)
+    {
+        // An operator expression that yields a value. Operand-specific semantic flags (conversion, operator-specific)
+        // are populated later during runtime analysis and threaded back into this fact via a separate enrichment pass.
+        return new ExpressionFact(
+            node.Identity, 
+            node.Location, 
+            type, 
+            ExpressionClassification.Operation, 
+            null, 
+            0,
+            error);
     }
 
     private static ExpressionFact DescribeIndex(
@@ -69,7 +105,7 @@ internal static class ExpressionFactDescriber
         }
 
         // an object that is indexed is a call of its default member, and an object of no particular class has one that is found out when it runs.
-        if (facts.TryGet(index.Callee.Identity, out var callee) && callee.DeclaredType is { } calleeType)
+        if (facts.TryGet(index.Callee.Identity, out var callee) && callee?.DeclaredType is { } calleeType)
         {
             if (calleeType is VBClassType { DefaultMember: { } defaultMember })
             {
@@ -106,7 +142,7 @@ internal static class ExpressionFactDescriber
 
         var ownerType = owner is null
             ? context.EnclosingWithTargetType
-            : facts.TryGet(owner.Identity, out var ownerFact) ? ownerFact.DeclaredType : null;
+            : facts.TryGet(owner.Identity, out var ownerFact) ? ownerFact?.DeclaredType : null;
 
         if (ownerType is IVBMemberOwnerType { Members: var members }
             && members.FirstOrDefault(member => string.Equals(member.Name, memberName, StringComparison.OrdinalIgnoreCase)) is { } found)
@@ -120,7 +156,7 @@ internal static class ExpressionFactDescriber
             : Fact(ExpressionClassification.Unknown, null, flags);
     }
 
-    private static Symbol? BoundClassOf(VBType? type) => type is VBClassType classType ? classType.Symbol : null;
+    private static VBClassModuleSymbol? BoundClassOf(VBType? type) => type is VBClassType classType ? classType.Symbol : null;
 
     // Get, Let and Set are the one property; Function and Sub are what they are written as.
     private static ExpressionClassification ClassificationOf(Symbol symbol) => symbol switch

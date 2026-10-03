@@ -1,9 +1,9 @@
-using RDCore.SDK.Model.Symbols.Operators;
-﻿using RDCore.SDK.Model;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
@@ -231,7 +231,7 @@ public static class ExpressionStaticSemanticsEvaluator
 
             if (facts.TryGet(passed.Identity, out var fact))
             {
-                facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.PassedAsArgument });
+                facts.Record(fact! with { ExpressionFlags = fact.ExpressionFlags | ValueExpressionSemanticFlags.PassedAsArgument });
             }
         }
     }

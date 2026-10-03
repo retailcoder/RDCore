@@ -294,14 +294,14 @@ public static class StatementStaticSemanticsEvaluator
             if (statement is CallStatementNode callStatement)
             {
                 // the arguments of the statement may be taken by reference like those of a call written as an expression, unless the callee is an array.
-                if (context.Facts is { } facts && facts.TryGet(callStatement.Callee.Identity, out var callee) && callee.DeclaredType is not VBArrayType)
+                if (context.Facts is { } facts && facts.TryGet(callStatement.Callee.Identity, out var callee) && callee?.DeclaredType is not VBArrayType)
                 {
                     ExpressionStaticSemanticsEvaluator.MarkPassedAsArguments(context, callStatement.Arguments);
                 }
 
                 if (callStatement.IsExplicitCall && context.Facts is { } explicitFacts && explicitFacts.TryGet(callStatement.Callee.Identity, out var explicitCallee))
                 {
-                    explicitFacts.Record(explicitCallee with { Flags = explicitCallee.Flags | ValueExpressionSemanticFlags.ExplicitCallKeyword });
+                    explicitFacts.Record(explicitCallee! with { ExpressionFlags = explicitCallee.ExpressionFlags | ValueExpressionSemanticFlags.ExplicitCallKeyword });
                 }
             }
         }
@@ -395,7 +395,7 @@ public static class StatementStaticSemanticsEvaluator
 
         if (facts.TryGet(target.Identity, out var fact))
         {
-            facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.AssignmentTarget });
+            facts.Record(fact! with { ExpressionFlags = fact.ExpressionFlags | ValueExpressionSemanticFlags.AssignmentTarget });
         }
     }
 

@@ -144,7 +144,7 @@ public record class ModuleSemanticsDto(
             procedure.IsFullyAnalyzed,
             [.. procedure.CompileErrors.Select(ErrorOf)],
             [.. procedure.Expressions.Values.Select(fact => new ExpressionFactDto(
-                fact.Node, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.Flags, fact.Error is null ? null : ErrorOf(fact.Error)))]))],
+                fact.NodeId, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.ExpressionFlags, fact.Error is null ? null : ErrorOf(fact.Error)))]))],
         [.. model.Declarations.Select(declaration => new DeclarationFactDto(
             declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References))]);
 

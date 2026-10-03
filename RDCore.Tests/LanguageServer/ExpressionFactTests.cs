@@ -3,15 +3,12 @@ using RDCore.Parsing;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Statements;
-using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
-using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Semantics.Static;
 using RDCore.SDK.Semantics.Static.Abstract;
-using RDCore.SDK.Workspace;
 
 namespace RDCore.Tests.LanguageServer;
 
@@ -68,7 +65,7 @@ public sealed class ExpressionFactTests
         var fact = LastValue([], ["Dim x", "x = 5"]);
 
         Assert.AreEqual(ExpressionClassification.Value, fact.Classification);
-        Assert.AreEqual(ValueExpressionSemanticFlags.Literal, fact.Flags);
+        Assert.AreEqual(ValueExpressionSemanticFlags.Literal, fact.ExpressionFlags);
         Assert.IsNull(fact.Binding);
         Assert.IsNotNull(fact.DeclaredType);
     }
@@ -81,16 +78,16 @@ public sealed class ExpressionFactTests
         Assert.AreEqual(ExpressionClassification.Variable, fact.Classification);
         Assert.AreEqual(VBLongType.TypeInfo, fact.DeclaredType);
         Assert.AreEqual(ModuleUri("Main.Run.n").AbsoluteUri, fact.Binding!.Value.Uri.AbsoluteUri, ignoreCase: true);
-        Assert.AreEqual((ValueExpressionSemanticFlags)0, fact.Flags);
+        Assert.AreEqual((ValueExpressionSemanticFlags)0, fact.ExpressionFlags);
     }
 
     [TestMethod]
     public void ANameWrittenInAnotherCaseThanItsDeclaration_IsAFact()
-        => Assert.IsTrue(LastValue([], ["Dim x", "Dim Total As Long", "x = TOTAL"]).Flags.HasFlag(ValueExpressionSemanticFlags.CaseMismatch));
+        => Assert.IsTrue(LastValue([], ["Dim x", "Dim Total As Long", "x = TOTAL"]).ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.CaseMismatch));
 
     [TestMethod]
     public void ANameWrittenAsItIsDeclared_IsNoMismatch()
-        => Assert.IsFalse(LastValue([], ["Dim x", "Dim Total As Long", "x = Total"]).Flags.HasFlag(ValueExpressionSemanticFlags.CaseMismatch));
+        => Assert.IsFalse(LastValue([], ["Dim x", "Dim Total As Long", "x = Total"]).ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.CaseMismatch));
 
     [TestMethod]
     public void AConstant_IsAConstant()
@@ -102,7 +99,7 @@ public sealed class ExpressionFactTests
         var fact = LastValue(["Public Function F() As Long", "End Function"], ["Dim x", "x = F"]);
 
         Assert.AreEqual(ExpressionClassification.Function, fact.Classification);
-        Assert.IsTrue(fact.Flags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall));
+        Assert.IsTrue(fact.ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall));
         Assert.IsNotNull(fact.Binding);
     }
 
@@ -112,7 +109,7 @@ public sealed class ExpressionFactTests
         var fact = LastValue(["Public Function G(ByVal n As Long) As Long", "End Function"], ["Dim x", "x = G(1)"]);
 
         Assert.AreEqual(ExpressionClassification.Value, fact.Classification);
-        Assert.IsTrue(fact.Flags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall));
+        Assert.IsTrue(fact.ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall));
         Assert.IsNotNull(fact.Binding);
     }
 
@@ -132,7 +129,7 @@ public sealed class ExpressionFactTests
         var fact = LastValue([], ["Dim x", "Dim o As Object", "x = o.Anything"]);
 
         Assert.AreEqual(ExpressionClassification.UnboundMember, fact.Classification);
-        Assert.IsTrue(fact.Flags.HasFlag(ValueExpressionSemanticFlags.LateBound));
+        Assert.IsTrue(fact.ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.LateBound));
         Assert.IsNull(fact.Binding);
     }
 
@@ -141,7 +138,7 @@ public sealed class ExpressionFactTests
     {
         var fact = LastValue([], ["Dim x", "Dim t As Table", "x = t(3)"], Table);
 
-        Assert.IsTrue(fact.Flags.HasFlag(ValueExpressionSemanticFlags.DefaultMember));
+        Assert.IsTrue(fact.ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.DefaultMember));
         Assert.IsNotNull(fact.Binding);
     }
 
@@ -150,8 +147,8 @@ public sealed class ExpressionFactTests
     {
         var fact = LastValue([], ["Dim x", "Dim o As Object", "x = o!Name"]);
 
-        Assert.IsTrue(fact.Flags.HasFlag(ValueExpressionSemanticFlags.DictionaryAccess));
-        Assert.IsTrue(fact.Flags.HasFlag(ValueExpressionSemanticFlags.LateBound));
+        Assert.IsTrue(fact.ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.DictionaryAccess));
+        Assert.IsTrue(fact.ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.LateBound));
     }
 
     [TestMethod]
@@ -162,18 +159,18 @@ public sealed class ExpressionFactTests
         var (model, run, _) = Analyze(["Public Sub Work()", "End Sub"], [statement]);
 
         var call = run.Children.OfType<CallStatementNode>().Single();
-        Assert.AreEqual(explicitCall, model.Expressions[call.Callee.Identity].Flags.HasFlag(ValueExpressionSemanticFlags.ExplicitCallKeyword));
+        Assert.AreEqual(explicitCall, model.Expressions[call.Callee.Identity].ExpressionFlags.HasFlag(ValueExpressionSemanticFlags.ExplicitCallKeyword));
     }
 
     [TestMethod]
     public void AnOperand_HasAFactOfItsOwn()
     {
         var (model, run, _) = Analyze([], ["Dim x", "Dim n As Long", "x = n + 1"]);
-        var sum = (RDCore.SDK.Model.AST.Expressions.VBBinaryOperatorExpressionNode)run.Children.OfType<AssignmentStatementNode>().Last().Value;
+        var sum = (SDK.Model.AST.Expressions.VBBinaryOperatorExpressionNode)run.Children.OfType<AssignmentStatementNode>().Last().Value;
 
         Assert.AreEqual(ExpressionClassification.Variable, model.Expressions[sum.Left.Identity].Classification);
         Assert.AreEqual(ExpressionClassification.Value, model.Expressions[sum.Right.Identity].Classification);
-        Assert.IsTrue(model.Expressions[sum.Identity].Flags == 0);
+        Assert.IsTrue(model.Expressions[sum.Identity].ExpressionFlags == 0);
     }
 
     [TestMethod]
