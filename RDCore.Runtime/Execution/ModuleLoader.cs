@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.Precompiler;
 using RDCore.SDK.Model.AST;
@@ -16,6 +15,7 @@ using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Semantics.Static;
 using RDCore.SDK.Semantics.Static.Abstract;
 using RDCore.SDK.Services.VerboseMessages;
+using System.Collections.Immutable;
 
 namespace RDCore.Runtime.Execution;
 
@@ -98,11 +98,61 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
         }
 
         // a module is valid when what it declares is, as well as every procedure of it.
+        var moduleOptions = session.Environment.Language.HasModuleOptions ? new List<ModuleOptionDirectiveFact>() : [];
+        if (session.Environment.Language.HasModuleOptions)
+        {
+            if (module is VBModuleSymbol { Directives.Explicit: true })
+            {
+                // Option Explicit is explicitly specified
+                moduleOptions.Add(new(ModuleOptionKind.OptionExplicit, Value: true, IsImplicit: false));
+            }
+            else
+            {
+                // Option Explicit is not specified (implicit: false)
+                moduleOptions.Add(new(ModuleOptionKind.OptionExplicit, Value: false, IsImplicit: true));
+            }
+
+            if (module is VBModuleSymbol { Directives.Compare: OptionCompare.Text })
+            {
+                // Option Compare Text is explicitly specified
+                moduleOptions.Add(new(ModuleOptionKind.OptionCompareText, Value: true, IsImplicit: false));
+            }
+            else if (module is VBModuleSymbol { Directives.Compare: OptionCompare.Binary })
+            {
+                // Option Compare Binary is explicitly specified
+                moduleOptions.Add(new(ModuleOptionKind.OptionCompareBinary, Value: true, IsImplicit: false));
+            }
+            else if (module is VBModuleSymbol { Directives.Compare: OptionCompare.Database })
+            {
+                // Option Compare Database is explicitly specified
+                var optionCompare = session.Environment.DatabaseCompare == OptionCompare.Text
+                     ? new ModuleOptionDirectiveFact(ModuleOptionKind.OptionCompareText, Value: true, IsImplicit: false)
+                     : new ModuleOptionDirectiveFact(ModuleOptionKind.OptionCompareBinary, Value: true, IsImplicit: false);
+                moduleOptions.Add(optionCompare);
+            }
+            else
+            {
+                // Option Compare is not specified; Compare Binary is the implicit default in all dialects.
+                moduleOptions.Add(new(ModuleOptionKind.OptionCompareBinary, Value: true, IsImplicit: true));
+            }
+
+            if (module is VBModuleSymbol { Directives.Strict: true })
+            {
+                // Option Strict is explicitly specified
+                moduleOptions.Add(new(ModuleOptionKind.OptionStrict, Value: true, IsImplicit: false));
+            }
+            else
+            {
+                // Option Strict is not specified (implicit: false)
+                moduleOptions.Add(new(ModuleOptionKind.OptionStrict, Value: false, IsImplicit: true));
+            }
+        }
         var moduleModel = new ModuleSemanticModel(
             module.Uri, DeclarationStaticSemanticsEvaluator.Evaluate(module, members, session.Symbols.Resolver), procedureModels.ToImmutable())
         {
             // a language that has no such directive has no fact to state about it.
-            OptionExplicit = session.Environment.Language is { HasOptionExplicit: false } ? null : module is VBModuleSymbol { Directives.Explicit: true },
+            OptionExplicit = session.Environment.Language is { HasModuleOptions: false } ? null : module is VBModuleSymbol { Directives.Explicit: true },
+            Options = [.. moduleOptions],
             Declarations = DeclarationUsage.Of(DeclarationUsage.DeclaredBy(members), procedureModels),
         };
 

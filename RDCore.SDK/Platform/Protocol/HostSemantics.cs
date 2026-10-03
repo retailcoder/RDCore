@@ -112,17 +112,19 @@ public record class ProcedureSemanticsDto(
 public record class DeclarationFactDto(
     Uri Symbol, string Name, DeclarationKind Kind, AccessModifier Access, bool IsImplicit, SourceLocation Location, DeclarationReferences? References);
 
+public record class ModuleOptionDirectiveDto(ModuleOptionKind Kind, bool Value, bool IsImplicit);
+
 /// <summary>
 /// A <see cref="ModuleSemanticModel"/>, as it travels.
 /// </summary>
 /// <param name="Module">The address of the module.</param>
-/// <param name="OptionExplicit">Whether the module states <c>Option Explicit</c>; not issued (<see langword="null"/>) in a language that has no such directive.</param>
+/// <param name="Options">The module option directives, if the language supports them; empty otherwise.</param>
 /// <param name="DeclarationErrors">What is wrong with what the module declares.</param>
 /// <param name="Procedures">The model of each procedure of the module.</param>
 /// <param name="Declarations">What is known of how the module's declarations are used.</param>
 public record class ModuleSemanticsDto(
     Uri Module,
-    bool? OptionExplicit,
+    ImmutableArray<ModuleOptionDirectiveDto> Options,
     ImmutableArray<CompileErrorDto> DeclarationErrors,
     ImmutableArray<ProcedureSemanticsDto> Procedures,
     ImmutableArray<DeclarationFactDto> Declarations)
@@ -135,7 +137,7 @@ public record class ModuleSemanticsDto(
     /// <param name="model">The model of a module.</param>
     public static ModuleSemanticsDto From(ModuleSemanticModel model) => new(
         model.Module,
-        model.OptionExplicit,
+        [.. model.Options.Select(option => new ModuleOptionDirectiveDto(option.Kind, option.Value, option.IsImplicit))],
         [.. model.DeclarationErrors.Select(ErrorOf)],
         [.. model.Procedures.Select(procedure => new ProcedureSemanticsDto(
             procedure.Procedure.Uri,

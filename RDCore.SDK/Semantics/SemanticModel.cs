@@ -59,10 +59,15 @@ public sealed record class ModuleSemanticModel(
     /// </summary>
     /// <remarks>
     /// The fact is not issued - it is <see langword="null"/> - for a module of a language that has no such directive
-    /// (<see cref="Workspace.SupportedLanguage.HasOptionExplicit"/>): there is nothing it could state, and a <see langword="false"/> would say that it
+    /// (<see cref="Workspace.SupportedLanguage.HasModuleOptions"/>): there is nothing it could state, and a <see langword="false"/> would say that it
     /// does not when it cannot.
     /// </remarks>
     public bool? OptionExplicit { get; init; }
+
+    /// <summary>
+    /// The module options, if the language supports them; empty otherwise.
+    /// </summary>
+    public ImmutableArray<ModuleOptionDirectiveFact> Options { get; init; } = [];
 
     /// <summary>
     /// How each declaration of the module is used by the module's own code (<see cref="Static.DeclarationUsage"/>): its variables, constants, parameters,

@@ -21,7 +21,7 @@ public sealed class HostSemanticsTests
     {
         var payload = await ModuleWorkspace.SemanticsAsync([Widget], Program("Public Sub Main()", "End Sub"));
 
-        CollectionAssert.AreEquivalent(new[] { "Program", "Widget" }, payload.Modules.Select(model => model.Module.Fragment.TrimStart('#')).ToArray());
+        Assert.AreSequenceEqual(["Program", "Widget"], [.. payload.Modules.Select(model => model.Module.Fragment.TrimStart('#'))], SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -52,7 +52,7 @@ public sealed class HostSemanticsTests
         var payload = await ModuleWorkspace.SemanticsAsync([], Program("Option Explicit", "Public Sub Main()", "Dim n As Long", "n = 5", "Debug.Print n", "End Sub"));
 
         var model = payload.Modules.Single();
-        Assert.IsTrue(model.OptionExplicit);
+        Assert.IsTrue(model.Options.Any(o => o.Kind == ModuleOptionKind.OptionExplicit && o.Value == true));
         var main = model.Procedures.Single();
         Assert.IsTrue(main.IsFullyAnalyzed);
         Assert.IsTrue(main.Expressions.Any(fact => fact.Flags.HasFlag(ValueExpressionSemanticFlags.Literal)));
@@ -70,7 +70,7 @@ public sealed class HostSemanticsTests
         var payload = await ModuleWorkspace.SemanticsAsync(
             [], Program(directive, "Public Sub Main()", "End Sub"), language: RDCore.SDK.Workspace.SupportedLanguages.Get(language));
 
-        Assert.AreEqual(stated, payload.Modules.Single().OptionExplicit);
+        Assert.AreEqual(stated, payload.Modules.Single().Options.SingleOrDefault(o => o.Kind == ModuleOptionKind.OptionExplicit)?.Value);
     }
 
     [TestMethod]
@@ -80,6 +80,6 @@ public sealed class HostSemanticsTests
         var payload = await ModuleWorkspace.SemanticsAsync(
             [], Program("Public Sub Main()", "End Sub"), language: RDCore.SDK.Workspace.SupportedLanguages.BASIC);
 
-        Assert.IsNull(payload.Modules.Single().OptionExplicit);
+        Assert.IsNull(payload.Modules.Single().Options.SingleOrDefault(o => o.Kind == ModuleOptionKind.OptionExplicit));
     }
 }

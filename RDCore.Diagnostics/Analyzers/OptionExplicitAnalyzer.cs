@@ -17,9 +17,10 @@ internal sealed class OptionExplicitAnalyzer : IModuleAnalyzer
 {
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
     {
-        if (context.Semantics is { OptionExplicit: false })
+        var option = context.Semantics?.Options.SingleOrDefault(directive => directive.Kind == SDK.Semantics.ModuleOptionKind.OptionExplicit);
+        if (option?.IsImplicit == true)
         {
-            // the module as a whole is what is wrong with it: the first line is where a reader looks for the option.
+            // the option metadata is only supplied if the language supports them; null option means no diagnostics should be issued.
             yield return new AnalyzerFinding(
                 RDCoreDiagnosticId.ImplicitDeclarationsEnabled,
                 new SourceRange(new SourcePosition(0, 0), new SourcePosition(1, 0)),

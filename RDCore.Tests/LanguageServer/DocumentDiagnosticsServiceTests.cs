@@ -133,7 +133,7 @@ public sealed class DocumentDiagnosticsServiceTests
 
         Assert.AreEqual("v1", result.ResultId);
         Assert.IsFalse(result.Unchanged);
-        Assert.AreEqual(2, result.Diagnostics.Count);
+        Assert.HasCount(2, result.Diagnostics);
     }
 
     [TestMethod]
@@ -149,7 +149,7 @@ public sealed class DocumentDiagnosticsServiceTests
 
         var result = await Sut().GetAsync(document.Id.Uri.ToUri(), previousResultId: null, CancellationToken.None);
 
-        Assert.AreEqual(2, result.Diagnostics.Count, "the diagnostic reported by both providers is collapsed");
+        Assert.HasCount(2, result.Diagnostics, "the diagnostic reported by both providers is collapsed");
     }
 
     [TestMethod]
@@ -187,7 +187,7 @@ public sealed class DocumentDiagnosticsServiceTests
 
         var result = await Sut().GetAsync(document.Id.Uri.ToUri(), previousResultId: null, CancellationToken.None);
 
-        Assert.AreEqual(1, result.Diagnostics.Count);
+        Assert.HasCount(1, result.Diagnostics);
     }
 
     private IRDCoreClientApp HostThatProvidesSemantics(string json)
@@ -213,7 +213,7 @@ public sealed class DocumentDiagnosticsServiceTests
         WorkspaceHas(document);
         ParseYields();
         var module = new Uri("file://rdcore-test#Mod1");
-        var host = HostThatProvidesSemantics(PlatformJson.Serialize(new SemanticsPayload([new ModuleSemanticsDto(module, true, [], [], [])])));
+        var host = HostThatProvidesSemantics(PlatformJson.Serialize(new SemanticsPayload([new ModuleSemanticsDto(module, [new ModuleOptionDirectiveDto(SDK.Semantics.ModuleOptionKind.OptionExplicit, Value: false, IsImplicit: true)], [], [], [])])));
         var provider = Provider("RDCore.Diagnostics", 1);
         ProvidersAre(provider);
 
@@ -221,7 +221,7 @@ public sealed class DocumentDiagnosticsServiceTests
 
         var semantics = PayloadSentTo(provider).Semantics;
         Assert.IsNotNull(semantics);
-        Assert.IsTrue(semantics.OptionExplicit);
+        Assert.IsFalse(semantics.Options.SingleOrDefault(o => o.Kind == SDK.Semantics.ModuleOptionKind.OptionExplicit)?.Value);
         await host.Received(1).SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(
             Arg.Is<HostSemanticsParams>(request => request.ModuleName.Contains("Mod1")), Arg.Any<CancellationToken>());
     }
@@ -258,7 +258,7 @@ public sealed class DocumentDiagnosticsServiceTests
 
         var result = await Sut().GetAsync(document.Id.Uri.ToUri(), previousResultId: null, CancellationToken.None);
 
-        Assert.AreEqual(1, result.Diagnostics.Count);
+        Assert.HasCount(1, result.Diagnostics);
         Assert.IsNull(PayloadSentTo(provider).Semantics);
     }
 
@@ -272,7 +272,7 @@ public sealed class DocumentDiagnosticsServiceTests
     public async Task AModuleTheClientSupplied_IsPutInTheHost_DefinedAndLoaded_BeforeItIsAskedAbout()
     {
         FragmentParses();
-        var host = HostThatProvidesSemantics(PlatformJson.Serialize(new SemanticsPayload([new ModuleSemanticsDto(FragmentUri, false, [], [], [])])));
+        var host = HostThatProvidesSemantics(PlatformJson.Serialize(new SemanticsPayload([new ModuleSemanticsDto(FragmentUri, [], [], [], [])])));
         var provider = Provider("RDCore.Diagnostics", 0);
         ProvidersAre(provider);
 
@@ -285,7 +285,7 @@ public sealed class DocumentDiagnosticsServiceTests
             host.SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(
                 Arg.Is<HostSemanticsParams>(request => request.ModuleName == "Program"), Arg.Any<CancellationToken>());
         });
-        Assert.AreEqual(false, PayloadSentTo(provider).Semantics!.OptionExplicit);
+        Assert.IsNull(PayloadSentTo(provider).Semantics!.Options.SingleOrDefault(o => o.Kind == SDK.Semantics.ModuleOptionKind.OptionExplicit)?.Value);
     }
 
     [TestMethod]
@@ -316,7 +316,7 @@ public sealed class DocumentDiagnosticsServiceTests
 
         var (diagnostics, _) = await Sut().AnalyzeFragmentAsync(FragmentUri, "Public Sub Foo()\r\nEnd Sub", CancellationToken.None);
 
-        Assert.AreEqual(1, diagnostics.Count);
+        Assert.HasCount(1, diagnostics);
         Assert.IsNull(PayloadSentTo(provider).Semantics);
     }
 

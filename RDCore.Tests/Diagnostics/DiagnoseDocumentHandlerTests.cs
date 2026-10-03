@@ -4,15 +4,14 @@ using RDCore.Diagnostics.Analyzers;
 using RDCore.Diagnostics.Handlers;
 using RDCore.Parsing;
 using RDCore.SDK.Model.AST;
-using RDCore.SDK.Model.AST.Declarations;
-using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Model.AST.Abstract;
+using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Source;
+using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
-using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Server.ProtocolExtensions;
 
 namespace RDCore.Tests.Diagnostics;
@@ -63,7 +62,7 @@ public sealed class DiagnoseDocumentHandlerTests
         var result = await HandleAsync(request);
         var diagnostics = result.Diagnostics.ToArray();
 
-        Assert.AreEqual(parseResult.SyntaxErrors.Length, diagnostics.Length);
+        Assert.HasCount(parseResult.SyntaxErrors.Length, diagnostics);
         Assert.AreEqual(7, result.SourceVersion, "the provider echoes the source version back");
 
         for (var i = 0; i < parseResult.SyntaxErrors.Length; i++)
@@ -72,7 +71,7 @@ public sealed class DiagnoseDocumentHandlerTests
             var diagnostic = diagnostics[i];
 
             Assert.AreEqual(error.ToDiagnosticCode(), diagnostic.Code!.Value.String);
-            StringAssert.StartsWith(diagnostic.Code!.Value.String, "VBC");
+            Assert.StartsWith("VBC", diagnostic.Code!.Value.String);
             var href = diagnostic.CodeDescription!.Href.ToString();
             Assert.AreEqual(
                 $"https://rubberduck-vba.github.io/RDCore/diagnostics/{error.ToDiagnosticCode().ToLowerInvariant()}.html",
@@ -99,7 +98,13 @@ public sealed class DiagnoseDocumentHandlerTests
 
     private static ModuleSemanticsDto Semantics(
         bool optionExplicit = true, CompileErrorDto[]? declarationErrors = null, ProcedureSemanticsDto[]? procedures = null)
-        => new(Module, optionExplicit, [.. declarationErrors ?? []], [.. procedures ?? []], []);
+        => new(Module,
+            Options: optionExplicit
+                ? [new ModuleOptionDirectiveDto(ModuleOptionKind.OptionExplicit, Value: true, IsImplicit: false)]
+                : [new ModuleOptionDirectiveDto(ModuleOptionKind.OptionExplicit, Value: false, IsImplicit: true)],
+            DeclarationErrors: [.. declarationErrors ?? []],
+            Procedures: [.. procedures ?? []],
+            Declarations: []);
 
     private static ProcedureSemanticsDto Procedure(CompileErrorDto[]? errors = null, ExpressionFactDto[]? expressions = null)
         => new(new Uri("file://rdcore-test#Mod1.Run"), true, [.. errors ?? []], [.. expressions ?? []]);
@@ -113,7 +118,7 @@ public sealed class DiagnoseDocumentHandlerTests
 
         var result = await HandleAsync(RequestFor(CleanModule, out _, semantics: semantics));
 
-        CollectionAssert.AreEqual(new[] { "VBC09303", "VBC09312" }, result.Diagnostics.Select(diagnostic => diagnostic.Code!.Value.String).ToArray());
+        Assert.AreSequenceEqual(["VBC09303", "VBC09312"], result.Diagnostics.Select(diagnostic => diagnostic.Code!.Value.String).ToArray());
         Assert.IsTrue(result.Diagnostics.All(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.IsTrue(result.Diagnostics.All(diagnostic => diagnostic.Range == Somewhere.Range.ToLsp()));
     }
@@ -164,6 +169,6 @@ public sealed class DiagnoseDocumentHandlerTests
         var result = await HandleAsync(
             RequestFor(CleanModule, out _, semantics: Semantics(optionExplicit: false)), new FailingAnalyzer(), new OptionExplicitAnalyzer());
 
-        Assert.AreEqual("RDC00101", result.Diagnostics.Single().Code!.Value.String);
+        Assert.AreEqual("RDC00101", result.Diagnostics.SingleOrDefault()?.Code?.String);
     }
 }
