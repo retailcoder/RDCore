@@ -60,28 +60,20 @@ public sealed class AppTheme(ThemeDocument document)
     }
 
     /// <summary>The shell background, in 24-bit colour — what the console shell frame is painted with.</summary>
-    public ConsoleRgbColor ShellBackground => ToRgb(Resolve(document.Shell.Background));
+    public ConsoleRgbColor ShellBackground => ToBackgroundRgb(Resolve(document.Shell.Background));
 
     /// <summary>The shell foreground, in 24-bit colour — what the console shell frame is painted with.</summary>
-    public ConsoleRgbColor ShellForeground => ToRgb(Resolve(document.Shell.Foreground));
-
-    /// <summary>The resolved style token for the splash logo art.</summary>
-    public string SplashLogo => Resolve(document.Splash.Logo);
-
-    /// <summary>The resolved style token for the splash title.</summary>
-    public string SplashTitle => Resolve(document.Splash.Title);
-
-    /// <summary>The splash logo colour, in 24-bit colour (the art is printed raw, unwrapped).</summary>
-    public ConsoleRgbColor SplashLogoColor => ToRgb(SplashLogo);
-
-    /// <summary>The splash title colour, in 24-bit colour.</summary>
-    public ConsoleRgbColor SplashTitleColor => ToRgb(SplashTitle);
+    public ConsoleRgbColor ShellForeground => ToForegroundRgb(Resolve(document.Shell.Foreground));
 
     /// <summary>The resolved syntax-highlight tokens for program-mode listings.</summary>
     public ThemeSyntaxStyles Syntax => new(
-        Resolve(document.Syntax.Keyword), Resolve(document.Syntax.Comment), Resolve(document.Syntax.String),
-        Resolve(document.Syntax.Number), Resolve(document.Syntax.Identifier),
-        Resolve(document.Syntax.IdentifierClass), Resolve(document.Syntax.IdentifierConst));
+        Resolve(document.Syntax.Keyword),
+        Resolve(document.Syntax.Comment),
+        Resolve(document.Syntax.String),
+        Resolve(document.Syntax.Number),
+        Resolve(document.Syntax.Identifier),
+        Resolve(document.Syntax.IdentifierClass),
+        Resolve(document.Syntax.IdentifierConst));
 
     private static string Key(MessageKind kind) => kind.ToString().ToLowerInvariant();
 
@@ -111,7 +103,19 @@ public sealed class AppTheme(ThemeDocument document)
 
     // a resolved token is a Spectre style; its foreground carries the 24-bit value the frame needs,
     // whether the theme wrote it as #rrggbb or as a named colour.
-    private static ConsoleRgbColor ToRgb(string token)
+    private static ConsoleRgbColor ToForegroundRgb(string token)
+    {
+        try
+        {
+            var color = Style.Parse(token).Foreground;
+            return new ConsoleRgbColor(color.R, color.G, color.B);
+        }
+        catch (Exception)
+        {
+            return new ConsoleRgbColor(255, 255, 255);
+        }
+    }
+    private ConsoleRgbColor ToBackgroundRgb(string token)
     {
         try
         {
