@@ -9,6 +9,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Semantics.Statements;
 
@@ -621,6 +622,7 @@ public sealed record class FileStatementRuntimeSemantics(
             NodeId = expression.Identity,
             SourceValue = evaluated.Result!,
             DestinationTypeDesc = new(VBStringType.TypeInfo),
+            Site = ConversionSite.FileStatement,
         });
 
         if (!coerced.IsSuccess)
@@ -706,6 +708,7 @@ public sealed record class FileStatementRuntimeSemantics(
             NodeId = expression.Identity,
             SourceValue = evaluated.Result!,
             DestinationTypeDesc = new(destinationType),
+            Site = ConversionSite.FileStatement,
         });
 
         if (!coerced.IsSuccess)

@@ -22,6 +22,7 @@ using RDCore.SDK.Runtime.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Semantics.Statements;
 
@@ -169,7 +170,7 @@ public sealed class LetAssignmentEvaluator(
             return RuntimeExecutionOutcome.Next;
         }
 
-        var frame = new LetCoercionStackFrame(source.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(array.ItemType));
+        var frame = new LetCoercionStackFrame(source.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(array.ItemType), ConversionSite.Assignment);
         var coerced = coercions.EvaluateLetCoercionSemantics(session.Symbols.Resolver, source, frame);
         if (!coerced.IsApplicable)
         {
@@ -293,7 +294,7 @@ public sealed class LetAssignmentEvaluator(
         var handle = instance.GetValue(field);
         if (!isSet)
         {
-            var frame = new LetCoercionStackFrame(statement.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(field.ResolvedType));
+            var frame = new LetCoercionStackFrame(statement.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(field.ResolvedType), ConversionSite.Assignment);
             var coerced = coercions.EvaluateLetCoercionSemantics(session.Symbols.Resolver, source, frame);
             if (!coerced.IsApplicable)
             {
@@ -376,7 +377,7 @@ public sealed class LetAssignmentEvaluator(
         // "the source is Let-coerced to the target's declared type" - a field's declared type is its own, and
         // the coercion is the same one an assignment to a variable of that type would apply.
         var frame = new LetCoercionStackFrame(
-            statement.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(fieldType));
+            statement.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(fieldType), ConversionSite.Assignment);
         var coerced = coercions.EvaluateLetCoercionSemantics(session.Symbols.Resolver, source, frame);
         if (!coerced.IsApplicable)
         {
@@ -509,7 +510,7 @@ public sealed class LetAssignmentEvaluator(
             // directly instead, the same lower-level call ByVal/ByRef-fallback parameter passing already
             // makes for the identical reason.
             var returnCoercionFrame = new LetCoercionStackFrame(statement.Identity, InputIndex.CoercionSourceValue,
-                value, new VBTypeDescValue(((ITypedSymbol)symbol).ResolvedType));
+                value, new VBTypeDescValue(((ITypedSymbol)symbol).ResolvedType), ConversionSite.Return);
             var returnCoercionResult = coercions.EvaluateLetCoercionSemantics(session.Symbols.Resolver, source, returnCoercionFrame);
             if (!returnCoercionResult.IsApplicable)
             {

@@ -10,6 +10,7 @@ using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Facts;
 using System.Collections.Immutable;
 
 namespace RDCore.Runtime.Execution;
@@ -192,7 +193,7 @@ public sealed class PrintOutputEvaluator(
 
     private RuntimeSemanticsEvaluationResult Coerce(IRuntimeSession session, ExpressionNode expression, VBTypedValue value, VBType destination)
     {
-        var frame = new LetCoercionStackFrame(expression.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(destination));
+        var frame = new LetCoercionStackFrame(expression.Identity, InputIndex.CoercionSourceValue, value, new VBTypeDescValue(destination), ConversionSite.PrintItem);
         var result = letCoercion.EvaluateLetCoercionSemantics(session.Symbols.Resolver, expression, frame);
         return result.IsSuccess
             ? RuntimeSemanticsEvaluationResult.Success(result.Result!)
@@ -210,7 +211,7 @@ public sealed class PrintOutputEvaluator(
                 : RuntimeExecutionOutcome.Error(result.ErrorInfo!));
         }
 
-        var frame = new LetCoercionStackFrame(expression.Identity, InputIndex.CoercionSourceValue, result.Result!, new VBTypeDescValue(VBLongType.TypeInfo));
+        var frame = new LetCoercionStackFrame(expression.Identity, InputIndex.CoercionSourceValue, result.Result!, new VBTypeDescValue(VBLongType.TypeInfo), ConversionSite.PrintItem);
         var coerced = letCoercion.EvaluateLetCoercionSemantics(session.Symbols.Resolver, expression, frame);
 
         return coerced is { IsSuccess: true, Result: VBLongValue count }
