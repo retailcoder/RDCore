@@ -144,6 +144,35 @@ public sealed class BinaryArithmeticOperatorRuntimeTests : OperatorArithmeticRun
     }
 
     [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3.7 Binary '^' Operator")]
+    [DataRow(true, 1d)]
+    [DataRow(false, 0.5d)]
+    public void Exponent_ABooleanOperand_IsNumeric_WithADoubleEffectiveType(bool booleanOnTheLeft, double expected)
+    {
+        // True is -1: True ^ 2 is 1, and 2 ^ True is 0.5.
+        var semantics = new BinaryExponentOperatorRuntimeSemantics(RealCoercionProvider(), Formatter());
+        var result = booleanOnTheLeft
+            ? Evaluate(semantics, new VBBooleanValue(true), new VBIntegerValue(2))
+            : Evaluate(semantics, new VBIntegerValue(2), new VBBooleanValue(true));
+
+        AssertResult<VBDoubleValue>(result, expected);
+    }
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3.6 '\\' Operator and Mod Operator")]
+    public void IntegerDivision_OfASingleByABoolean_IsALong()
+        // a Boolean is an operand as an Integer is: 5 \ True is 5 \ -1.
+        => AssertResult<VBLongValue>(Evaluate(
+            new BinaryIntegerDivisionOperatorRuntimeSemantics(RealCoercionProvider(), Formatter()), new VBSingleValue(5), new VBBooleanValue(true)), -5);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3.6 '\\' Operator and Mod Operator")]
+    public void Modulo_OfASingleByABoolean_IsALong()
+        => AssertResult<VBLongValue>(Evaluate(
+            new BinaryModuloOperatorRuntimeSemantics(RealCoercionProvider(), Formatter()), new VBSingleValue(5), new VBBooleanValue(true)), 0);
+
+
+    [TestMethod]
     [TestCategory("MS-VBAL 5.6.9.3.5 Binary '/' Operator")]
     public void Division_Double_RealQuotient()
         => AssertResult<VBDoubleValue>(
