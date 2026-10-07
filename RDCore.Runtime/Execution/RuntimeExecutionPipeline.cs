@@ -12,6 +12,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Analysis;
 using RDCore.SDK.Semantics.Builders;
+using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Services.VerboseMessages;
 
@@ -72,12 +73,20 @@ public sealed class RuntimeExecutionPipeline
     /// run's own cancellation — it is what makes a program that will never finish on its own
     /// interruptible.
     /// </param>
+    /// <param name="observer">
+    /// Told of every conversion and operation the pipeline evaluates, as the facts the language core states about the code
+    /// being evaluated. <see langword="null"/> (the default) when the pipeline runs code rather than analyzes it: then nothing
+    /// is observed, and nothing about how the code runs is different.
+    /// </param>
     public static RuntimeExecutionPipeline Create(
         IRuntimeSession session,
         IReadOnlyDictionary<SemanticId, InstructionList> bodies,
         IVerboseMessageBuilder messages,
-        CancellationToken cancellation = default)
+        CancellationToken cancellation = default,
+        IAnalysisObserver? observer = null)
     {
+        // the parts of the pipeline that state facts share one observation, so that describing a fact is not itself observed.
+        var observation = observer is null ? null : new AnalysisObservation(observer);
         var handle = new ProviderHandle();
         var objectCoercion = new VBObjectLetCoercionRuntimeSemantics(handle, messages);
 
@@ -97,11 +106,12 @@ public sealed class RuntimeExecutionPipeline
                 new VBResizableByteArrayLetCoercionRuntimeSemantics(handle, messages),
                 new VBResizableArrayLetCoercionRuntimeSemantics(handle, messages),
             ],
-            messages);
+            messages,
+            observation);
         handle.Inner = letCoercion;
 
         var setCoercion = new SetCoercionRuntimeSemantics(messages);
-        var operators = new OperatorRuntimeSemanticsProvider(letCoercion, messages);
+        var operators = new OperatorRuntimeSemanticsProvider(letCoercion, messages, observation);
         var expressions = new RuntimeExpressionEvaluator(operators);
         var print = new PrintOutputEvaluator(expressions, letCoercion);
         var conditions = new ConditionEvaluator(expressions, letCoercion);

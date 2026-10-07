@@ -7,6 +7,7 @@ using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Execution;
 
@@ -77,7 +78,7 @@ public sealed class CaseMatchEvaluator(RuntimeExpressionEvaluator expressionEval
         {
             return operandResult;
         }
-        return operators.EvaluateBinaryOperator(session, comparisonOperator, operand, selector, operandResult.Result!);
+        return operators.EvaluateBinaryOperator(session, comparisonOperator, operand, selector, operandResult.Result!, ConversionSite.CaseTest);
     }
 
     private RuntimeSemanticsEvaluationResult EvaluateRange(IRuntimeSession session, VBTypedValue selector, CaseToRangeClauseNode range, RuntimeEvaluationContext context)
@@ -94,6 +95,6 @@ public sealed class CaseMatchEvaluator(RuntimeExpressionEvaluator expressionEval
             return upperBound;
         }
 
-        return operators.EvaluateBinaryOperator(session, Tokens.LogicalAndOp, range.Start, lowerBound.Result!, upperBound.Result!);
+        return operators.EvaluateBinaryOperator(session, Tokens.LogicalAndOp, range.Start, lowerBound.Result!, upperBound.Result!, ConversionSite.CaseTest);
     }
 }

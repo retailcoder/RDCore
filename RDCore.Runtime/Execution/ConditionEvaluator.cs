@@ -6,6 +6,7 @@ using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Execution;
 
@@ -33,7 +34,7 @@ public sealed class ConditionEvaluator(RuntimeExpressionEvaluator expressionEval
             return valueResult;
         }
 
-        var frame = new LetCoercionStackFrame(condition.Identity, InputIndex.CoercionSourceValue, valueResult.Result!, new VBTypeDescValue(VBBooleanType.TypeInfo));
+        var frame = new LetCoercionStackFrame(condition.Identity, InputIndex.CoercionSourceValue, valueResult.Result!, new VBTypeDescValue(VBBooleanType.TypeInfo), ConversionSite.Condition);
         var coercionResult = letCoercion.EvaluateLetCoercionSemantics(session.Symbols.Resolver, condition, frame);
 
         return coercionResult.IsSuccess

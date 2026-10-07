@@ -11,6 +11,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Builders;
 using RDCore.SDK.Semantics.Context;
+using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Runtime.Semantics.Statements;
@@ -182,6 +183,7 @@ public sealed record class FixedAssignmentRuntimeSemantics(
             NodeId = assignment.Identity,
             SourceValue = source,
             DestinationTypeDesc = new(VBStringType.TypeInfo),
+            Site = ConversionSite.StringStatement,
         });
 
         if (!coerced.IsSuccess)

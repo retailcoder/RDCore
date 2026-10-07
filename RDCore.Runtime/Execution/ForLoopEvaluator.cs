@@ -8,6 +8,7 @@ using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Execution;
 
@@ -46,7 +47,7 @@ public sealed class ForLoopEvaluator(RuntimeExpressionEvaluator expressionEvalua
     /// counter on every <c>Next</c>.
     /// </summary>
     public RuntimeSemanticsEvaluationResult Increment(IRuntimeSession session, ForLoopState state, VBTypedValue counter)
-        => operators.EvaluateBinaryOperator(session, Tokens.AdditionOp, state.ControlExpression, counter, state.Step);
+        => operators.EvaluateBinaryOperator(session, Tokens.AdditionOp, state.ControlExpression, counter, state.Step, ConversionSite.LoopBound);
 
     /// <summary>
     /// Whether the loop has run out of range and should complete — steps 1/2 of the algorithm: a
@@ -56,5 +57,5 @@ public sealed class ForLoopEvaluator(RuntimeExpressionEvaluator expressionEvalua
     public RuntimeSemanticsEvaluationResult IsOutOfRange(IRuntimeSession session, ForLoopState state, VBTypedValue counter)
         => operators.EvaluateBinaryOperator(session,
             ((VBNumericTypedValue)state.Step).AsDouble < 0 ? Tokens.CompareLessThanOp : Tokens.CompareGreaterThanOp,
-            state.ControlExpression, counter, state.End);
+            state.ControlExpression, counter, state.End, ConversionSite.LoopBound);
 }

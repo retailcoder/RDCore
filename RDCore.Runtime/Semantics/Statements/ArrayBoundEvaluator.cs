@@ -3,6 +3,7 @@ using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Semantics.Statements;
 
@@ -49,6 +50,7 @@ public sealed record class ArrayBoundEvaluator(
             NodeId = expression.Identity,
             SourceValue = evaluated.Result!,
             DestinationTypeDesc = new(VBIntegerType.TypeInfo),
+            Site = ConversionSite.Subscript,
         });
 
         if (!coerced.IsSuccess)

@@ -7,6 +7,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Facts;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -113,6 +114,7 @@ public sealed record class MidStatementRuntimeSemantics(
             NodeId = mid.Identity,
             SourceValue = source,
             DestinationTypeDesc = new(VBStringType.TypeInfo),
+            Site = ConversionSite.StringStatement,
         });
 
         if (!coerced.IsSuccess)
@@ -146,6 +148,7 @@ public sealed record class MidStatementRuntimeSemantics(
             NodeId = expression.Identity,
             SourceValue = evaluated.Result!,
             DestinationTypeDesc = new(VBLongType.TypeInfo),
+            Site = ConversionSite.StringStatement,
         });
 
         if (!coerced.IsSuccess)
