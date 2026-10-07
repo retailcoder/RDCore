@@ -63,8 +63,9 @@ public sealed class IndeterminateOperandRuntimeTests : LetCoercionRuntimeSemanti
 
     private static readonly VBType[] DeclaredTypes =
     [
-        VBByteType.TypeInfo, VBBooleanType.TypeInfo, VBIntegerType.TypeInfo, VBLongType.TypeInfo, VBSingleType.TypeInfo, VBDoubleType.TypeInfo,
-        VBCurrencyType.TypeInfo, VBDecimalType.TypeInfo, VBDateType.TypeInfo, VBStringType.TypeInfo, VBVariantType.TypeInfo, VBObjectType.TypeInfo,
+        VBByteType.TypeInfo, VBBooleanType.TypeInfo, VBIntegerType.TypeInfo, VBLongType.TypeInfo, VBLongLongType.TypeInfo, VBSingleType.TypeInfo,
+        VBDoubleType.TypeInfo, VBCurrencyType.TypeInfo, VBDecimalType.TypeInfo, VBDateType.TypeInfo, VBStringType.TypeInfo, VBVariantType.TypeInfo,
+        VBObjectType.TypeInfo,
     ];
 
     [TestMethod]
@@ -78,19 +79,10 @@ public sealed class IndeterminateOperandRuntimeTests : LetCoercionRuntimeSemanti
                 foreach (var right in DeclaredTypes)
                 {
                     var result = Binary(token, Unknown(left), Unknown(right));
-                    if (result.IsSuccess && result.Result!.IsIndeterminate)
+                    if (!result.IsSuccess || !result.Result!.IsIndeterminate)
                     {
-                        continue;
+                        failures.Add($"{left.Name} {token} {right.Name}: {(result.IsSuccess ? "a known value" : $"error {result.ErrorInfo?.ErrorId}")}");
                     }
-
-                    // an internal error is a defect of the operator itself, which the values the operands assume raise just the same.
-                    var assumed = Binary(token, left.DefaultValue, right.DefaultValue);
-                    if (result.ErrorInfo?.ErrorId == (int)VBRuntimeErrorId.InternalError && assumed.ErrorInfo?.ErrorId == result.ErrorInfo.ErrorId)
-                    {
-                        continue;
-                    }
-
-                    failures.Add($"{left.Name} {token} {right.Name}: {(result.IsSuccess ? "a known value" : $"error {result.ErrorInfo?.ErrorId}")}");
                 }
             }
         }
