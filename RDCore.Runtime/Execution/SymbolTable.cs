@@ -1,0 +1,184 @@
+using RDCore.SDK.Model.AST.Abstract;
+using RDCore.SDK.Model.Symbols;
+using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
+using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.Shared;
+using System.Diagnostics.CodeAnalysis;
+
+namespace RDCore.Runtime.Execution;
+
+/// <summary>
+/// The declared symbols of a session, and how a name finds one: the <em>static context</em> that code is evaluated in
+/// (<strong>RD-VBAL §2.3.1.2</strong>).
+/// </summary>
+/// <remarks>
+/// <para>
+/// Holds what the code declares and nothing that happens when it runs: no storage, no bindings, no objects. That is what lets
+/// an evaluation that must not touch the live session's state (an analysis) be given its own state over the same table,
+/// instead of a copy of thousands of symbols.
+/// </para>
+/// <para>
+/// Not thread-safe: the scope tree is built on first use after a change, so a table that is shared has to be done changing,
+/// and have had its tree built, before anything else reads it.
+/// </para>
+/// </remarks>
+internal sealed class SymbolTable
+{
+    // one bucket per RD-VBAL §2.3.1.2 heap: global, workspace (module), instance, and the local
+    // frame. TryAdd keeps the first symbol of a colliding uri; the scope tree walks all four.
+    private readonly Dictionary<SymbolIdentity, Symbol> _globalSymbols = [];
+    private readonly Dictionary<SymbolIdentity, Symbol> _workspaceSymbols = [];
+    private readonly Dictionary<SymbolIdentity, Symbol> _instanceSymbols = [];
+    private readonly Dictionary<SymbolIdentity, Symbol> _localSymbols = [];
+
+    private ScopeTree? _scopeTree;
+
+    /// <summary>
+    /// What makes two definitions the same declaration: the symbol's own semantic identity, plus its
+    /// concrete type.
+    /// </summary>
+    /// <remarks>
+    /// Not the symbol itself. A <c>Symbol</c> is a record, so record equality compares every member,
+    /// derived ones included — two definitions of the SAME declaration that differ only in what was
+    /// known about it (a procedure that gained its locals, a field whose declared type resolved on the
+    /// second pass) compare unequal, and the table would hold both. The name would then resolve to
+    /// neither of them, since resolution requires exactly one match.
+    /// <para>
+    /// The concrete type is part of it because a <c>Property</c>'s <c>Get</c>, <c>Let</c> and
+    /// <c>Set</c> accessors are three declarations that legitimately share one URI.
+    /// </para>
+    /// </remarks>
+    private readonly record struct SymbolIdentity(SemanticId Id, Type Declaration)
+    {
+        public static SymbolIdentity Of(Symbol symbol) => new(symbol.SemanticId, symbol.GetType());
+    }
+
+    /// <summary>
+    /// Resolves names against the table as it is when the name is looked up.
+    /// </summary>
+    public ISymbolResolver Names => new LiveScopeResolver(this);
+
+    /// <summary>
+    /// The symbols declared in the instance tier: the fields of the classes.
+    /// </summary>
+    public IEnumerable<Symbol> InstanceSymbols => _instanceSymbols.Values;
+
+    /// <summary>
+    /// The symbols declared in the global and workspace tiers: the variables and fields that outlive a call.
+    /// </summary>
+    public IEnumerable<Symbol> ModuleLevelSymbols => _globalSymbols.Values.Concat(_workspaceSymbols.Values);
+
+    /// <summary>
+    /// The symbols declared in the local tier: parameters, local variables and what a procedure declares inside.
+    /// </summary>
+    public IEnumerable<Symbol> LocalSymbols => _localSymbols.Values;
+
+    /// <summary>
+    /// Every symbol declared, whichever tier it is in.
+    /// </summary>
+    /// <remarks>
+    /// A snapshot: the caller may define and undefine symbols while enumerating it.
+    /// </remarks>
+    public IReadOnlyList<Symbol> All()
+        => [.. _globalSymbols.Values, .. _workspaceSymbols.Values, .. _instanceSymbols.Values, .. _localSymbols.Values];
+
+    /// <summary>
+    /// The scope tree of the symbols as they are now.
+    /// </summary>
+    public ScopeTree ScopeTree => _scopeTree ??= ScopeTreeBuilder.Build(All());
+
+    /// <summary>
+    /// Adds <paramref name="symbol"/> to the tier its scope belongs to.
+    /// </summary>
+    /// <returns><see langword="false"/> if that tier already holds the declaration: the first one wins.</returns>
+    public bool TryAdd(Symbol symbol, ScopeKind scope)
+    {
+        _scopeTree = null;
+        return TableFor(scope).TryAdd(SymbolIdentity.Of(symbol), symbol);
+    }
+
+    /// <summary>
+    /// Removes the declaration <paramref name="symbol"/> is from the tier its scope belongs to.
+    /// </summary>
+    /// <returns><see langword="false"/> if there was none.</returns>
+    public bool Remove(Symbol symbol, ScopeKind scope)
+    {
+        var removed = TableFor(scope).Remove(SymbolIdentity.Of(symbol));
+        if (removed)
+        {
+            _scopeTree = null;
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// Gets the declaration that <paramref name="symbol"/> is a newer definition of.
+    /// </summary>
+    public bool TryGet(Symbol symbol, ScopeKind scope, [NotNullWhen(true)][MaybeNullWhen(false)] out Symbol? existing)
+        => TableFor(scope).TryGetValue(SymbolIdentity.Of(symbol), out existing);
+
+    /// <summary>
+    /// Replaces a declaration with a newer definition of it, in place.
+    /// </summary>
+    public void Replace(Symbol symbol, ScopeKind scope)
+    {
+        TableFor(scope)[SymbolIdentity.Of(symbol)] = symbol;
+        _scopeTree = null;
+    }
+
+    // one bucket per RD-VBAL §2.3.1.2 heap tier; every scope maps onto exactly one.
+    private Dictionary<SymbolIdentity, Symbol> TableFor(ScopeKind scope) => scope switch
+    {
+        ScopeKind.Module => _workspaceSymbols,
+        ScopeKind.Instance => _instanceSymbols,
+        ScopeKind.Local or ScopeKind.External => _localSymbols,
+        _ => _globalSymbols,
+    };
+
+    /// <summary>
+    /// The name-lookup half of a session's resolver: walks a fresh <see cref="ScopeTreeSymbolResolver"/>
+    /// over the table's always-current scope tree. Cheap to rebuild per call —
+    /// <see cref="ScopeTree"/> itself is the memoized, expensive part.
+    /// </summary>
+    private sealed class LiveScopeResolver(SymbolTable owner) : ISymbolResolver
+    {
+        public SymbolResolutionResult ResolveValue(string name, ScopeKind scope, Uri handle)
+            => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveValue(name, scope, handle);
+
+        public SymbolResolutionResult ResolveType(string name, ScopeKind scope, Uri handle)
+            => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveType(name, scope, handle);
+
+        public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle)
+            => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveQualifier(name, scope, handle);
+
+        public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
+            => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveConditionalConstant(name, scope, handle);
+
+        public SymbolResolutionResult ResolveMember(Symbol qualifier, string name, Uri handle)
+            => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveMember(qualifier, name, handle);
+
+        public IBindingHandle GetValue(Symbol symbol)
+            => throw new NotSupportedException("The scope-tree resolver binds names only; it holds no run-time bindings.");
+
+        public bool TryRead(MemoryAddress address, [NotNullWhen(true)][MaybeNullWhen(false)] out IBindingHandle? value)
+        {
+            value = null;
+            return false;
+        }
+
+        public bool TryGetAddress(Symbol symbol, out MemoryAddress address)
+        {
+            address = default;
+            return false;
+        }
+
+        public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address)
+        {
+            address = default;
+            return false;
+        }
+    }
+}

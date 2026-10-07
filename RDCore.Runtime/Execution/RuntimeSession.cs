@@ -312,40 +312,13 @@ internal sealed class SessionObjects : ISessionObjects
 /// The session's call stack — an ordinary (non-<c>Static</c>) local's storage is instead allocated per
 /// activation, on the current <see cref="ICallStackFrame"/>, when a procedure call pushes one.
 /// </param>
-internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack callStack) : ISessionSymbols
+internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack callStack, SymbolTable table) : ISessionSymbols
 {
-    // one bucket per RD-VBAL §2.3.1.2 heap: global, workspace (module), instance, and the local
-    // frame. TryDefine keeps the first symbol of a colliding uri; the scope tree walks all four.
-    private readonly Dictionary<SymbolIdentity, Symbol> _globalSymbols = [];
-    private readonly Dictionary<SymbolIdentity, Symbol> _workspaceSymbols = [];
-    private readonly Dictionary<SymbolIdentity, Symbol> _instanceSymbols = [];
-    private readonly Dictionary<SymbolIdentity, Symbol> _localSymbols = [];
-
     /// <inheritdoc/>
     public IVariableDefaults? Defaults { get; set; }
 
     private VBTypedValue DefaultValueOf(Symbol variable)
         => Defaults?.DefaultValueOf(variable) ?? ((ITypedSymbol)variable).ResolvedType.DefaultValue;
-
-    /// <summary>
-    /// What makes two definitions the same declaration: the symbol's own semantic identity, plus its
-    /// concrete type.
-    /// </summary>
-    /// <remarks>
-    /// Not the symbol itself. A <c>Symbol</c> is a record, so record equality compares every member,
-    /// derived ones included — two definitions of the SAME declaration that differ only in what was
-    /// known about it (a procedure that gained its locals, a field whose declared type resolved on the
-    /// second pass) compare unequal, and the table would hold both. The name would then resolve to
-    /// neither of them, since resolution requires exactly one match.
-    /// <para>
-    /// The concrete type is part of it because a <c>Property</c>'s <c>Get</c>, <c>Let</c> and
-    /// <c>Set</c> accessors are three declarations that legitimately share one URI.
-    /// </para>
-    /// </remarks>
-    private readonly record struct SymbolIdentity(SemanticId Id, Type Declaration)
-    {
-        public static SymbolIdentity Of(Symbol symbol) => new(symbol.SemanticId, symbol.GetType());
-    }
 
     // live objects, keyed by the identity ISessionObjects.CreateObject minted for them - a separate
     // registry from the four buckets above, since those hold declared *symbols* (one per declared
@@ -355,27 +328,14 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     // a stable component for the session's lifetime — unlike the compile-time name lookup below, the
     // symbol->address map it owns must survive a scope-tree rebuild, not be discarded with it.
     private RuntimeSymbolResolver? _sessionBindingsField;
-    private RuntimeSymbolResolver SessionBindings => _sessionBindingsField ??= new RuntimeSymbolResolver(new LiveScopeResolver(this), storage);
+    private RuntimeSymbolResolver SessionBindings => _sessionBindingsField ??= new RuntimeSymbolResolver(table.Names, storage);
 
     private CallStackAwareSymbolResolver? _bindingsField;
     private CallStackAwareSymbolResolver Bindings => _bindingsField ??= new CallStackAwareSymbolResolver(callStack, SessionBindings, this);
 
-    private ScopeTree? _scopeTree;
-
-    // one bucket per RD-VBAL §2.3.1.2 heap tier; every scope maps onto exactly one.
-    private Dictionary<SymbolIdentity, Symbol> TableFor(ScopeKind scope) => scope switch
-    {
-        ScopeKind.Module => _workspaceSymbols,
-        ScopeKind.Instance => _instanceSymbols,
-        ScopeKind.Local or ScopeKind.External => _localSymbols,
-        _ => _globalSymbols,
-    };
-
     public bool TryDefine(Symbol symbol, ScopeKind scope)
     {
-        _scopeTree = null;  // resolution rebuilds the tree on next use
-
-        if (!TableFor(scope).TryAdd(SymbolIdentity.Of(symbol), symbol))
+        if (!table.TryAdd(symbol, scope))
         {
             return false;
         }
@@ -398,24 +358,20 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
     public bool TryUndefine(Symbol symbol, ScopeKind scope)
     {
-        var table = TableFor(scope);
-        if (!table.Remove(SymbolIdentity.Of(symbol)))
+        if (!table.Remove(symbol, scope))
         {
             return false;
         }
 
-        // resolution rebuilds the scope tree on next use; the storage the definition allocated (a
-        // module field, a Static local) is freed here, since nothing can reach it by name any more.
-        _scopeTree = null;
+        // the storage the definition allocated (a module field, a Static local) is freed here,
+        // since nothing can reach it by name any more.
         SessionBindings.TryDeallocate(symbol);
         return true;
     }
 
     public bool TryRedefine(Symbol symbol, ScopeKind scope)
     {
-        var table = TableFor(scope);
-        var identity = SymbolIdentity.Of(symbol);
-        if (!table.TryGetValue(identity, out var existing))
+        if (!table.TryGet(symbol, scope, out var existing))
         {
             return false;
         }
@@ -433,8 +389,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
         // storage is keyed by the symbol's semantic identity, which the newest definition shares, so replacing the
         // symbol itself leaves what it holds where it is.
-        table[identity] = symbol;
-        _scopeTree = null;
+        table.Replace(symbol, scope);
         return true;
     }
 
@@ -450,7 +405,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
         // a variable of a module, or a global, starts again from what it was defined as. Taken before any of them is touched: freeing and allocating
         // storage is what the lookup of the next one would otherwise be made over.
-        var variables = _globalSymbols.Values.Concat(_workspaceSymbols.Values)
+        var variables = table.ModuleLevelSymbols
             .Where(symbol => symbol is ITypedSymbol && symbol.Kind is SymbolKindExt.Field or SymbolKindExt.Variable && SessionBindings.TryGetAddress(symbol, out _))
             .ToList();
         foreach (var variable in variables)
@@ -460,7 +415,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         }
 
         // a Static local is allocated by its procedure's first call, and so starts from nothing: the call that comes next allocates it again.
-        var statics = _localSymbols.Values.OfType<VBLocalVariableSymbol>()
+        var statics = table.LocalSymbols.OfType<VBLocalVariableSymbol>()
             .Where(symbol => symbol.IsStatic && SessionBindings.TryGetAddress(symbol, out _))
             .ToList();
         foreach (var local in statics)
@@ -472,7 +427,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     public bool TryComposeClassModule(
         string moduleName, ImmutableArray<string> implementedInterfaceNames, ImmutableArray<SourceRange> implementedInterfaceRanges = default)
     {
-        var module = AllSymbols().OfType<VBClassModuleSymbol>()
+        var module = table.All().OfType<VBClassModuleSymbol>()
             .FirstOrDefault(candidate => string.Equals(candidate.Name, moduleName, StringComparison.OrdinalIgnoreCase));
         if (module is null)
         {
@@ -487,7 +442,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
         // every class that names an interface is resolved again, whichever it is that has just been composed: it may be the
         // interface another holds, as it was.
-        var classModules = AllSymbols().OfType<VBClassModuleSymbol>().ToList();
+        var classModules = table.All().OfType<VBClassModuleSymbol>().ToList();
         var resolved = ImplementedInterfaceResolution.Resolve(classModules);
         foreach (var classModule in classModules)
         {
@@ -501,7 +456,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     }
 
     public IReadOnlyList<VBTypeMemberSymbol> MembersOf(Uri moduleUri)
-        => [.. AllSymbols().OfType<VBTypeMemberSymbol>().Where(member => member.ParentUri.AbsoluteUri == moduleUri.AbsoluteUri)];
+        => [.. table.All().OfType<VBTypeMemberSymbol>().Where(member => member.ParentUri.AbsoluteUri == moduleUri.AbsoluteUri)];
 
     // A symbol's Uri is its parent's with the fragment extended by its own name: a symbol is under a module when it is of the same document and its
     // fragment continues the module's with a dot. VBA names are not case sensitive, and so neither is the comparison.
@@ -510,15 +465,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         var document = moduleUri.GetLeftPart(UriPartial.Path);
         var prefix = moduleUri.Fragment.TrimStart('#') + ".";
 
-        return [.. AllSymbols().Where(symbol =>
+        return [.. table.All().Where(symbol =>
             string.Equals(symbol.Uri.GetLeftPart(UriPartial.Path), document, StringComparison.Ordinal)
             && symbol.Uri.Fragment.TrimStart('#').StartsWith(prefix, StringComparison.OrdinalIgnoreCase))];
     }
 
-    public LexicalScope? ScopeOf(Uri uri) => EnsureScopeTree().TryGetScope(uri, out var scope) ? scope : null;
-
-    private IEnumerable<Symbol> AllSymbols()
-        => _globalSymbols.Values.Concat(_workspaceSymbols.Values).Concat(_instanceSymbols.Values).Concat(_localSymbols.Values).ToList();
+    public LexicalScope? ScopeOf(Uri uri) => table.ScopeTree.TryGetScope(uri, out var scope) ? scope : null;
 
     // a class module symbol holds no storage and is keyed by its identity, which the newer one shares.
     private void Replace(Symbol existing, Symbol replacement)
@@ -555,7 +507,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     public IObjectInstance CreateInstance(VBRuntimeObjectId objectId, VBClassModuleSymbol classModule)
     {
         var instance = new ObjectInstance(objectId, classModule, storage);
-        var fields = _instanceSymbols.Values.Where(field =>
+        var fields = table.InstanceSymbols.Where(field =>
             field.ParentUri.AbsoluteUri == classModule.Uri.AbsoluteUri
             && field.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
             && field is ITypedSymbol { ResolvedType: var _ });
@@ -585,53 +537,5 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
         instance.ReleaseAll();
         return true;
-    }
-
-    private ScopeTree EnsureScopeTree()
-        => _scopeTree ??= ScopeTreeBuilder.Build(
-            [.. _globalSymbols.Values, .. _workspaceSymbols.Values, .. _instanceSymbols.Values, .. _localSymbols.Values]);
-
-    /// <summary>
-    /// The name-lookup half of <see cref="Bindings"/>: walks a fresh <see cref="ScopeTreeSymbolResolver"/>
-    /// over <paramref name="owner"/>'s always-current scope tree. Cheap to rebuild per call —
-    /// <see cref="EnsureScopeTree"/> itself is the memoized, expensive part.
-    /// </summary>
-    private sealed class LiveScopeResolver(SessionSymbols owner) : ISymbolResolver
-    {
-        public SymbolResolutionResult ResolveValue(string name, ScopeKind scope, Uri handle)
-            => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveValue(name, scope, handle);
-
-        public SymbolResolutionResult ResolveType(string name, ScopeKind scope, Uri handle)
-            => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveType(name, scope, handle);
-
-        public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle)
-            => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveQualifier(name, scope, handle);
-
-        public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
-            => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveConditionalConstant(name, scope, handle);
-
-        public SymbolResolutionResult ResolveMember(Symbol qualifier, string name, Uri handle)
-            => new ScopeTreeSymbolResolver(owner.EnsureScopeTree()).ResolveMember(qualifier, name, handle);
-
-        public IBindingHandle GetValue(Symbol symbol)
-            => throw new NotSupportedException("The scope-tree resolver binds names only; it holds no run-time bindings.");
-
-        public bool TryRead(MemoryAddress address, [NotNullWhen(true)][MaybeNullWhen(false)] out IBindingHandle? value)
-        {
-            value = null;
-            return false;
-        }
-
-        public bool TryGetAddress(Symbol symbol, out MemoryAddress address)
-        {
-            address = default;
-            return false;
-        }
-
-        public bool TryAllocate(Symbol symbol, VBTypedValue value, out MemoryAddress address)
-        {
-            address = default;
-            return false;
-        }
     }
 }
