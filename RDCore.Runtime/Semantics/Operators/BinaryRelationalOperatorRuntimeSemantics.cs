@@ -37,6 +37,10 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
     /// </summary>
     protected abstract bool ComparisonOp<T>(T lhs, T rhs) where T : INumber<T>;
 
+    // MS-VBAL 5.6.9.5: a comparison yields a Boolean, or Null when its effective type is Null.
+    protected override VBType ResultTypeOf(VBType effectiveType)
+        => effectiveType is VBNullType ? effectiveType : VBBooleanType.TypeInfo;
+
     protected override OperatorAnalysisContext<ComparisonOperatorSemanticFlags> CreateAnalysisContext(
         SyntaxNode node,
         DetermineOperatorEffectiveTypeResult determineOperatorEffectiveTypeResult,

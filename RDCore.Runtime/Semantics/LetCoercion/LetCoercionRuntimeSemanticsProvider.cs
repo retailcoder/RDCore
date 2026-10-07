@@ -170,6 +170,24 @@ public class LetCoercionRuntimeSemanticsProvider(
         ExpressionNode expression,
         LetCoercionStackFrame frame)
     {
+        var result = Coerce(resolver, expression, frame);
+
+        // an indeterminate source coerces to an indeterminate value; what it raises for the value it assumes is not known to happen.
+        return frame.SourceValue.IsIndeterminate && result.ErrorInfo?.ErrorId != (int)VBRuntimeErrorId.InternalError
+            ? result with
+            {
+                IsApplicable = true,
+                Result = (result.IsSuccess ? result.Result! : frame.DestinationTypeDesc.Target.DefaultValue).AsIndeterminate(),
+                ErrorInfo = null,
+            }
+            : result;
+    }
+
+    private LetCoercionResult Coerce(
+        ISymbolResolver resolver,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame)
+    {
         // a Variant source's own TypeInfo already mirrors its wrapped value's (so dispatch above still
         // picks the right destination strategy), but every strategy casts frame.SourceValue directly to
         // its own concrete value type - unwrap here, once, so that cast sees the real wrapped value
