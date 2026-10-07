@@ -311,8 +311,9 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
             }
             return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(lhsValue, rhsValue)));
         }
-        else if (frame.EffectiveType is VBDoubleType)
+        else if (frame.EffectiveType is VBDoubleType or VBDateType)
         {
+            // a Date effective type compares the operands as they were let-coerced: to Double.
             var lhsValue = ((VBDoubleValue)lhs).Value;
             var rhsValue = ((VBDoubleValue)rhs).Value;
             if (double.IsNaN(lhsValue) || double.IsNaN(rhsValue))
