@@ -50,7 +50,7 @@ public static class RuntimeSessionComposer
         var memory = new SessionMemory(new FreeListManager(), environment.Is64Bit ? PointerSize.x64 : PointerSize.x86);
         var callStack = new RuntimeCallStack();
         var storage = new SessionStorage(memory);
-        var symbols = new SessionSymbols(storage, callStack);
+        var symbols = new SessionSymbols(storage, callStack, new SymbolTable());
         var objects = new SessionObjects();
         var errors = new SessionErrorState(callStack);
         // the file system is already abstracted platform-wide, so a session composed with a fake one does real
