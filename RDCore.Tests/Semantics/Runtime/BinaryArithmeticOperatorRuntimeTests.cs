@@ -171,6 +171,25 @@ public sealed class BinaryArithmeticOperatorRuntimeTests : OperatorArithmeticRun
         => AssertResult<VBLongValue>(Evaluate(
             new BinaryModuloOperatorRuntimeSemantics(RealCoercionProvider(), Formatter()), new VBSingleValue(5), new VBBooleanValue(true)), 0);
 
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3 Arithmetic Operators")]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void Addition_OfAnErrorOperand_IsATypeMismatch(bool errorOnTheLeft)
+    {
+        var semantics = new BinaryAdditionOperatorRuntimeSemantics(RealCoercionProvider(), Formatter());
+        var result = errorOnTheLeft
+            ? Evaluate(semantics, new VBErrorValue(5), new VBLongValue(1))
+            : Evaluate(semantics, new VBLongValue(1), new VBErrorValue(5));
+
+        AssertError(result, VBRuntimeErrorId.TypeMismatch);
+    }
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3 Arithmetic Operators")]
+    public void Addition_OfTwoErrorOperands_IsATypeMismatch()
+        => AssertError(Evaluate(new BinaryAdditionOperatorRuntimeSemantics(RealCoercionProvider(), Formatter()), new VBErrorValue(5), new VBErrorValue(5)),
+            VBRuntimeErrorId.TypeMismatch);
 
     [TestMethod]
     [TestCategory("MS-VBAL 5.6.9.3.5 Binary '/' Operator")]

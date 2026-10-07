@@ -148,9 +148,7 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
             VBNullType when rhsType is INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType => VBNullType.TypeInfo,
             INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType when rhsType is VBNullType => VBNullType.TypeInfo,
 
-            VBErrorType when rhsType is INumericType or VBStringType or VBDateType or VBEmptyType or VBErrorType => VBErrorType.TypeInfo,
-            INumericType or VBStringType or VBDateType or VBEmptyType or VBErrorType when rhsType is VBErrorType => VBErrorType.TypeInfo,
-
+            // MS-VBAL 5.6.9.3: an Error operand is a type mismatch, whatever the other operand is.
             _ => (VBType?)default
         };
 

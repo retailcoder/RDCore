@@ -78,8 +78,14 @@ public sealed class OperatorAnalysisFlagsTests : LetCoercionRuntimeSemanticsTest
 
     [TestMethod]
     [DynamicData(nameof(ArithmeticOperators))]
-    public void AnErrorOperation_HasAnErrorEffectiveType(BinaryArithmeticOperatorRuntimeSemantics op)
-        => Assert.AreEqual(ArithmeticOperatorSemanticFlags.VBErrorEffectiveType, FlagsOf(op, new VBErrorValue(5), new VBLongValue(3)));
+    public void AnErrorOperand_IsATypeMismatch_WithNoEffectiveType(BinaryArithmeticOperatorRuntimeSemantics op)
+    {
+        // MS-VBAL 5.6.9.3: an Error operand raises runtime error 13, whatever the other operand is.
+        var context = OperatorAnalysisHarness.Analyze(op, ThrowawayExpression, new VBErrorValue(5), new VBLongValue(3));
+
+        Assert.AreEqual((ArithmeticOperatorSemanticFlags)0, context.Flags);
+        Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, context.Errors.Single().ErrorId);
+    }
 
     [TestMethod]
     public void ANumericOperandInAStringOperation_MakesANumericOperation()
