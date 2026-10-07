@@ -97,6 +97,13 @@ public sealed class LikeRelationalOperatorRuntimeTests : OperatorRelationalRunti
 
     [TestMethod]
     [TestCategory("MS-VBAL 5.6.9.6 'Like' Operator")]
+    public void Like_AVariantNumberAndAVariantString_MatchesTheirStrings()
+        // the Variant number-below-String rank of the comparison operators (MS-VBAL 5.6.9.5) is not Like's.
+        => AssertResult<VBBooleanValue>(Evaluate(new LikeRelationalOperatorRuntimeSemantics(LetCoercionAnalysisHarness.BuildProvider(), Formatter()),
+            new VBVariantValue(new VBLongValue(7)), new VBVariantValue(new VBStringValue("7"))), true);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.6 'Like' Operator")]
     public void Like_AnErrorOperand_IsATypeMismatch()
         // MS-VBAL 5.5.1.2.9: an Error is not let-coerced to a String.
         => AssertError(Evaluate(new LikeRelationalOperatorRuntimeSemantics(LetCoercionAnalysisHarness.BuildProvider(), Formatter()),
