@@ -202,9 +202,17 @@ public class LetCoercionRuntimeSemanticsProvider(
         // the destination at all - like the Variant unwrap above, destination-based dispatch alone
         // would only ever reach VBObjectLetCoercionRuntimeSemantics when the destination itself is an
         // object type, never for the (far more common) object-to-Long/String/etc. case.
-        var strategyFound = frame.SourceValue is VBObjectValue
-            ? TryGetStrategy(VBObjectType.TypeInfo, out var strategy)
-            : TryGetStrategy(frame.DestinationTypeDesc.Target, out strategy);
+        ILetCoercionRuntimeSemantics? strategy;
+        var strategyFound = frame.SourceValue switch
+        {
+            VBObjectValue => TryGetStrategy(VBObjectType.TypeInfo, out strategy),
+
+            // MS-VBAL §5.5.1.2.9-11: so do a Null, an Empty and an Error source, to any destination but a Variant that holds them.
+            VBNullValue or VBEmptyValue or VBErrorValue when frame.DestinationTypeDesc.Target is not VBVariantType
+                => TryGetStrategy(frame.SourceValue.TypeInfo, out strategy),
+
+            _ => TryGetStrategy(frame.DestinationTypeDesc.Target, out strategy),
+        };
 
         if (!strategyFound || strategy is null)
         {

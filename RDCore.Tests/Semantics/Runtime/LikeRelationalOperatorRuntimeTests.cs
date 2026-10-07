@@ -94,4 +94,11 @@ public sealed class LikeRelationalOperatorRuntimeTests : OperatorRelationalRunti
         => AssertResult<VBBooleanValue>(
             Evaluate(new LikeRelationalOperatorRuntimeSemantics(RealCoercionProvider(), Formatter()), new VBIntegerValue(5), new VBStringValue("5")),
             true);
+
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.6 'Like' Operator")]
+    public void Like_AnErrorOperand_IsATypeMismatch()
+        // MS-VBAL 5.5.1.2.9: an Error is not let-coerced to a String.
+        => AssertError(Evaluate(new LikeRelationalOperatorRuntimeSemantics(LetCoercionAnalysisHarness.BuildProvider(), Formatter()),
+            new VBStringValue("5"), new VBErrorValue(5)), VBRuntimeErrorId.TypeMismatch);
 }
