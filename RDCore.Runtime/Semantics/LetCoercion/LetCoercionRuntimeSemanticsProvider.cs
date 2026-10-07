@@ -10,6 +10,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Analysis;
 using RDCore.SDK.Semantics.Builders;
+using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Services.VerboseMessages;
 using System.Diagnostics;
@@ -58,9 +59,14 @@ public interface ILetCoercionRuntimeSemanticsProvider
 /// <remarks>
 /// 👉 Each instance only instantiates the let-coercion strategies it needs for its context.
 /// </remarks>
+/// <param name="semantics">The let-coercion strategies, keyed by the destination type each is specified for.</param>
+/// <param name="formatterService">Builds the verbose half of an error message.</param>
+/// <param name="observation">Told of every coercion this provider evaluates, as a <see cref="ConversionFact"/>; <see langword="null"/> when nothing is
+/// analyzing the code, which is how code runs.</param>
 public class LetCoercionRuntimeSemanticsProvider(
     IEnumerable<ILetCoercionRuntimeSemantics> semantics,
-    IVerboseMessageBuilder formatterService)
+    IVerboseMessageBuilder formatterService,
+    AnalysisObservation? observation = null)
     : ILetCoercionRuntimeSemanticsProvider
 {
     private readonly IVerboseMessageBuilder _formatterService = formatterService;
@@ -110,6 +116,16 @@ public class LetCoercionRuntimeSemanticsProvider(
         ILetCoercionSemanticContextBuilder builder,
         ExpressionNode expression,
         LetCoercionStackFrame frame)
+        => Analyze(resolver, builder, expression, frame, evaluated: null);
+
+    // the result of the coercion is the evaluation's own when it has been evaluated already, which is what a coercion that is
+    // observed has: describing it must not evaluate it twice.
+    private LetCoercionAnalysisContext Analyze(
+        ISymbolResolver resolver,
+        ILetCoercionSemanticContextBuilder builder,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame,
+        LetCoercionResult? evaluated)
     {
         var coercionResult = LetCoercionResult.NotApplicable(frame);
         var context = new LetCoercionAnalysisContext(expression.Identity, coercionResult, 0);
@@ -119,7 +135,7 @@ public class LetCoercionRuntimeSemanticsProvider(
         if (TryGetStrategy(frame.DestinationTypeDesc.Target, out var strategy))
         {
             // 1. evaluate the coercion the way it is evaluated when the code runs:
-            coercionResult = EvaluateLetCoercionSemantics(resolver, expression, frame);
+            coercionResult = evaluated ?? EvaluateUnobserved(resolver, expression, frame);
 
             // 2. add any error to the semantic context so they become unmistakable error diagnostics in analyzers:
             builder.AddOnError(coercionResult.ErrorInfo?.AsErrorInfo);
@@ -166,6 +182,57 @@ public class LetCoercionRuntimeSemanticsProvider(
     };
 
     public LetCoercionResult EvaluateLetCoercionSemantics(
+        ISymbolResolver resolver,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame)
+    {
+        var result = EvaluateUnobserved(resolver, expression, frame);
+        if (observation is { IsSuspended: false })
+        {
+            Observe(observation, resolver, expression, frame, result);
+        }
+
+        return result;
+    }
+
+    // States the coercion that has just been evaluated as a fact: the types and the site are the code's, the flags are the
+    // analysis of the coercion, and the error is the evaluation's own.
+    private void Observe(
+        AnalysisObservation target,
+        ISymbolResolver resolver,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame,
+        LetCoercionResult result)
+    {
+        var builder = new LetCoercionSemanticContextFlagsBuilder();
+
+        // the coercions a strategy evaluates to describe this one are not the code's.
+        using (target.Suspend())
+        {
+            Analyze(resolver, builder, expression, frame, result);
+        }
+
+        // every conversion the runtime evaluates is one the code did not spell out: the semantics of an operation say
+        // so (an operand of an operator), and a statement that coerces a value does not say otherwise.
+        var flags = builder.Build().Flags;
+        if ((flags & (ConversionSemanticFlags.Implicit | ConversionSemanticFlags.Explicit)) == 0)
+        {
+            flags |= ConversionSemanticFlags.Implicit;
+        }
+
+        target.OnConversion(new ConversionFact(
+            expression.Identity,
+            expression.Location,
+            frame.Site,
+            frame.OperandIndex,
+            frame.SourceValue.TypeInfo,
+            frame.DestinationTypeDesc.Target,
+            flags,
+            IsValueKnown: !frame.SourceValue.IsIndeterminate,
+            StatedErrors.Of(result.ErrorInfo)));
+    }
+
+    private LetCoercionResult EvaluateUnobserved(
         ISymbolResolver resolver,
         ExpressionNode expression,
         LetCoercionStackFrame frame)

@@ -83,7 +83,8 @@ public sealed record class UnaryLetCoerceOperatorRuntimeSemantics(
             new(NodeId: expression.Identity,
                 OperandIndex: InputIndex.UnaryOperand,
                 SourceValue: frame[InputIndex.UnaryOperand],
-                DestinationTypeDesc: new VBTypeDescValue(frame.EffectiveType)));
+                DestinationTypeDesc: new VBTypeDescValue(frame.EffectiveType),
+                Site: frame.Site));
 
         return coercionResult.IsSuccess
             ? RuntimeSemanticsEvaluationResult.Success(coercionResult.Result!)
