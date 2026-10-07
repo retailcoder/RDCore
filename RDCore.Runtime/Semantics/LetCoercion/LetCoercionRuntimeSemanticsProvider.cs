@@ -118,8 +118,8 @@ public class LetCoercionRuntimeSemanticsProvider(
 
         if (TryGetStrategy(frame.DestinationTypeDesc.Target, out var strategy))
         {
-            // 1. evaluate the strategy that should be applicable for the destination declared type:
-            coercionResult = strategy.EvaluateLetCoercion(resolver, expression, frame);
+            // 1. evaluate the coercion the way it is evaluated when the code runs:
+            coercionResult = EvaluateLetCoercionSemantics(resolver, expression, frame);
 
             // 2. add any error to the semantic context so they become unmistakable error diagnostics in analyzers:
             builder.AddOnError(coercionResult.ErrorInfo?.AsErrorInfo);
