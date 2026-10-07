@@ -10,6 +10,7 @@ using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Analysis;
 using RDCore.SDK.Semantics.Builders;
 using RDCore.SDK.Semantics.Context;
@@ -51,7 +52,11 @@ public abstract record class UnaryLogicalOperatorRuntimeSemantics(
     protected sealed override DetermineOperatorEffectiveTypeResult DetermineOperatorEffectiveType(
         ISymbolResolver resolver, 
         ExpressionNode expression, 
-        OperatorEvaluationFrame frame) => DetermineOperatorEffectiveTypeResult.NotApplicable(); // lets the base semantics handle this.
+        OperatorEvaluationFrame frame)
+        // MS-VBAL 5.6.9.8.1 negates the bits of an integral value: a non-integral operand is a Long, as the binary logical operators take it.
+        => frame[InputIndex.UnaryOperand].TypeInfo is IFloatingPointNumericType or IFixedPointNumericType or VBStringType or VBDateType
+            ? DetermineOperatorEffectiveTypeResult.Success(VBLongType.TypeInfo)
+            : DetermineOperatorEffectiveTypeResult.NotApplicable(); // lets the base semantics handle this.
 
     /// <summary>
     /// Evaluates the runtime semantics of a unary logical operator and returns a value of the effective numeric data type.

@@ -118,8 +118,8 @@ public class LetCoercionRuntimeSemanticsProvider(
 
         if (TryGetStrategy(frame.DestinationTypeDesc.Target, out var strategy))
         {
-            // 1. evaluate the strategy that should be applicable for the destination declared type:
-            coercionResult = strategy.EvaluateLetCoercion(resolver, expression, frame);
+            // 1. evaluate the coercion the way it is evaluated when the code runs:
+            coercionResult = EvaluateLetCoercionSemantics(resolver, expression, frame);
 
             // 2. add any error to the semantic context so they become unmistakable error diagnostics in analyzers:
             builder.AddOnError(coercionResult.ErrorInfo?.AsErrorInfo);
@@ -170,6 +170,24 @@ public class LetCoercionRuntimeSemanticsProvider(
         ExpressionNode expression,
         LetCoercionStackFrame frame)
     {
+        var result = Coerce(resolver, expression, frame);
+
+        // an indeterminate source coerces to an indeterminate value; what it raises for the value it assumes is not known to happen.
+        return frame.SourceValue.IsIndeterminate && result.ErrorInfo?.ErrorId != (int)VBRuntimeErrorId.InternalError
+            ? result with
+            {
+                IsApplicable = true,
+                Result = (result.IsSuccess ? result.Result! : frame.DestinationTypeDesc.Target.DefaultValue).AsIndeterminate(),
+                ErrorInfo = null,
+            }
+            : result;
+    }
+
+    private LetCoercionResult Coerce(
+        ISymbolResolver resolver,
+        ExpressionNode expression,
+        LetCoercionStackFrame frame)
+    {
         // a Variant source's own TypeInfo already mirrors its wrapped value's (so dispatch above still
         // picks the right destination strategy), but every strategy casts frame.SourceValue directly to
         // its own concrete value type - unwrap here, once, so that cast sees the real wrapped value
@@ -184,9 +202,17 @@ public class LetCoercionRuntimeSemanticsProvider(
         // the destination at all - like the Variant unwrap above, destination-based dispatch alone
         // would only ever reach VBObjectLetCoercionRuntimeSemantics when the destination itself is an
         // object type, never for the (far more common) object-to-Long/String/etc. case.
-        var strategyFound = frame.SourceValue is VBObjectValue
-            ? TryGetStrategy(VBObjectType.TypeInfo, out var strategy)
-            : TryGetStrategy(frame.DestinationTypeDesc.Target, out strategy);
+        ILetCoercionRuntimeSemantics? strategy;
+        var strategyFound = frame.SourceValue switch
+        {
+            VBObjectValue => TryGetStrategy(VBObjectType.TypeInfo, out strategy),
+
+            // MS-VBAL §5.5.1.2.9-11: so do a Null, an Empty and an Error source, to any destination but a Variant that holds them.
+            VBNullValue or VBEmptyValue or VBErrorValue when frame.DestinationTypeDesc.Target is not VBVariantType
+                => TryGetStrategy(frame.SourceValue.TypeInfo, out strategy),
+
+            _ => TryGetStrategy(frame.DestinationTypeDesc.Target, out strategy),
+        };
 
         if (!strategyFound || strategy is null)
         {

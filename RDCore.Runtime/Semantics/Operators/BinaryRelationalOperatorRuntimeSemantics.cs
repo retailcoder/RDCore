@@ -37,6 +37,15 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
     /// </summary>
     protected abstract bool ComparisonOp<T>(T lhs, T rhs) where T : INumber<T>;
 
+    // MS-VBAL 5.6.9.5: a comparison yields a Boolean, or Null when its effective type is Null.
+    protected override VBType ResultTypeOf(VBType effectiveType)
+        => effectiveType is VBNullType ? effectiveType : VBBooleanType.TypeInfo;
+
+    /// <summary>
+    /// Whether a Variant holding a number compares below a Variant holding a <c>String</c>, whatever their values (<strong>MS-VBAL 5.6.9.5</strong>).
+    /// </summary>
+    protected virtual bool RanksVariantNumberBelowString => true;
+
     protected override OperatorAnalysisContext<ComparisonOperatorSemanticFlags> CreateAnalysisContext(
         SyntaxNode node,
         DetermineOperatorEffectiveTypeResult determineOperatorEffectiveTypeResult,
@@ -70,7 +79,8 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
         // wrapped value's (see VBVariantValue's own remarks), never VBVariantType itself - read the
         // subtype off the actual wrapped value, not off TypeInfo.
         var variantSubTypes = operands.OfType<VBVariantValue>().Select(variant => variant.TypedValue.TypeInfo).ToArray();
-        if (operands.Length == operands.OfType<VBVariantValue>().Count()
+        if (RanksVariantNumberBelowString
+            && operands.Length == operands.OfType<VBVariantValue>().Count()
             && variantSubTypes.Any(subType => subType is VBStringType)
             && variantSubTypes.Any(subType => subType is VBNumericType))
         {
@@ -107,10 +117,11 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
     // and ValidateOperand check this, short-circuiting to a synthetic Integer rank (0 = numeric side,
     // 1 = String side) that the existing VBIntegerType evaluation branch below then compares for real,
     // via the concrete operator's own ComparisonOp - no new evaluation code needed.
-    private static bool IsVariantStringNumericException(OperatorEvaluationFrame frame, out bool leftIsNumeric)
+    private bool IsVariantStringNumericException(OperatorEvaluationFrame frame, out bool leftIsNumeric)
     {
         leftIsNumeric = false;
-        if (frame[InputIndex.BinaryLeftOperand] is not VBVariantValue left || frame[InputIndex.BinaryRightOperand] is not VBVariantValue right)
+        if (!RanksVariantNumberBelowString
+            || frame[InputIndex.BinaryLeftOperand] is not VBVariantValue left || frame[InputIndex.BinaryRightOperand] is not VBVariantValue right)
         {
             return false;
         }
@@ -311,8 +322,9 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
             }
             return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(ComparisonOp(lhsValue, rhsValue)));
         }
-        else if (frame.EffectiveType is VBDoubleType)
+        else if (frame.EffectiveType is VBDoubleType or VBDateType)
         {
+            // a Date effective type compares the operands as they were let-coerced: to Double.
             var lhsValue = ((VBDoubleValue)lhs).Value;
             var rhsValue = ((VBDoubleValue)rhs).Value;
             if (double.IsNaN(lhsValue) || double.IsNaN(rhsValue))

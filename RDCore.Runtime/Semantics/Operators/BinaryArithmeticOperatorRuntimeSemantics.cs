@@ -148,8 +148,8 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
             VBNullType when rhsType is INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType => VBNullType.TypeInfo,
             INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType when rhsType is VBNullType => VBNullType.TypeInfo,
 
-            VBErrorType when rhsType is INumericType or VBStringType or VBDateType or VBEmptyType or VBErrorType => VBErrorType.TypeInfo,
-            INumericType or VBStringType or VBDateType or VBEmptyType or VBErrorType when rhsType is VBErrorType => VBErrorType.TypeInfo,
+            // the operation of two Error values is evaluated in Error, which its operand validation refuses (ValidateOperand); one Error is a type mismatch.
+            VBErrorType when rhsType is VBErrorType => VBErrorType.TypeInfo,
 
             _ => (VBType?)default
         };
@@ -160,6 +160,13 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
             : DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
                 Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", [frame[InputIndex.BinaryLeftOperand].TypeInfo.Name, rhsType.Name]))));
     }
+
+    // MS-VBAL 5.6.9.3: "If the value type of any operand is an array, UDT or Error, runtime error 13 (Type mismatch) is raised."
+    protected override LetCoercionResult ValidateOperand(ISymbolResolver resolver, ExpressionNode expression, OperatorEvaluationFrame frame, InputIndex index)
+        => frame[index] is VBErrorValue
+            ? LetCoercionResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
+                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", frame.Operands.Select(operand => operand.TypeInfo.Name)))))
+            : base.ValidateOperand(resolver, expression, frame, index);
 
     /// <summary>
     /// Evaluates the <see cref="VBNumericType"/> runtime semantics of a <em>binary arithmetic operator</em> 
