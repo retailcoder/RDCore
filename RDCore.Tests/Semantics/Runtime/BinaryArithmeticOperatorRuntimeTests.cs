@@ -129,6 +129,21 @@ public sealed class BinaryArithmeticOperatorRuntimeTests : OperatorArithmeticRun
         => AssertIsNull(Evaluate(Mul(), VBNullValue.Null, VBNullValue.Null));
 
     [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.3.4 Binary '*' Operator")]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void Multiplication_DateAndEmpty_IsADouble(bool dateOnTheLeft)
+    {
+        // MS-VBAL 5.6.9.3.4: a Date by Empty has a Double effective type, whichever side the Date is on.
+        var semantics = new BinaryMultiplicationOperatorRuntimeSemantics(RealCoercionProvider(), Formatter());
+        var result = dateOnTheLeft
+            ? Evaluate(semantics, new VBDateValue(2), VBEmptyValue.Empty)
+            : Evaluate(semantics, VBEmptyValue.Empty, new VBDateValue(2));
+
+        AssertResult<VBDoubleValue>(result, 0d);
+    }
+
+    [TestMethod]
     [TestCategory("MS-VBAL 5.6.9.3.5 Binary '/' Operator")]
     public void Division_Double_RealQuotient()
         => AssertResult<VBDoubleValue>(
