@@ -34,6 +34,13 @@ public abstract record class VBArrayType(VBType ItemType) :
     /// array object itself, not in anything a handle could reconstruct piecemeal, so this unboxes the
     /// original instance rather than building a new one.
     /// </summary>
+    /// <remarks>
+    /// An array read from a binding that is not known (<see cref="BindingKnowledge.ForReading"/>) is not known either, and neither is anything read
+    /// from it: the element cells are the stored array's own, shared, but what an element of it is can no longer be relied on.
+    /// </remarks>
     public override VBTypedValue CreateValue(IBindingHandle handle)
-        => ((VBRuntimeValue<VBRuntimeArrayValue>)handle.Value).StoredValue.Array;
+    {
+        var array = ((VBRuntimeValue<VBRuntimeArrayValue>)handle.Value).StoredValue.Array;
+        return handle is IndeterminateBindingHandle ? array.AsIndeterminate() : array;
+    }
 }

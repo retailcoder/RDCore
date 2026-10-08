@@ -8,6 +8,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Builders;
 using RDCore.SDK.Semantics.Context;
@@ -66,7 +67,7 @@ public sealed record class FixedAssignmentRuntimeSemantics(
         }
 
         var current = ((SDK.Model.Symbols.Abstract.ITypedSymbol)symbol!).ResolvedType
-            .CreateValue(session.Symbols.Resolver.GetValue(symbol!));
+            .CreateValue(session.Symbols.Resolver.GetValue(symbol!).ForReading());
 
         var evaluated = Expressions.Evaluate(session, assignment.Value, context);
         if (!evaluated.IsSuccess)

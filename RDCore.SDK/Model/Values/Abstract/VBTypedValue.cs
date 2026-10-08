@@ -93,6 +93,15 @@ public abstract record class VBTypedValue(VBType TypeInfo)
         => IsIndeterminate ? this : this with { Handle = new IndeterminateBindingHandle(Handle) };
 
     /// <summary>
+    /// Returns a copy of this value that is known, when it is not known only because it was read as not known (<see cref="AsIndeterminate"/>).
+    /// </summary>
+    /// <remarks>
+    /// For the statements that give a variable a value that no longer depends on what it held: they are what makes it known again.
+    /// </remarks>
+    public VBTypedValue AsKnown()
+        => Handle is IndeterminateBindingHandle indeterminate ? this with { Handle = indeterminate.Assumed } : this;
+
+    /// <summary>
     /// The bound managed value, or <c>null</c> when the binding cannot yield one.
     /// </summary>
     /// <remarks>

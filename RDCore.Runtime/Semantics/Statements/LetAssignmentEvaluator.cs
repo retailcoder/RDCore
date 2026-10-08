@@ -139,12 +139,15 @@ public sealed class LetAssignmentEvaluator(
             return RuntimeExecutionOutcome.InternalError;
         }
 
-        if (expressions.EvaluateSubscripts(session, context, subscripts, out var indices) is { } failure)
+        if (expressions.EvaluateSubscripts(session, context, subscripts, out var indices, out var indicesKnown) is { } failure)
         {
             return failure.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(failure.ErrorInfo!);
         }
 
-        if (array.GetElementHandle(indices) is null)
+        // a subscript outside the bounds is error 9 - unless it, or the array, is not known: the error is not known to happen, and there is
+        // no element to assign.
+        var isElement = indicesKnown && array.GetElementHandle(indices) is not null;
+        if (indicesKnown && !isElement && !array.IsIndeterminate)
         {
             return RuntimeExecutionOutcome.Error(VBRuntimeErrorInfo.For(
                 VBRuntimeErrorId.SubscriptOutOfRange, arrayExpression.Location, string.Join(", ", indices)));
@@ -161,6 +164,17 @@ public sealed class LetAssignmentEvaluator(
             if (!setResult.IsSuccess)
             {
                 return RuntimeExecutionOutcome.Error(setResult.ErrorInfo!);
+            }
+
+            if (!isElement)
+            {
+                // which element is assigned is not known: each could now hold the object, or what it held.
+                if (!indicesKnown)
+                {
+                    array.ForgetElements();
+                }
+
+                return RuntimeExecutionOutcome.Next;
             }
 
             // what the element held is its object's identity as of now: the cell is about to be bound to something else.
@@ -180,6 +194,17 @@ public sealed class LetAssignmentEvaluator(
         if (!coerced.IsSuccess)
         {
             return RuntimeExecutionOutcome.Error(coerced.ErrorInfo!);
+        }
+
+        if (!isElement)
+        {
+            // which element is assigned is not known: each could now hold the value, or what it held - the same, if it held the value already.
+            if (!indicesKnown)
+            {
+                array.ForgetElements(coerced.Result!.IsIndeterminate ? null : coerced.Result.RuntimeValue);
+            }
+
+            return RuntimeExecutionOutcome.Next;
         }
 
         StoreElement(session, array, indices, coerced.Result!, coerced.Result!.RuntimeValue);

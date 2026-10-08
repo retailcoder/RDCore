@@ -98,7 +98,37 @@ public abstract record class VBArrayValue : VBTypedValue
         get
         {
             var index = LinearIndex(subscripts);
-            return index < 0 ? null : ItemType.CreateValue(_cells[index].ForReading());
+            return index < 0 ? null : ReadElement(_cells[index]);
+        }
+    }
+
+    // an element of an array that is not known is not known either, whatever its own cell says: the cells are shared by every view of the array,
+    // so what the array is read as decides.
+    private VBTypedValue ReadElement(IBindingHandle cell)
+    {
+        var element = ItemType.CreateValue(cell.ForReading());
+        return IsIndeterminate ? element.AsIndeterminate() : element;
+    }
+
+    /// <summary>
+    /// Makes the elements that an assignment to an element that could be any of them may have replaced not known.
+    /// </summary>
+    /// <param name="assigned">
+    /// The value the assignment stores, when it is known: an element that already holds it is the same after the assignment whichever element
+    /// was assigned, so it stays known. <see langword="null"/> when the value is not known, which leaves no element that is.
+    /// </param>
+    /// <remarks>
+    /// An assignment to <c>A(i)</c> with an unknown <c>i</c> replaces exactly one element, and which one is not known: afterwards each element holds
+    /// either what it held or the value assigned. That is a value the array does not know, unless the two are the same.
+    /// </remarks>
+    public void ForgetElements(IRuntimeValue? assigned = null)
+    {
+        foreach (var cell in _cells)
+        {
+            if (cell is IKnowledgeBinding { IsKnown: true } known && !(assigned is not null && Equals(known.Value.BoxedValue, assigned.BoxedValue)))
+            {
+                known.Forget();
+            }
         }
     }
 
@@ -113,7 +143,7 @@ public abstract record class VBArrayValue : VBTypedValue
     /// re-deriving per-dimension subscripts.
     /// </remarks>
     public VBTypedValue? ElementAt(int flatIndex)
-        => flatIndex < 0 || flatIndex >= _cells.Length ? null : ItemType.CreateValue(_cells[flatIndex].ForReading());
+        => flatIndex < 0 || flatIndex >= _cells.Length ? null : ReadElement(_cells[flatIndex]);
 
     /// <summary>
     /// Gets the binding of the element at the given subscripts, or <c>null</c> when any subscript is out of
