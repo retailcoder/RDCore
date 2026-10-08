@@ -165,7 +165,7 @@ public sealed class LetAssignmentEvaluator(
 
             // what the element held is its object's identity as of now: the cell is about to be bound to something else.
             var previous = array[indices] is VBObjectValue heldObject ? new VBObjectValue(heldObject.Value) : null;
-            var cell = StoreElement(session, array, indices, setResult.Result!.RuntimeValue);
+            var cell = StoreElement(session, array, indices, setResult.Result!, setResult.Result!.RuntimeValue);
             ObjectReferences.Rebind(session, cell, previous, setResult.Result as VBObjectValue);
             return RuntimeExecutionOutcome.Next;
         }
@@ -182,23 +182,23 @@ public sealed class LetAssignmentEvaluator(
             return RuntimeExecutionOutcome.Error(coerced.ErrorInfo!);
         }
 
-        StoreElement(session, array, indices, coerced.Result!.RuntimeValue);
+        StoreElement(session, array, indices, coerced.Result!, coerced.Result!.RuntimeValue);
         return RuntimeExecutionOutcome.Next;
     }
 
     // An element is written where it is: its cell is the storage, and the one an object reference is held by, which is what
     // lets the reference be released when the element is assigned again. Only a cell that cannot be written - the inert one
     // an element of a class, user-defined type or Object type starts with - is given a binding that can.
-    private static IBindingHandle StoreElement(IRuntimeSession session, VBArrayValue array, int[] indices, IRuntimeValue value)
+    private static IBindingHandle StoreElement(IRuntimeSession session, VBArrayValue array, int[] indices, VBTypedValue source, IRuntimeValue value)
     {
         var cell = array.GetElementHandle(indices)!;
         if (cell.BindingCapabilities.HasFlag(BindingCapabilities.SetValue))
         {
-            cell.SetValue(session.Symbols.Resolver, value);
+            cell.Store(session.Symbols.Resolver, value, !source.IsIndeterminate);
             return cell;
         }
 
-        array.TrySetElement(new ValueBindingHandle(value), indices);
+        array.TrySetElement(BindingKnowledge.NewCell(value, !source.IsIndeterminate), indices);
         return array.GetElementHandle(indices)!;
     }
 
@@ -308,7 +308,7 @@ public sealed class LetAssignmentEvaluator(
 
             // an array, a record and a Variant are held as the value that identifies them by where it is, which is what every allocation boxes them
             // in: the value's own runtime value is not one for them, and a whole array assigned to a variable of an object would have none.
-            handle.SetValue(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(coerced.Result!));
+            handle.Store(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(coerced.Result!), !coerced.Result!.IsIndeterminate);
             return RuntimeExecutionOutcome.Next;
         }
 
@@ -331,7 +331,7 @@ public sealed class LetAssignmentEvaluator(
             EventAttachments.Detach(session, owner.Value, field, previous);
         }
 
-        handle.SetValue(session.Symbols.Resolver, setResult.Result!.RuntimeValue);
+        handle.Store(session.Symbols.Resolver, setResult.Result!);
         ObjectReferences.Rebind(session, handle, previous, setResult.Result as VBObjectValue);
         if (withEvents)
         {

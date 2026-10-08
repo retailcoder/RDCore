@@ -8,15 +8,20 @@ namespace RDCore.SDK.Model.Values.Bindings;
 /// <summary>
 /// Represents a handle to an internally addressed, writable reference to a <see cref="VBTypedValue"/>.
 /// </summary>
-public record class ReferenceBindingHandle : IBindingHandle
+public record class ReferenceBindingHandle : IKnowledgeBinding
 {
     private VBRuntimeReference _value;
+    private bool _isKnown = true;
+
     public ReferenceBindingHandle(VBRuntimeReference value)
     {
         _value = value;
     }
 
     public IRuntimeValue Value => _value;
+
+    /// <inheritdoc/>
+    public bool IsKnown => _isKnown;
 
     public BindingCapabilities BindingCapabilities => BindingCapabilities.GetValue | BindingCapabilities.SetValue;
 
@@ -42,8 +47,21 @@ public record class ReferenceBindingHandle : IBindingHandle
         return visited.Add(next._value.Value) ? next.GetValue(resolver, visited) : _value;
     }
 
-    public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => _value = value is VBRuntimeReference reference
-        ? reference : throw new ArgumentException($"Expected {nameof(VBRuntimeReference)} value", nameof(value));
+    /// <remarks>
+    /// Stores a reference that is known: a write that may be of one that is not says so with <see cref="Store"/>.
+    /// </remarks>
+    public void SetValue(ISymbolResolver resolver, IRuntimeValue value) => Store(value, isKnown: true);
+
+    /// <inheritdoc/>
+    public void Store(IRuntimeValue value, bool isKnown)
+    {
+        _value = value is VBRuntimeReference reference
+            ? reference : throw new ArgumentException($"Expected {nameof(VBRuntimeReference)} value", nameof(value));
+        _isKnown = isKnown;
+    }
+
+    /// <inheritdoc/>
+    public void Forget() => _isKnown = false;
 
     public IRuntimeValue Invoke(ISymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 }
