@@ -925,16 +925,25 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        if (EvaluateSubscripts(session, context, indexExpression.Arguments, out var subscripts) is { } subscriptFailure)
+        if (EvaluateSubscripts(session, context, indexExpression.Arguments, out var subscripts, out var subscriptsKnown) is { } subscriptFailure)
         {
             return subscriptFailure;
+        }
+
+        // a subscript that is not known selects an element that could be any of them, so what is read is not known; the error 9 a subscript
+        // that is out of the bounds would raise is the same, and so is the one an array that is not known would: it is not known to happen.
+        if (!subscriptsKnown)
+        {
+            return RuntimeSemanticsEvaluationResult.Success(array.ItemType.CreateIndeterminateValue());
         }
 
         var element = array[subscripts];
         return element is not null
             ? RuntimeSemanticsEvaluationResult.Success(element)
-            : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
-                string.Join(", ", subscripts)));
+            : array.IsIndeterminate
+                ? RuntimeSemanticsEvaluationResult.Success(array.ItemType.CreateIndeterminateValue())
+                : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
+                    string.Join(", ", subscripts)));
     }
 
     // a Function or Property Get that declares no parameters, called with arguments: they are not its own, and index what it returns.
@@ -960,8 +969,18 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     /// <returns>The error or internal error that stopped it, or <see langword="null"/> when every subscript has a value.</returns>
     public RuntimeSemanticsEvaluationResult? EvaluateSubscripts(
         IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<ExpressionNode> arguments, out int[] subscripts)
+        => EvaluateSubscripts(session, context, arguments, out subscripts, out _);
+
+    /// <inheritdoc cref="EvaluateSubscripts(IRuntimeSession, RuntimeEvaluationContext, ImmutableArray{ExpressionNode}, out int[])"/>
+    /// <param name="isKnown">
+    /// Whether every subscript is known. When one is not, <paramref name="subscripts"/> holds the value its type assumes in its place, which
+    /// selects an element that is no more likely than any other, or none at all.
+    /// </param>
+    public RuntimeSemanticsEvaluationResult? EvaluateSubscripts(
+        IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<ExpressionNode> arguments, out int[] subscripts, out bool isKnown)
     {
         subscripts = [];
+        isKnown = true;
         var evaluated = new int[arguments.Length];
         for (var i = 0; i < arguments.Length; i++)
         {
@@ -976,6 +995,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 return RuntimeSemanticsEvaluationResult.InternalError();
             }
 
+            isKnown &= !argumentResult.Value.Result!.IsIndeterminate;
             evaluated[i] = subscript;
         }
 

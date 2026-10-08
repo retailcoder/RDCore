@@ -30,7 +30,8 @@ public record class VBUserDefinedType(Symbol Symbol, ImmutableArray<VBTypeMember
     /// </remarks>
     public override VBTypedValue CreateValue(Values.Bindings.IBindingHandle handle)
         => handle.Value is VBRuntimeValue<VBRuntimeUserDefinedTypeValue> boxed
-            ? boxed.StoredValue.UserDefinedType
+            // read from a binding that is not known, it is not known either, and neither is any field of it.
+            ? handle is Values.Bindings.IndeterminateBindingHandle ? boxed.StoredValue.UserDefinedType.AsIndeterminate() : boxed.StoredValue.UserDefinedType
             // a binding that is not one of this type's own values is one nothing has stored a UDT in yet: a
             // freshly allocated slot, whose value is a UDT with every field at its declared default.
             : new VBUserDefinedTypeValue(handle, this);
