@@ -340,11 +340,17 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
             return false;
         }
 
-        // instance fields need a live object to allocate into (a later, separate concern); an
-        // ordinary local lives on the call stack frame, allocated per activation, not here. A Const
-        // is a compile-time substitution, never a runtime address, regardless of scope. A Static
-        // local is the one ScopeKind.Local exception: it's allocated here, same as a module field, so
-        // it keeps its value between calls instead of being torn down when its frame pops.
+        AllocateStorageOf(symbol, scope);
+        return true;
+    }
+
+    // instance fields need a live object to allocate into (a later, separate concern); an
+    // ordinary local lives on the call stack frame, allocated per activation, not here. A Const
+    // is a compile-time substitution, never a runtime address, regardless of scope. A Static
+    // local is the one ScopeKind.Local exception: it's allocated here, same as a module field, so
+    // it keeps its value between calls instead of being torn down when its frame pops.
+    private void AllocateStorageOf(Symbol symbol, ScopeKind scope)
+    {
         var isStaticLocal = scope is ScopeKind.Local && symbol is VBLocalVariableSymbol { IsStatic: true };
         if ((scope is ScopeKind.Module or ScopeKind.Global || isStaticLocal)
             && symbol is ITypedSymbol
@@ -352,8 +358,26 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         {
             _ = SessionBindings.TryAllocate(symbol, DefaultValueOf(symbol), out _);
         }
+    }
 
-        return true;
+    /// <summary>
+    /// The declared symbols this session shares with the ones composed over the same table.
+    /// </summary>
+    internal SymbolTable Table => table;
+
+    /// <summary>
+    /// Allocates the storage of every declared symbol that lives as long as the program, which <see cref="TryDefine"/> does for the ones it is given:
+    /// for a session composed over a table that is already declared.
+    /// </summary>
+    /// <remarks>
+    /// Done once <see cref="Defaults"/> is in place, for it is what the storage starts as.
+    /// </remarks>
+    internal void AllocateDeclaredStorage()
+    {
+        foreach (var symbol in table.All())
+        {
+            AllocateStorageOf(symbol, symbol.ScopeKind);
+        }
     }
 
     public bool TryUndefine(Symbol symbol, ScopeKind scope)

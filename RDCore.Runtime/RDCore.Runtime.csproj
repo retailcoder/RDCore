@@ -15,6 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the file system of an analysis: the analyzed code's file statements act on one in memory, never on the real one. -->
+    <PackageReference Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="22.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RDCore.SDK\RDCore.SDK.csproj" />
   </ItemGroup>
 

@@ -84,6 +84,39 @@ public sealed class RuntimeExecutionPipeline
         IVerboseMessageBuilder messages,
         CancellationToken cancellation = default,
         IAnalysisObserver? observer = null)
+        => Build(session, bodies, messages, cancellation, observer, analysis: false);
+
+    /// <summary>
+    /// Composes the pipeline for <paramref name="session"/>, a session composed to be analyzed (<see cref="RuntimeSessionComposer.ComposeForAnalysis"/>).
+    /// </summary>
+    /// <param name="session">The session every part of the pipeline runs against.</param>
+    /// <param name="bodies">Every procedure's lowered body, keyed by its <see cref="Symbol.SemanticId"/>.</param>
+    /// <param name="messages">Builds the verbose half of a run-time error message.</param>
+    /// <param name="observer">Told of every conversion and operation the analysis evaluates.</param>
+    /// <param name="cancellation">Stops the interpreter between instructions.</param>
+    /// <remarks>
+    /// <para>
+    /// The code runs: assignments, objects, and the workspace's own procedures are evaluated for real, against state that belongs to the
+    /// session. What differs is where the program meets what is not its own: a variable that outlives an activation starts as a value that is
+    /// not known (<see cref="AnalysisDefaults"/>), and a call to the outside world is not made, and yields a value that is not known
+    /// (<see cref="OutsideWorldCallProvider"/>).
+    /// </para>
+    /// </remarks>
+    public static RuntimeExecutionPipeline CreateForAnalysis(
+        IRuntimeSession session,
+        IReadOnlyDictionary<SemanticId, InstructionList> bodies,
+        IVerboseMessageBuilder messages,
+        IAnalysisObserver observer,
+        CancellationToken cancellation = default)
+        => Build(session, bodies, messages, cancellation, observer, analysis: true);
+
+    private static RuntimeExecutionPipeline Build(
+        IRuntimeSession session,
+        IReadOnlyDictionary<SemanticId, InstructionList> bodies,
+        IVerboseMessageBuilder messages,
+        CancellationToken cancellation,
+        IAnalysisObserver? observer,
+        bool analysis)
     {
         // the parts of the pipeline that state facts share one observation, so that describing a fact is not itself observed.
         var observation = observer is null ? null : new AnalysisObservation(observer);
@@ -145,7 +178,11 @@ public sealed class RuntimeExecutionPipeline
         // composed here with the rest of the pipeline rather than being something a caller opts into.
         // every external call goes through the pipeline: the interceptors see it and may refuse it, then
         // whichever provider can reach it runs it.
-        var external = ExternalCallPipeline.For(session, [StdLibDispatcher.For(session)]);
+        // an analysis does not make a call the platform does not run itself, and no policy decides whether it may: the outside world answers
+        // with a value that is not known.
+        var external = analysis
+            ? new ExternalCallPipeline(session, [], [StdLibDispatcher.For(session), new OutsideWorldCallProvider()])
+            : ExternalCallPipeline.For(session, [StdLibDispatcher.For(session)]);
         var bindings = new RuntimeCallableBindingFactory(invoker, external);
         expressions.ProcedureInvoker = invoker;
         expressions.Bindings = bindings;
@@ -160,7 +197,17 @@ public sealed class RuntimeExecutionPipeline
         // an object's lifecycle events run its class's handlers, which is code only this pipeline can run.
         session.Lifecycle = new ClassLifecycle(session, bindings);
         // a fixed-size array is as big as its declaration says, which takes evaluating its bounds: this is what can.
-        session.Symbols.Defaults = new DeclaredVariableDefaults(session, new ArrayBoundEvaluator(expressions, letCoercion));
+        var defaults = new DeclaredVariableDefaults(session, new ArrayBoundEvaluator(expressions, letCoercion));
+        if (analysis)
+        {
+            // the session shares the declared symbols of another, and holds none of its storage yet: what that starts as is the analysis's to say.
+            session.Symbols.Defaults = new AnalysisDefaults(defaults);
+            ((SessionSymbols)session.Symbols).AllocateDeclaredStorage();
+        }
+        else
+        {
+            session.Symbols.Defaults = defaults;
+        }
 
         return new RuntimeExecutionPipeline(expressions, letCoercion, statements, executor, invoker);
     }
