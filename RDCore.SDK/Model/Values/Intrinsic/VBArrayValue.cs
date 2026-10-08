@@ -98,7 +98,7 @@ public abstract record class VBArrayValue : VBTypedValue
         get
         {
             var index = LinearIndex(subscripts);
-            return index < 0 ? null : ItemType.CreateValue(_cells[index]);
+            return index < 0 ? null : ItemType.CreateValue(_cells[index].ForReading());
         }
     }
 
@@ -113,7 +113,7 @@ public abstract record class VBArrayValue : VBTypedValue
     /// re-deriving per-dimension subscripts.
     /// </remarks>
     public VBTypedValue? ElementAt(int flatIndex)
-        => flatIndex < 0 || flatIndex >= _cells.Length ? null : ItemType.CreateValue(_cells[flatIndex]);
+        => flatIndex < 0 || flatIndex >= _cells.Length ? null : ItemType.CreateValue(_cells[flatIndex].ForReading());
 
     /// <summary>
     /// Gets the binding of the element at the given subscripts, or <c>null</c> when any subscript is out of

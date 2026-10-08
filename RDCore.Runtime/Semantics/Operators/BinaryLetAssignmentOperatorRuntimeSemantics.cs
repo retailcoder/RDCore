@@ -155,9 +155,9 @@ public sealed record class BinaryLetAssignmentOperatorRuntimeSemantics(
         // an array is identified by where it is, not by a value its own binding could hold: what a variable holds of one is the
         // array boxed, as it is wherever else an array is stored. A coerced array - a fixed-size array let-coerced to a resizable
         // one - has no binding of its own to read it from.
-        handle.SetValue(resolver, coercionResult.Result is VBArrayValue
+        handle.Store(resolver, coercionResult.Result is VBArrayValue
             ? SymbolAddressTable.BoxedValue(coercionResult.Result)
-            : coercionResult.Result!.RuntimeValue);
+            : coercionResult.Result!.RuntimeValue, !coercionResult.Result.IsIndeterminate);
         return RuntimeSemanticsEvaluationResult.Success(coercionResult.Result!);
     }
 }

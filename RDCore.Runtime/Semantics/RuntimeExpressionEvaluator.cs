@@ -160,7 +160,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
 
             // an element is a Variant holding what the argument came to; an object in it is referenced by the cell, as by any variable.
             var value = element.Result is VBVariantValue variant ? variant : new VBVariantValue(element.Result!);
-            array.TrySetElement(new ValueBindingHandle(value.RuntimeValue), lower + index);
+            array.TrySetElement(BindingKnowledge.NewCell(value), lower + index);
             if (UnwrappedOwner(value) is VBObjectValue { } held && !held.IsNothing())
             {
                 ObjectReferences.Rebind(session, array.GetElementHandle(lower + index)!, null, held);
@@ -260,7 +260,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         }
 
         var handle = session.Symbols.Resolver.GetValue(symbol);
-        var value = typed.ResolvedType.CreateValue(handle);
+        var value = typed.ResolvedType.CreateValue(handle.ForReading());
 
         // MS-VBAL §5.2.3.1.4 / §2.5.1: a variable declared As New - a class module's default instance among them - is
         // never Nothing when it is referred to: the reference creates the object it was waiting for, which is also
@@ -802,7 +802,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             .FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase));
 
         return member is { Kind: SymbolKindExt.Field or SymbolKindExt.Variable }
-            ? RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member)))
+            ? RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member).ForReading()))
             : RuntimeSemanticsEvaluationResult.InternalError();
     }
 
@@ -1311,7 +1311,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.Error(coercionResult.ErrorInfo!));
             }
 
-            array.TrySetElement(new ValueBindingHandle(coercionResult.Result!.RuntimeValue), i);
+            array.TrySetElement(BindingKnowledge.NewCell(coercionResult.Result!), i);
         }
 
         return new ParamArrayCollectResult(new VBRuntimeValue<VBRuntimeArrayValue>(new VBRuntimeArrayValue(array)), null);

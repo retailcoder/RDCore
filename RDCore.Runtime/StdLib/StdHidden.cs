@@ -36,7 +36,7 @@ public sealed class StdHidden(IRuntimeSession session) : IStdHiddenModule
         var array = new VBResizableArrayValue([(0, arglist.Length - 1)], VBVariantType.TypeInfo);
         for (var index = 0; index < arglist.Length; index++)
         {
-            array.TrySetElement(new ValueBindingHandle(arglist[index].RuntimeValue), index);
+            array.TrySetElement(BindingKnowledge.NewCell(arglist[index]), index);
         }
 
         return RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(array));
