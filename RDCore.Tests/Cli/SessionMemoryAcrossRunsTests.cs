@@ -31,13 +31,13 @@ public sealed class SessionMemoryAcrossRunsTests
         (10, "N = 30 'TODO INPUT"),
         (20, "FOR I = 1 TO N"),
         (30, "IF I MOD 15 = 0 THEN"),
-        (40, "Debug.Print \"FIZZBUZZ!\""),
+        (40, "PRINT \"FIZZBUZZ!\""),
         (50, "ELSEIF I MOD 5 = 0 THEN"),
-        (60, "Debug.Print \"BUZZ\""),
+        (60, "PRINT \"BUZZ\""),
         (70, "ELSEIF I MOD 3 = 0 THEN"),
-        (80, "Debug.Print \"FIZZ\""),
+        (80, "PRINT \"FIZZ\""),
         (90, "ELSE"),
-        (100, "Debug.Print I"),
+        (100, "PRINT I"),
         (110, "END IF"),
         (120, "NEXT"),
     ];
@@ -46,7 +46,7 @@ public sealed class SessionMemoryAcrossRunsTests
     [
         (10, "DIM A AS LONG"),
         (20, "A = 42 * 523"),
-        (30, "Debug.Print A"),
+        (30, "PRINT A"),
     ];
 
     private static string SourceOf((int Number, string Statement)[] lines)
@@ -66,7 +66,7 @@ public sealed class SessionMemoryAcrossRunsTests
         var project = new ProjectFile(Root, new RDCoreProject { Name = moduleName, Modules = [new RDCoreModule { RelativeUri = $"{moduleName}.bas" }] });
         var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [Path.Combine(Root, ProjectFile.FileName)] = new(JsonSerializer.Serialize(project)) });
         var sessionProvider = new EnvironmentSessionProvider(
-            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false), fs, NullLogger<EnvironmentSessionProvider>.Instance);
+            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false, SourceLanguage: SupportedLanguages.BASIC), fs, NullLogger<EnvironmentSessionProvider>.Instance);
         var workspaceRoot = new Uri(Root);
         sessionProvider.Compose(project.ProjectInfo, workspaceRoot);
         var moduleUri = new UriBuilder(workspaceRoot) { Fragment = moduleName }.Uri;
@@ -80,9 +80,9 @@ public sealed class SessionMemoryAcrossRunsTests
             Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
 
             var resolver = WorkspaceSymbolResolver.Compose(
-                workspaceRoot, [(moduleUri, ModuleType.StdModule, parse)], new IntrinsicSymbolResolver(), implicitScope: ImplicitDeclarationScope.Module);
+                workspaceRoot, [(moduleUri, ModuleType.StdModule, parse)], new IntrinsicSymbolResolver(), implicitScope: SupportedLanguages.BASIC.ImplicitDeclarationScope);
             var symbols = new SyntaxTreeSymbolProvider(
-                workspaceRoot, moduleUri, ModuleType.StdModule, parse, resolver, withImplicitDeclarations: true, ImplicitDeclarationScope.Module).ProvideSymbols();
+                workspaceRoot, moduleUri, ModuleType.StdModule, parse, resolver, withImplicitDeclarations: true, SupportedLanguages.BASIC.ImplicitDeclarationScope).ProvideSymbols();
 
             await new DefineSymbolsHandler(sessionProvider, Substitute.For<IVerboseMessageBuilder>(), NullLogger<DefineSymbolsHandler>.Instance)
                 .Handle(new DefineSymbolsParams
