@@ -573,7 +573,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             return;
         }
         var id = GetCurrentNodeId();
-        var eventName = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name());
+        var eventName = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name(), identifier.TypeHint());
         var arguments = context.eventArgumentList()?.eventArgument().Select((argument, index) => CaptureEventArgument(id.Add(0).Add(index), argument)) ?? [];
         var inputs = new ExpressionNode?[] { eventName }.Concat(arguments).Where(input => input is not null).Cast<SyntaxNode>().ToImmutableArray();
         CurrentBuilder.AddChild(new KeywordStatementNode(id, context.GetSourceLocation(_rootUri), Tokens.RaiseEvent, inputs));
@@ -1236,7 +1236,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         }
 
         var location = context.GetSourceLocation(_rootUri);
-        OnExpression(new SimpleNameExpressionNode(GetCurrentNodeId(), location, value));
+        OnExpression(new SimpleNameExpressionNode(GetCurrentNodeId(), location, value, identifier.TypeHint()));
     }
 
     // `lExpression` (MS-VBAL §5.6.10-16) is left-recursive, same as `expression` — every alternative
@@ -1272,7 +1272,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         }
         CurrentBuilder.PopLastChildren(1);
         var id = GetCurrentNodeId();
-        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name());
+        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name(), identifier.TypeHint());
         CurrentBuilder.AddChild(new MemberAccessExpressionNode(id, context.GetSourceLocation(_rootUri), owner, member));
     }
 
@@ -1289,7 +1289,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             return;
         }
         var id = GetCurrentNodeId();
-        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name());
+        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name(), identifier.TypeHint());
         CurrentBuilder.AddChild(new MemberAccessExpressionNode(id, context.GetSourceLocation(_rootUri), null, member));
     }
 
@@ -1306,7 +1306,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         }
         CurrentBuilder.PopLastChildren(1);
         var id = GetCurrentNodeId();
-        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name());
+        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name(), identifier.TypeHint());
         CurrentBuilder.AddChild(new DictionaryAccessExpressionNode(id, context.GetSourceLocation(_rootUri), owner, member));
     }
 
@@ -1323,7 +1323,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             return;
         }
         var id = GetCurrentNodeId();
-        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name());
+        var member = new SimpleNameExpressionNode(id.Add(0), identifier.GetSourceLocation(_rootUri), identifier.Name(), identifier.TypeHint());
         CurrentBuilder.AddChild(new DictionaryAccessExpressionNode(id, context.GetSourceLocation(_rootUri), null, member));
     }
 
