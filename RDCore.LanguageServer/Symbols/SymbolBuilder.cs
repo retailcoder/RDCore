@@ -164,7 +164,7 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
         var bounds = node.Children.OfType<ArrayBoundsNode>().FirstOrDefault();
         var type = VariableType(ArrayElementType(node.Name, asType, node.TypeHint, moduleUri), asType, bounds);
         var field = WithArrayBounds(AutoInstantiatedIfDeclaredAsNew(new VBModuleFieldVariableMemberSymbol(
-            workspaceRoot, moduleUri, node.Name, memberScope, type, range, range, node.AccessModifier), asType), bounds);
+            workspaceRoot, moduleUri, node.Name, memberScope, type, range, node.NameRange ?? range, node.AccessModifier), asType), bounds);
 
         // MS-VBAL §5.2.3.1.2: what makes the procedures named for this variable event handlers.
         return node.IsWithEvents ? field.With(SymbolProperties.WithEvents, true) : field;
@@ -185,7 +185,7 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
         var range = RangeOf(node);
         var type = DeclaredType(AsTypeOf(node), node.TypeHint, moduleUri);
         return new VBConstantMemberSymbol(
-            workspaceRoot, moduleUri, node.Name, memberScope, type, range, range, node.AccessModifier,
+            workspaceRoot, moduleUri, node.Name, memberScope, type, range, node.NameRange ?? range, node.AccessModifier,
             ConstantExpressionOf(node));
     }
 
@@ -678,7 +678,7 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
         var bounds = node.Children.OfType<ArrayBoundsNode>().FirstOrDefault();
         var type = VariableType(elementType, asType, bounds);
         return WithArrayBounds(AutoInstantiatedIfDeclaredAsNew(new VBLocalVariableSymbol(
-            workspaceRoot, procedureUri, node.Name, ScopeKind.Local, range, range,
+            workspaceRoot, procedureUri, node.Name, ScopeKind.Local, range, node.NameRange ?? range,
             IsStatic: node.IsStatic, ResolvedType: type), asType), bounds);
     }
 
@@ -686,7 +686,7 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
     {
         var range = RangeOf(node);
         var type = DeclaredType(AsTypeOf(node), node.TypeHint, procedureUri);
-        return new VBLocalConstantSymbol(workspaceRoot, procedureUri, node.Name, range, range, type, ConstantExpressionOf(node));
+        return new VBLocalConstantSymbol(workspaceRoot, procedureUri, node.Name, range, node.NameRange ?? range, type, ConstantExpressionOf(node));
     }
 
     /// <summary>
