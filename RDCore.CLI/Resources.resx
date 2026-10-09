@@ -382,4 +382,7 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Repl_NotStopped" xml:space="preserve">
     <value>PROGRAM NOT STOPPED</value>
   </data>
+  <data name="Repl_Frame_Summary" xml:space="preserve">
+    <value>Selects the procedure VARS is about: FRAME 1 is the one that called.</value>
+  </data>
 </root>

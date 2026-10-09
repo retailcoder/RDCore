@@ -401,6 +401,53 @@ public sealed class ReplDebuggingTests
         });
     }
 
+    // ---- FRAME ----
+
+    [TestMethod]
+    public async Task AFrame_SelectsTheActivationVarsIsAbout()
+    {
+        ExecuteReturns(SuspendedAt(2));
+        await RunAsync();
+        _platform.GetStackAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new HostDebugStackResult
+        {
+            Frames = [new HostStackFrame(0, "Helper", "Program", 2, 0), new HostStackFrame(1, "Main", "Program", 1, 0)],
+        }));
+        _platform.GetVariablesAsync(1, Arg.Any<HostVariableScope>(), Arg.Is(0), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new HostDebugVariablesResult()));
+
+        await CommandAsync(new FrameReplCommand(), "1");
+        await CommandAsync(new VarsReplCommand());
+
+        Assert.AreEqual(1, _context.Debugger.SelectedFrame);
+        _console.Received().WriteLine("#1 Main");
+        await _platform.Received().GetVariablesAsync(1, HostVariableScope.Module, 0, Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task AFrame_ThatIsNotOnTheStack_IsASyntaxError_AndTheSelectionStays()
+    {
+        ExecuteReturns(SuspendedAt(2));
+        await RunAsync();
+        _platform.GetStackAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(new HostDebugStackResult { Frames = [new HostStackFrame(0, "Main", "Program", 1, 0)] }));
+
+        await CommandAsync(new FrameReplCommand(), "3");
+
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Error, Resources.Repl_SyntaxError, "3");
+        Assert.AreEqual(0, _context.Debugger.SelectedFrame);
+    }
+
+    [TestMethod]
+    public async Task TheSelectedFrame_IsTheInnermostAgain_WhenTheProgramGoesOn()
+    {
+        ExecuteReturns(SuspendedAt(2));
+        await RunAsync();
+        _context.Debugger.SelectedFrame = 2;
+        ResumeReturns(SuspendedAt(3));
+
+        await CommandAsync(new ContReplCommand());
+
+        Assert.AreEqual(0, _context.Debugger.SelectedFrame);
+    }
+
     [TestMethod]
     public async Task AVars_ShowsThePartsOfAnArray_UnderIt()
     {

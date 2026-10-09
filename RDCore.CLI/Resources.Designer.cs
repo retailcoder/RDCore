@@ -485,6 +485,12 @@ namespace RDCore.CLI {
             }
         }
         
+        public static string Repl_Frame_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Frame_Summary", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Looks up a localized string similar to NOT A PROGRAM ERROR.
         /// </summary>
