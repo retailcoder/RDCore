@@ -124,15 +124,6 @@ namespace RDCore.LanguageServer.Debugging {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to {0} (in {1}).
-        /// </summary>
-        internal static string FrameInHandler {
-            get {
-                return ResourceManager.GetString("FrameInHandler", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Looks up a localized string similar to {0} (GoSub).
         /// </summary>
         internal static string FrameGoSub {
@@ -140,7 +131,16 @@ namespace RDCore.LanguageServer.Debugging {
                 return ResourceManager.GetString("FrameGoSub", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} (in {1}).
+        /// </summary>
+        internal static string FrameInHandler {
+            get {
+                return ResourceManager.GetString("FrameInHandler", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Looks up a localized string similar to Line {0}.
         /// </summary>
@@ -300,6 +300,33 @@ namespace RDCore.LanguageServer.Debugging {
         internal static string WorkspaceCouldNotBeLoaded {
             get {
                 return ResourceManager.GetString("WorkspaceCouldNotBeLoaded", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a statement is one line.
+        /// </summary>
+        internal static string StatementIsOneLine {
+            get {
+                return ResourceManager.GetString("StatementIsOneLine", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to this is not a statement.
+        /// </summary>
+        internal static string NotAStatement {
+            get {
+                return ResourceManager.GetString("NotAStatement", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to one statement at a time.
+        /// </summary>
+        internal static string OneStatementAtATime {
+            get {
+                return ResourceManager.GetString("OneStatementAtATime", resourceCulture);
             }
         }
     }

@@ -93,4 +93,13 @@
   <data name="CannotGoOnFromThere" xml:space="preserve">
     <value>le programme ne peut pas continuer à partir de là</value>
   </data>
+  <data name="StatementIsOneLine" xml:space="preserve">
+    <value>une instruction tient sur une ligne</value>
+  </data>
+  <data name="NotAStatement" xml:space="preserve">
+    <value>ceci n'est pas une instruction</value>
+  </data>
+  <data name="OneStatementAtATime" xml:space="preserve">
+    <value>une instruction à la fois</value>
+  </data>
 </root>

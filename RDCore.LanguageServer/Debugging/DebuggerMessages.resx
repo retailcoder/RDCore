@@ -93,4 +93,13 @@
   <data name="CannotGoOnFromThere" xml:space="preserve">
     <value>the program cannot go on from there</value>
   </data>
+  <data name="StatementIsOneLine" xml:space="preserve">
+    <value>a statement is one line</value>
+  </data>
+  <data name="NotAStatement" xml:space="preserve">
+    <value>this is not a statement</value>
+  </data>
+  <data name="OneStatementAtATime" xml:space="preserve">
+    <value>one statement at a time</value>
+  </data>
 </root>

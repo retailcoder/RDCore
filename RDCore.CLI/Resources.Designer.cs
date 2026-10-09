@@ -883,5 +883,23 @@ namespace RDCore.CLI {
                 return ResourceManager.GetString("Host_ValueUnavailable", resourceCulture);
             }
         }
+
+        public static string Host_TheStatementEndedTheProgram {
+            get {
+                return ResourceManager.GetString("Host_TheStatementEndedTheProgram", resourceCulture);
+            }
+        }
+
+        public static string Host_TheStatementWasStopped {
+            get {
+                return ResourceManager.GetString("Host_TheStatementWasStopped", resourceCulture);
+            }
+        }
+
+        public static string Host_RequestCarriedNoStatement {
+            get {
+                return ResourceManager.GetString("Host_RequestCarriedNoStatement", resourceCulture);
+            }
+        }
     }
 }

@@ -451,4 +451,13 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Host_ValueUnavailable" xml:space="preserve">
     <value>&lt;unavailable&gt;</value>
   </data>
+  <data name="Host_TheStatementEndedTheProgram" xml:space="preserve">
+    <value>the statement ended the program</value>
+  </data>
+  <data name="Host_TheStatementWasStopped" xml:space="preserve">
+    <value>the statement was stopped by a Stop</value>
+  </data>
+  <data name="Host_RequestCarriedNoStatement" xml:space="preserve">
+    <value>the request carried no statement</value>
+  </data>
 </root>

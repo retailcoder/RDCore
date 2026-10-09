@@ -449,4 +449,13 @@
   <data name="Host_ValueUnavailable" xml:space="preserve">
     <value>&lt;indisponible&gt;</value>
   </data>
+  <data name="Host_TheStatementEndedTheProgram" xml:space="preserve">
+    <value>l'instruction a mis fin au programme</value>
+  </data>
+  <data name="Host_TheStatementWasStopped" xml:space="preserve">
+    <value>l'instruction a été interrompue par un Stop</value>
+  </data>
+  <data name="Host_RequestCarriedNoStatement" xml:space="preserve">
+    <value>la requête ne portait aucune instruction</value>
+  </data>
 </root>
