@@ -36,6 +36,12 @@ public sealed record class ProcedureSemanticModel(SemanticId Procedure, Immutabl
     public bool IsFullyAnalyzed { get; init; }
 
     /// <summary>
+    /// On how many of its code paths a function or a property getter assigns its return value, or <see langword="null"/> when the procedure returns none or the pass
+    /// could not tell (<see cref="Flow.ReturnValueAnalysis"/>): which is not to say that it assigns it on every path.
+    /// </summary>
+    public Flow.ReturnValueFact? ReturnValue { get; init; }
+
+    /// <summary>
     /// Whether the static pass found nothing wrong with the procedure.
     /// </summary>
     public bool IsValid => CompileErrors.IsEmpty;
@@ -63,6 +69,12 @@ public sealed record class ModuleSemanticModel(
     /// does not when it cannot.
     /// </remarks>
     public bool? OptionExplicit { get; init; }
+
+    /// <summary>
+    /// The identifier of the language the module is loaded as (<see cref="Workspace.SupportedLanguage.Id"/>): what is idiomatic in a module depends on it, and the
+    /// host is what knows it. <see langword="null"/> when the host has not said.
+    /// </summary>
+    public string? Language { get; init; }
 
     /// <summary>
     /// How each declaration of the module is used by the module's own code (<see cref="Static.DeclarationUsage"/>): its variables, constants, parameters,

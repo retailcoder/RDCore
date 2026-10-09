@@ -12,6 +12,7 @@ using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Flow;
 using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Semantics.Static;
 using RDCore.SDK.Semantics.Static.Abstract;
@@ -96,7 +97,8 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
                 procedure.SemanticId, body, new StaticSemanticsOptions(deadRanges, session.Environment.Language, blocks), declaration.MemberKind,
                 scope is null ? null : new StaticEvaluationContext(session.Symbols.Resolver, scope));
 
-            procedureModels.Add(model);
+            // the code paths are those of the lowered body, which only the loader has next to what the static pass found out about it.
+            procedureModels.Add(model with { ReturnValue = ReturnValueAnalysis.Of(declaration, model, lowering.InstructionList) });
             procedures.Add(new(procedure.SemanticId, lowering.InstructionList));
         }
 
@@ -108,7 +110,9 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
         {
             // a language that has no such directive has no fact to state about it.
             OptionExplicit = session.Environment.Language is { HasOptionExplicit: false } ? null : module is VBModuleSymbol { Directives.Explicit: true },
-            Declarations = DeclarationUsage.Of(DeclarationUsage.DeclaredBy(members), procedureModels),
+            Declarations = DeclarationUsage.Of(
+                DeclarationUsage.DeclaredBy(members), procedureModels, module is VBClassModuleSymbol classModule ? MemberRoles.Of(classModule, session.Symbols.Resolver) : null),
+            Language = session.Environment.Language?.Id,
         };
 
         // kept whether or not the module loads: what is wrong with a module is what is asked after.

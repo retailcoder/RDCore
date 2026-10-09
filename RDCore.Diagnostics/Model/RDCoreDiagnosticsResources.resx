@@ -177,4 +177,82 @@
   <data name="ObsoleteCallStatement_Message" xml:space="preserve">
     <value>Le mot-cl&#233; Call est obsol&#232;te; l'appel est le m&#234;me sans lui.</value>
   </data>
+  <data name="ImplicitNonDefaultArrayBase_Message" xml:space="preserve">
+    <value>Option Base 1 fait commencer &#224; 1 plut&#244;t qu'&#224; 0 tout tableau d&#233;clar&#233; sans borne inf&#233;rieure, alors que les tableaux des autres modules et des biblioth&#232;ques gardent leurs propres bornes. Indiquez plut&#244;t les bornes de chaque tableau.</value>
+  </data>
+  <data name="ImplicitTypeDeclarationsEnabled_Message" xml:space="preserve">
+    <value>{0} donne un type &#224; tout nom qu'elle couvre et qui est d&#233;clar&#233; sans type; le type d'une variable n'est donc plus &#233;crit o&#249; elle est d&#233;clar&#233;e. D&#233;clarez plut&#244;t chacune avec une clause As.</value>
+  </data>
+  <data name="ImplicitByRefModifier_Message" xml:space="preserve">
+    <value>Le param&#232;tre '{0}' est pass&#233; implicitement ByRef: la proc&#233;dure peut modifier la variable de l'appelant. &#201;crivez ByRef si c'est voulu, et ByVal sinon.</value>
+  </data>
+  <data name="ImplicitPublicMember_Message" xml:space="preserve">
+    <value>'{0}' est implicitement Public. Indiquez son accessibilit&#233;.</value>
+  </data>
+  <data name="ImplicitVariantDeclaration_Message" xml:space="preserve">
+    <value>'{0}' est d&#233;clar&#233; implicitement comme Variant. Indiquez son type avec une clause As (As Variant, si c'est voulu).</value>
+  </data>
+  <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
+    <value>'{0}' retourne implicitement un Variant. Indiquez son type de retour avec une clause As (As Variant, si c'est voulu).</value>
+  </data>
+  <data name="IntegerDataTypeDeclaration_Message" xml:space="preserve">
+    <value>Integer est un type de 16 bits qui d&#233;borde &#224; 32 767. Utilisez un Long, sauf si une proc&#233;dure ou un format de fichier attend un Integer.</value>
+  </data>
+  <data name="ModuleScopeDimDeclaration_Message" xml:space="preserve">
+    <value>Dim au niveau du module d&#233;clare une variable Private. Utilisez Private pour le dire.</value>
+  </data>
+  <data name="MultilineParameterDeclaration_Message" xml:space="preserve">
+    <value>La d&#233;claration du param&#232;tre '{0}' est r&#233;partie sur plusieurs lignes par une continuation de ligne. &#201;crivez-la sur une seule ligne.</value>
+  </data>
+  <data name="MultipleDeclarations_Message" xml:space="preserve">
+    <value>Une seule instruction fait plusieurs d&#233;clarations, et chacune a besoin de son propre type: dans Dim a, b As Long, seule b est un Long. D&#233;clarez chacune sur sa propre ligne.</value>
+  </data>
+  <data name="NotAllPathsReturnValue_Message" xml:space="preserve">
+    <value>Au moins un chemin d'ex&#233;cution de '{0}' n'assigne pas sa valeur de retour: sur ce chemin, l'appelant re&#231;oit la valeur par d&#233;faut du type (0, une cha&#238;ne vide, Empty ou Nothing).</value>
+  </data>
+  <data name="NotAllPathsReturnValue_NeverAssigned_Message" xml:space="preserve">
+    <value>'{0}' n'assigne jamais sa valeur de retour: l'appelant re&#231;oit toujours la valeur par d&#233;faut du type (0, une cha&#238;ne vide, Empty ou Nothing).</value>
+  </data>
+  <data name="ObsoleteCommentSyntax_Message" xml:space="preserve">
+    <value>Le mot-cl&#233; Rem est obsol&#232;te: un commentaire commence par une apostrophe (').</value>
+  </data>
+  <data name="ObsoleteErrorSyntax_Message" xml:space="preserve">
+    <value>L'instruction Error est obsol&#232;te: Err.Raise soul&#232;ve la m&#234;me erreur.</value>
+  </data>
+  <data name="ObsoleteGlobalModifier_Message" xml:space="preserve">
+    <value>Global est obsol&#232;te: il fait la m&#234;me chose que Public.</value>
+  </data>
+  <data name="ObsoleteLetStatement_Message" xml:space="preserve">
+    <value>Le mot-cl&#233; Let est obsol&#232;te: l'affectation est la m&#234;me sans lui.</value>
+  </data>
+  <data name="ObsoleteTypeHint_Message" xml:space="preserve">
+    <value>'{0}' est &#233;crit avec un caract&#232;re de d&#233;claration de type, ce qui est obsol&#232;te: indiquez son type avec une clause As l&#224; o&#249; il est d&#233;clar&#233;.</value>
+  </data>
+  <data name="ObsoleteWhileWend_Message" xml:space="preserve">
+    <value>While...Wend est obsol&#232;te: Do While...Loop est la m&#234;me boucle, et celle que Exit Do peut quitter.</value>
+  </data>
+  <data name="ObsoleteOnLocalErrorStatement_Message" xml:space="preserve">
+    <value>On Local Error est obsol&#232;te: toute erreur est locale &#224; la proc&#233;dure, donc Local ne dit rien. Utilisez On Error.</value>
+  </data>
+  <data name="ImplementationsShouldBePrivate_Interface_Message" xml:space="preserve">
+    <value>'{0}' impl&#233;mente un membre d'une interface, et est Public: il expose ce membre sur l'interface par d&#233;faut de cette classe, o&#249; il n'a pas sa place. Rendez-le Private.</value>
+  </data>
+  <data name="ImplementationsShouldBePrivate_EventHandler_Message" xml:space="preserve">
+    <value>'{0}' g&#232;re un &#233;v&#233;nement, et est Public: on peut l'appeler de l'ext&#233;rieur, ce qu'un gestionnaire d'&#233;v&#233;nement ne devrait jamais permettre. Rendez-le Private.</value>
+  </data>
+  <data name="UseMeaningfulIdentifierNames_TooShort_Message" xml:space="preserve">
+    <value>'{0}' est trop court pour dire ce qu'il est: un nom devrait avoir au moins 3 caract&#232;res.</value>
+  </data>
+  <data name="UseMeaningfulIdentifierNames_EndsWithDigit_Message" xml:space="preserve">
+    <value>'{0}' se termine par un chiffre, ce qui dit qu'il est l'un de plusieurs et non ce qui le distingue des autres. Donnez-lui un nom qui dit ce qu'il est.</value>
+  </data>
+  <data name="UseMeaningfulIdentifierNames_NoVowel_Message" xml:space="preserve">
+    <value>'{0}' n'a aucune voyelle, et n'est probablement pas un mot. Donnez-lui un nom qui dit ce qu'il est.</value>
+  </data>
+  <data name="HungarianNotation_Message" xml:space="preserve">
+    <value>'{0}' commence par un pr&#233;fixe qui indique son type. Le type est d&#233;clar&#233;: le nom devrait dire ce qu'est la chose, pas de quoi elle est faite.</value>
+  </data>
+  <data name="MisleadingByRefParameter_Message" xml:space="preserve">
+    <value>ByRef n'a aucun effet sur '{0}', le param&#232;tre de valeur d'une propri&#233;t&#233; Let ou Set: il est toujours pass&#233; ByVal.</value>
+  </data>
 </root>

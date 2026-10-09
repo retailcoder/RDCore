@@ -17,7 +17,12 @@ namespace RDCore.SDK.Model.AST.Declarations;
 /// <c>true</c> when the procedure is declared with the <c>Static</c> keyword (<strong>MS-VBAL §5.3.1.2</strong>): every local variable of it then has module
 /// extent, as if each were declared <c>Static</c>. Only a <c>Sub</c>, a <c>Function</c> or a property can be.
 /// </param>
-public record class MemberDeclarationNode(SyntaxNodeId Identity, SourceLocation SourceLocation, ImmutableArray<SyntaxNode> Children, string Name, MemberKind MemberKind, AccessModifier AccessModifier = AccessModifier.Implicit, bool IsStatic = false)
+/// <param name="TypeHint">
+/// The <em>type hint</em> the name is written with, if any (<c>Function Name$()</c>): the declared type of what a function or a property getter returns, written
+/// in place of an <c>As</c> clause. Only a member that returns a value can have one.
+/// </param>
+/// <param name="NameRange">Where the name is written, with its type-declaration character; <see langword="null"/> when it is not known.</param>
+public record class MemberDeclarationNode(SyntaxNodeId Identity, SourceLocation SourceLocation, ImmutableArray<SyntaxNode> Children, string Name, MemberKind MemberKind, AccessModifier AccessModifier = AccessModifier.Implicit, bool IsStatic = false, string? TypeHint = null, SourceRange? NameRange = null)
     : SyntaxNode(Identity, SourceLocation, Children);
 /// <summary>
 /// 
@@ -31,5 +36,7 @@ public record class MemberDeclarationNode(SyntaxNodeId Identity, SourceLocation 
 /// <param name="MemberKind">Specifies the kind of member.</param>
 /// <param name="Alias">The declared alias of the external member, if provided.</param>
 /// <param name="AccessModifier">An access modifier, if one was supplied.</param>
-public record class ExternalMemberDeclarationNode(SyntaxNodeId Identity, SourceLocation SourceLocation, ImmutableArray<SyntaxNode> Children, string Name = "", string Library = "", bool IsPtrSafe = false, MemberKind MemberKind = MemberKind.ExternalProcedure, string? Alias = default, AccessModifier AccessModifier = AccessModifier.Implicit)
-    : MemberDeclarationNode(Identity, SourceLocation, Children, Name, MemberKind, AccessModifier);
+/// <param name="TypeHint">The <em>type hint</em> the name is written with, if any (<c>Declare Function Name$ Lib "lib"</c>).</param>
+/// <param name="NameRange">Where the name is written, with its type-declaration character; <see langword="null"/> when it is not known.</param>
+public record class ExternalMemberDeclarationNode(SyntaxNodeId Identity, SourceLocation SourceLocation, ImmutableArray<SyntaxNode> Children, string Name = "", string Library = "", bool IsPtrSafe = false, MemberKind MemberKind = MemberKind.ExternalProcedure, string? Alias = default, AccessModifier AccessModifier = AccessModifier.Implicit, string? TypeHint = null, SourceRange? NameRange = null)
+    : MemberDeclarationNode(Identity, SourceLocation, Children, Name, MemberKind, AccessModifier, TypeHint: TypeHint, NameRange: NameRange);

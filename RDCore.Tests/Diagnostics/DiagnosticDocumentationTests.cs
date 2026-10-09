@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Model.Errors;
 
 namespace RDCore.Tests.Diagnostics;
@@ -65,5 +66,53 @@ public sealed class DiagnosticDocumentationTests
             .ToArray();
 
         Assert.IsEmpty(missing, $"not in toc.yml: {string.Join(", ", missing)}");
+    }
+
+    // an analyzer issues these: the number is the code the page is named by, and the one editors of older builds link to.
+    private static readonly (RDCoreDiagnosticId Id, int Code)[] Published =
+    [
+        (RDCoreDiagnosticId.ImplicitDeclarationsEnabled, 101),
+        (RDCoreDiagnosticId.ImplicitNonDefaultArrayBase, 102),
+        (RDCoreDiagnosticId.ImplicitTypeDeclarationsEnabled, 103),
+        (RDCoreDiagnosticId.ImplicitByRefModifier, 104),
+        (RDCoreDiagnosticId.ImplicitPublicMember, 105),
+        (RDCoreDiagnosticId.ImplicitVariantDeclaration, 106),
+        (RDCoreDiagnosticId.ImplicitVariantReturnType, 107),
+        (RDCoreDiagnosticId.IntegerDataTypeDeclaration, 201),
+        (RDCoreDiagnosticId.ModuleScopeDimDeclaration, 202),
+        (RDCoreDiagnosticId.MultilineParameterDeclaration, 203),
+        (RDCoreDiagnosticId.MultipleDeclarations, 204),
+        (RDCoreDiagnosticId.MisleadingByRefParameter, 205),
+        (RDCoreDiagnosticId.NotAllPathsReturnValue, 206),
+        (RDCoreDiagnosticId.ObsoleteCallStatement, 302),
+        (RDCoreDiagnosticId.ObsoleteCommentSyntax, 303),
+        (RDCoreDiagnosticId.ObsoleteErrorSyntax, 304),
+        (RDCoreDiagnosticId.ObsoleteGlobalModifier, 305),
+        (RDCoreDiagnosticId.ObsoleteLetStatement, 306),
+        (RDCoreDiagnosticId.ObsoleteTypeHint, 307),
+        (RDCoreDiagnosticId.ObsoleteWhileWend, 308),
+        (RDCoreDiagnosticId.ObsoleteOnLocalErrorStatement, 309),
+        (RDCoreDiagnosticId.ImplementationsShouldBePrivate, 405),
+        (RDCoreDiagnosticId.UseMeaningfulIdentifierNames, 1001),
+        (RDCoreDiagnosticId.HungarianNotation, 1002),
+    ];
+
+    [TestMethod]
+    public void EveryPublishedRubberduckCoreDiagnostic_KeepsItsCode()
+    {
+        var renumbered = Published.Where(published => (int)published.Id != published.Code).Select(published => $"{published.Id} is {(int)published.Id}, published as {published.Code}").ToArray();
+
+        Assert.IsEmpty(renumbered, $"a published code is never renumbered: {string.Join("; ", renumbered)}");
+    }
+
+    [TestMethod]
+    public void EveryPublishedRubberduckCoreDiagnostic_HasAPage()
+    {
+        var missing = Published
+            .Select(published => $"rdc{published.Code:00000}.md")
+            .Where(page => !File.Exists(Path.Combine(Diagnostics(), page)))
+            .ToArray();
+
+        Assert.IsEmpty(missing, $"no page for: {string.Join(", ", missing)}");
     }
 }

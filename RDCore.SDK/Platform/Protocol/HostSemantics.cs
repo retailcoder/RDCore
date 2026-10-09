@@ -7,6 +7,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Semantics.Flow;
 using System.Collections.Immutable;
 
 namespace RDCore.SDK.Platform.Protocol;
@@ -96,8 +97,9 @@ public record class ExpressionFactDto(
 /// <param name="IsFullyAnalyzed">Whether the references the facts say there are in its body are all of them.</param>
 /// <param name="CompileErrors">What the static pass found wrong with the body.</param>
 /// <param name="Expressions">What it found out about each expression.</param>
+/// <param name="ReturnValue">On how many code paths a function or a property getter assigns its return value, when the pass could tell.</param>
 public record class ProcedureSemanticsDto(
-    Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions);
+    Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions, ReturnValueFact? ReturnValue = null);
 
 /// <summary>
 /// A <see cref="DeclarationFact"/>, as it travels.
@@ -109,8 +111,10 @@ public record class ProcedureSemanticsDto(
 /// <param name="IsImplicit">Whether it was never declared.</param>
 /// <param name="Location">Where it is declared.</param>
 /// <param name="References">Every reference to it, when they are known; <see langword="null"/> says they are not.</param>
+/// <param name="Role">What it is there for, when it implements an interface member or handles an event.</param>
 public record class DeclarationFactDto(
-    Uri Symbol, string Name, DeclarationKind Kind, AccessModifier Access, bool IsImplicit, SourceLocation Location, DeclarationReferences? References);
+    Uri Symbol, string Name, DeclarationKind Kind, AccessModifier Access, bool IsImplicit, SourceLocation Location, DeclarationReferences? References,
+    DeclarationRole Role = DeclarationRole.None);
 
 /// <summary>
 /// A <see cref="ModuleSemanticModel"/>, as it travels.
@@ -120,12 +124,14 @@ public record class DeclarationFactDto(
 /// <param name="DeclarationErrors">What is wrong with what the module declares.</param>
 /// <param name="Procedures">The model of each procedure of the module.</param>
 /// <param name="Declarations">What is known of how the module's declarations are used.</param>
+/// <param name="Language">The identifier of the language the module is loaded as, when the host says.</param>
 public record class ModuleSemanticsDto(
     Uri Module,
     bool? OptionExplicit,
     ImmutableArray<CompileErrorDto> DeclarationErrors,
     ImmutableArray<ProcedureSemanticsDto> Procedures,
-    ImmutableArray<DeclarationFactDto> Declarations)
+    ImmutableArray<DeclarationFactDto> Declarations,
+    string? Language = null)
 {
 
 
@@ -142,9 +148,12 @@ public record class ModuleSemanticsDto(
             procedure.IsFullyAnalyzed,
             [.. procedure.CompileErrors.Select(ErrorOf)],
             [.. procedure.Expressions.Values.Select(fact => new ExpressionFactDto(
-                fact.Node, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.Flags, fact.Error is null ? null : ErrorOf(fact.Error)))]))],
+                fact.Node, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.Flags, fact.Error is null ? null : ErrorOf(fact.Error)))],
+            procedure.ReturnValue))],
         [.. model.Declarations.Select(declaration => new DeclarationFactDto(
-            declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References))]);
+            declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References,
+            declaration.Role))],
+        model.Language);
 
     private static CompileErrorDto ErrorOf(VBCompileErrorInfo error) => new(error.VBCompileErrorId, error.Location, error.Verbose);
 }

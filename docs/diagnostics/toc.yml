@@ -244,5 +244,49 @@
   href: vbr00746.md
 - name: RDC00101 — Implicit declarations enabled
   href: rdc00101.md
+- name: RDC00102 — Implicit non-default array base
+  href: rdc00102.md
+- name: RDC00103 — Implicit type declarations enabled
+  href: rdc00103.md
+- name: RDC00104 — Implicit ByRef modifier
+  href: rdc00104.md
+- name: RDC00105 — Implicit Public member
+  href: rdc00105.md
+- name: RDC00106 — Implicit Variant declaration
+  href: rdc00106.md
+- name: RDC00107 — Implicit Variant return type
+  href: rdc00107.md
+- name: RDC00201 — Integer data type declaration
+  href: rdc00201.md
+- name: RDC00202 — Module-scope Dim declaration
+  href: rdc00202.md
+- name: RDC00203 — Multiline parameter declaration
+  href: rdc00203.md
+- name: RDC00204 — Multiple declarations
+  href: rdc00204.md
+- name: RDC00205 — Misleading ByRef parameter
+  href: rdc00205.md
+- name: RDC00206 — Not all code paths return a value
+  href: rdc00206.md
 - name: RDC00302 — Obsolete Call statement
   href: rdc00302.md
+- name: RDC00303 — Obsolete comment syntax
+  href: rdc00303.md
+- name: RDC00304 — Obsolete error syntax
+  href: rdc00304.md
+- name: RDC00305 — Obsolete Global modifier
+  href: rdc00305.md
+- name: RDC00306 — Obsolete Let statement
+  href: rdc00306.md
+- name: RDC00307 — Obsolete type hint
+  href: rdc00307.md
+- name: RDC00308 — Obsolete While…Wend
+  href: rdc00308.md
+- name: RDC00309 — Obsolete On Local Error statement
+  href: rdc00309.md
+- name: RDC00405 — Implementations should be private
+  href: rdc00405.md
+- name: RDC01001 — Use meaningful identifier names
+  href: rdc01001.md
+- name: RDC01002 — Hungarian notation
+  href: rdc01002.md

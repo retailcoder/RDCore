@@ -783,7 +783,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
                 CurrentBuilder.AddChild(BuildUnbuiltStatementTrivia(context));
                 return;
             }
-            CurrentBuilder.AddChild(new OnErrorGoToStatementNode(GetCurrentNodeId(), context.GetSourceLocation(_rootUri), label));
+            CurrentBuilder.AddChild(new OnErrorGoToStatementNode(GetCurrentNodeId(), context.GetSourceLocation(_rootUri), label, context.ON_LOCAL_ERROR() is not null));
             return;
         }
         if (context.RESUME() is null || context.NEXT() is not { Symbol.TokenIndex: >= 0 })
@@ -791,7 +791,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             CurrentBuilder.AddChild(BuildUnbuiltStatementTrivia(context));
             return;
         }
-        CurrentBuilder.AddChild(new OnErrorResumeStatementNode(GetCurrentNodeId(), context.GetSourceLocation(_rootUri)));
+        CurrentBuilder.AddChild(new OnErrorResumeStatementNode(GetCurrentNodeId(), context.GetSourceLocation(_rootUri), context.ON_LOCAL_ERROR() is not null));
     }
 
     // Bare `Resume`, `Resume <label>`, and `Resume Next` (MS-VBAL §5.4.4.2) are the same grammar
@@ -2084,7 +2084,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
                 // we cannot do this before knowing how many parameters there are,
                 // because it's only applicable to the RHS/value parameter (last).
                 CurrentBuilder.UpdateLastChild(
-                    node with { ParameterKind = ParameterKind.ImplicitByVal });
+                    node with { ParameterKind = ParameterKind.ImplicitByVal, IsByRefIgnored = node.ParameterKind == ParameterKind.ExplicitByRef });
             }
         }
     }
