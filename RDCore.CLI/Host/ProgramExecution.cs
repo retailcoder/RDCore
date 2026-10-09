@@ -223,6 +223,11 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     /// <param name="moduleName">The programmatic name of the module.</param>
     /// <param name="lines">The zero-based lines of the source. None removes them.</param>
     /// <returns>Each line, and whether a statement of the module's loaded code begins on it.</returns>
+    /// <remarks>
+    /// A breakpoint is where an instruction is, and a line no statement begins on is reported as not verified - nothing would ever wait there, and a client is to drop it.
+    /// Every line is kept all the same, since the code can be loaded again before the program runs (a shell redefines its program at each <c>RUN</c>), and what is
+    /// verified is a fact about the code that is loaded now. Whether it is the code the person means is what <see cref="HostDebugBreakpointsResult.Judged"/> says.
+    /// </remarks>
     public HostDebugBreakpointsResult SetBreakpoints(string moduleName, IReadOnlyList<int> lines)
     {
         var session = provider.Session;
@@ -233,7 +238,11 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
 
         session.Halt.Breakpoints.Set(module.Uri.AbsoluteUri, lines);
         var bodies = provider.Image.BodiesOf(module.Uri);
-        return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, IBreakpointTable.Verify(bodies, line)))] };
+        return new HostDebugBreakpointsResult
+        {
+            Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, IBreakpointTable.Verify(bodies, line)))],
+            Judged = bodies.Any(),
+        };
     }
 
     /// <summary>
