@@ -207,6 +207,12 @@
   <data name="MultipleDeclarations_Message" xml:space="preserve">
     <value>Une seule instruction fait plusieurs d&#233;clarations, et chacune a besoin de son propre type: dans Dim a, b As Long, seule b est un Long. D&#233;clarez chacune sur sa propre ligne.</value>
   </data>
+  <data name="NotAllPathsReturnValue_Message" xml:space="preserve">
+    <value>Au moins un chemin d'ex&#233;cution de '{0}' n'assigne pas sa valeur de retour: sur ce chemin, l'appelant re&#231;oit la valeur par d&#233;faut du type (0, une cha&#238;ne vide, Empty ou Nothing).</value>
+  </data>
+  <data name="NotAllPathsReturnValue_NeverAssigned_Message" xml:space="preserve">
+    <value>'{0}' n'assigne jamais sa valeur de retour: l'appelant re&#231;oit toujours la valeur par d&#233;faut du type (0, une cha&#238;ne vide, Empty ou Nothing).</value>
+  </data>
   <data name="MisleadingByRefParameter_Message" xml:space="preserve">
     <value>ByRef n'a aucun effet sur '{0}', le param&#232;tre de valeur d'une propri&#233;t&#233; Let ou Set: il est toujours pass&#233; ByVal.</value>
   </data>

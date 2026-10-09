@@ -83,6 +83,7 @@ public sealed class DiagnosticDocumentationTests
         (RDCoreDiagnosticId.MultilineParameterDeclaration, 203),
         (RDCoreDiagnosticId.MultipleDeclarations, 204),
         (RDCoreDiagnosticId.MisleadingByRefParameter, 205),
+        (RDCoreDiagnosticId.NotAllPathsReturnValue, 206),
         (RDCoreDiagnosticId.ObsoleteCallStatement, 302),
     ];
 

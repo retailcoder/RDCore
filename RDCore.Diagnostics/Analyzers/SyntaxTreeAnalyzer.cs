@@ -1,7 +1,6 @@
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.Diagnostics;
-using System.Globalization;
 
 namespace RDCore.Diagnostics.Analyzers;
 
@@ -28,8 +27,7 @@ internal abstract class SyntaxTreeAnalyzer : IModuleAnalyzer
     /// </summary>
     /// <param name="message">The localized text of the message, with <c>{0}</c> for the particular.</param>
     /// <param name="particular">What the occurrence is about: usually a name.</param>
-    protected static string Say(string message, string particular)
-        => string.Format(CultureInfo.CurrentUICulture, message, particular);
+    protected static string Say(string message, string particular) => AnalyzerMessages.Format(message, particular);
 }
 
 internal static class SyntaxNodeScan

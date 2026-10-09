@@ -332,6 +332,24 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>NotAllPathsReturnValue_Message</c>; <c>{0}</c> is the procedure.
+        /// </summary>
+        public static string NotAllPathsReturnValue_Message {
+            get {
+                return ResourceManager.GetString("NotAllPathsReturnValue_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>NotAllPathsReturnValue_NeverAssigned_Message</c>; <c>{0}</c> is the procedure.
+        /// </summary>
+        public static string NotAllPathsReturnValue_NeverAssigned_Message {
+            get {
+                return ResourceManager.GetString("NotAllPathsReturnValue_NeverAssigned_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string for the message of the diagnostic named <c>MisleadingByRefParameter_Message</c>; <c>{0}</c> is the parameter.
         /// </summary>
         public static string MisleadingByRefParameter_Message {

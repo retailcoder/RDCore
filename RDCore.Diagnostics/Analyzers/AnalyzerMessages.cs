@@ -1,0 +1,13 @@
+using System.Globalization;
+
+namespace RDCore.Diagnostics.Analyzers;
+
+internal static class AnalyzerMessages
+{
+    /// <summary>
+    /// A message of a diagnostic, with the particulars of the occurrence in it.
+    /// </summary>
+    /// <param name="message">The localized text of the message, with <c>{0}</c> for the particular.</param>
+    /// <param name="particular">What the occurrence is about: usually a name.</param>
+    public static string Format(string message, string particular) => string.Format(CultureInfo.CurrentUICulture, message, particular);
+}

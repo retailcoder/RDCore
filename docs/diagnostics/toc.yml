@@ -266,5 +266,7 @@
   href: rdc00204.md
 - name: RDC00205 — Misleading ByRef parameter
   href: rdc00205.md
+- name: RDC00206 — Not all code paths return a value
+  href: rdc00206.md
 - name: RDC00302 — Obsolete Call statement
   href: rdc00302.md

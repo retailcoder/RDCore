@@ -43,7 +43,7 @@ public enum RDCoreDiagnosticId
     MultilineParameterDeclaration = 203,
     MultipleDeclarations = 204,
     MisleadingByRefParameter = 205, // property let/set value parameter is always passed ByVal
-    NotAllPathsReturnValue, // [RD2:NonReturningFunctionInspection], but for any path that does not assign the return value, not only when none does
+    NotAllPathsReturnValue = 206, // [RD2:NonReturningFunctionInspection], but for any path that does not assign the return value, not only when none does
 
     ObsoleteCallingConvention = 301,
     ObsoleteCallStatement = 302,

@@ -207,6 +207,12 @@
   <data name="MultipleDeclarations_Message" xml:space="preserve">
     <value>Several declarations are made by one statement, and each needs a type of its own: in Dim a, b As Long only b is a Long. Declare each on its own line.</value>
   </data>
+  <data name="NotAllPathsReturnValue_Message" xml:space="preserve">
+    <value>At least one code path of '{0}' does not assign its return value: on that path, the caller gets the default value of the type (0, an empty string, Empty or Nothing).</value>
+  </data>
+  <data name="NotAllPathsReturnValue_NeverAssigned_Message" xml:space="preserve">
+    <value>'{0}' never assigns its return value: the caller always gets the default value of the type (0, an empty string, Empty or Nothing).</value>
+  </data>
   <data name="MisleadingByRefParameter_Message" xml:space="preserve">
     <value>ByRef has no effect on '{0}', the value parameter of a property Let or Set: it is always passed ByVal.</value>
   </data>
