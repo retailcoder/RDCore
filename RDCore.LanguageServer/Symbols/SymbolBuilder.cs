@@ -285,7 +285,7 @@ internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind 
     // The directive that covers the first letter of the name gives it its type; where several do (a static error, MS-VBAL 5.2.2) the first one written wins.
     private VBType ImplicitTypeOf(string name, Uri handle)
     {
-        var directive = typeDefs.IsDefault ? null : typeDefs.FirstOrDefault(typeDef => typeDef.Covers(name));
+        var directive = typeDefs.IsDefault ? null : TypeDefDirectiveNode.Covering(typeDefs, name);
         return directive?.TypeName is { } typeName
             ? ResolveTypeName(typeName, handle)
             : implicitType ?? VBUnknownType.TypeInfo;

@@ -2084,7 +2084,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
                 // we cannot do this before knowing how many parameters there are,
                 // because it's only applicable to the RHS/value parameter (last).
                 CurrentBuilder.UpdateLastChild(
-                    node with { ParameterKind = ParameterKind.ImplicitByVal });
+                    node with { ParameterKind = ParameterKind.ImplicitByVal, IsByRefIgnored = node.ParameterKind == ParameterKind.ExplicitByRef });
             }
         }
     }

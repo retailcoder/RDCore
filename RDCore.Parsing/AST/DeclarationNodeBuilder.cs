@@ -53,10 +53,12 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             [.. _children],
             name, 
             lib, 
-            isPtrSafe, 
-            kind, 
-            alias, 
-            modifier);
+            isPtrSafe,
+            kind,
+            alias,
+            modifier,
+            context.identifier().TypeHint(),
+            context.identifier().SourceRange);
     }
     public SyntaxNode BuildEventDeclaration(VBAParser.EventStmtContext context)
     {
@@ -69,7 +71,8 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             [.. _children],
             name,
             MemberKind.Event,
-            modifier);
+            modifier,
+            NameRange: context.identifier().SourceRange);
     }
     public SyntaxNode BuildUserDefinedTypeDeclaration(VBAParser.UdtDeclarationContext context)
     {
@@ -80,9 +83,10 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             NodeId,
             context.GetSourceLocation(_rootUri),
             [.. _children],
-            name, 
-            MemberKind.UserDefinedType, 
-            modifier);
+            name,
+            MemberKind.UserDefinedType,
+            modifier,
+            NameRange: context.untypedIdentifier().SourceRange);
     }
     public SyntaxNode BuildUserDefinedTypeMember(VBAParser.UdtMemberContext context)
     {
@@ -107,9 +111,10 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             NodeId,
             context.GetSourceLocation(_rootUri),
             [.. _children],
-            name, 
-            MemberKind.Enum, 
-            modifier);
+            name,
+            MemberKind.Enum,
+            modifier,
+            NameRange: context.identifier().SourceRange);
     }
     public SyntaxNode BuildParameterDeclaration(VBAParser.ArgContext context, bool isPropertyWriterMember = false, bool isLast = false)
     {
@@ -130,7 +135,8 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
                     context.PARAMARRAY() is not null,
                     [.. _children],
                     // `Items() As Long`: the parentheses after the name make it an array.
-                    context.LPAREN() is not null);
+                    context.LPAREN() is not null,
+                    context.unrestrictedIdentifier().TypeHint());
     }
     public SyntaxNode BuildPropertyGetDeclaration(VBAParser.PropertyGetStmtContext context)
     {
@@ -145,7 +151,9 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             name,
             MemberKind.PropertyGet,
             modifier,
-            IsStatic: context.STATIC() is not null);
+            IsStatic: context.STATIC() is not null,
+            TypeHint: context.functionName().identifier().TypeHint(),
+            NameRange: context.functionName().identifier().SourceRange);
     }
     public SyntaxNode BuildPropertyLetDeclaration(VBAParser.PropertyLetStmtContext context)
     {
@@ -160,7 +168,8 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             name,
             MemberKind.PropertyLet,
             modifier,
-            IsStatic: context.STATIC() is not null);
+            IsStatic: context.STATIC() is not null,
+            NameRange: context.subroutineName().identifier().SourceRange);
     }
     public SyntaxNode BuildPropertySetDeclaration(VBAParser.PropertySetStmtContext context)
     {
@@ -175,7 +184,8 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             name,
             MemberKind.PropertySet,
             modifier,
-            IsStatic: context.STATIC() is not null);
+            IsStatic: context.STATIC() is not null,
+            NameRange: context.subroutineName().identifier().SourceRange);
     }
     public SyntaxNode BuildProcedureDeclaration(VBAParser.SubStmtContext context)
     {
@@ -190,7 +200,8 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             name,
             MemberKind.Procedure,
             modifier,
-            IsStatic: context.STATIC() is not null);
+            IsStatic: context.STATIC() is not null,
+            NameRange: context.subroutineName().identifier().SourceRange);
     }
     public SyntaxNode BuildFunctionDeclaration(VBAParser.FunctionStmtContext context)
     {
@@ -205,7 +216,9 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             name,
             MemberKind.Function,
             modifier,
-            IsStatic: context.STATIC() is not null);
+            IsStatic: context.STATIC() is not null,
+            TypeHint: context.functionName().identifier().TypeHint(),
+            NameRange: context.functionName().identifier().SourceRange);
     }
 
     /// <param name="boundExpressions">

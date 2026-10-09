@@ -18,5 +18,11 @@ namespace RDCore.SDK.Model.AST.Declarations;
 /// An indicator that is <c>true</c> if the parameter is an array, which the parentheses after its name say:
 /// <c>Items() As Long</c> (<strong>MS-VBAL §5.3.1.5</strong>). What the parameter is an array <em>of</em> is its <c>As</c> clause's.
 /// </param>
-public record class ParameterDeclarationNode(SyntaxNodeId Identity, SourceLocation Location, string Name, ParameterKind ParameterKind = ParameterKind.ImplicitByRef, bool IsOptional = false, bool IsParamArray = false, ImmutableArray<SyntaxNode> Children = default, bool IsArray = false)
+/// <param name="TypeHint">The <em>type hint</em> the name is written with, if any (<c>Name$</c>), in place of an <c>As</c> clause.</param>
+/// <param name="IsByRefIgnored">
+/// <c>true</c> when <c>ByRef</c> is written on the value parameter of a <c>Property Let</c> or <c>Property Set</c> (<strong>MS-VBAL §5.3.1.7</strong>), where it has no effect:
+/// the parameter is passed by value whatever is written, so its <see cref="ParameterKind"/> is <see cref="ParameterKind.ImplicitByVal"/>, and this is what
+/// remembers that the keyword is there.
+/// </param>
+public record class ParameterDeclarationNode(SyntaxNodeId Identity, SourceLocation Location, string Name, ParameterKind ParameterKind = ParameterKind.ImplicitByRef, bool IsOptional = false, bool IsParamArray = false, ImmutableArray<SyntaxNode> Children = default, bool IsArray = false, string? TypeHint = null, bool IsByRefIgnored = false)
     : SyntaxNode(Identity, Location, Children);

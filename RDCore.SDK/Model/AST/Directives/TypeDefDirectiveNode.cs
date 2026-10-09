@@ -48,6 +48,19 @@ public record class TypeDefDirectiveNode(SyntaxNodeId Identity, SourceLocation L
     public bool Covers(string identifierName) => Mappings.Any(mapping => mapping.IsMatch(identifierName));
 
     /// <summary>
+    /// The directive that gives <paramref name="identifierName"/> its implicit declared type, or <see langword="null"/> when none covers it and the name is
+    /// a <c>Variant</c> (<strong>MS-VBAL §5.2.2</strong>).
+    /// </summary>
+    /// <remarks>
+    /// Where several directives cover a letter, which is a static error, the one written first is the one that counts: this is the single place that says so,
+    /// for whoever needs the implicit type of a name.
+    /// </remarks>
+    /// <param name="directives">The <c>Def&lt;Type&gt;</c> directives of a module, in the order they are written.</param>
+    /// <param name="identifierName">The name of an entity that is declared without a type.</param>
+    public static TypeDefDirectiveNode? Covering(IEnumerable<TypeDefDirectiveNode> directives, string identifierName)
+        => directives.FirstOrDefault(directive => directive.Covers(identifierName));
+
+    /// <summary>
     /// The type this directive gives to the names it covers, with <see cref="VBUnknownType"/> for a token that is no <c>Def&lt;Type&gt;</c>.
     /// </summary>
     /// <param name="is64bit">Whether <c>DefLngPtr</c> is a 64-bit pointer.</param>
