@@ -81,6 +81,9 @@
   <data name="FrameInHandler" xml:space="preserve">
     <value>{0} (in {1})</value>
   </data>
+  <data name="FrameGoSub" xml:space="preserve">
+    <value>{0} (GoSub)</value>
+  </data>
   <data name="ExpressionHasNoValue" xml:space="preserve">
     <value>the expression has no value</value>
   </data>

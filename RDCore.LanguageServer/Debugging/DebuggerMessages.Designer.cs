@@ -131,7 +131,16 @@ namespace RDCore.LanguageServer.Debugging {
                 return ResourceManager.GetString("FrameInHandler", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0} (GoSub).
+        /// </summary>
+        internal static string FrameGoSub {
+            get {
+                return ResourceManager.GetString("FrameGoSub", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Line {0}.
         /// </summary>
