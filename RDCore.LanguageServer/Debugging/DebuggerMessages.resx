@@ -102,4 +102,13 @@
   <data name="OneStatementAtATime" xml:space="preserve">
     <value>one statement at a time</value>
   </data>
+  <data name="FilterUnhandledErrors" xml:space="preserve">
+    <value>Unhandled errors</value>
+  </data>
+  <data name="FilterAllErrors" xml:space="preserve">
+    <value>All errors</value>
+  </data>
+  <data name="NoErrorToExplain" xml:space="preserve">
+    <value>The program does not wait at an error.</value>
+  </data>
 </root>

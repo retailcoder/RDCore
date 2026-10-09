@@ -102,4 +102,13 @@
   <data name="OneStatementAtATime" xml:space="preserve">
     <value>une instruction à la fois</value>
   </data>
+  <data name="FilterUnhandledErrors" xml:space="preserve">
+    <value>Erreurs non gérées</value>
+  </data>
+  <data name="FilterAllErrors" xml:space="preserve">
+    <value>Toutes les erreurs</value>
+  </data>
+  <data name="NoErrorToExplain" xml:space="preserve">
+    <value>Le programme n'est pas interrompu sur une erreur.</value>
+  </data>
 </root>

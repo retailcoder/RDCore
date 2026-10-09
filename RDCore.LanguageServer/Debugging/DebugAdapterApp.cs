@@ -122,6 +122,10 @@ internal sealed class DebugAdapterApp(
                 SupportsGotoTargetsRequest = true,
                 SupportsTerminateRequest = true,
                 SupportsEvaluateForHovers = true,
+                SupportsExceptionInfoRequest = true,
+                ExceptionBreakpointFilters = new Container<ExceptionBreakpointsFilter>(
+                    new ExceptionBreakpointsFilter { Filter = ProgramDebugAdapter.UnhandledErrors, Label = DebuggerMessages.FilterUnhandledErrors, Default = true },
+                    new ExceptionBreakpointsFilter { Filter = ProgramDebugAdapter.AllErrors, Label = DebuggerMessages.FilterAllErrors }),
             };
 
             options

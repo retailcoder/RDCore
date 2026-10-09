@@ -329,5 +329,32 @@ namespace RDCore.LanguageServer.Debugging {
                 return ResourceManager.GetString("OneStatementAtATime", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Unhandled errors.
+        /// </summary>
+        internal static string FilterUnhandledErrors {
+            get {
+                return ResourceManager.GetString("FilterUnhandledErrors", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to All errors.
+        /// </summary>
+        internal static string FilterAllErrors {
+            get {
+                return ResourceManager.GetString("FilterAllErrors", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The program does not wait at an error..
+        /// </summary>
+        internal static string NoErrorToExplain {
+            get {
+                return ResourceManager.GetString("NoErrorToExplain", resourceCulture);
+            }
+        }
     }
 }
