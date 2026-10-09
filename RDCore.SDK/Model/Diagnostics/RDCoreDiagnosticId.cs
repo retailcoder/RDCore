@@ -5,6 +5,10 @@
 /// the <c>RDCore.Diagnostics</c> analyzers, distinct from the language core's <c>VBC</c>/<c>VBR</c>/<c>VBA</c>
 /// error diagnostics. The numeric value is the code (see <see cref="Errors.Abstract.VBErrorExtensions"/>).
 /// </summary>
+/// <remarks>
+/// A member with an explicit value is <em>published</em>: an analyzer issues it, and its documentation page exists, so its value is the code older builds link to
+/// and is never changed. A member without one is only reserved, and takes the value after the one above it until it is published, which is when it is given its own.
+/// </remarks>
 public enum RDCoreDiagnosticId
 {
     // TODO sort and categorize, then carve in stone.
@@ -20,12 +24,12 @@ public enum RDCoreDiagnosticId
     SllFailure = 3,
 
     ImplicitDeclarationsEnabled = 101, // [RD2:OptionExplicitInspection]
-    ImplicitNonDefaultArrayBase, // [RD2: OptionBaseInspection]
-    ImplicitTypeDeclarationsEnabled, // [Type]Def
-    ImplicitByRefModifier,
-    ImplicitPublicMember,
-    ImplicitVariantDeclaration,
-    ImplicitVariantReturnType,
+    ImplicitNonDefaultArrayBase = 102, // [RD2: OptionBaseInspection]
+    ImplicitTypeDeclarationsEnabled = 103, // [Type]Def
+    ImplicitByRefModifier = 104,
+    ImplicitPublicMember = 105,
+    ImplicitVariantDeclaration = 106,
+    ImplicitVariantReturnType = 107,
 
     ImplicitStringCoercion,
     ImplicitNumericCoercion,
@@ -35,14 +39,14 @@ public enum RDCoreDiagnosticId
     ImplicitWideningConversion,
 
     IntegerDataTypeDeclaration = 201,
-    ModuleScopeDimDeclaration,
-    MultilineParameterDeclaration,
-    MultipleDeclarations,
-    //NotAllPathsReturnValue, // [RD2:NonReturningFunctionInspection]
-    MisleadingByRefParameter, // property let/set value parameter is always passed ByVal
+    ModuleScopeDimDeclaration = 202,
+    MultilineParameterDeclaration = 203,
+    MultipleDeclarations = 204,
+    MisleadingByRefParameter = 205, // property let/set value parameter is always passed ByVal
+    NotAllPathsReturnValue, // [RD2:NonReturningFunctionInspection], but for any path that does not assign the return value, not only when none does
 
     ObsoleteCallingConvention = 301,
-    ObsoleteCallStatement,
+    ObsoleteCallStatement = 302,
     ObsoleteCommentSyntax,
     //ObsoleteErrorSyntax,
     ObsoleteGlobalModifier,
