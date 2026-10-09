@@ -7,6 +7,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Semantics.Flow;
 using System.Collections.Immutable;
 
 namespace RDCore.SDK.Platform.Protocol;
@@ -96,8 +97,9 @@ public record class ExpressionFactDto(
 /// <param name="IsFullyAnalyzed">Whether the references the facts say there are in its body are all of them.</param>
 /// <param name="CompileErrors">What the static pass found wrong with the body.</param>
 /// <param name="Expressions">What it found out about each expression.</param>
+/// <param name="ReturnValue">On how many code paths a function or a property getter assigns its return value, when the pass could tell.</param>
 public record class ProcedureSemanticsDto(
-    Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions);
+    Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions, ReturnValueFact? ReturnValue = null);
 
 /// <summary>
 /// A <see cref="DeclarationFact"/>, as it travels.
@@ -142,7 +144,8 @@ public record class ModuleSemanticsDto(
             procedure.IsFullyAnalyzed,
             [.. procedure.CompileErrors.Select(ErrorOf)],
             [.. procedure.Expressions.Values.Select(fact => new ExpressionFactDto(
-                fact.Node, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.Flags, fact.Error is null ? null : ErrorOf(fact.Error)))]))],
+                fact.Node, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.Flags, fact.Error is null ? null : ErrorOf(fact.Error)))],
+            procedure.ReturnValue))],
         [.. model.Declarations.Select(declaration => new DeclarationFactDto(
             declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References))]);
 

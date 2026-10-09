@@ -36,6 +36,12 @@ public sealed record class ProcedureSemanticModel(SemanticId Procedure, Immutabl
     public bool IsFullyAnalyzed { get; init; }
 
     /// <summary>
+    /// On how many of its code paths a function or a property getter assigns its return value, or <see langword="null"/> when the procedure returns none or the pass
+    /// could not tell (<see cref="Flow.ReturnValueAnalysis"/>): which is not to say that it assigns it on every path.
+    /// </summary>
+    public Flow.ReturnValueFact? ReturnValue { get; init; }
+
+    /// <summary>
     /// Whether the static pass found nothing wrong with the procedure.
     /// </summary>
     public bool IsValid => CompileErrors.IsEmpty;
