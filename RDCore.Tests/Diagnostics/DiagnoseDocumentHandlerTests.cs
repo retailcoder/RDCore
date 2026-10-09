@@ -166,4 +166,16 @@ public sealed class DiagnoseDocumentHandlerTests
 
         Assert.AreEqual("RDC00101", result.Diagnostics.Single().Code!.Value.String);
     }
+
+    [TestMethod]
+    public async Task WhatTheSyntaxTreeSays_NeedsNoFactsFromTheHost_AndLinksToItsPage()
+    {
+        var result = await HandleAsync(RequestFor("Public Sub Work(total As Long)\r\nEnd Sub\r\n", out _), new ImplicitByRefModifierAnalyzer());
+
+        var diagnostic = result.Diagnostics.Single();
+        Assert.AreEqual("RDC00104", diagnostic.Code!.Value.String);
+        Assert.AreEqual(DiagnosticSeverity.Information, diagnostic.Severity);
+        Assert.AreEqual("https://rubberduck-vba.github.io/RDCore/diagnostics/rdc00104.html", diagnostic.CodeDescription!.Href.ToString());
+        StringAssert.Contains(diagnostic.Message, "'total'");
+    }
 }

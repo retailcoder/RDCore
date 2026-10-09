@@ -177,4 +177,37 @@
   <data name="ObsoleteCallStatement_Message" xml:space="preserve">
     <value>The Call keyword is obsolete: the call is the same without it.</value>
   </data>
+  <data name="ImplicitNonDefaultArrayBase_Message" xml:space="preserve">
+    <value>Option Base 1 makes every array declared without a lower bound start at 1 instead of 0, while the arrays of other modules and libraries keep their own bounds. State the bounds of each array instead.</value>
+  </data>
+  <data name="ImplicitTypeDeclarationsEnabled_Message" xml:space="preserve">
+    <value>{0} gives a type to every name it covers that is declared without one, so the type of a variable is no longer written where it is declared. Declare each with an As clause instead.</value>
+  </data>
+  <data name="ImplicitByRefModifier_Message" xml:space="preserve">
+    <value>Parameter '{0}' is implicitly passed ByRef: the procedure can change the caller's variable. Write ByRef if that is intended, and ByVal otherwise.</value>
+  </data>
+  <data name="ImplicitPublicMember_Message" xml:space="preserve">
+    <value>'{0}' is implicitly Public. State its accessibility.</value>
+  </data>
+  <data name="ImplicitVariantDeclaration_Message" xml:space="preserve">
+    <value>'{0}' is implicitly declared as a Variant. State its type with an As clause (As Variant, if that is intended).</value>
+  </data>
+  <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
+    <value>'{0}' implicitly returns a Variant. State its return type with an As clause (As Variant, if that is intended).</value>
+  </data>
+  <data name="IntegerDataTypeDeclaration_Message" xml:space="preserve">
+    <value>Integer is a 16-bit type that overflows at 32,767. Use a Long, unless an Integer is what a procedure or a file format expects.</value>
+  </data>
+  <data name="ModuleScopeDimDeclaration_Message" xml:space="preserve">
+    <value>Dim at the module level declares a Private variable. Use Private to say so.</value>
+  </data>
+  <data name="MultilineParameterDeclaration_Message" xml:space="preserve">
+    <value>The declaration of parameter '{0}' is split over several lines with a line continuation. Write it on one line.</value>
+  </data>
+  <data name="MultipleDeclarations_Message" xml:space="preserve">
+    <value>Several declarations are made by one statement, and each needs a type of its own: in Dim a, b As Long only b is a Long. Declare each on its own line.</value>
+  </data>
+  <data name="MisleadingByRefParameter_Message" xml:space="preserve">
+    <value>ByRef has no effect on '{0}', the value parameter of a property Let or Set: it is always passed ByVal.</value>
+  </data>
 </root>

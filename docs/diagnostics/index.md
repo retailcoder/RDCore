@@ -167,6 +167,17 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |Code|Condition|
 |---|---|
 |[RDC00101](rdc00101.md)|Implicit declarations enabled — a module that does not state Option Explicit|
+|[RDC00102](rdc00102.md)|Implicit non-default array base — a module that states Option Base 1|
+|[RDC00103](rdc00103.md)|Implicit type declarations enabled — a Def&lt;Type&gt; directive|
+|[RDC00104](rdc00104.md)|Implicit ByRef modifier — a parameter that states neither ByRef nor ByVal|
+|[RDC00105](rdc00105.md)|Implicit Public member — a member that states no access modifier|
+|[RDC00106](rdc00106.md)|Implicit Variant declaration — a variable or parameter declared without a type|
+|[RDC00107](rdc00107.md)|Implicit Variant return type — a function declared without a return type|
+|[RDC00201](rdc00201.md)|Integer data type declaration — an As Integer clause|
+|[RDC00202](rdc00202.md)|Module-scope Dim declaration — a module-level variable declared with Dim|
+|[RDC00203](rdc00203.md)|Multiline parameter declaration — one parameter declared over several lines|
+|[RDC00204](rdc00204.md)|Multiple declarations — a statement that declares several names|
+|[RDC00205](rdc00205.md)|Misleading ByRef parameter — ByRef on the value parameter of a property Let or Set|
 |[RDC00302](rdc00302.md)|Obsolete Call statement — a call statement written with the Call keyword|
 
 ---

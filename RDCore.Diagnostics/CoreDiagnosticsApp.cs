@@ -45,6 +45,19 @@ internal class CoreDiagnosticsApp(
         // every analyzer the extension has, which the handler calls for each document it diagnoses.
         services.AddSingleton<IModuleAnalyzer, OptionExplicitAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObsoleteCallStatementAnalyzer>();
+
+        // the ones that read how the module is written.
+        services.AddSingleton<IModuleAnalyzer, OptionBaseAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, TypeDefDirectiveAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ImplicitByRefModifierAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ImplicitPublicMemberAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ImplicitVariantDeclarationAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ImplicitVariantReturnTypeAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, IntegerDataTypeAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ModuleScopeDimAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, MultilineParameterAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, MultipleDeclarationsAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, MisleadingByRefParameterAnalyzer>();
     }
 
     protected override void Dispose(bool disposing)

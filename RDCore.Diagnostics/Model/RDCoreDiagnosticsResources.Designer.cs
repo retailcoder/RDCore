@@ -240,5 +240,104 @@ namespace RDCore.Diagnostics.Model {
                 return ResourceManager.GetString("ObsoleteCallStatement_Message", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitNonDefaultArrayBase_Message</c>.
+        /// </summary>
+        public static string ImplicitNonDefaultArrayBase_Message {
+            get {
+                return ResourceManager.GetString("ImplicitNonDefaultArrayBase_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitTypeDeclarationsEnabled_Message</c>; <c>{0}</c> is the directive.
+        /// </summary>
+        public static string ImplicitTypeDeclarationsEnabled_Message {
+            get {
+                return ResourceManager.GetString("ImplicitTypeDeclarationsEnabled_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitByRefModifier_Message</c>; <c>{0}</c> is the parameter.
+        /// </summary>
+        public static string ImplicitByRefModifier_Message {
+            get {
+                return ResourceManager.GetString("ImplicitByRefModifier_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitPublicMember_Message</c>; <c>{0}</c> is the member.
+        /// </summary>
+        public static string ImplicitPublicMember_Message {
+            get {
+                return ResourceManager.GetString("ImplicitPublicMember_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitVariantDeclaration_Message</c>; <c>{0}</c> is the declared name.
+        /// </summary>
+        public static string ImplicitVariantDeclaration_Message {
+            get {
+                return ResourceManager.GetString("ImplicitVariantDeclaration_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitVariantReturnType_Message</c>; <c>{0}</c> is the procedure.
+        /// </summary>
+        public static string ImplicitVariantReturnType_Message {
+            get {
+                return ResourceManager.GetString("ImplicitVariantReturnType_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>IntegerDataTypeDeclaration_Message</c>.
+        /// </summary>
+        public static string IntegerDataTypeDeclaration_Message {
+            get {
+                return ResourceManager.GetString("IntegerDataTypeDeclaration_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ModuleScopeDimDeclaration_Message</c>.
+        /// </summary>
+        public static string ModuleScopeDimDeclaration_Message {
+            get {
+                return ResourceManager.GetString("ModuleScopeDimDeclaration_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>MultilineParameterDeclaration_Message</c>; <c>{0}</c> is the parameter.
+        /// </summary>
+        public static string MultilineParameterDeclaration_Message {
+            get {
+                return ResourceManager.GetString("MultilineParameterDeclaration_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>MultipleDeclarations_Message</c>.
+        /// </summary>
+        public static string MultipleDeclarations_Message {
+            get {
+                return ResourceManager.GetString("MultipleDeclarations_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>MisleadingByRefParameter_Message</c>; <c>{0}</c> is the parameter.
+        /// </summary>
+        public static string MisleadingByRefParameter_Message {
+            get {
+                return ResourceManager.GetString("MisleadingByRefParameter_Message", resourceCulture);
+            }
+        }
     }
 }

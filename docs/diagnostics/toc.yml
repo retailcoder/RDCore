@@ -244,5 +244,27 @@
   href: vbr00746.md
 - name: RDC00101 — Implicit declarations enabled
   href: rdc00101.md
+- name: RDC00102 — Implicit non-default array base
+  href: rdc00102.md
+- name: RDC00103 — Implicit type declarations enabled
+  href: rdc00103.md
+- name: RDC00104 — Implicit ByRef modifier
+  href: rdc00104.md
+- name: RDC00105 — Implicit Public member
+  href: rdc00105.md
+- name: RDC00106 — Implicit Variant declaration
+  href: rdc00106.md
+- name: RDC00107 — Implicit Variant return type
+  href: rdc00107.md
+- name: RDC00201 — Integer data type declaration
+  href: rdc00201.md
+- name: RDC00202 — Module-scope Dim declaration
+  href: rdc00202.md
+- name: RDC00203 — Multiline parameter declaration
+  href: rdc00203.md
+- name: RDC00204 — Multiple declarations
+  href: rdc00204.md
+- name: RDC00205 — Misleading ByRef parameter
+  href: rdc00205.md
 - name: RDC00302 — Obsolete Call statement
   href: rdc00302.md

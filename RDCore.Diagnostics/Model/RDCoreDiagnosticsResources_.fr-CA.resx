@@ -177,4 +177,37 @@
   <data name="ObsoleteCallStatement_Message" xml:space="preserve">
     <value>Le mot-cl&#233; Call est obsol&#232;te; l'appel est le m&#234;me sans lui.</value>
   </data>
+  <data name="ImplicitNonDefaultArrayBase_Message" xml:space="preserve">
+    <value>Option Base 1 fait commencer &#224; 1 plut&#244;t qu'&#224; 0 tout tableau d&#233;clar&#233; sans borne inf&#233;rieure, alors que les tableaux des autres modules et des biblioth&#232;ques gardent leurs propres bornes. Indiquez plut&#244;t les bornes de chaque tableau.</value>
+  </data>
+  <data name="ImplicitTypeDeclarationsEnabled_Message" xml:space="preserve">
+    <value>{0} donne un type &#224; tout nom qu'elle couvre et qui est d&#233;clar&#233; sans type; le type d'une variable n'est donc plus &#233;crit o&#249; elle est d&#233;clar&#233;e. D&#233;clarez plut&#244;t chacune avec une clause As.</value>
+  </data>
+  <data name="ImplicitByRefModifier_Message" xml:space="preserve">
+    <value>Le param&#232;tre '{0}' est pass&#233; implicitement ByRef: la proc&#233;dure peut modifier la variable de l'appelant. &#201;crivez ByRef si c'est voulu, et ByVal sinon.</value>
+  </data>
+  <data name="ImplicitPublicMember_Message" xml:space="preserve">
+    <value>'{0}' est implicitement Public. Indiquez son accessibilit&#233;.</value>
+  </data>
+  <data name="ImplicitVariantDeclaration_Message" xml:space="preserve">
+    <value>'{0}' est d&#233;clar&#233; implicitement comme Variant. Indiquez son type avec une clause As (As Variant, si c'est voulu).</value>
+  </data>
+  <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
+    <value>'{0}' retourne implicitement un Variant. Indiquez son type de retour avec une clause As (As Variant, si c'est voulu).</value>
+  </data>
+  <data name="IntegerDataTypeDeclaration_Message" xml:space="preserve">
+    <value>Integer est un type de 16 bits qui d&#233;borde &#224; 32 767. Utilisez un Long, sauf si une proc&#233;dure ou un format de fichier attend un Integer.</value>
+  </data>
+  <data name="ModuleScopeDimDeclaration_Message" xml:space="preserve">
+    <value>Dim au niveau du module d&#233;clare une variable Private. Utilisez Private pour le dire.</value>
+  </data>
+  <data name="MultilineParameterDeclaration_Message" xml:space="preserve">
+    <value>La d&#233;claration du param&#232;tre '{0}' est r&#233;partie sur plusieurs lignes par une continuation de ligne. &#201;crivez-la sur une seule ligne.</value>
+  </data>
+  <data name="MultipleDeclarations_Message" xml:space="preserve">
+    <value>Une seule instruction fait plusieurs d&#233;clarations, et chacune a besoin de son propre type: dans Dim a, b As Long, seule b est un Long. D&#233;clarez chacune sur sa propre ligne.</value>
+  </data>
+  <data name="MisleadingByRefParameter_Message" xml:space="preserve">
+    <value>ByRef n'a aucun effet sur '{0}', le param&#232;tre de valeur d'une propri&#233;t&#233; Let ou Set: il est toujours pass&#233; ByVal.</value>
+  </data>
 </root>
