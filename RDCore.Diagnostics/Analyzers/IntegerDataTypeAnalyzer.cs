@@ -8,7 +8,7 @@ using RDCore.SDK.Model.Types;
 namespace RDCore.Diagnostics.Analyzers;
 
 /// <summary>
-/// <c>RDC00201</c>: an <c>As Integer</c> clause (<strong>MS-VBAL §2.1</strong>).
+/// <c>RDC00201</c>: an <c>As Integer</c> clause, the 16-bit type (<strong>MS-VBAL §2.1</strong> Data Values and Value Types).
 /// </summary>
 /// <remarks>
 /// A <c>Declare</c> statement is not looked into: the types it states are the ones the external procedure takes, which are not the declaring module's to choose.

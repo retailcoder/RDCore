@@ -7,7 +7,7 @@ using RDCore.SDK.Model.Diagnostics;
 namespace RDCore.Diagnostics.Analyzers;
 
 /// <summary>
-/// <c>RDC00202</c>: a <c>Dim</c> statement at the module level, which declares <c>Private</c> variables (<strong>MS-VBAL §5.2.3.1</strong>).
+/// <c>RDC00202</c>: a <c>Dim</c> statement at the module level, which declares <c>Private</c> variables (<strong>MS-VBAL §5.2.3</strong>).
 /// </summary>
 /// <remarks>
 /// A module-level variable that states no access modifier can only have been declared with <c>Dim</c>. One finding is made for each statement, however many variables it declares.

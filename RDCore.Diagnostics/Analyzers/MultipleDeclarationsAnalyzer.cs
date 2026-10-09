@@ -7,7 +7,7 @@ using RDCore.SDK.Model.Diagnostics;
 namespace RDCore.Diagnostics.Analyzers;
 
 /// <summary>
-/// <c>RDC00204</c>: a <c>Dim</c>, <c>Static</c> or <c>Const</c> statement that declares several names (<strong>MS-VBAL §5.2.3.1</strong>, <strong>§5.4.3</strong>).
+/// <c>RDC00204</c>: a <c>Dim</c>, <c>Static</c> or <c>Const</c> statement that declares several names (<strong>MS-VBAL §5.2.3.1.1</strong>, <strong>§5.4.3.1</strong>).
 /// </summary>
 /// <remarks>
 /// Each name has a type of its own, and a clause that is written once at the end of the statement is the type of the last name only. One finding is made for each statement.

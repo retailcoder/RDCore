@@ -6,7 +6,7 @@ using RDCore.SDK.Model.Diagnostics;
 namespace RDCore.Diagnostics.Analyzers;
 
 /// <summary>
-/// <c>RDC00106</c>: a variable or a parameter that is declared without a type, and is a <c>Variant</c> (<strong>MS-VBAL §5.2.2</strong>).
+/// <c>RDC00106</c>: a variable or a parameter that is declared without a type, and is a <c>Variant</c> (<strong>MS-VBAL §5.2.3.1.5</strong>).
 /// </summary>
 /// <remarks>
 /// A name that a <c>Def&lt;Type&gt;</c> directive covers is given that type and not a <c>Variant</c>, which <see cref="TypeDefDirectiveAnalyzer"/> reports at the directive.
