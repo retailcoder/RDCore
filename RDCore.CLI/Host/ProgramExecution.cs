@@ -1,6 +1,7 @@
 using RDCore.Runtime.Execution;
 using RDCore.Runtime.Execution.Frames;
 using RDCore.SDK.Model.Errors.Abstract;
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -73,11 +74,16 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     /// <param name="entryPoint">The procedure to run.</param>
     /// <param name="debug">Whether the program runs under a debugger.</param>
     /// <param name="token">The cancellation of the request: for a program under a debugger it is a break, and not the end of it.</param>
+    /// <param name="immediate">
+    /// Whether the entry point is a statement typed at a prompt. While a program waits it is run alongside it, in the session as the program left it, and the program
+    /// waits still: that is how its variables are read and set at a stop. Otherwise it is a run like any other.
+    /// </param>
     /// <returns>
     /// How it ended, or where it waits. A program that is suspended is let go of, and not refused: running one is what <c>RUN</c> does, and in BASIC it starts the
     /// program over. A program that is running is refused.
     /// </returns>
-    public Task<ExecuteSessionResult> RunAsync(RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, bool debug, CancellationToken token)
+    public Task<ExecuteSessionResult> RunAsync(
+        RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, bool debug, CancellationToken token, bool immediate = false)
     {
         var session = provider.Session;
         lock (_sync)
@@ -85,6 +91,11 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             if (_state is ProgramState.Running)
             {
                 return Task.FromResult(Refused("a program is running"));
+            }
+
+            if (_state is ProgramState.Suspended && immediate)
+            {
+                return Task.FromResult(RunAlongside(session, pipeline, entryPoint, token));
             }
 
             if (_state is ProgramState.Suspended)
@@ -121,10 +132,10 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                 return Refused(_state is ProgramState.Running ? "the program is running" : "no program is suspended");
             }
 
-            if (ChangedModules() is { Length: > 0 } changed)
+            if (ChangedCode() is { Length: > 0 } changed)
             {
                 return Refused(
-                    $"the code of {string.Join(", ", changed)} changed while the program waited, and a program is resumed on the code it was suspended with: run it again to pick the changes up");
+                    $"{string.Join(", ", changed)} changed while the program waited, and a program is resumed on the code it was suspended with: run it again to pick the changes up");
             }
 
             (execution, _state) = (suspended, ProgramState.Running);
@@ -152,9 +163,9 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                 return NotMoved(_state is ProgramState.Running ? "the program is running" : "no program is suspended");
             }
 
-            if (ChangedModules() is { Length: > 0 } changed)
+            if (ChangedCode() is { Length: > 0 } changed)
             {
-                return NotMoved($"the code of {string.Join(", ", changed)} changed while the program waited: run it again to pick the changes up");
+                return NotMoved($"{string.Join(", ", changed)} changed while the program waited: run it again to pick the changes up");
             }
 
             if (provider.Session.CallStack.Current is not CallStackFrame { Body: { } body } frame)
@@ -187,6 +198,25 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     }
 
     private static HostDebugGotoResult NotMoved(string reason) => new() { Reason = reason };
+
+    /// <summary>
+    /// Sets the lines of a module that a program under a debugger waits at.
+    /// </summary>
+    /// <param name="moduleName">The programmatic name of the module.</param>
+    /// <param name="lines">The zero-based lines of the source. None removes them.</param>
+    /// <returns>Each line, and whether a statement of the module's loaded code begins on it.</returns>
+    public HostDebugBreakpointsResult SetBreakpoints(string moduleName, IReadOnlyList<int> lines)
+    {
+        var session = provider.Session;
+        if (!session.Symbols.TryResolveValue(moduleName, GlobalSymbols.UnresolvedSymbol, out var module) || module is null)
+        {
+            return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, false))] };
+        }
+
+        session.Halt.Breakpoints.Set(module.Uri.AbsoluteUri, lines);
+        var bodies = provider.Image.BodiesOf(module.Uri);
+        return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, IBreakpointTable.Verify(bodies, line)))] };
+    }
 
     /// <summary>
     /// Stops the program that is running, at the next instruction, so that it waits there.
@@ -243,6 +273,32 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
 
         await idle;
         return true;
+    }
+
+    // ---- a statement typed while the program waits ----
+
+    // Run on the thread of the request, above the activations of the program that waits, which are the session's and stay as they are. It cannot wait at a Stop
+    // of its own (the gate holds only the thread of the program), so it is stopped by one, as a run that is not under a debugger is. An End in it is the end of the
+    // program: the one that waits is ended with the session wiped, which is what End does. Called with the lock held, and so nothing else resumes or ends the
+    // program meanwhile.
+    private ExecuteSessionResult RunAlongside(IRuntimeSession session, RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, CancellationToken token)
+    {
+        var output = new RuntimeOutputBuffer();
+        provider.Output.Target = output;
+        try
+        {
+            var result = Report(pipeline.Invoker.Invoke(entryPoint, session.Symbols.Resolver, []), session, output, token);
+            if (result.Outcome is ExecutionOutcome.Halted)
+            {
+                EndSuspended(session, wipe: true);
+            }
+
+            return result;
+        }
+        finally
+        {
+            provider.Output.Target = NullRuntimeOutput.Instance;
+        }
     }
 
     // ---- a run that is not under a debugger ----
@@ -324,7 +380,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             }
 
             _state = ProgramState.Suspended;
-            _suspendedWith = provider.Image.Fingerprints();
+            _suspendedWith = provider.Image.ProcedureFingerprints();
             provider.Output.Target = NullRuntimeOutput.Instance;
         }
 
@@ -368,12 +424,17 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
         }
     }
 
-    // the modules the program was suspended with whose code is not what it was. A module that was loaded since is of no matter to a program that could not have
-    // called it, and a module that is gone is a change.
-    private string[] ChangedModules()
+    // the procedures the program was suspended with whose code is not what it was, by name. A procedure that was loaded since is of no matter to a program that
+    // could not have called it - the statement typed at a break is one - and a procedure that is gone is a change.
+    private string[] ChangedCode()
     {
-        var now = provider.Image.Fingerprints();
-        return [.. _suspendedWith.Where(module => !now.TryGetValue(module.Key, out var fingerprint) || fingerprint != module.Value).Select(module => module.Key)];
+        var now = provider.Image.ProcedureFingerprints();
+        return
+        [
+            .. _suspendedWith
+                .Where(procedure => !now.TryGetValue(procedure.Key, out var fingerprint) || fingerprint != procedure.Value)
+                .Select(procedure => procedure.Key[(procedure.Key.LastIndexOf('#') + 1)..]),
+        ];
     }
 
     private static ExecuteSessionResult Refused(string reason) => new() { Outcome = ExecutionOutcome.Refused, ErrorMessage = reason };

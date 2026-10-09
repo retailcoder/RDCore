@@ -76,6 +76,23 @@ public sealed class ProgramImage : IReadOnlyDictionary<SemanticId, InstructionLi
     public bool IsLoaded(Uri moduleUri) => _modules.ContainsKey(moduleUri.AbsoluteUri);
 
     /// <summary>
+    /// The bodies of the procedures that were loaded for a module.
+    /// </summary>
+    /// <param name="moduleUri">The <see cref="Symbol.Uri"/> of the module symbol.</param>
+    /// <returns>None when nothing has been loaded for it.</returns>
+    public IReadOnlyList<InstructionList> BodiesOf(Uri moduleUri)
+    {
+        ImmutableDictionary<SemanticId, InstructionList> procedures;
+        ImmutableDictionary<string, ImmutableArray<SemanticId>> modules;
+        lock (_loading)
+        {
+            (procedures, modules) = (_procedures, _modules);
+        }
+
+        return modules.TryGetValue(moduleUri.AbsoluteUri, out var keys) ? [.. keys.Select(key => procedures[key])] : [];
+    }
+
+    /// <summary>
     /// What the code of each module is, as a value that is the same for the same code: two images with the same fingerprint of a module run the same program
     /// for that module, and one that differs does not.
     /// </summary>
@@ -104,20 +121,47 @@ public sealed class ProgramImage : IReadOnlyDictionary<SemanticId, InstructionLi
             foreach (var key in keys.OrderBy(key => key.ToString(), StringComparer.Ordinal))
             {
                 Append(hash, key.ToString());
-                foreach (var instruction in procedures[key].Items)
-                {
-                    Append(hash, $"{instruction.Offset}|{instruction.Kind}|{instruction.Target}|{string.Join(',', instruction.Targets)}|{instruction.Else}|{instruction.End}|{instruction.Matching}|{instruction.EnclosingWith}");
-                    if (instruction.Node is { } node)
-                    {
-                        Append(hash, System.Text.Json.JsonSerializer.Serialize<RDCore.SDK.Model.AST.Abstract.SyntaxNode>(node, LocationFree));
-                    }
-                }
+                Append(hash, FingerprintOf(procedures[key]));
             }
 
             fingerprints[module] = Convert.ToHexString(hash.GetHashAndReset());
         }
 
         return fingerprints.ToImmutable();
+    }
+
+    /// <summary>
+    /// What the code of each procedure is, as <see cref="Fingerprints"/> says it of each module.
+    /// </summary>
+    /// <returns>A hash of the lowered body of each procedure that is loaded, by the address of the procedure.</returns>
+    /// <remarks>
+    /// A program that waits is resumed on the procedures it was suspended with: one that was added since is no change to a program that could not have called it
+    /// (the immediate statement typed at a break is one, and so is a procedure typed in while it waits), and one that is changed or gone is.
+    /// </remarks>
+    public ImmutableDictionary<string, string> ProcedureFingerprints()
+    {
+        ImmutableDictionary<SemanticId, InstructionList> procedures;
+        lock (_loading)
+        {
+            procedures = _procedures;
+        }
+
+        return procedures.ToImmutableDictionary(procedure => procedure.Key.ToString(), procedure => FingerprintOf(procedure.Value));
+    }
+
+    private static string FingerprintOf(InstructionList body)
+    {
+        using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        foreach (var instruction in body.Items)
+        {
+            Append(hash, $"{instruction.Offset}|{instruction.Kind}|{instruction.Target}|{string.Join(',', instruction.Targets)}|{instruction.Else}|{instruction.End}|{instruction.Matching}|{instruction.EnclosingWith}");
+            if (instruction.Node is { } node)
+            {
+                Append(hash, System.Text.Json.JsonSerializer.Serialize<RDCore.SDK.Model.AST.Abstract.SyntaxNode>(node, LocationFree));
+            }
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
 
     // the options a syntax node travels with, less every property that says where in the source it was written.
