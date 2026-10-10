@@ -1,4 +1,5 @@
 using RDCore.Runtime.Execution;
+using RDCore.Runtime.Execution.External;
 using RDCore.Runtime.Semantics.Expressions;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Literals;
@@ -256,6 +257,13 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             return FoldConstant(session, context, symbol!, constantValue);
         }
 
+        // a member of an enumeration that a library or the standard library stated has its value on the symbol, there being no declaration to fold
+        // and no storage: MS-VBAL §5.2.3.4 gives an enumeration member the type Long, and a value of a library that does not fit in one wraps as VBA's does.
+        if (symbol is VBEnumConstMemberSymbol && symbol.TryGetProperty(SymbolProperties.EnumValue, out var enumValue))
+        {
+            return Assumed(RuntimeSemanticsEvaluationResult.Success(new VBLongValue(unchecked((int)enumValue))));
+        }
+
         // static semantics should already have rejected an unresolved, ambiguous, or duplicate name;
         // reaching here means that check was skipped.
         if (symbol is not ITypedSymbol typed)
@@ -292,13 +300,20 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     {
         // a declared type carries the class as it was when the type was built, and the class is what the instance is
         // made from: its members at the moment of the reference.
-        if (session.Symbols.Resolver.ResolveType(classModule.Name, ScopeKind.Global, StaticSymbol.GlobalUri).Symbol is VBClassModuleSymbol current)
+        // A class of a library is looked up by that library, as the name that declared it was qualified or resolved to it: only a name that is not qualified is
+        // decided by the order the references are in, and the class here has already been decided.
+        if (VBProjectSymbol.ResolveClass(session.Symbols.Resolver, classModule) is { } current)
         {
             classModule = current;
         }
 
         var objectId = session.Objects.CreateObject();
         session.Symbols.CreateInstance(objectId, classModule);
+        if (ExternalObjectCreation.Create(session, classModule, objectId, default) is { } notCreated)
+        {
+            return notCreated;
+        }
+
         var created = new VBObjectValue(objectId);
 
         // the variable holds the object before Initialize runs, as it holds one a Set stored: the handler can already
@@ -318,6 +333,20 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     // classification the compiler uses, so that what is compiled as a namespace is run as one.
     private static Symbol? TryClassifyNamespace(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
         => session.Symbols.Resolver.NamespaceOf(expression, context.Scope);
+
+    // the enumeration an expression names - `Mode`, or `Widgets.Mode` - when it names one: classified by what the name resolves to, as a namespace is.
+    private static VBEnumType? TryClassifyEnumeration(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
+    {
+        var named = expression switch
+        {
+            SimpleNameExpressionNode name => session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol,
+            MemberAccessExpressionNode { Owner: { } owner } access when TryClassifyNamespace(session, context, owner) is { } qualifier
+                => ResolveNamespaceMember(session, context, qualifier, access),
+            _ => null,
+        };
+
+        return named is VBEnumMemberSymbol { ResolvedType: VBEnumType enumeration } ? enumeration : null;
+    }
 
     // the member of a namespace a qualified name refers to, or null when there is none to refer to - which static
     // semantics should have rejected, as it should an unresolved bare name.
@@ -475,6 +504,14 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         {
             return ReadSymbol(
                 session, context, ResolveNamespaceMember(session, context, qualifier, memberAccess), nameOfEnclosingFunctionIsItsResult: false);
+        }
+
+        // MS-VBAL §5.6.12: likewise a member of an enumeration named by its type is a constant to read, not a member of a value.
+        if (memberAccess.Owner is { } enumerationExpression && TryClassifyEnumeration(session, context, enumerationExpression) is { } enumeration)
+        {
+            return ReadSymbol(
+                session, context, enumeration.Members.FirstOrDefault(member => string.Equals(member.Name, memberAccess.Member.IdentifierName, StringComparison.OrdinalIgnoreCase)),
+                nameOfEnclosingFunctionIsItsResult: false);
         }
 
         var ownerResult = EvaluateOwner(session, context, memberAccess);

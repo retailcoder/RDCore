@@ -47,7 +47,10 @@ internal static class ModuleWorkspace
     /// </summary>
     /// <param name="References">The names of the libraries the project references, in order, after the standard library.</param>
     /// <param name="Source">Where the descriptions of the libraries are.</param>
-    public sealed record WorkspaceLibraries(IReadOnlyList<string> References, ILibrarySource Source);
+    /// <param name="Automation">What the objects of the libraries are held by: the servers of the machine unless a test brings its own.</param>
+    /// <param name="AllowAutomation">Whether the environment lets a program use the objects of a library at all.</param>
+    public sealed record WorkspaceLibraries(
+        IReadOnlyList<string> References, ILibrarySource Source, RDCore.Runtime.Execution.External.Automation.IAutomationServer? Automation = null, bool AllowAutomation = true);
 
     /// <summary>
     /// Loads the workspace like <see cref="LoadErrorsAsync(IReadOnlyList{ValueTuple{string, string}}, string)"/>, for a project that references libraries.
@@ -96,7 +99,8 @@ internal static class ModuleWorkspace
     /// <param name="moduleName">The module whose model is given.</param>
     /// <param name="language">The language the code is written in; RD-VBA unless said otherwise.</param>
     public static async Task<SDK.Semantics.ModuleSemanticModel> ModelAsync(
-        IReadOnlyList<(string Name, string Source)> classes, string program, string moduleName = "Program", SupportedLanguage? language = null)
+        IReadOnlyList<(string Name, string Source)> classes, string program, string moduleName = "Program", SupportedLanguage? language = null,
+        WorkspaceLibraries? libraries = null)
     {
         SDK.Semantics.ModuleSemanticModel? model = null;
         await RunCoreAsync(classes, program, errorsOnly: true, afterLoading: async sessionProvider =>
@@ -104,7 +108,7 @@ internal static class ModuleWorkspace
             // the facts of the code are evaluated in the background, after the model is stored.
             await sessionProvider.Image.Semantics.WhenAllEvaluatedAsync();
             model = sessionProvider.Image.Semantics.All.Single(candidate => candidate.Module.Fragment.TrimStart('#') == moduleName);
-        }, language: language);
+        }, language: language, libraries: libraries);
 
         return model!;
     }
@@ -150,8 +154,8 @@ internal static class ModuleWorkspace
         }
 
         var sessionProvider = new EnvironmentSessionProvider(
-            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false, SourceLanguage: language), new MockFileSystem(files), NullLogger<EnvironmentSessionProvider>.Instance,
-            libraries?.Source);
+            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false, SourceLanguage: language, AllowAutomation: libraries?.AllowAutomation ?? true),
+            new MockFileSystem(files), NullLogger<EnvironmentSessionProvider>.Instance, libraries?.Source, libraries?.Automation);
         var workspaceRoot = new Uri(Root);
         sessionProvider.Compose(project.ProjectInfo, workspaceRoot);
 
