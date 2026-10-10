@@ -1,5 +1,6 @@
 using System.Text;
 using System.IO.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 using RDCore.Runtime.Execution.Files;
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Execution.Memory;
@@ -47,10 +48,66 @@ public static class RuntimeSessionComposer
         IRuntimeOutput? output = null,
         IFileSystem? fileSystem = null)
     {
+        var session = Compose(environment, references, new SymbolTable(), output, fileSystem);
+
+        foreach (var provider in providers)
+        {
+            foreach (var symbol in provider.ProvideSymbols())
+            {
+                session.Symbols.TryDefine(symbol, symbol.ScopeKind);
+            }
+        }
+
+        return session;
+    }
+
+    /// <summary>
+    /// Composes a session to <em>analyze</em> code in: it shares the declared symbols of <paramref name="staticContext"/> and holds the run-time state
+    /// of its own.
+    /// </summary>
+    /// <param name="staticContext">A session whose symbols are declared: the context the code is analyzed in. It is not changed, and nothing the
+    /// analysis does reaches it.</param>
+    /// <param name="fileSystem">The file system the analyzed code's file statements act on. Omitted, an empty one in memory: the code
+    /// never touches the real one.</param>
+    /// <remarks>
+    /// <para>
+    /// What the symbols declare is not copied - a project that references anything declares thousands of them, and an analysis does not change a
+    /// declaration. Everything that happens when code runs belongs to the new session alone: its storage, its objects, its call stack, its error state,
+    /// its files. Its output is discarded.
+    /// </para>
+    /// <para>
+    /// Its storage is allocated when the pipeline for it is composed (<see cref="RuntimeExecutionPipeline.CreateForAnalysis"/>), because what a variable
+    /// starts as is the analysis's to say. The declarations must be done changing before they are shared, and are not to be changed while a session
+    /// composed over them is in use.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="staticContext"/> is not a session this composer composed.</exception>
+    public static IRuntimeSession ComposeForAnalysis(IRuntimeSession staticContext, IFileSystem? fileSystem = null)
+    {
+        if (staticContext.Symbols is not SessionSymbols declared)
+        {
+            throw new ArgumentException("The static context of an analysis is a session that this composer composed.", nameof(staticContext));
+        }
+
+        // the scope tree is built when it is first needed after a change: it is built here, once, before anything else reads the table through it.
+        _ = declared.Table.ScopeTree;
+
+        return Compose(
+            staticContext.Environment, staticContext.References, declared.Table, NullRuntimeOutput.Instance,
+            fileSystem ?? new MockFileSystem(new Dictionary<string, MockFileData>(), OperatingSystem.IsWindows() ? @"C:\" : "/"));
+    }
+
+    private static RuntimeSession Compose(
+        IRuntimeEnvironmentProfile environment,
+        IReadOnlyList<ReferencePriorityInfo> references,
+        SymbolTable declared,
+        IRuntimeOutput? output,
+        IFileSystem? fileSystem)
+    {
         var memory = new SessionMemory(new FreeListManager(), environment.Is64Bit ? PointerSize.x64 : PointerSize.x86);
         var callStack = new RuntimeCallStack();
         var storage = new SessionStorage(memory);
-        var symbols = new SessionSymbols(storage, callStack);
+        var symbols = new SessionSymbols(storage, callStack, declared);
         var objects = new SessionObjects();
         var errors = new SessionErrorState(callStack);
         // the file system is already abstracted platform-wide, so a session composed with a fake one does real
@@ -58,14 +115,6 @@ public static class RuntimeSessionComposer
         // text written to a file is in the environment's own ANSI code page, the same one Byte() <-> String uses.
         var files = new SessionFileChannels(
             fileSystem ?? new FileSystem(), CodePagesEncodingProvider.Instance.GetEncoding(environment.AnsiCodePage) ?? Encoding.Latin1);
-
-        foreach (var provider in providers)
-        {
-            foreach (var symbol in provider.ProvideSymbols())
-            {
-                symbols.TryDefine(symbol, symbol.ScopeKind);
-            }
-        }
 
         return new RuntimeSession(environment, memory, storage, symbols, objects, errors, files, callStack, new SessionHalt(), references, output ?? NullRuntimeOutput.Instance);
     }

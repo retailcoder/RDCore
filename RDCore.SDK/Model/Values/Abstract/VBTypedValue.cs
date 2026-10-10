@@ -76,20 +76,30 @@ public abstract record class VBTypedValue(VBType TypeInfo)
         => this with { Handle = new ValueBindingHandle(runtimeValue) };
 
     /// <summary>
-    /// Whether the value is not known: it is bound to an <see cref="IndeterminateBindingHandle"/>, and the value it yields is assumed.
+    /// Whether the value is not known: it is bound to an <see cref="IndeterminateBindingHandle"/>, or to a cell that does not know what it holds
+    /// (<see cref="IKnowledgeBinding.IsKnown"/>), and the value it yields is assumed.
     /// </summary>
     /// <remarks>
     /// An analysis evaluates code without running it, so a value that is not a constant is not known: it is represented by an indeterminate value of
     /// its declared type (<see cref="VBType.CreateIndeterminateValue"/>). Whatever is derived from an indeterminate value is indeterminate, and
     /// nothing that is raised because of the value it assumes is known to happen.
     /// </remarks>
-    public bool IsIndeterminate => Handle is IndeterminateBindingHandle;
+    public bool IsIndeterminate => Handle is IndeterminateBindingHandle or IKnowledgeBinding { IsKnown: false };
 
     /// <summary>
     /// Returns a copy of this value whose value is not known, and which assumes the value this one holds.
     /// </summary>
     public VBTypedValue AsIndeterminate()
         => IsIndeterminate ? this : this with { Handle = new IndeterminateBindingHandle(Handle) };
+
+    /// <summary>
+    /// Returns a copy of this value that is known, when it is not known only because it was read as not known (<see cref="AsIndeterminate"/>).
+    /// </summary>
+    /// <remarks>
+    /// For the statements that give a variable a value that no longer depends on what it held: they are what makes it known again.
+    /// </remarks>
+    public VBTypedValue AsKnown()
+        => Handle is IndeterminateBindingHandle indeterminate ? this with { Handle = indeterminate.Assumed } : this;
 
     /// <summary>
     /// The bound managed value, or <c>null</c> when the binding cannot yield one.

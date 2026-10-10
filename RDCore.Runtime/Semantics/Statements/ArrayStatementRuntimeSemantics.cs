@@ -10,6 +10,7 @@ using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -70,10 +71,14 @@ public sealed record class ArrayStatementRuntimeSemantics(
             return Failed(redim, VBRuntimeErrorId.ThisArrayIsFixedOrTemporarilyLocked, $"{redim.Name} is locked by a ByRef parameter");
         }
 
-        if (!TryEvaluateBounds(session, context, redim, out var bounds, out var failure))
+        if (!TryEvaluateBounds(session, context, redim, out var bounds, out var boundsKnown, out var failure))
         {
             return failure;
         }
+
+        // the array a ReDim makes is known - whatever the variable held before, and so whether it was known - unless its bounds are not: then
+        // it has the shape its type assumes, and nothing that is read from it is known. (Its elements are the declared defaults either way.)
+        VBArrayValue Redimensioned(VBArrayValue array) => boundsKnown ? array : (VBArrayValue)array.AsIndeterminate();
 
         var held = Unwrapped(target.Current);
         if (held is not VBArrayValue array)
@@ -85,13 +90,14 @@ public sealed record class ArrayStatementRuntimeSemantics(
             // is what the rule is about, so it is the unwrapped value that decides: a Variant holding a
             // number is the error, and one holding nothing yet is not.
             return held is null or VBEmptyValue
-                ? Store(session, context, redim, target, new VBResizableArrayValue(bounds, ItemTypeOf(target.Current)))
+                ? Store(session, context, redim, target, Redimensioned(new VBResizableArrayValue(bounds, ItemTypeOf(target.Current))))
                 : Failed(redim, VBRuntimeErrorId.TypeMismatch, $"{redim.Name} is not an array");
         }
 
         return redim.IsPreserve
-            ? Preserved(session, context, redim, target, array, bounds)
-            : Store(session, context, redim, target, new VBResizableArrayValue(bounds, array.IsInitialized ? array.ItemType : DeclaredItemType(target, array.ItemType)));
+            ? Preserved(session, context, redim, target, array, bounds, boundsKnown)
+            : Store(session, context, redim, target, Redimensioned(
+                new VBResizableArrayValue(bounds, array.IsInitialized ? array.ItemType : DeclaredItemType(target, array.ItemType))));
     }
 
     // a variable that an activation on the call stack has a ByRef parameter for is that parameter's for as long as the activation is: the array it holds is
@@ -152,7 +158,7 @@ public sealed record class ArrayStatementRuntimeSemantics(
             // initial value of the declared array element type" - the dimensions stay, since a fixed-size
             // array's bounds are part of its declaration and nothing at run time may change them.
             var outcome = array is VBFixedSizeArrayValue fixedSize
-                ? Reset(fixedSize)
+                ? Wiped(session, context, statement, target, fixedSize)
                 // "this data value is set to be an empty array with the same element type" - dimensions gone.
                 : Store(session, context, statement, target, new VBResizableArrayValue([], array.ItemType));
 
@@ -194,7 +200,7 @@ public sealed record class ArrayStatementRuntimeSemantics(
         }
 
         var declared = (symbol as ITypedSymbol)?.ResolvedType;
-        var current = declared?.CreateValue(session.Symbols.Resolver.GetValue(symbol));
+        var current = declared?.CreateValue(session.Symbols.Resolver.GetValue(symbol).ForReading());
 
         target = new(symbol, null, declared, current);
         return true;
@@ -202,14 +208,18 @@ public sealed record class ArrayStatementRuntimeSemantics(
 
     // "Each element in the array is reset to the default value for its data type" - in place, the array
     // itself keeping the identity and the bounds its declaration gave it.
-    private static RuntimeExecutionOutcome Reset(VBFixedSizeArrayValue array)
+    private RuntimeExecutionOutcome Wiped(
+        IRuntimeSession session, RuntimeEvaluationContext context, StatementNode statement, Target target, VBFixedSizeArrayValue array)
     {
         foreach (var subscripts in Subscripts(array))
         {
             array.TrySetElement(array.ItemType.DefaultValue.Handle, subscripts);
         }
 
-        return RuntimeExecutionOutcome.Next;
+        // what the array holds no longer depends on what it held, so it is known again, which an array that was read as not known has to be told.
+        return array.IsIndeterminate
+            ? Store(session, context, statement, target, (VBArrayValue)array.AsKnown())
+            : RuntimeExecutionOutcome.Next;
     }
 
     // "If the Preserve keyword is present, a <redim-statement> can only change the upper bound of the last
@@ -218,14 +228,18 @@ public sealed record class ArrayStatementRuntimeSemantics(
     // dimensions will result in Error 9."
     private RuntimeExecutionOutcome Preserved(
         IRuntimeSession session, RuntimeEvaluationContext context, RedimDeclarationNode redim, Target target,
-        VBArrayValue array, (int LBound, int UBound)[] bounds)
+        VBArrayValue array, (int LBound, int UBound)[] bounds, bool boundsKnown)
     {
-        if (array.Rank != bounds.Length)
+        // what is preserved is what the array held, and its shape is what the rules below are about: neither is known if the array was read as not
+        // known, nor are the bounds it is given if they are not - and an error that is raised because of a shape that is only assumed is not known to happen.
+        var isKnown = boundsKnown && !array.IsIndeterminate;
+
+        if (isKnown && array.Rank != bounds.Length)
         {
             return Failed(redim, VBRuntimeErrorId.SubscriptOutOfRange, "Preserve cannot change the number of dimensions");
         }
 
-        for (var dimension = 0; dimension < bounds.Length; dimension++)
+        for (var dimension = 0; isKnown && dimension < bounds.Length; dimension++)
         {
             var changedLower = array.Dimensions[dimension].LowerBound != bounds[dimension].LBound;
             var changedUpper = array.Dimensions[dimension].UpperBound != bounds[dimension].UBound;
@@ -250,7 +264,7 @@ public sealed record class ArrayStatementRuntimeSemantics(
             }
         }
 
-        return Store(session, context, redim, target, resized);
+        return Store(session, context, redim, target, isKnown ? resized : (VBArrayValue)resized.AsIndeterminate());
     }
 
     // every subscript tuple of an array, outermost dimension varying slowest - the order does not matter to
@@ -305,9 +319,10 @@ public sealed record class ArrayStatementRuntimeSemantics(
 
     private bool TryEvaluateBounds(
         IRuntimeSession session, RuntimeEvaluationContext context, RedimDeclarationNode redim,
-        out (int LBound, int UBound)[] bounds, out RuntimeExecutionOutcome failure)
+        out (int LBound, int UBound)[] bounds, out bool isKnown, out RuntimeExecutionOutcome failure)
     {
         bounds = [];
+        isKnown = true;
         failure = RuntimeExecutionOutcome.Next;
 
         if (redim.Bounds is not { Dimensions.IsDefaultOrEmpty: false } declared)
@@ -327,21 +342,36 @@ public sealed record class ArrayStatementRuntimeSemantics(
             var spec = declared.Dimensions[dimension];
 
             var lower = optionBase;
-            if (spec.LowerBound is { } lowerBound
-                && !TryEvaluateSubscript(session, context, lowerBound, out lower, out failure))
+            var dimensionKnown = true;
+            if (spec.LowerBound is { } lowerBound)
+            {
+                if (!TryEvaluateSubscript(session, context, lowerBound, out lower, out var lowerKnown, out failure))
+                {
+                    return false;
+                }
+
+                dimensionKnown &= lowerKnown;
+            }
+
+            if (!TryEvaluateSubscript(session, context, spec.UpperBound, out var upper, out var upperKnown, out failure))
             {
                 return false;
             }
 
-            if (!TryEvaluateSubscript(session, context, spec.UpperBound, out var upper, out failure))
-            {
-                return false;
-            }
+            dimensionKnown &= upperKnown;
+            isKnown &= dimensionKnown;
 
             if (upper < lower)
             {
-                failure = Failed(redim, VBRuntimeErrorId.SubscriptOutOfRange, $"{lower} To {upper}");
-                return false;
+                // inverted bounds are error 9 - unless a bound is not known: the one it assumes may be what inverts them. The array then has
+                // the one element its lower bound gives it, which nothing read from it relies on.
+                if (dimensionKnown)
+                {
+                    failure = Failed(redim, VBRuntimeErrorId.SubscriptOutOfRange, $"{lower} To {upper}");
+                    return false;
+                }
+
+                upper = lower;
             }
 
             evaluated[dimension] = (lower, upper);
@@ -353,8 +383,8 @@ public sealed record class ArrayStatementRuntimeSemantics(
 
     private bool TryEvaluateSubscript(
         IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression,
-        out int value, out RuntimeExecutionOutcome failure)
-        => _bounds.TryEvaluate(session, context, expression, out value, out failure);
+        out int value, out bool isKnown, out RuntimeExecutionOutcome failure)
+        => _bounds.TryEvaluate(session, context, expression, out value, out isKnown, out failure);
 
     // a ReDim of a Variant that held nothing keeps Variant elements, which is what a Variant array is.
     private static VBType ItemTypeOf(VBTypedValue? current)

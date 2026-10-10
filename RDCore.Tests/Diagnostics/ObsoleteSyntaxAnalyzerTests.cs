@@ -16,7 +16,7 @@ namespace RDCore.Tests.Diagnostics;
 [TestClass]
 public sealed class ObsoleteSyntaxAnalyzerTests
 {
-    private static string Module(string source) => $"Attribute VB_Name = \"Program\"\r\n{source.Replace("\n", "\r\n")}\r\n";
+    private static string Module(string source) => $"Attribute VB_Name = \"Program\"\r\n{source.ReplaceLineEndings("\r\n")}\r\n";
 
     // without the host: what is written is all there is.
     private static AnalyzerFinding[] Run(IModuleAnalyzer analyzer, string source, ModuleSemanticsDto? semantics = null)

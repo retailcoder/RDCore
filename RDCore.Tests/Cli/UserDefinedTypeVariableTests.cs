@@ -48,6 +48,23 @@ public sealed class UserDefinedTypeVariableTests
             "Private Sub Show(ByRef q As TPoint)", "Debug.Print q.X", "End Sub"));
 
     [TestMethod]
+    public async Task AnObjectField_OfAUserDefinedType_IsSetToAnObject()
+        => CollectionAssert.AreEqual(new[] { "1", "True" }, await RunAsync(
+            "Private Type TState", "Items As Collection", "End Type",
+            "Public Sub Main()", "Dim s As TState", "Set s.Items = New Collection", "s.Items.Add 5", "Debug.Print s.Items.Count",
+            "Set s.Items = Nothing", "Debug.Print s.Items Is Nothing", "End Sub"));
+
+    [TestMethod]
+    public async Task AnObjectField_OfAUserDefinedTypeOfAClass_IsSetThroughAProperty()
+        => CollectionAssert.AreEqual(new[] { "2" }, await ModuleWorkspace.RunAsync(
+            [("Holder", ModuleWorkspace.ClassModule(
+                "Holder", "Private Type TState", "Items As Collection", "End Type", "Private this As TState",
+                "Public Property Get Items() As Collection", "Set Items = this.Items", "End Property",
+                "Public Property Set Items(ByVal value As Collection)", "Set this.Items = value", "End Property"))],
+            Program(
+                "Public Sub Main()", "Dim h As New Holder", "Dim c As New Collection", "c.Add 1", "c.Add 2", "Set h.Items = c", "Debug.Print h.Items.Count", "End Sub")));
+
+    [TestMethod]
     public async Task AFieldThatIsNotOneOfTheType_IsStillAnError()
     {
         var errors = await ModuleWorkspace.LoadErrorsAsync([], Program(

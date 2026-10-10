@@ -139,12 +139,15 @@ public sealed class LetAssignmentEvaluator(
             return RuntimeExecutionOutcome.InternalError;
         }
 
-        if (expressions.EvaluateSubscripts(session, context, subscripts, out var indices) is { } failure)
+        if (expressions.EvaluateSubscripts(session, context, subscripts, out var indices, out var indicesKnown) is { } failure)
         {
             return failure.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(failure.ErrorInfo!);
         }
 
-        if (array.GetElementHandle(indices) is null)
+        // a subscript outside the bounds is error 9 - unless it, or the array, is not known: the error is not known to happen, and there is
+        // no element to assign.
+        var isElement = indicesKnown && array.GetElementHandle(indices) is not null;
+        if (indicesKnown && !isElement && !array.IsIndeterminate)
         {
             return RuntimeExecutionOutcome.Error(VBRuntimeErrorInfo.For(
                 VBRuntimeErrorId.SubscriptOutOfRange, arrayExpression.Location, string.Join(", ", indices)));
@@ -163,9 +166,20 @@ public sealed class LetAssignmentEvaluator(
                 return RuntimeExecutionOutcome.Error(setResult.ErrorInfo!);
             }
 
+            if (!isElement)
+            {
+                // which element is assigned is not known: each could now hold the object, or what it held.
+                if (!indicesKnown)
+                {
+                    array.ForgetElements();
+                }
+
+                return RuntimeExecutionOutcome.Next;
+            }
+
             // what the element held is its object's identity as of now: the cell is about to be bound to something else.
             var previous = array[indices] is VBObjectValue heldObject ? new VBObjectValue(heldObject.Value) : null;
-            var cell = StoreElement(session, array, indices, setResult.Result!.RuntimeValue);
+            var cell = StoreElement(session, array, indices, setResult.Result!, setResult.Result!.RuntimeValue);
             ObjectReferences.Rebind(session, cell, previous, setResult.Result as VBObjectValue);
             return RuntimeExecutionOutcome.Next;
         }
@@ -182,23 +196,34 @@ public sealed class LetAssignmentEvaluator(
             return RuntimeExecutionOutcome.Error(coerced.ErrorInfo!);
         }
 
-        StoreElement(session, array, indices, coerced.Result!.RuntimeValue);
+        if (!isElement)
+        {
+            // which element is assigned is not known: each could now hold the value, or what it held - the same, if it held the value already.
+            if (!indicesKnown)
+            {
+                array.ForgetElements(coerced.Result!.IsIndeterminate ? null : coerced.Result.RuntimeValue);
+            }
+
+            return RuntimeExecutionOutcome.Next;
+        }
+
+        StoreElement(session, array, indices, coerced.Result!, coerced.Result!.RuntimeValue);
         return RuntimeExecutionOutcome.Next;
     }
 
     // An element is written where it is: its cell is the storage, and the one an object reference is held by, which is what
     // lets the reference be released when the element is assigned again. Only a cell that cannot be written - the inert one
     // an element of a class, user-defined type or Object type starts with - is given a binding that can.
-    private static IBindingHandle StoreElement(IRuntimeSession session, VBArrayValue array, int[] indices, IRuntimeValue value)
+    private static IBindingHandle StoreElement(IRuntimeSession session, VBArrayValue array, int[] indices, VBTypedValue source, IRuntimeValue value)
     {
         var cell = array.GetElementHandle(indices)!;
         if (cell.BindingCapabilities.HasFlag(BindingCapabilities.SetValue))
         {
-            cell.SetValue(session.Symbols.Resolver, value);
+            cell.Store(session.Symbols.Resolver, value, !source.IsIndeterminate);
             return cell;
         }
 
-        array.TrySetElement(new ValueBindingHandle(value), indices);
+        array.TrySetElement(BindingKnowledge.NewCell(value, !source.IsIndeterminate), indices);
         return array.GetElementHandle(indices)!;
     }
 
@@ -246,9 +271,40 @@ public sealed class LetAssignmentEvaluator(
             return failure;
         }
 
-        return owner is VBObjectValue objectOwner
-            ? AssignObjectMember(session, context, statement, memberAccess, indexArguments, objectOwner, source, value, isSet)
-            : RuntimeExecutionOutcome.InternalError;
+        return owner switch
+        {
+            VBObjectValue objectOwner => AssignObjectMember(session, context, statement, memberAccess, indexArguments, objectOwner, source, value, isSet),
+            VBUserDefinedTypeValue record when isSet && indexArguments.IsEmpty => SetField(session, memberAccess, record, source, value),
+            _ => RuntimeExecutionOutcome.InternalError,
+        };
+    }
+
+    // MS-VBAL §5.4.3.9 with a <member-access-expression> target whose owner is a UDT: the field is Set-coerced to its declared type and holds the
+    // object. Like Let (AssignField) the field lives on the value, and not in storage of its own, so the object the field held is let go of
+    // through the field's cell.
+    private RuntimeExecutionOutcome SetField(
+        IRuntimeSession session, MemberAccessExpressionNode memberAccess, VBUserDefinedTypeValue record, ExpressionNode source, VBTypedValue value)
+    {
+        var name = memberAccess.Member.IdentifierName;
+        if (record.Fields.FirstOrDefault(field => field.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is not { ResolvedType: { } fieldType } declared
+            || record.GetFieldHandle(declared.Name) is not { } handle
+            || expressions.SetCoercion is not { } setCoercion)
+        {
+            return RuntimeExecutionOutcome.InternalError;
+        }
+
+        var setResult = setCoercion.EvaluateSetCoercion(session, source, value, fieldType);
+        if (!setResult.IsSuccess)
+        {
+            return RuntimeExecutionOutcome.Error(setResult.ErrorInfo!);
+        }
+
+        // a value is a view of its handle, which is about to be written to: what the field held is its object's identity as of now.
+        var previous = fieldType.CreateValue(handle) is VBObjectValue held ? new VBObjectValue(held.Value) : null;
+
+        handle.Store(session.Symbols.Resolver, setResult.Result!);
+        ObjectReferences.Rebind(session, handle, previous, setResult.Result as VBObjectValue);
+        return RuntimeExecutionOutcome.Next;
     }
 
     private RuntimeExecutionOutcome AssignObjectMember(
@@ -308,7 +364,7 @@ public sealed class LetAssignmentEvaluator(
 
             // an array, a record and a Variant are held as the value that identifies them by where it is, which is what every allocation boxes them
             // in: the value's own runtime value is not one for them, and a whole array assigned to a variable of an object would have none.
-            handle.SetValue(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(coerced.Result!));
+            handle.Store(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(coerced.Result!), !coerced.Result!.IsIndeterminate);
             return RuntimeExecutionOutcome.Next;
         }
 
@@ -331,7 +387,7 @@ public sealed class LetAssignmentEvaluator(
             EventAttachments.Detach(session, owner.Value, field, previous);
         }
 
-        handle.SetValue(session.Symbols.Resolver, setResult.Result!.RuntimeValue);
+        handle.Store(session.Symbols.Resolver, setResult.Result!);
         ObjectReferences.Rebind(session, handle, previous, setResult.Result as VBObjectValue);
         if (withEvents)
         {

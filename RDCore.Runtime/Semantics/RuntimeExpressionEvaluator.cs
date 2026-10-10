@@ -160,7 +160,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
 
             // an element is a Variant holding what the argument came to; an object in it is referenced by the cell, as by any variable.
             var value = element.Result is VBVariantValue variant ? variant : new VBVariantValue(element.Result!);
-            array.TrySetElement(new ValueBindingHandle(value.RuntimeValue), lower + index);
+            array.TrySetElement(BindingKnowledge.NewCell(value), lower + index);
             if (UnwrappedOwner(value) is VBObjectValue { } held && !held.IsNothing())
             {
                 ObjectReferences.Rebind(session, array.GetElementHandle(lower + index)!, null, held);
@@ -193,7 +193,11 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             dimension = evaluated.Result;
         }
 
-        return ArrayBoundRuntimeSemantics.Evaluate(arrayBound, array.Result!, dimension);
+        // an array that is not known has bounds that are not known, and is not known to be no array: the error it would raise is the assumed value's, which is
+        // not stated. The same goes for a dimension that is not known.
+        return array.Result!.IsIndeterminate || dimension is { IsIndeterminate: true }
+            ? RuntimeSemanticsEvaluationResult.Success(VBLongType.TypeInfo.CreateIndeterminateValue())
+            : ArrayBoundRuntimeSemantics.Evaluate(arrayBound, array.Result!, dimension);
     }
 
     private RuntimeSemanticsEvaluationResult EvaluateSimpleName(IRuntimeSession session, RuntimeEvaluationContext context, SimpleNameExpressionNode simpleName)
@@ -239,7 +243,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             // names the function, from anywhere, and is a call.
             return nameOfEnclosingFunctionIsItsResult
                 && returningMember.Uri.AbsoluteUri == context.Scope.AbsoluteUri && session.CallStack.Current is { } enclosing
-                    ? RuntimeSemanticsEvaluationResult.Success(enclosing.ReturnValue!)
+                    ? Assumed(RuntimeSemanticsEvaluationResult.Success(enclosing.ReturnValue!))
                     : InvokeProcedure(session, context, returningMember, []);
         }
 
@@ -260,16 +264,29 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         }
 
         var handle = session.Symbols.Resolver.GetValue(symbol);
-        var value = typed.ResolvedType.CreateValue(handle);
+        var value = typed.ResolvedType.CreateValue(handle.ForReading());
 
         // MS-VBAL §5.2.3.1.4 / §2.5.1: a variable declared As New - a class module's default instance among them - is
         // never Nothing when it is referred to: the reference creates the object it was waiting for, which is also
         // why `Is Nothing` of it can never be true.
         return symbol.GetProperty(SymbolProperties.AutoInstantiated) && value is VBObjectValue { } held && held.IsNothing()
             && typed.ResolvedType is VBClassType { Symbol: { } classModule }
-                ? AutoInstantiate(session, handle, classModule)
-                : RuntimeSemanticsEvaluationResult.Success(value);
+                ? Assumed(AutoInstantiate(session, handle, classModule))
+                : Assumed(RuntimeSemanticsEvaluationResult.Success(value));
     }
+
+    /// <summary>
+    /// Whether what a variable holds is assumed rather than read: a read of a variable gives the value its declared type allows, which is not known
+    /// (<see cref="VBTypedValue.IsIndeterminate"/>), whatever the variable was last assigned.
+    /// </summary>
+    /// <remarks>
+    /// 👉 An evaluation of code that does not follow its paths cannot say which assignment a read sees. A value that was assigned along one path is no
+    /// fact about a read on another, so no read is trusted; what is written is still written, and the evaluation of the assignment is still observed.
+    /// </remarks>
+    public bool AssumesVariables { get; set; }
+
+    private RuntimeSemanticsEvaluationResult Assumed(RuntimeSemanticsEvaluationResult read)
+        => AssumesVariables && read.IsSuccess && read.Result is { } value ? RuntimeSemanticsEvaluationResult.Success(value.AsIndeterminate()) : read;
 
     private static RuntimeSemanticsEvaluationResult AutoInstantiate(IRuntimeSession session, IBindingHandle handle, VBClassModuleSymbol classModule)
     {
@@ -784,7 +801,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
 
     // A late-bound Variant/Object member, and a call through a Property/Function/Sub member, are both
     // invocations, not reads - only a Field/Variable-kind member is readable this way.
-    private static RuntimeSemanticsEvaluationResult EvaluateInstanceField(IRuntimeSession session, VBTypedValue owner, string memberName)
+    private RuntimeSemanticsEvaluationResult EvaluateInstanceField(IRuntimeSession session, VBTypedValue owner, string memberName)
     {
         // a UDT field is not reached through an instance the session knows about: a UDT has location identity
         // but no instance record, and its fields live on the value itself (MS-VBAL §2.1 - a UDT data value is
@@ -808,7 +825,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             .FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase));
 
         return member is { Kind: SymbolKindExt.Field or SymbolKindExt.Variable }
-            ? RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member)))
+            ? Assumed(RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member).ForReading())))
             : RuntimeSemanticsEvaluationResult.InternalError();
     }
 
@@ -910,6 +927,21 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             calleeValue = wrapped;
         }
 
+        // what is indexed is not known: it is not known to be an array, nor an object with a default member, nor to be Nothing, and so what is read is not
+        // known, and the error it would raise is the assumed value's. The arguments are the code's, and are evaluated as they would be.
+        if (calleeResult.Result!.IsIndeterminate && calleeValue is not VBArrayValue)
+        {
+            foreach (var argument in indexExpression.Arguments)
+            {
+                if (EvaluateIndexArgument(session, argument, context) is { IsSuccess: false } failed)
+                {
+                    return failed;
+                }
+            }
+
+            return RuntimeSemanticsEvaluationResult.Success(VBVariantType.TypeInfo.CreateIndeterminateValue());
+        }
+
         // an object that is indexed is a call of its default member: `c(1)` is `c.Item(1)`.
         if (calleeValue is VBObjectValue indexed)
         {
@@ -931,16 +963,25 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        if (EvaluateSubscripts(session, context, indexExpression.Arguments, out var subscripts) is { } subscriptFailure)
+        if (EvaluateSubscripts(session, context, indexExpression.Arguments, out var subscripts, out var subscriptsKnown) is { } subscriptFailure)
         {
             return subscriptFailure;
+        }
+
+        // a subscript that is not known selects an element that could be any of them, so what is read is not known; the error 9 a subscript
+        // that is out of the bounds would raise is the same, and so is the one an array that is not known would: it is not known to happen.
+        if (!subscriptsKnown)
+        {
+            return RuntimeSemanticsEvaluationResult.Success(array.ItemType.CreateIndeterminateValue());
         }
 
         var element = array[subscripts];
         return element is not null
             ? RuntimeSemanticsEvaluationResult.Success(element)
-            : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
-                string.Join(", ", subscripts)));
+            : array.IsIndeterminate
+                ? RuntimeSemanticsEvaluationResult.Success(array.ItemType.CreateIndeterminateValue())
+                : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
+                    string.Join(", ", subscripts)));
     }
 
     // a Function or Property Get that declares no parameters, called with arguments: they are not its own, and index what it returns.
@@ -966,8 +1007,18 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     /// <returns>The error or internal error that stopped it, or <see langword="null"/> when every subscript has a value.</returns>
     public RuntimeSemanticsEvaluationResult? EvaluateSubscripts(
         IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<ExpressionNode> arguments, out int[] subscripts)
+        => EvaluateSubscripts(session, context, arguments, out subscripts, out _);
+
+    /// <inheritdoc cref="EvaluateSubscripts(IRuntimeSession, RuntimeEvaluationContext, ImmutableArray{ExpressionNode}, out int[])"/>
+    /// <param name="isKnown">
+    /// Whether every subscript is known. When one is not, <paramref name="subscripts"/> holds the value its type assumes in its place, which
+    /// selects an element that is no more likely than any other, or none at all.
+    /// </param>
+    public RuntimeSemanticsEvaluationResult? EvaluateSubscripts(
+        IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<ExpressionNode> arguments, out int[] subscripts, out bool isKnown)
     {
         subscripts = [];
+        isKnown = true;
         var evaluated = new int[arguments.Length];
         for (var i = 0; i < arguments.Length; i++)
         {
@@ -982,6 +1033,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 return RuntimeSemanticsEvaluationResult.InternalError();
             }
 
+            isKnown &= !argumentResult.Value.Result!.IsIndeterminate;
             evaluated[i] = subscript;
         }
 
@@ -1317,7 +1369,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.Error(coercionResult.ErrorInfo!));
             }
 
-            array.TrySetElement(new ValueBindingHandle(coercionResult.Result!.RuntimeValue), i);
+            array.TrySetElement(BindingKnowledge.NewCell(coercionResult.Result!), i);
         }
 
         return new ParamArrayCollectResult(new VBRuntimeValue<VBRuntimeArrayValue>(new VBRuntimeArrayValue(array)), null);

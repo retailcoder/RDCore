@@ -32,6 +32,7 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00105`](../diagnostics/rdc00105.md)|Implicit Public member|Information|the syntax tree: `MemberDeclarationNode.AccessModifier`|
 |[`RDC00106`](../diagnostics/rdc00106.md)|Implicit Variant declaration|Information|the syntax tree: a declaration with no type, and the `Def<Type>` directives|
 |[`RDC00107`](../diagnostics/rdc00107.md)|Implicit Variant return type|Information|the syntax tree: a function with no type, and the `Def<Type>` directives|
+|[`RDC00112`](../diagnostics/rdc00112.md)|Implicit narrowing conversion|Warning|`ProcedureSemanticModel.Runtime`: the `ConversionFact`s the language core states about the code of the procedure|
 |[`RDC00201`](../diagnostics/rdc00201.md)|Integer data type declaration|Information|the syntax tree: `AsTypeExpressionNode`|
 |[`RDC00202`](../diagnostics/rdc00202.md)|Module-scope Dim declaration|Information|the syntax tree: a module-level variable with no access modifier|
 |[`RDC00203`](../diagnostics/rdc00203.md)|Multiline parameter declaration|Information|the syntax tree: the range of a `ParameterDeclarationNode`|

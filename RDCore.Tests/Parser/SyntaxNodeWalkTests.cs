@@ -61,7 +61,7 @@ public sealed class SyntaxNodeWalkTests
 
     private static MemberDeclarationNode Procedure()
     {
-        var result = new ModuleParser().Parse(TestUri.TestModuleUri(), Body.Replace("\n", "\r\n") + "\r\n");
+        var result = new ModuleParser().Parse(TestUri.TestModuleUri(), Body.ReplaceLineEndings("\r\n") + "\r\n");
         Assert.IsEmpty(result.SyntaxErrors, string.Join("; ", result.SyntaxErrors.Select(error => error.Verbose)));
         return result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
     }

@@ -34,8 +34,16 @@ public sealed record class ArrayBoundEvaluator(
     public bool TryEvaluate(
         IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression,
         out int value, out RuntimeExecutionOutcome failure)
+        => TryEvaluate(session, context, expression, out value, out _, out failure);
+
+    /// <inheritdoc cref="TryEvaluate(IRuntimeSession, RuntimeEvaluationContext, ExpressionNode, out int, out RuntimeExecutionOutcome)"/>
+    /// <param name="isKnown">Whether the bound is known. When it is not, <paramref name="value"/> is the one its type assumes in its place.</param>
+    public bool TryEvaluate(
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression,
+        out int value, out bool isKnown, out RuntimeExecutionOutcome failure)
     {
         value = 0;
+        isKnown = true;
         var evaluated = Expressions.Evaluate(session, expression, context);
         if (!evaluated.IsSuccess)
         {
@@ -60,6 +68,7 @@ public sealed record class ArrayBoundEvaluator(
         }
 
         value = Convert.ToInt32(coerced.Result!.Handle.Value.BoxedValue);
+        isKnown = !coerced.Result.IsIndeterminate;
         failure = RuntimeExecutionOutcome.Next;
         return true;
     }

@@ -13,7 +13,7 @@ public sealed class ReturnValueAnalysisTests
 {
     private static async Task<ReturnValueFact?> FactOfAsync(string body, string declaration = "Public Function F(ByVal c As Boolean, ByVal n As Long) As Long", string end = "End Function")
     {
-        var program = $"Attribute VB_Name = \"Program\"\r\nOption Explicit\r\n{declaration}\r\n{body.Replace("\n", "\r\n")}\r\n{end}\r\n"
+        var program = $"Attribute VB_Name = \"Program\"\r\nOption Explicit\r\n{declaration}\r\n{body.ReplaceLineEndings("\r\n")}\r\n{end}\r\n"
             + "Private Function G() As Long\r\nG = 1\r\nEnd Function\r\n";
 
         var payload = await ModuleWorkspace.SemanticsAsync([], program);

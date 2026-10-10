@@ -6,6 +6,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Semantics.Flow;
 using System.Collections.Immutable;
@@ -91,6 +92,45 @@ public record class ExpressionFactDto(
     CompileErrorDto? Error);
 
 /// <summary>
+/// A run-time error that code is guaranteed to raise, as it travels.
+/// </summary>
+/// <param name="ErrorId">The number of the error.</param>
+/// <param name="Description">What the error is.</param>
+/// <param name="Verbose">What is wrong, in particular.</param>
+public record class RuntimeErrorDto(int ErrorId, string Description, string Verbose);
+
+/// <summary>
+/// A <see cref="ConversionFact"/>, as it travels.
+/// </summary>
+/// <param name="Node">The syntax node the conversion is evaluated for.</param>
+/// <param name="Location">Where the conversion is.</param>
+/// <param name="Site">The construct that asks for the conversion.</param>
+/// <param name="Source">The name of the declared type of the value that is converted.</param>
+/// <param name="Destination">The name of the type it is converted to.</param>
+/// <param name="Flags">What the conversion does, and what is known about its source.</param>
+/// <param name="IsValueKnown">Whether the value that is converted is known, as opposed to a value its type merely allows.</param>
+/// <param name="Error">The run-time error the conversion raises, when it is guaranteed to.</param>
+public record class ConversionFactDto(
+    SyntaxNodeId Node,
+    SourceLocation Location,
+    ConversionSite Site,
+    string Source,
+    string Destination,
+    ConversionSemanticFlags Flags,
+    bool IsValueKnown,
+    RuntimeErrorDto? Error);
+
+/// <summary>
+/// A <see cref="RuntimeFacts"/>, as it travels.
+/// </summary>
+/// <remarks>
+/// The conversions travel; the operations do not yet: no analyzer reads them.
+/// </remarks>
+/// <param name="Conversions">Every conversion the code of the procedure asks for.</param>
+/// <param name="IsFullyAnalyzed">Whether every instruction of the procedure was evaluated.</param>
+public record class RuntimeFactsDto(ImmutableArray<ConversionFactDto> Conversions, bool IsFullyAnalyzed);
+
+/// <summary>
 /// A <see cref="ProcedureSemanticModel"/>, as it travels.
 /// </summary>
 /// <param name="Procedure">The address of the procedure.</param>
@@ -98,8 +138,10 @@ public record class ExpressionFactDto(
 /// <param name="CompileErrors">What the static pass found wrong with the body.</param>
 /// <param name="Expressions">What it found out about each expression.</param>
 /// <param name="ReturnValue">On how many code paths a function or a property getter assigns its return value, when the pass could tell.</param>
+/// <param name="Runtime">What the language core states about the conversions of the code, or <see langword="null"/> when the procedure has not been evaluated.</param>
 public record class ProcedureSemanticsDto(
-    Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions, ReturnValueFact? ReturnValue = null);
+    Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions, ReturnValueFact? ReturnValue = null,
+    RuntimeFactsDto? Runtime = null);
 
 /// <summary>
 /// A <see cref="DeclarationFact"/>, as it travels.
@@ -149,7 +191,12 @@ public record class ModuleSemanticsDto(
             [.. procedure.CompileErrors.Select(ErrorOf)],
             [.. procedure.Expressions.Values.Select(fact => new ExpressionFactDto(
                 fact.Node, fact.Location, fact.DeclaredType?.Name, fact.Classification, fact.Binding?.Uri, fact.Flags, fact.Error is null ? null : ErrorOf(fact.Error)))],
-            procedure.ReturnValue))],
+            procedure.ReturnValue,
+            procedure.Runtime is null ? null : new RuntimeFactsDto(
+                [.. procedure.Runtime.Conversions.Select(conversion => new ConversionFactDto(
+                    conversion.Node, conversion.Location, conversion.Site, conversion.Source.Name, conversion.Destination.Name, conversion.Flags, conversion.IsValueKnown,
+                    conversion.Error is null ? null : new RuntimeErrorDto(conversion.Error.ErrorId, conversion.Error.Description, conversion.Error.Verbose)))],
+                procedure.Runtime.IsFullyAnalyzed)))],
         [.. model.Declarations.Select(declaration => new DeclarationFactDto(
             declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References,
             declaration.Role))],

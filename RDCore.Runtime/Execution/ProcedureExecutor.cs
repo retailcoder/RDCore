@@ -113,6 +113,81 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             : outcome;
     }
 
+    /// <summary>
+    /// Evaluates every instruction of <paramref name="list"/> once, in the order they are written, and follows no jump.
+    /// </summary>
+    /// <returns>
+    /// Whether every instruction was evaluated: <see langword="false"/> if the evaluation of one failed for a reason that is not the code's
+    /// (<see cref="RuntimeExecutionOutcomeKind.InternalError"/>), or the sweep was cancelled.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// This is what an analysis of the code as a whole does, as opposed to a run of it: a run follows one path for one set of arguments, and
+    /// the branch nobody took is never seen. Each instruction is evaluated by the same evaluator that evaluates it when the code runs, so
+    /// the facts the pipeline's observer is told of are the language's own answer at each place, and not a second reading of the code.
+    /// </para>
+    /// <para>
+    /// A <c>Select Case</c>, a <c>With</c> and a <c>For</c> are opened before they are closed, and so find their state where they look for
+    /// it. An error is the answer of the instruction that raised it and does not stop the sweep, and no handler catches it: the
+    /// next instruction is the one that follows, as it is for the next sweep of the next procedure.
+    /// </para>
+    /// </remarks>
+    public bool Sweep(IRuntimeSession session, ICallStackFrame frame, InstructionList list, RuntimeEvaluationContext context)
+    {
+        var activation = (CallStackFrame)frame;
+        var complete = true;
+
+        foreach (var instruction in list.Items)
+        {
+            if (cancellation.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            activation.Pc = instruction.Offset;
+            RuntimeExecutionOutcome? outcome;
+            try
+            {
+                outcome = SweepInstruction(session, ResolveContext(context, activation, list, instruction), instruction, activation);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // an analysis is the one thing that evaluates code nobody asked to run, so a defect of the platform that a program would never reach in
+                // a run is reached here, in a process that also holds the session the program runs in. It is that instruction's, not the procedure's:
+                // the instructions that follow are still evaluated, and the procedure says it was not all.
+                outcome = RuntimeExecutionOutcome.InternalError;
+            }
+
+            complete &=outcome is not { Kind: RuntimeExecutionOutcomeKind.InternalError };
+        }
+
+        return complete;
+    }
+
+    // the outcome of evaluating the instruction, or null when there was nothing to evaluate. What an instruction does to the program counter is of
+    // no interest here, and a Return, a Resume or an On Error evaluates no expression of the code.
+    private RuntimeExecutionOutcome? SweepInstruction(IRuntimeSession session, RuntimeEvaluationContext context, Instruction instruction, CallStackFrame activation)
+        => instruction.Kind switch
+        {
+            InstructionKind.Simple => statements.Execute(session, context, instruction.Node!),
+            InstructionKind.ConditionalBranch => ExecuteConditionalBranch(session, context, instruction, activation),
+            InstructionKind.LoopBack => ExecuteLoopBack(session, context, instruction, activation),
+            InstructionKind.With => ExecuteWith(session, context, instruction, activation),
+            InstructionKind.Select => ExecuteSelect(session, context, instruction, activation),
+            InstructionKind.ForOpener => ExecuteForOpener(session, context, instruction, activation),
+            InstructionKind.ForNext => ExecuteForNext(session, context, instruction, activation),
+            InstructionKind.ForEachOpener => ExecuteForEachOpener(session, context, instruction, activation),
+            InstructionKind.ForEachNext => ExecuteForEachNext(session, context, instruction, activation),
+            InstructionKind.RaiseError => ExecuteRaiseError(session, context, instruction),
+            InstructionKind.JumpTable => ExecuteJumpTable(session, context, instruction, activation, pushReturn: false),
+            InstructionKind.GoSubTable => ExecuteJumpTable(session, context, instruction, activation, pushReturn: true),
+            InstructionKind.Jump or InstructionKind.ExitLoop or InstructionKind.GoSub or InstructionKind.Return or InstructionKind.ExitProcedure
+                or InstructionKind.Halt or InstructionKind.Break or InstructionKind.OnErrorGoTo or InstructionKind.OnErrorDisable
+                or InstructionKind.OnErrorResumeNext or InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext
+                or InstructionKind.ResumeLabel => null,
+            _ => RuntimeExecutionOutcome.InternalError,
+        };
+
     private RuntimeExecutionOutcome RunInstructions(IRuntimeSession session, ICallStackFrame frame, InstructionList list, RuntimeEvaluationContext context)
     {
         var activation = (CallStackFrame)frame;

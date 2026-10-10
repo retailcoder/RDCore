@@ -10,4 +10,12 @@ internal static class AnalyzerMessages
     /// <param name="message">The localized text of the message, with <c>{0}</c> for the particular.</param>
     /// <param name="particular">What the occurrence is about: usually a name.</param>
     public static string Format(string message, string particular) => string.Format(CultureInfo.CurrentUICulture, message, particular);
+
+    /// <summary>
+    /// A message of a diagnostic, with two particulars of the occurrence in it.
+    /// </summary>
+    /// <param name="message">The localized text of the message, with <c>{0}</c> and <c>{1}</c> for the particulars.</param>
+    /// <param name="first">What the occurrence starts from.</param>
+    /// <param name="second">What the occurrence ends at.</param>
+    public static string Format(string message, string first, string second) => string.Format(CultureInfo.CurrentUICulture, message, first, second);
 }

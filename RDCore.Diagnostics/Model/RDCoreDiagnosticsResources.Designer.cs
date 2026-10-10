@@ -124,15 +124,6 @@ namespace RDCore.Diagnostics.Model {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Conversion implicite (réduction), d&apos;un type numérique à un autre dont la capacité est moindre - attention, un dépassement arithmétique (overflow) est techniquement possible ici..
-        /// </summary>
-        public static string ImplicitNarrowingConversion_Message {
-            get {
-                return ResourceManager.GetString("ImplicitNarrowingConversion_Message", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Coercion numérique implicite (`{toType.Name}`) from `{fromType.Name}`; l&apos;utilisation d&apos;une fonction de conversion explicite améliorerait la traçabilité des types impliqués..
         /// </summary>
         public static string ImplicitNumericCoercion_Message {
@@ -292,6 +283,24 @@ namespace RDCore.Diagnostics.Model {
         public static string ImplicitVariantReturnType_Message {
             get {
                 return ResourceManager.GetString("ImplicitVariantReturnType_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitNarrowingConversion_Message</c>; <c>{0}</c> is the source type, <c>{1}</c> the destination type.
+        /// </summary>
+        public static string ImplicitNarrowingConversion_Message {
+            get {
+                return ResourceManager.GetString("ImplicitNarrowingConversion_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the message of the diagnostic named <c>ImplicitNarrowingConversion_Lossy_Message</c>; <c>{0}</c> is the source type, <c>{1}</c> the destination type.
+        /// </summary>
+        public static string ImplicitNarrowingConversion_Lossy_Message {
+            get {
+                return ResourceManager.GetString("ImplicitNarrowingConversion_Lossy_Message", resourceCulture);
             }
         }
 

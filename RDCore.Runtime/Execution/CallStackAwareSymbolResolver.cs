@@ -115,7 +115,7 @@ public sealed class CallStackAwareSymbolResolver(ICallStack callStack, ISymbolRe
             return false;
         }
 
-        held.SetValue(this, SymbolAddressTable.BoxedValue(value));
+        held.Store(this, SymbolAddressTable.BoxedValue(value), !value.IsIndeterminate);
         return true;
     }
 }

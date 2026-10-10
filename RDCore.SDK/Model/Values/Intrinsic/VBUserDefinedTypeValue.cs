@@ -84,9 +84,12 @@ public record class VBUserDefinedTypeValue : VBTypedValue,
         get
         {
             var index = IndexOf(name);
-            return index < 0 ? null : _fields[index];
+            return index < 0 ? null : ReadField(_fields[index]);
         }
     }
+
+    // a field of a UDT that is not known is not known either, whatever it was assigned: what the UDT holds is as unreliable as the UDT.
+    private VBTypedValue ReadField(VBTypedValue field) => IsIndeterminate ? field.AsIndeterminate() : field;
 
     /// <summary>
     /// The value of the field at <paramref name="index"/> in declaration order, or <c>null</c> when there is
@@ -97,7 +100,7 @@ public record class VBUserDefinedTypeValue : VBTypedValue,
     /// serialize them wants this rather than the name-keyed indexer.
     /// </remarks>
     public VBTypedValue? FieldAt(int index)
-        => index < 0 || index >= _fields.Length ? null : _fields[index];
+        => index < 0 || index >= _fields.Length ? null : ReadField(_fields[index]);
 
     /// <summary>
     /// Replaces the value of the field named <paramref name="name"/>. Mutates the cell in place — field
@@ -133,7 +136,7 @@ public record class VBUserDefinedTypeValue : VBTypedValue,
     /// neither of which constructs a value, so neither goes through the indexer.
     /// </remarks>
     /// <param name="name">The field name, compared case-insensitively.</param>
-    public IBindingHandle? GetFieldHandle(string name) => this[name]?.Handle;
+    public IBindingHandle? GetFieldHandle(string name) => IndexOf(name) is >= 0 and var index ? _fields[index].Handle : null;
 
     public bool Equals(IVBTypedValue<VBUserDefinedTypeValue, MemoryAddress>? other) => Value.Value.Equals(other?.Value.Value);
 

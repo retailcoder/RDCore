@@ -6,6 +6,7 @@ using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract;
@@ -49,7 +50,7 @@ public sealed class ForEachEvaluator(RuntimeExpressionEvaluator expressionEvalua
             }
 
             var handle = session.Symbols.Resolver.GetValue((Symbol)control);
-            handle.SetValue(session.Symbols.Resolver, coercionResult.Result!.RuntimeValue);
+            handle.Store(session.Symbols.Resolver, coercionResult.Result!);
             return RuntimeSemanticsEvaluationResult.Success(coercionResult.Result!);
         }
 

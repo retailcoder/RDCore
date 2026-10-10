@@ -94,7 +94,20 @@ internal sealed class SymbolAddressTable(ISessionStorage storage)
         _ => value.Handle.Value,
     };
 
-    private static IBindingHandle FreshBinding(VBTypedValue value) => value switch
+    private static IBindingHandle FreshBinding(VBTypedValue value)
+    {
+        var cell = FreshCell(value);
+
+        // the cell is known unless the value it starts as is not: it holds the value assumed in its place, and can be assigned.
+        if (value.IsIndeterminate && cell is IKnowledgeBinding knowledge)
+        {
+            knowledge.Forget();
+        }
+
+        return cell;
+    }
+
+    private static IBindingHandle FreshCell(VBTypedValue value) => value switch
     {
         VBArrayValue array => new ValueBindingHandle(new VBRuntimeValue<VBRuntimeArrayValue>(new VBRuntimeArrayValue(array))),
         VBUserDefinedTypeValue udt => new ValueBindingHandle(new VBRuntimeValue<VBRuntimeUserDefinedTypeValue>(new VBRuntimeUserDefinedTypeValue(udt))),
@@ -103,6 +116,8 @@ internal sealed class SymbolAddressTable(ISessionStorage storage)
         {
             ValueBindingHandle => new ValueBindingHandle(value.Handle.Value),
             ReferenceBindingHandle => new ReferenceBindingHandle((VBRuntimeReference)value.Handle.Value),
+            IndeterminateBindingHandle { Assumed: ReferenceBindingHandle } => new ReferenceBindingHandle((VBRuntimeReference)value.Handle.Value),
+            IndeterminateBindingHandle => new ValueBindingHandle(value.Handle.Value),
             _ => value.Handle,
         }
     };

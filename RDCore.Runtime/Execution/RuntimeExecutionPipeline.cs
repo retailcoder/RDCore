@@ -38,14 +38,22 @@ public sealed class RuntimeExecutionPipeline
         ILetCoercionRuntimeSemanticsProvider letCoercion,
         IStatementRuntimeSemanticsProvider statements,
         ProcedureExecutor executor,
-        IProcedureInvoker invoker)
+        IProcedureInvoker invoker,
+        RuntimeProcedureInvoker? sweeper)
     {
         Expressions = expressions;
         LetCoercion = letCoercion;
         Statements = statements;
         Executor = executor;
         Invoker = invoker;
+        Sweeper = sweeper;
     }
+
+    /// <summary>
+    /// Enters a procedure to evaluate every instruction of it (<see cref="RuntimeProcedureInvoker.Sweep"/>); <see langword="null"/> unless the
+    /// pipeline was composed to sweep (<see cref="CreateForSweep"/>).
+    /// </summary>
+    public RuntimeProcedureInvoker? Sweeper { get; }
 
     /// <summary>The Let-coercion strategies, as one provider.</summary>
     public ILetCoercionRuntimeSemanticsProvider LetCoercion { get; }
@@ -84,7 +92,74 @@ public sealed class RuntimeExecutionPipeline
         IVerboseMessageBuilder messages,
         CancellationToken cancellation = default,
         IAnalysisObserver? observer = null)
+        => Build(session, bodies, messages, cancellation, observer, PipelineMode.Run);
+
+    /// <summary>
+    /// Composes the pipeline for <paramref name="session"/>, a session composed to be analyzed (<see cref="RuntimeSessionComposer.ComposeForAnalysis"/>).
+    /// </summary>
+    /// <param name="session">The session every part of the pipeline runs against.</param>
+    /// <param name="bodies">Every procedure's lowered body, keyed by its <see cref="Symbol.SemanticId"/>.</param>
+    /// <param name="messages">Builds the verbose half of a run-time error message.</param>
+    /// <param name="observer">Told of every conversion and operation the analysis evaluates.</param>
+    /// <param name="cancellation">Stops the interpreter between instructions.</param>
+    /// <remarks>
+    /// <para>
+    /// The code runs: assignments, objects, and the workspace's own procedures are evaluated for real, against state that belongs to the
+    /// session. What differs is where the program meets what is not its own: a variable that outlives an activation starts as a value that is
+    /// not known (<see cref="AnalysisDefaults"/>), and a call to the outside world is not made, and yields a value that is not known
+    /// (<see cref="OutsideWorldCallProvider"/>).
+    /// </para>
+    /// </remarks>
+    public static RuntimeExecutionPipeline CreateForAnalysis(
+        IRuntimeSession session,
+        IReadOnlyDictionary<SemanticId, InstructionList> bodies,
+        IVerboseMessageBuilder messages,
+        IAnalysisObserver observer,
+        CancellationToken cancellation = default)
+        => Build(session, bodies, messages, cancellation, observer, PipelineMode.Analysis);
+
+    /// <summary>
+    /// Composes the pipeline for <paramref name="session"/>, a session composed to be analyzed (<see cref="RuntimeSessionComposer.ComposeForAnalysis"/>),
+    /// to sweep the code of a module: every instruction evaluated once, wherever the code paths lead (<see cref="Sweeper"/>).
+    /// </summary>
+    /// <param name="session">The session every part of the pipeline runs against.</param>
+    /// <param name="bodies">Every procedure's lowered body, keyed by its <see cref="Symbol.SemanticId"/>.</param>
+    /// <param name="messages">Builds the verbose half of a run-time error message.</param>
+    /// <param name="observer">Told of every conversion and operation the sweep evaluates.</param>
+    /// <param name="cancellation">Stops the sweep between instructions.</param>
+    /// <remarks>
+    /// <para>
+    /// A sweep follows no path, so it can trust nothing that a path made true: what a variable holds is not known whatever was assigned to it
+    /// (<see cref="RuntimeExpressionEvaluator.AssumesVariables"/>), and a call to a procedure of the workspace returns a value that is not known
+    /// (<see cref="AssumedProcedureInvoker"/>) - the callee is swept as an entry point of its own. What stays known is what the code says: literals
+    /// and constants. Facts that follow from the types alone (a <c>Double</c> narrowed into a <c>Long</c>) are stated for every line, and the
+    /// run-time errors that the values the code says guarantee (<c>Dim b As Byte: b = 300</c>) are stated for the lines that raise them.
+    /// </para>
+    /// </remarks>
+    public static RuntimeExecutionPipeline CreateForSweep(
+        IRuntimeSession session,
+        IReadOnlyDictionary<SemanticId, InstructionList> bodies,
+        IVerboseMessageBuilder messages,
+        IAnalysisObserver observer,
+        CancellationToken cancellation = default)
+        => Build(session, bodies, messages, cancellation, observer, PipelineMode.Sweep);
+
+    private enum PipelineMode
     {
+        Run,
+        Analysis,
+        Sweep,
+    }
+
+    private static RuntimeExecutionPipeline Build(
+        IRuntimeSession session,
+        IReadOnlyDictionary<SemanticId, InstructionList> bodies,
+        IVerboseMessageBuilder messages,
+        CancellationToken cancellation,
+        IAnalysisObserver? observer,
+        PipelineMode mode)
+    {
+        var analysis = mode is not PipelineMode.Run;
         // the parts of the pipeline that state facts share one observation, so that describing a fact is not itself observed.
         var observation = observer is null ? null : new AnalysisObservation(observer);
         var handle = new ProviderHandle();
@@ -140,15 +215,20 @@ public sealed class RuntimeExecutionPipeline
         // last edge of the cycle is closed by assignment rather than by construction.
         // the standard library is part of every session (RD-VBAL 6.1), so the dispatcher that reaches it is
         // composed here with the rest of the pipeline rather than being something a caller opts into.
-        var invoker = new RuntimeProcedureInvoker(session, bodies, executor);
-        // the standard library is part of every session (RD-VBAL 6.1), so the dispatcher that reaches it is
-        // composed here with the rest of the pipeline rather than being something a caller opts into.
+        var running = new RuntimeProcedureInvoker(session, bodies, executor);
+        // a sweep calls nothing: it enters each procedure itself, and a call is the value that the procedure is declared to return.
+        IProcedureInvoker invoker = mode is PipelineMode.Sweep ? new AssumedProcedureInvoker() : running;
         // every external call goes through the pipeline: the interceptors see it and may refuse it, then
         // whichever provider can reach it runs it.
-        var external = ExternalCallPipeline.For(session, [StdLibDispatcher.For(session)]);
+        // an analysis does not make a call the platform does not run itself, and no policy decides whether it may: the outside world answers
+        // with a value that is not known.
+        var external = analysis
+            ? new ExternalCallPipeline(session, [], [StdLibDispatcher.For(session), new OutsideWorldCallProvider()])
+            : ExternalCallPipeline.For(session, [StdLibDispatcher.For(session)]);
         var bindings = new RuntimeCallableBindingFactory(invoker, external);
         expressions.ProcedureInvoker = invoker;
         expressions.Bindings = bindings;
+        expressions.AssumesVariables = mode is PipelineMode.Sweep;
         // a default member is invoked the same way any member is, and it was reaching neither engine before:
         // nothing assigned these, so every default-member Let-coercion reported an internal error.
         objectCoercion.ProcedureInvoker = invoker;
@@ -160,9 +240,19 @@ public sealed class RuntimeExecutionPipeline
         // an object's lifecycle events run its class's handlers, which is code only this pipeline can run.
         session.Lifecycle = new ClassLifecycle(session, bindings);
         // a fixed-size array is as big as its declaration says, which takes evaluating its bounds: this is what can.
-        session.Symbols.Defaults = new DeclaredVariableDefaults(session, new ArrayBoundEvaluator(expressions, letCoercion));
+        var defaults = new DeclaredVariableDefaults(session, new ArrayBoundEvaluator(expressions, letCoercion));
+        if (analysis)
+        {
+            // the session shares the declared symbols of another, and holds none of its storage yet: what that starts as is the analysis's to say.
+            session.Symbols.Defaults = new AnalysisDefaults(defaults);
+            ((SessionSymbols)session.Symbols).AllocateDeclaredStorage();
+        }
+        else
+        {
+            session.Symbols.Defaults = defaults;
+        }
 
-        return new RuntimeExecutionPipeline(expressions, letCoercion, statements, executor, invoker);
+        return new RuntimeExecutionPipeline(expressions, letCoercion, statements, executor, invoker, mode is PipelineMode.Sweep ? running : null);
     }
 
     /// <summary>

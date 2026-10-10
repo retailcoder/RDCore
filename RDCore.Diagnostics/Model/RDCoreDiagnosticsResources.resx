@@ -138,9 +138,6 @@
   <data name="ImplicitLetCoercion_message" xml:space="preserve">
     <value>Coercion `Let` implicite (`{toType.Name}`) de `{fromType.Name}`; invoquer explicitement les membres visés évite les appels implicites "magiques" qui sont difficiles à suivre et à comprendre sans tracer d'obscurs attributs cachés.</value>
   </data>
-  <data name="ImplicitNarrowingConversion_Message" xml:space="preserve">
-    <value>Conversion implicite (réduction), d'un type numérique à un autre dont la capacité est moindre - attention, un dépassement arithmétique (overflow) est techniquement possible ici.</value>
-  </data>
   <data name="ImplicitNumericCoercion_Message" xml:space="preserve">
     <value>Coercion numérique implicite (`{toType.Name}`) from `{fromType.Name}`; l'utilisation d'une fonction de conversion explicite améliorerait la traçabilité des types impliqués.</value>
   </data>
@@ -194,6 +191,12 @@
   </data>
   <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
     <value>'{0}' retourne implicitement un Variant. Indiquez son type de retour avec une clause As (As Variant, si c'est voulu).</value>
+  </data>
+  <data name="ImplicitNarrowingConversion_Message" xml:space="preserve">
+    <value>Une valeur de type {0} est convertie implicitement en {1}, et elle pourrait ne pas y tenir. Si la conversion est voulue, dites-le avec une fonction de conversion.</value>
+  </data>
+  <data name="ImplicitNarrowingConversion_Lossy_Message" xml:space="preserve">
+    <value>Une valeur de type {0} est convertie implicitement en {1}, et sa partie fractionnaire est arrondie (au nombre pair lorsqu'elle est exactement &#224; mi-chemin). Si la conversion est voulue, dites-le avec une fonction de conversion.</value>
   </data>
   <data name="IntegerDataTypeDeclaration_Message" xml:space="preserve">
     <value>Integer est un type de 16 bits qui d&#233;borde &#224; 32 767. Utilisez un Long, sauf si une proc&#233;dure ou un format de fichier attend un Integer.</value>

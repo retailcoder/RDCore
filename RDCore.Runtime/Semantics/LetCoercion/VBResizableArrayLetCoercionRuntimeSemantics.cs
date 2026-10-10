@@ -96,6 +96,6 @@ public record class VBResizableArrayLetCoercionRuntimeSemantics(
     // An element with no readable binding - a Variant, UDT or Object cell that was never assigned - stays inert.
     private static IBindingHandle CopyOfElement(IBindingHandle element)
         => element.BindingCapabilities.HasFlag(BindingCapabilities.GetValue)
-            ? new ValueBindingHandle(element.Value)
+            ? BindingKnowledge.NewCell(element.Value, element is not IKnowledgeBinding { IsKnown: false })
             : InvalidBindingHandle.Default;
 }

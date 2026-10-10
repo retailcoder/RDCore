@@ -20,6 +20,7 @@ using RDCore.SDK.Runtime.StdLib;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Services.VerboseMessages;
+using RDCore.Tests.Semantics.Runtime;
 using System.IO.Abstractions;
 
 namespace RDCore.Tests.Runtime;
@@ -124,6 +125,24 @@ internal static class RuntimeSourceHarness
     public static (IRuntimeSession Session, RuntimeExecutionOutcome Outcome) Run(
         IFileSystem? fileSystem, IEnumerable<Symbol> symbols, IRuntimeOutput? output, bool standardLibrary,
         Action<IRuntimeSession>? arrange, ModuleDirectives directives, IAnalysisObserver? observer, params string[] body)
+        => Run(fileSystem, symbols, output, standardLibrary, arrange, directives, observer, analyze: false, body);
+
+    /// <summary>
+    /// <inheritdoc cref="Run(IFileSystem?, IEnumerable{Symbol}, string[])" path="/summary"/>
+    /// </summary>
+    /// <param name="fileSystem">The file system the session's file channels open against.</param>
+    /// <param name="symbols">The symbols the source refers to.</param>
+    /// <param name="output">Where the body's <c>Debug.Print</c> output goes, or <c>null</c> to discard it.</param>
+    /// <param name="standardLibrary">Whether the library's own symbols are defined too.</param>
+    /// <param name="arrange">What to do to the composed session before the body runs.</param>
+    /// <param name="directives">The module dials the body runs under.</param>
+    /// <param name="observer">Told of every conversion and operation the body evaluates, or <c>null</c> to run it unobserved.</param>
+    /// <param name="analyze">Whether the body is analyzed rather than run: in a session that shares the declared symbols of the composed one
+    /// and holds the run-time state of its own (<see cref="RuntimeSessionComposer.ComposeForAnalysis"/>). The session returned is that one.</param>
+    /// <param name="body">The statements, one per line.</param>
+    public static (IRuntimeSession Session, RuntimeExecutionOutcome Outcome) Run(
+        IFileSystem? fileSystem, IEnumerable<Symbol> symbols, IRuntimeOutput? output, bool standardLibrary,
+        Action<IRuntimeSession>? arrange, ModuleDirectives directives, IAnalysisObserver? observer, bool analyze, params string[] body)
     {
         // resolution walks the scope tree, so the module and the procedure have to be in it as symbols and
         // not only as a call frame: a name resolved from a procedure Uri no node exists for resolves to
@@ -172,8 +191,16 @@ internal static class RuntimeSourceHarness
             new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false), [], providers,
             output: output, fileSystem: fileSystem);
 
-        var pipeline = RuntimeExecutionPipeline.Create(
-            session, new Dictionary<SemanticId, InstructionList>(), Substitute.For<IVerboseMessageBuilder>(), observer: observer);
+        if (analyze)
+        {
+            session = RuntimeSessionComposer.ComposeForAnalysis(session);
+        }
+
+        var pipeline = analyze
+            ? RuntimeExecutionPipeline.CreateForAnalysis(
+                session, new Dictionary<SemanticId, InstructionList>(), Substitute.For<IVerboseMessageBuilder>(), observer ?? new RecordingAnalysisObserver())
+            : RuntimeExecutionPipeline.Create(
+                session, new Dictionary<SemanticId, InstructionList>(), Substitute.For<IVerboseMessageBuilder>(), observer: observer);
 
         var procedureUri = procedure.Uri;
         var nodeId = new SyntaxNodeId(procedureUri.AbsolutePath, [1]);
