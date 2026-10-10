@@ -128,7 +128,8 @@ public static class DeclarationStaticSemanticsEvaluator
 
             foreach (var parameter in ParametersOf(member))
             {
-                CheckDeclaredType(module, parameter, parameter.SelectionRange, member.ParentUri, resolver, errors);
+                CheckDeclaredType(module, parameter, parameter.SelectionRange, member.ParentUri, resolver, errors,
+                    mayBeAny: member is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol);
             }
 
             foreach (var local in LocalsOf(member))
@@ -154,9 +155,12 @@ public static class DeclarationStaticSemanticsEvaluator
     };
 
     private static void CheckDeclaredType(
-        Symbol module, Symbol declared, SourceRange range, Uri document, ISymbolResolver resolver, ImmutableArray<VBCompileErrorInfo>.Builder errors)
+        Symbol module, Symbol declared, SourceRange range, Uri document, ISymbolResolver resolver, ImmutableArray<VBCompileErrorInfo>.Builder errors, bool mayBeAny = false)
     {
-        if (declared is not ITypedSymbol { ResolvedType: var type } || Unresolved(type) is not { } name || Resolves(name, module, resolver))
+        if (declared is not ITypedSymbol { ResolvedType: var type } || Unresolved(type) is not { } name || Resolves(name, module, resolver)
+            // `As Any` is a type only of a parameter of an external procedure, which takes whatever it is given (MS-VBAL §5.2.3.5 leaves its parameters to the
+            // implementation).
+            || mayBeAny && string.Equals(name, VBTypeNames.VBAny, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -183,7 +187,7 @@ public static class DeclarationStaticSemanticsEvaluator
         var split = name.LastIndexOf('.');
         var (qualifier, typeName) = split < 0 ? ((string?)null, name) : (name[..split], name[(split + 1)..]);
 
-        return qualifier is null && IntrinsicVBTypes.TryResolve(typeName, out _)
+        return qualifier is null && IntrinsicVBTypes.IsIntrinsic(typeName)
             || VBProjectSymbol.ResolveQualifiedType(resolver, qualifier, typeName, module.Uri).IsResolved;
     }
 }

@@ -21,14 +21,15 @@ namespace RDCore.LanguageServer.Symbols;
 /// resolver composed with those symbols is available. A reserved data-type name is a type, never a
 /// value, so it binds in the type binding context only.
 /// </remarks>
-internal sealed class IntrinsicSymbolResolver : ISymbolResolver
+/// <param name="is64Bit">Whether the environment is 64-bit: what <c>LongPtr</c> is an alias of.</param>
+internal sealed class IntrinsicSymbolResolver(bool is64Bit = true) : ISymbolResolver
 {
     /// <inheritdoc/>
     public SymbolResolutionResult ResolveValue(string name, ScopeKind scope, Uri handle) => SymbolResolutionResult.Unbound;
 
     /// <inheritdoc/>
     public SymbolResolutionResult ResolveType(string name, ScopeKind scope, Uri handle)
-        => IntrinsicVBTypes.TryResolve(name, out var type) || IntrinsicVBTypes.TryResolveTypeHint(name, out type)
+        => IntrinsicVBTypes.TryResolve(name, is64Bit, out var type) || IntrinsicVBTypes.TryResolveTypeHint(name, out type)
             ? SymbolResolutionResult.Resolved(new StaticSymbol(name, SymbolKindExt.TypeDescriptor, type))
             : SymbolResolutionResult.Unbound;
 

@@ -1134,7 +1134,8 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        if (BindArguments(session, context, parameters, argumentNodes, out var arguments) is { } bindingError)
+        if (BindArguments(session, context, parameters, argumentNodes, out var arguments, external: procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol)
+            is { } bindingError)
         {
             return bindingError;
         }
@@ -1242,10 +1243,15 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     /// <param name="parameters">The parameters of whatever is called, without its <c>Me</c>.</param>
     /// <param name="argumentNodes">The arguments, as written.</param>
     /// <param name="arguments">What the call is made with, one per parameter. Empty when binding failed.</param>
+    /// <param name="external">
+    /// Whether what is called is a <c>Declare</c>d procedure, whose arguments are passed the way a native library takes them: a <c>ByVal String</c> is the
+    /// buffer of the variable it names, which the library may write to and which takes what it wrote, and an <c>As Any</c> parameter takes a variable of any
+    /// type by reference.
+    /// </param>
     /// <returns>The error that stopped the binding, or <see langword="null"/> when every argument was bound.</returns>
     private RuntimeSemanticsEvaluationResult? BindArguments(
         IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<VBParameterSymbol> parameters,
-        ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments)
+        ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments, bool external = false)
     {
         arguments = [];
         if (LetCoercionProvider is null)
@@ -1301,8 +1307,8 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 continue;
             }
 
-            if (RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind)
-                && TryResolveByRefArgument(session, context, argumentNode, parameter, out var reference))
+            var aliased = RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || external && parameter.ResolvedType is VBStringType;
+            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, out var reference, external))
             {
                 bound[i] = reference;
                 continue;
@@ -1333,6 +1339,13 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 }
 
                 bound[i] = setResult.Result!.RuntimeValue;
+                continue;
+            }
+
+            // `As Any` has no type to coerce to: the argument is passed as what it is.
+            if (external && parameter.ResolvedType is VBUnknownType)
+            {
+                bound[i] = argumentResult.Value.Result!.RuntimeValue;
                 continue;
             }
 
@@ -1509,9 +1522,20 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     // than-spec gap rather than a wrong result). Anything else (an expression, a literal, a mismatched-
     // type argument, a read-only target) falls through to the same Let-coerced copy every ByVal argument
     // already gets - MS-VBAL's own "otherwise" case, never an error.
-    private bool TryResolveByRefArgument(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode argument, VBParameterSymbol parameter, out VBRuntimeReference reference)
+    private bool TryResolveByRefArgument(
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode argument, VBParameterSymbol parameter, out VBRuntimeReference reference, bool external = false)
     {
         reference = VBRuntimeReference.NullRef;
+
+        // `As Any` is a parameter of a Declare that takes whatever it is given, a variable of any type by reference.
+        if (external && parameter.ResolvedType is VBUnknownType && argument is SimpleNameExpressionNode anyName
+            && session.Symbols.Resolver.ResolveValue(anyName, ScopeKind.Local, context.Scope).Symbol is { } anySymbol and ITypedSymbol
+            && session.Symbols.Resolver.TryGetAddress(anySymbol, out var anyAddress))
+        {
+            reference = new VBRuntimeReference(anyAddress);
+            return true;
+        }
+
         if (argument is MemberAccessExpressionNode memberAccess)
         {
             return TryResolveFieldByRefArgument(session, context, memberAccess, parameter, out reference);

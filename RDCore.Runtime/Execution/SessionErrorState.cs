@@ -28,10 +28,11 @@ internal sealed class SessionErrorState(ICallStack callStack) : ISessionErrorSta
     /// <inheritdoc/>
     public int HelpContext { get; set; }
 
-    // nothing can set this: no Declare'd procedure can be invoked yet. It is here because
-    // Err.LastDllError has to read something, and 0 is what VBA reports when no DLL call has failed.
     /// <inheritdoc/>
-    public int LastDllError => 0;
+    public int LastDllError { get; private set; }
+
+    /// <inheritdoc/>
+    public void RecordDllError(int code) => LastDllError = code;
 
     /// <inheritdoc/>
     public VBStackTrace StackTrace { get; private set; } = VBStackTrace.Empty;
@@ -62,6 +63,9 @@ internal sealed class SessionErrorState(ICallStack callStack) : ISessionErrorSta
         HelpContext = 0;
         LineNumber = 0;
         StackTrace = VBStackTrace.Empty;
+
+        // MS-VBAL §6.1.3.2.1.1: "clears all property settings of the Err object", the one a DLL call sets among them.
+        LastDllError = 0;
 
         return had;
     }
