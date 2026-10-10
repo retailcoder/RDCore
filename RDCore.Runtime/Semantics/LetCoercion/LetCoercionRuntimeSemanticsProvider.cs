@@ -273,6 +273,24 @@ public class LetCoercionRuntimeSemanticsProvider(
             frame = frame with { DestinationTypeDesc = new VBTypeDescValue(VBLongType.TypeInfo) };
         }
 
+        // MS-VBAL §2.2: LongPtr is a type alias, of LongLong in a 64-bit environment and of Long in a 32-bit one - and is let-coerced to as what it is an alias of.
+        if (frame.DestinationTypeDesc.Target is VBLongPtrType_x64 or VBLongPtrType_x86)
+        {
+            frame = frame with
+            {
+                DestinationTypeDesc = new VBTypeDescValue(frame.DestinationTypeDesc.Target is VBLongPtrType_x64 ? VBLongLongType.TypeInfo : VBLongType.TypeInfo),
+            };
+        }
+
+        // and a LongPtr source is the value of what it is an alias of.
+        if (frame.SourceValue is VBLongPtrValue pointer)
+        {
+            frame = frame with
+            {
+                SourceValue = pointer.TypeInfo is VBLongPtrType_x64 ? new VBLongLongValue(pointer.Value) : new VBLongValue(unchecked((int)pointer.Value)),
+            };
+        }
+
         // MS-VBAL §5.5.1.2.13's "Any class -> Any type" and "Nothing -> Any type" rules don't key off
         // the destination at all - like the Variant unwrap above, destination-based dispatch alone
         // would only ever reach VBObjectLetCoercionRuntimeSemantics when the destination itself is an

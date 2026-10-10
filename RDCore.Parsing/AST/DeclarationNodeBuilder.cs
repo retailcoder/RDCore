@@ -6,6 +6,7 @@ using RDCore.SDK.Model.AST.Directives;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Source;
+using RDCore.SDK.Model.Values.Intrinsic;
 using System.Collections.Immutable;
 using System.Linq;
 
@@ -40,9 +41,10 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
         var isPtrSafe = context.PTRSAFE() is not null;
         // `Declare Sub Foo Lib` with the string half-typed: recovery inserts a synthetic STRINGLITERAL
         // whose text is "<missing STRINGLITERAL>". That is not a library name.
+        // MS-VBAL §5.2.3.5 names "the data value of the <STRING> element": the delimiters are not the library's name, and a doubled quote is one.
         var literals = context.STRINGLITERAL();
-        var lib = (literals.Length > 0 ? literals[0].RealText() : null) ?? string.Empty;
-        var alias = literals.Length > 1 ? literals[1].RealText() : null;
+        var lib = (literals.Length > 0 ? literals[0].RealText() is { } libText ? VBStringValue.FromLiteralToken(libText).Value : null : null) ?? string.Empty;
+        var alias = literals.Length > 1 && literals[1].RealText() is { } aliasText ? VBStringValue.FromLiteralToken(aliasText).Value : null;
 
         var location = context.GetSourceLocation(_rootUri);
         var modifier = ParseAccessModifier(context.visibility()?.GetText());

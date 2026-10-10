@@ -97,7 +97,7 @@ internal sealed class DefineSymbolsHandler(
 
         VBType? ResolveType(string typeName)
         {
-            if (IntrinsicVBTypes.TryResolve(typeName, out var type))
+            if (IntrinsicVBTypes.TryResolve(typeName, session.Environment.Is64Bit, out var type))
             {
                 return type;
             }

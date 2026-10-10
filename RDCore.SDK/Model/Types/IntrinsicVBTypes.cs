@@ -55,6 +55,33 @@ public static class IntrinsicVBTypes
         => _byName.TryGetValue(typeName, out type);
 
     /// <summary>
+    /// Resolves an intrinsic type by its reserved name (case-insensitive), <c>LongPtr</c> among them, as an environment of the given bitness has it.
+    /// </summary>
+    /// <remarks>
+    /// MS-VBAL §2.2: "an implementation-defined LongPtr type alias is also defined", a <c>Long</c> on a 32-bit implementation and a <c>LongLong</c> on a 64-bit one -
+    /// which is why it is a name only an environment can resolve.
+    /// </remarks>
+    /// <param name="typeName">The name.</param>
+    /// <param name="is64Bit">Whether the environment is 64-bit.</param>
+    /// <param name="type">The type.</param>
+    public static bool TryResolve(string typeName, bool is64Bit, [NotNullWhen(true)] out VBType? type)
+    {
+        if (string.Equals(typeName, VBTypeNames.VBLongPtr, StringComparison.OrdinalIgnoreCase))
+        {
+            type = is64Bit ? VBLongPtrType_x64.TypeInfo : VBLongPtrType_x86.TypeInfo;
+            return true;
+        }
+
+        return TryResolve(typeName, out type);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="typeName"/> is the name of an intrinsic type, whatever the bitness of the environment: <c>LongPtr</c> is one in every environment.
+    /// </summary>
+    /// <param name="typeName">The name.</param>
+    public static bool IsIntrinsic(string typeName) => TryResolve(typeName, is64Bit: true, out _);
+
+    /// <summary>
     /// Resolves the intrinsic type named by an MS-VBAL 3.3.1 type-declaration character
     /// (<c>%</c>, <c>&amp;</c>, <c>^</c>, <c>!</c>, <c>#</c>, <c>@</c>, <c>$</c>).
     /// </summary>
