@@ -90,6 +90,32 @@ internal sealed class SymbolTable
     public ScopeTree ScopeTree => _scopeTree ??= ScopeTreeBuilder.Build(All());
 
     /// <summary>
+    /// A copy of the table as it is now, which nothing that is done to this one reaches, and so is safe to read from another thread.
+    /// </summary>
+    /// <remarks>
+    /// The symbols are immutable and are not copied, only the tiers that hold them; the scope tree is built once and not changed after it is built (a table that
+    /// changes builds another), so the copy shares it. This is taken by whoever owns the table, on the thread that changes it: the copy is consistent as of that call.
+    /// </remarks>
+    public SymbolTable Snapshot()
+    {
+        var snapshot = new SymbolTable();
+        foreach (var (tier, copy) in new[]
+        {
+            (_globalSymbols, snapshot._globalSymbols), (_workspaceSymbols, snapshot._workspaceSymbols),
+            (_instanceSymbols, snapshot._instanceSymbols), (_localSymbols, snapshot._localSymbols),
+        })
+        {
+            foreach (var (identity, symbol) in tier)
+            {
+                copy.Add(identity, symbol);
+            }
+        }
+
+        snapshot._scopeTree = ScopeTree;
+        return snapshot;
+    }
+
+    /// <summary>
     /// Adds <paramref name="symbol"/> to the tier its scope belongs to.
     /// </summary>
     /// <returns><see langword="false"/> if that tier already holds the declaration: the first one wins.</returns>

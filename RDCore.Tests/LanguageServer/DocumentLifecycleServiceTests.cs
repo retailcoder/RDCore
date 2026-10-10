@@ -9,6 +9,7 @@ using RDCore.LanguageServer.Workspace.Services;
 using RDCore.LanguageServer.Workspace.States;
 using RDCore.Parsing;
 using RDCore.SDK.Model.AST;
+using RDCore.SDK.Model.Diagnostics;
 using System.IO.Abstractions.TestingHelpers;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -40,8 +41,11 @@ public sealed class DocumentLifecycleServiceTests
 
         _parsing.ParseDocumentAsync(Arg.Any<Uri>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(new ModuleParser().Parse((Uri)call[0], "Public Sub Foo()\r\nEnd Sub")));
-        _diagnostics.GetAsync(Arg.Any<Uri>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        // the static phase finds one thing, and the runtime phase nothing: one publication.
+        _diagnostics.GetPhaseAsync(Arg.Any<Uri>(), AnalysisPhase.Static, Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(DocumentDiagnosticsResult.Fresh(1, [Diagnostic()])));
+        _diagnostics.GetPhaseAsync(Arg.Any<Uri>(), AnalysisPhase.Runtime, Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult(DocumentDiagnosticsResult.Fresh(1, [])));
 
         _sut = new DocumentLifecycleService(_documents, _parsing, _symbols, _diagnostics, _publisher, NullLogger<DocumentLifecycleService>.Instance);
     }
@@ -63,9 +67,61 @@ public sealed class DocumentLifecycleServiceTests
             _parsing.Invalidate(Mod1);
             _parsing.ParseDocumentAsync(Mod1, Arg.Any<CancellationToken>());
             _symbols.SyncDocumentAsync(Mod1, Arg.Any<CancellationToken>());
-            _diagnostics.GetAsync(Mod1, null, Arg.Any<CancellationToken>());
+            _diagnostics.GetPhaseAsync(Mod1, AnalysisPhase.Static, Arg.Any<CancellationToken>());
             _publisher.Publish(Mod1, 4, Arg.Any<IReadOnlyList<Diagnostic>>());
+            _diagnostics.GetPhaseAsync(Mod1, AnalysisPhase.Runtime, Arg.Any<CancellationToken>());
         });
+    }
+
+    [TestMethod]
+    public async Task WhatIsReady_IsPublished_BeforeTheSlowPhaseIsDone_AndTheSlowPhaseAddsToIt()
+    {
+        var runtimeStarted = new TaskCompletionSource();
+        var releaseRuntime = new TaskCompletionSource();
+        _diagnostics.GetPhaseAsync(Mod1, AnalysisPhase.Runtime, Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                runtimeStarted.SetResult();
+                await releaseRuntime.Task;
+                return DocumentDiagnosticsResult.Fresh(4, [Diagnostic(), Diagnostic()]);
+            });
+        var published = new List<int>();
+        _publisher.When(publisher => publisher.Publish(Mod1, 4, Arg.Any<IReadOnlyList<Diagnostic>>()))
+            .Do(call => published.Add(call.Arg<IReadOnlyList<Diagnostic>>().Count));
+
+        _sut.Opened(Mod1, "Public Sub Foo()\r\nEnd Sub", version: 4);
+        await runtimeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        CollectionAssert.AreEqual(new[] { 1 }, published, "the static findings are with the client while the runtime phase is still being found");
+
+        releaseRuntime.SetResult();
+        await _sut.WhenRefreshedAsync(Mod1);
+
+        CollectionAssert.AreEqual(new[] { 1, 3 }, published, "and the next publication is all of it, since a publication replaces the one before");
+    }
+
+    [TestMethod]
+    public async Task ARefreshSupersededWhileTheSlowPhaseRuns_PublishesNothingMoreForTheTextThatIsGone()
+    {
+        var runtimeStarted = new TaskCompletionSource();
+        var releaseRuntime = new TaskCompletionSource();
+        _diagnostics.GetPhaseAsync(Mod1, AnalysisPhase.Runtime, Arg.Any<CancellationToken>())
+            .Returns(async call =>
+            {
+                runtimeStarted.TrySetResult();
+                await releaseRuntime.Task;
+                return DocumentDiagnosticsResult.Fresh(1, [Diagnostic()]);
+            });
+
+        _sut.Opened(Mod1, "a", version: 1);
+        await runtimeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        _publisher.ClearReceivedCalls();
+
+        _ = _sut.Changed(Mod1, 2, [Full("b")]);
+        releaseRuntime.SetResult();
+        await _sut.WhenRefreshedAsync(Mod1);
+
+        _publisher.DidNotReceive().Publish(Mod1, 1, Arg.Any<IReadOnlyList<Diagnostic>>());
     }
 
     // ---- didChange ----

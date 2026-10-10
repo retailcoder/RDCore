@@ -1,0 +1,177 @@
+using RDCore.Runtime.Execution;
+using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Facts;
+using System.Collections.Immutable;
+
+namespace RDCore.Tests.Runtime.Execution;
+
+/// <summary>
+/// The model of a module is stored as soon as the static pass has made it, and the facts of evaluating its code are added when they are ready: what is ready is
+/// not made to wait for what is not.
+/// </summary>
+[TestClass]
+[TestCategory("RD-VBAL §5.0.3 Semantic Analysis")]
+public sealed class SemanticModelStoreTests
+{
+    private static readonly Uri Module = new("file:///c:/ws/Mod1.bas#Mod1");
+    private static readonly SemanticId Procedure = new(new Uri("file:///c:/ws/Mod1.bas#Mod1.Run"));
+
+    private static ModuleSemanticModel Model(params SemanticId[] procedures)
+        => new(Module, [], [.. procedures.Select(procedure => new ProcedureSemanticModel(procedure, []))]);
+
+    private static ImmutableDictionary<SemanticId, RuntimeFacts> Facts(bool isFullyAnalyzed = true)
+        => ImmutableDictionary<SemanticId, RuntimeFacts>.Empty.Add(Procedure, new RuntimeFacts([], [], isFullyAnalyzed));
+
+    private static RuntimeFacts? RuntimeOf(SemanticModelStore store, int procedure = 0)
+        => store.TryGet(Module, out var model) ? model.Procedures[procedure].Runtime : throw new AssertFailedException("no model");
+
+    [TestMethod]
+    public async Task TheModel_IsThereBeforeItsFacts_AndTheFactsAreAddedWhenTheyAreReady()
+    {
+        var store = new SemanticModelStore();
+        using var release = new ManualResetEventSlim();
+
+        store.Store(Model(Procedure), _ =>
+        {
+            release.Wait();
+            return Facts();
+        });
+
+        Assert.IsTrue(store.TryGet(Module, out _), "the static model is not held back");
+        Assert.IsNull(RuntimeOfModel(store), "and it does not say the code was evaluated: it was not, yet");
+
+        release.Set();
+        await store.WhenEvaluatedAsync(Module);
+
+        Assert.IsNotNull(RuntimeOfModel(store));
+
+        static RuntimeFacts? RuntimeOfModel(SemanticModelStore store) => RuntimeOf(store);
+    }
+
+    [TestMethod]
+    public async Task AModuleStoredWithNothingToEvaluate_HasNothingToWaitFor()
+    {
+        var store = new SemanticModelStore();
+        store.Store(Model(Procedure));
+
+        await store.WhenEvaluatedAsync(Module).WaitAsync(TimeSpan.FromSeconds(5));
+        await store.WhenAllEvaluatedAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.IsNull(RuntimeOf(store));
+    }
+
+    [TestMethod]
+    public async Task AModuleStoredAgain_StopsTheEvaluationOfTheModelItReplaced_AndKeepsNoFactsOfIt()
+    {
+        var store = new SemanticModelStore();
+        using var releaseFirst = new ManualResetEventSlim();
+        using var firstStarted = new ManualResetEventSlim();
+        CancellationToken firstToken = default;
+
+        store.Store(Model(Procedure), token =>
+        {
+            firstToken = token;
+            firstStarted.Set();
+            releaseFirst.Wait();
+            return Facts(isFullyAnalyzed: false);
+        });
+        Assert.IsTrue(firstStarted.Wait(TimeSpan.FromSeconds(5)));
+
+        var second = Facts(isFullyAnalyzed: true);
+        store.Store(Model(Procedure), _ => second);
+        await store.WhenEvaluatedAsync(Module);
+
+        releaseFirst.Set();
+        await Task.Delay(100);
+
+        Assert.IsTrue(firstToken.IsCancellationRequested, "the evaluation of the code that is gone is told to stop");
+        Assert.IsTrue(RuntimeOf(store)!.IsFullyAnalyzed, "and what it found, if it found it anyway, is not the model's");
+    }
+
+    [TestMethod]
+    public async Task AWaitForAModule_IsAWaitForTheModelAsItIsWhenTheWaitIsOver()
+    {
+        var store = new SemanticModelStore();
+        using var releaseFirst = new ManualResetEventSlim();
+        store.Store(Model(Procedure), _ =>
+        {
+            releaseFirst.Wait();
+            return Facts(isFullyAnalyzed: false);
+        });
+
+        var waiting = store.WhenEvaluatedAsync(Module);
+        store.Store(Model(Procedure), _ => Facts(isFullyAnalyzed: true));
+        releaseFirst.Set();
+        await waiting.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.IsTrue(RuntimeOf(store)!.IsFullyAnalyzed);
+    }
+
+    [TestMethod]
+    public async Task ARemovedModule_StopsItsEvaluation()
+    {
+        var store = new SemanticModelStore();
+        using var release = new ManualResetEventSlim();
+        using var started = new ManualResetEventSlim();
+        CancellationToken token = default;
+        store.Store(Model(Procedure), t =>
+        {
+            token = t;
+            started.Set();
+            release.Wait();
+            return Facts();
+        });
+        Assert.IsTrue(started.Wait(TimeSpan.FromSeconds(5)));
+
+        Assert.IsTrue(store.Remove(Module));
+        Assert.IsTrue(token.IsCancellationRequested);
+
+        release.Set();
+        await store.WhenEvaluatedAsync(Module).WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Delay(100);
+        Assert.IsFalse(store.TryGet(Module, out _), "the facts of a module that is gone do not bring it back");
+    }
+
+    [TestMethod]
+    public async Task AnEvaluationThatFails_LeavesTheModelAsItWas_NotEvaluated()
+    {
+        var store = new SemanticModelStore();
+        store.Store(Model(Procedure), _ => throw new InvalidOperationException("a defect of the evaluation"));
+
+        await store.WhenEvaluatedAsync(Module).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.IsNull(RuntimeOf(store), "no facts are made up for it");
+    }
+
+    [TestMethod]
+    public async Task ADeclarationThatRepeatsAnother_DoesNotGetTheFactsOfTheFirst()
+    {
+        var store = new SemanticModelStore();
+        store.Store(Model(Procedure, Procedure), _ => Facts());
+
+        await store.WhenEvaluatedAsync(Module);
+
+        Assert.IsNotNull(RuntimeOf(store, 0));
+        Assert.IsNull(RuntimeOf(store, 1), "its code is not what the session has");
+    }
+
+    [TestMethod]
+    public async Task AWaitThatIsCancelled_StopsWaiting_NotTheEvaluation()
+    {
+        var store = new SemanticModelStore();
+        using var release = new ManualResetEventSlim();
+        store.Store(Model(Procedure), _ =>
+        {
+            release.Wait();
+            return Facts();
+        });
+
+        using var cancellation = new CancellationTokenSource(50);
+        await Assert.ThrowsAsync<OperationCanceledException>(() => store.WhenEvaluatedAsync(Module, cancellation.Token));
+
+        release.Set();
+        await store.WhenEvaluatedAsync(Module).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.IsNotNull(RuntimeOf(store));
+    }
+}

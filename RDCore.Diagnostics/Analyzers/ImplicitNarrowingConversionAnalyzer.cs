@@ -21,6 +21,8 @@ internal sealed class ImplicitNarrowingConversionAnalyzer : IModuleAnalyzer
 {
     private const ConversionSemanticFlags Reported = ConversionSemanticFlags.Implicit | ConversionSemanticFlags.Narrowing;
 
+    public AnalysisPhase Phase => AnalysisPhase.Runtime;
+
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
         => (context.Semantics?.Procedures ?? [])
             .SelectMany(procedure => procedure.Runtime?.Conversions ?? [])

@@ -41,13 +41,14 @@ public sealed class DiagnoseDocumentHandlerTests
     private static DiagnoseDocumentHandler NewHandler(params IModuleAnalyzer[] analyzers)
         => new(new DiagnosticFactory(), analyzers.Length > 0 ? analyzers : [new OptionExplicitAnalyzer(), new ObsoleteCallStatementAnalyzer()], NullLogger<DiagnoseDocumentHandler>.Instance);
 
-    private static DiagnoseDocumentRequest RequestFor(string source, out ModuleParseResult parseResult, int version = 1, ModuleSemanticsDto? semantics = null)
+    private static DiagnoseDocumentRequest RequestFor(
+        string source, out ModuleParseResult parseResult, int version = 1, ModuleSemanticsDto? semantics = null, AnalysisPhase phase = AnalysisPhase.All)
     {
         var uri = TestUri.TestModuleUri();
         parseResult = new ModuleParser().Parse(uri, source);
         return new DiagnoseDocumentRequest
         {
-            Json = PlatformJson.Serialize(new DiagnoseDocumentPayload(uri, version, parseResult, semantics)),
+            Json = PlatformJson.Serialize(new DiagnoseDocumentPayload(uri, version, parseResult, semantics, phase)),
         };
     }
 
@@ -178,4 +179,45 @@ public sealed class DiagnoseDocumentHandlerTests
         Assert.AreEqual("https://rubberduck-vba.github.io/RDCore/diagnostics/rdc00104.html", diagnostic.CodeDescription!.Href.ToString());
         StringAssert.Contains(diagnostic.Message, "'total'");
     }
+
+    private sealed class SaysSomething(AnalysisPhase phase, int line) : IModuleAnalyzer
+    {
+        public AnalysisPhase Phase => phase;
+
+        public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
+            => [new AnalyzerFinding(RDCoreDiagnosticId.ImplicitNarrowingConversion, new SourceRange(new SourcePosition(line, 0), new SourcePosition(line, 1)), DiagnosticSeverity.Warning, phase.ToString())];
+    }
+
+    [TestMethod]
+    public async Task AnAnalyzerIsAsked_OnlyInThePhaseItDeclares()
+    {
+        var statically = new SaysSomething(AnalysisPhase.Static, 1);
+        var atRuntime = new SaysSomething(AnalysisPhase.Runtime, 2);
+
+        var staticOnly = await HandleAsync(RequestFor(CleanModule, out _, phase: AnalysisPhase.Static), statically, atRuntime);
+        var runtimeOnly = await HandleAsync(RequestFor(CleanModule, out _, phase: AnalysisPhase.Runtime), statically, atRuntime);
+        var everything = await HandleAsync(RequestFor(CleanModule, out _), statically, atRuntime);
+
+        CollectionAssert.AreEqual(new[] { "Static" }, staticOnly.Diagnostics.Select(diagnostic => diagnostic.Message).ToArray());
+        CollectionAssert.AreEqual(new[] { "Runtime" }, runtimeOnly.Diagnostics.Select(diagnostic => diagnostic.Message).ToArray());
+        Assert.AreEqual(2, everything.Diagnostics.Count(), "a request that does not say is a request for everything");
+    }
+
+    [TestMethod]
+    public async Task WhatIsWrongWithTheSyntax_IsOfTheStaticPhase_AndIsNotSaidAgainByTheRuntimeOne()
+    {
+        var staticPhase = await HandleAsync(RequestFor(SplitConditionalModule, out _, phase: AnalysisPhase.Static));
+        var runtimePhase = await HandleAsync(RequestFor(SplitConditionalModule, out _, phase: AnalysisPhase.Runtime));
+
+        Assert.IsNotEmpty(staticPhase.Diagnostics.ToArray());
+        Assert.IsEmpty(runtimePhase.Diagnostics.ToArray(), "the phases are put together by the language server, so each finding is in one of them");
+    }
+
+    [TestMethod]
+    public void AnAnalyzerThatDoesNotSay_IsOfTheStaticPhase()
+        => Assert.AreEqual(AnalysisPhase.Static, ((IModuleAnalyzer)new OptionExplicitAnalyzer()).Phase);
+
+    [TestMethod]
+    public void TheAnalyzerThatReadsWhatEvaluatingTheCodeFound_IsOfTheRuntimePhase()
+        => Assert.AreEqual(AnalysisPhase.Runtime, new ImplicitNarrowingConversionAnalyzer().Phase);
 }

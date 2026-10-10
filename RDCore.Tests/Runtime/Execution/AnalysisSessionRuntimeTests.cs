@@ -79,13 +79,17 @@ public sealed class AnalysisSessionRuntimeTests
     }
 
     [TestMethod]
-    public void TheDeclaredSymbols_AreShared_NotCopied()
+    public void TheDeclaredSymbols_AreThoseOfTheMomentItWasComposed_AndALaterDefinitionIsNotSeen()
     {
         var declared = Declared(M);
         var analysis = RuntimeSessionComposer.ComposeForAnalysis(declared);
 
         Assert.AreNotSame(declared, analysis);
-        Assert.AreSame(((SessionSymbols)declared.Symbols).Table, ((SessionSymbols)analysis.Symbols).Table);
+        Assert.IsTrue(analysis.Symbols.TryResolveValue("M", GlobalSymbols.UnresolvedSymbol, out var found) && found is not null, "what was declared is declared");
+
+        Assert.IsTrue(declared.Symbols.TryDefine(Y, Y.ScopeKind));
+        Assert.IsTrue(declared.Symbols.TryResolveValue("Y", GlobalSymbols.UnresolvedSymbol, out _), "the session it was composed over has it");
+        Assert.IsFalse(analysis.Symbols.TryResolveValue("Y", GlobalSymbols.UnresolvedSymbol, out _), "the analysis does not: it can run while the session changes");
     }
 
     [TestMethod]

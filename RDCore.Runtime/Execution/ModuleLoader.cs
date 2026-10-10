@@ -81,7 +81,7 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
         var procedures = new List<KeyValuePair<SemanticId, InstructionList>>();
         var procedureModels = ImmutableArray.CreateBuilder<ProcedureSemanticModel>();
         var sweepable = new List<(VBTypeMemberSymbol Procedure, InstructionList Body)>();
-        var sweptAt = new Dictionary<SemanticId, int>();
+        var swept = new HashSet<SemanticId>();
         foreach (var declaration in syntaxTree.Children.OfType<MemberDeclarationNode>())
         {
             if (FindMember(members, declaration) is not { } procedure)
@@ -104,16 +104,10 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
             procedures.Add(new(procedure.SemanticId, lowering.InstructionList));
             // a declaration that repeats another resolves to the symbol of the first, whose code is the one the session has: the repeat is an error of
             // the declarations, and its code is not evaluated for it.
-            if (model.IsValid && sweptAt.TryAdd(procedure.SemanticId, procedureModels.Count - 1))
+            if (model.IsValid && swept.Add(procedure.SemanticId))
             {
                 sweepable.Add((procedure, lowering.InstructionList));
             }
-        }
-
-        // what the language core states about the code is found out by evaluating it, which only a procedure with nothing wrong with it can be.
-        foreach (var (id, facts) in ModuleSweep.Evaluate(session, sweepable, messages))
-        {
-            procedureModels[sweptAt[id]] = procedureModels[sweptAt[id]] with { Runtime = facts };
         }
 
         // a module is valid when what it declares is, as well as every procedure of it.
@@ -129,8 +123,11 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
             Language = session.Environment.Language?.Id,
         };
 
-        // kept whether or not the module loads: what is wrong with a module is what is asked after.
-        image.Semantics.Store(moduleModel);
+        // kept whether or not the module loads: what is wrong with a module is what is asked after. What the language core states about the code is found out by
+        // evaluating it, which only a procedure with nothing wrong with it can be, and takes longer than anything above: the model is stored now, and the
+        // facts are added to it when they are ready. The evaluation is given what it needs of the session as it is at this moment, because it is not done here.
+        var sweep = sweepable.Count == 0 ? null : ModuleSweep.Prepare(session, sweepable, messages);
+        image.Semantics.Store(moduleModel, sweep is null ? null : sweep.Evaluate);
 
         // what the error is, and the detail that says which of the module's statements it is about.
         var errors = moduleModel.CompileErrors.Select(error => string.IsNullOrEmpty(error.Verbose) || error.Verbose == error.Description

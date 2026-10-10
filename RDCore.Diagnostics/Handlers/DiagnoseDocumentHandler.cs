@@ -18,20 +18,24 @@ internal sealed class DiagnoseDocumentHandler(
 
         var diagnosticList = new List<Diagnostic>();
 
-        // what is wrong with the syntax,
-        diagnosticList.AddRange(payload.ParseResult.SyntaxErrors.Select(diagnostics.FromVBSyntaxError));
-
-        // what the host's static pass found wrong with the code, which is the language's to say and not an analyzer's: a compile error is an error,
-        if (payload.Semantics is { } semantics)
+        // the phases are asked for apart, so that what is ready is not kept waiting for what is not: what is answered is the findings of the phase asked for.
+        if (payload.Phase.HasFlag(AnalysisPhase.Static))
         {
-            diagnosticList.AddRange(semantics.DeclarationErrors
-                .Concat(semantics.Procedures.SelectMany(procedure => procedure.CompileErrors))
-                .Select(error => diagnostics.FromVBCompileError(error.ToInfo())));
+            // what is wrong with the syntax,
+            diagnosticList.AddRange(payload.ParseResult.SyntaxErrors.Select(diagnostics.FromVBSyntaxError));
+
+            // what the host's static pass found wrong with the code, which is the language's to say and not an analyzer's: a compile error is an error,
+            if (payload.Semantics is { } semantics)
+            {
+                diagnosticList.AddRange(semantics.DeclarationErrors
+                    .Concat(semantics.Procedures.SelectMany(procedure => procedure.CompileErrors))
+                    .Select(error => diagnostics.FromVBCompileError(error.ToInfo())));
+            }
         }
 
         // and what the analyzers find worth saying, from the same facts.
         var context = new ModuleAnalysisContext(payload.DocumentUri, payload.ParseResult, payload.Semantics);
-        foreach (var analyzer in analyzers)
+        foreach (var analyzer in analyzers.Where(analyzer => payload.Phase.HasFlag(analyzer.Phase)))
         {
             try
             {

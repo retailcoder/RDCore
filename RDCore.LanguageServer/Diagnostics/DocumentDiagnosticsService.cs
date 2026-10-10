@@ -7,6 +7,7 @@ using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Client;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
+using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Workspace;
 
@@ -19,7 +20,23 @@ namespace RDCore.LanguageServer.Diagnostics;
 /// </summary>
 internal interface IDocumentDiagnosticsService
 {
+    /// <summary>
+    /// Every finding there is for a document: all the phases, awaited.
+    /// </summary>
     Task<DocumentDiagnosticsResult> GetAsync(Uri documentUri, string? previousResultId, CancellationToken token);
+
+    /// <summary>
+    /// The findings of one phase of the analysis of a document, and nothing of the others (<see cref="AnalysisPhase"/>).
+    /// </summary>
+    /// <remarks>
+    /// The static phase is ready as soon as the host has the module and does not wait for the facts that come of evaluating its code, which the runtime phase
+    /// does. A caller that can show findings as they come asks for the phases in turn and shows each as it arrives; the answer for a document that moved on while
+    /// it was being found is empty, and is of the version the document is at.
+    /// </remarks>
+    /// <param name="documentUri">The document.</param>
+    /// <param name="phase">The phase to ask for.</param>
+    /// <param name="token">A token that cancels the request.</param>
+    Task<DocumentDiagnosticsResult> GetPhaseAsync(Uri documentUri, AnalysisPhase phase, CancellationToken token);
 
     /// <summary>
     /// Analyzes source that is not a workspace document, through the same providers.
@@ -86,6 +103,22 @@ internal sealed class DocumentDiagnosticsService(
                 : DocumentDiagnosticsResult.NotChanged(version);
         }
 
+        return await AnalyzePhaseAsync(document, AnalysisPhase.All, token);
+    }
+
+    public async Task<DocumentDiagnosticsResult> GetPhaseAsync(Uri documentUri, AnalysisPhase phase, CancellationToken token)
+    {
+        var document = Resolve(documentUri);
+        return document is null
+            ? DocumentDiagnosticsResult.Fresh(0, [])
+            : await AnalyzePhaseAsync(document, phase, token);
+    }
+
+    private async Task<DocumentDiagnosticsResult> AnalyzePhaseAsync(WorkspaceDocument document, AnalysisPhase phase, CancellationToken token)
+    {
+        var documentUri = document.Id.Uri.ToUri();
+        var version = document.Version;
+
         var providers = DiagnosticsProviders();
         if (providers.Length == 0)
         {
@@ -93,9 +126,10 @@ internal sealed class DocumentDiagnosticsService(
         }
 
         var parseResult = await parsing.ParseDocumentAsync(documentUri, token);
-        // the module is named the way the workspace sync names it when it defines it in the host.
-        var semantics = await SemanticsOfAsync(parseResult.SyntaxTree?.GetDeclaredName() ?? document.Name, token);
-        var payloadJson = PlatformJson.Serialize(new DiagnoseDocumentPayload(documentUri, version, parseResult, semantics));
+        // the module is named the way the workspace sync names it when it defines it in the host. The host answers a request for the static phase at once, and one
+        // for the runtime phase when it has evaluated the code: the phases are asked for apart so that what is ready is not kept waiting for what is not.
+        var semantics = await SemanticsOfAsync(parseResult.SyntaxTree?.GetDeclaredName() ?? document.Name, phase, token);
+        var payloadJson = PlatformJson.Serialize(new DiagnoseDocumentPayload(documentUri, version, parseResult, semantics, phase));
 
         var reports = await Task.WhenAll(providers.Select(provider => AnalyzeAsync(provider, documentUri, payloadJson, token)));
 
@@ -135,12 +169,12 @@ internal sealed class DocumentDiagnosticsService(
             return null;
         }
 
-        return await SemanticsOfAsync(moduleName, token);
+        return await SemanticsOfAsync(moduleName, AnalysisPhase.All, token);
     }
 
     // what the environment host's semantic analysis pass found out about the module, which is what an analyzer decides what to say of; nothing when the host
     // does not run the pass, has not loaded the module, or could not answer: a diagnostics extension still has the syntax tree to go on.
-    private async Task<ModuleSemanticsDto?> SemanticsOfAsync(string moduleName, CancellationToken token)
+    private async Task<ModuleSemanticsDto?> SemanticsOfAsync(string moduleName, AnalysisPhase phase, CancellationToken token)
     {
         var host = orchestration.RuntimeEnvironment;
         if (host?.PlatformInfo?.Provides<SemanticAnalysis>() != true)
@@ -150,7 +184,7 @@ internal sealed class DocumentDiagnosticsService(
 
         try
         {
-            var result = await host.SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(new HostSemanticsParams { ModuleName = moduleName }, token);
+            var result = await host.SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(new HostSemanticsParams { ModuleName = moduleName, Phase = phase }, token);
             return PlatformJson.Deserialize<SemanticsPayload>(result.Json).Modules.FirstOrDefault();
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)

@@ -20,6 +20,12 @@ is true of the code, and an analyzer decides what is worth saying
 What the code *means* is a fact the host vouches for. How it is *written* - a keyword that is there or is not, where a name is - is a fact of the syntax tree, which
 the analyzer is given along with the model: those analyzers read the tree, and a module that did not parse has nothing for them to say.
 
+Not every fact is ready at the same time, and a finding that is ready is not held back for one that is not. An analyzer belongs to a **phase**
+(`IModuleAnalyzer.Phase`, `AnalysisPhase`): the *static* phase has the syntax tree and the facts of the host's static pass, which are there as soon as a module is
+loaded; the *runtime* phase has the facts that come of evaluating the code of the module, which take longer. The language server asks for the phases in turn and, for a
+client that is pushed diagnostics, publishes each as soon as it arrives together with the ones before it (a publication replaces the one before it). A client that
+pulls diagnostics is answered when every phase is. An analyzer that does not say is of the static phase.
+
 The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagnostics](rd-vbal.2.6.diagnostics.md)): a **Hint** states a fact, an **Information**
 (a *suggestion*) is a finding that a code action could fix, and a **Warning** is serious enough to break a build that treats warnings as errors.
 
