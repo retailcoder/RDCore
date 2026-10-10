@@ -145,8 +145,20 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             }
 
             activation.Pc = instruction.Offset;
-            var outcome = SweepInstruction(session, ResolveContext(context, activation, list, instruction), instruction, activation);
-            complete &= outcome is not { Kind: RuntimeExecutionOutcomeKind.InternalError };
+            RuntimeExecutionOutcome? outcome;
+            try
+            {
+                outcome = SweepInstruction(session, ResolveContext(context, activation, list, instruction), instruction, activation);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // an analysis is the one thing that evaluates code nobody asked to run, so a defect of the platform that a program would never reach in
+                // a run is reached here, in a process that also holds the session the program runs in. It is that instruction's, not the procedure's:
+                // the instructions that follow are still evaluated, and the procedure says it was not all.
+                outcome = RuntimeExecutionOutcome.InternalError;
+            }
+
+            complete &=outcome is not { Kind: RuntimeExecutionOutcomeKind.InternalError };
         }
 
         return complete;

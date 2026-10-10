@@ -88,6 +88,68 @@ public sealed class ModuleSweepTests
     }
 
     [TestMethod]
+    public async Task AMemberOfAClass_IsEvaluatedOnAnInstanceOfIt_WhoseFieldsAreNotKnown()
+    {
+        var holder = ModuleWorkspace.ClassModule(
+            "Holder",
+            "Option Explicit",
+            "Private Type TState",
+            "    Name As String",
+            "    Size As Long",
+            "    Target As Object",
+            "End Type",
+            "Private this As TState",
+            "Public Property Set Target(ByVal value As Object)",
+            "    Set this.Target = value",
+            "End Property",
+            "Public Sub Resize(ByVal factor As Double)",
+            "    this.Size = factor",
+            "    Dim d As Double",
+            "    d = this.Size",
+            "End Sub");
+
+        var model = await ModuleWorkspace.ModelAsync([("Holder", holder)], "Attribute VB_Name = \"Program\"\r\n", moduleName: "Holder");
+
+        Assert.AreEqual(2, model.Procedures.Length);
+        Assert.IsTrue(model.Procedures[0].Runtime!.IsFullyAnalyzed, "Property Set Target");
+        Assert.IsTrue(model.Procedures[1].Runtime!.IsFullyAnalyzed, "Resize");
+
+        Assert.IsTrue(
+            model.Procedures[1].Runtime!.Conversions
+                .Any(conversion => conversion.Flags.HasFlag(ConversionSemanticFlags.Narrowing)),
+            "this.Size = factor narrows a Double into a Long");
+    }
+
+    [TestMethod]
+    public async Task TheBoundsOfAnArrayThatIsNotKnown_AreNotKnown_AndNotAnError()
+    {
+        // coords holds whatever Split gave it, which an analysis does not know: it is not known to be an array, and so UBound(coords) is not known to fail either.
+        var facts = await FactsOfAsync(
+            "Dim coords As Variant", "Dim n As Long", "Dim v As Variant",
+            "n = UBound(coords) - LBound(coords) + 1");
+
+        Assert.IsTrue(facts.IsFullyAnalyzed, "bounds");
+        facts = await FactsOfAsync("Dim coords As Variant", "Dim v As Variant", "v = coords(1)");
+        Assert.IsTrue(facts.IsFullyAnalyzed, "an element of what is not known");
+        Assert.IsFalse(facts.Conversions.Any(conversion => conversion.Error is not null));
+        Assert.IsFalse(facts.Operations.Any(operation => operation.Error is not null));
+    }
+
+    [TestMethod]
+    public async Task AnInstructionThatCannotBeEvaluated_DoesNotTakeTheFollowingOnesWithIt()
+    {
+        // the first statement reads an Enum member, which the interpreter has no value for yet; whether or not it ever does, the narrowing after it is stated.
+        var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPublic Enum Color\r\n    Red\r\n    Green\r\nEnd Enum\r\n"
+            + "Public Sub Main()\r\n    Dim c As Long\r\n    c = Color.Green\r\n    Dim d As Double\r\n    Dim n As Long\r\n    n = d\r\nEnd Sub\r\n";
+
+        var model = await ModuleWorkspace.ModelAsync([], program);
+
+        Assert.IsTrue(
+            model.Procedures.Single().Runtime!.Conversions.Any(conversion => conversion.Source == VBDoubleType.TypeInfo && conversion.Destination == VBLongType.TypeInfo),
+            "n = d");
+    }
+
+    [TestMethod]
     public async Task AProcedureIsEvaluatedWhetherOrNotAnythingCallsIt_AndACallIsNotMade()
     {
         var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\n"

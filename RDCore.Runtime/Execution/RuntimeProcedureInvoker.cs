@@ -66,8 +66,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
     private Func<VBParameterSymbol, IRuntimeValue> AssumedArgument(VBTypeMemberSymbol procedure) => parameter =>
     {
-        if (parameter.Name == "Me" && Session.Symbols.TryResolveValue(procedure.ParentUri.Fragment.TrimStart('#'), GlobalSymbols.UnresolvedSymbol, out var parent)
-            && parent is VBClassModuleSymbol classModule)
+        if (parameter.Name == "Me"
+            && Session.Symbols.Resolver.ResolveType(procedure.ParentUri.Fragment.TrimStart('#'), ScopeKind.Global, StaticSymbol.GlobalUri).Symbol is VBClassModuleSymbol classModule)
         {
             var objectId = Session.Objects.CreateObject();
             Session.Symbols.CreateInstance(objectId, classModule);

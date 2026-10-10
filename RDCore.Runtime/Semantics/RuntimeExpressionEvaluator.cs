@@ -193,7 +193,11 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             dimension = evaluated.Result;
         }
 
-        return ArrayBoundRuntimeSemantics.Evaluate(arrayBound, array.Result!, dimension);
+        // an array that is not known has bounds that are not known, and is not known to be no array: the error it would raise is the assumed value's, which is
+        // not stated. The same goes for a dimension that is not known.
+        return array.Result!.IsIndeterminate || dimension is { IsIndeterminate: true }
+            ? RuntimeSemanticsEvaluationResult.Success(VBLongType.TypeInfo.CreateIndeterminateValue())
+            : ArrayBoundRuntimeSemantics.Evaluate(arrayBound, array.Result!, dimension);
     }
 
     private RuntimeSemanticsEvaluationResult EvaluateSimpleName(IRuntimeSession session, RuntimeEvaluationContext context, SimpleNameExpressionNode simpleName)
@@ -921,6 +925,21 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         while (calleeValue is VBVariantValue { TypedValue: var wrapped })
         {
             calleeValue = wrapped;
+        }
+
+        // what is indexed is not known: it is not known to be an array, nor an object with a default member, nor to be Nothing, and so what is read is not
+        // known, and the error it would raise is the assumed value's. The arguments are the code's, and are evaluated as they would be.
+        if (calleeResult.Result!.IsIndeterminate && calleeValue is not VBArrayValue)
+        {
+            foreach (var argument in indexExpression.Arguments)
+            {
+                if (EvaluateIndexArgument(session, argument, context) is { IsSuccess: false } failed)
+                {
+                    return failed;
+                }
+            }
+
+            return RuntimeSemanticsEvaluationResult.Success(VBVariantType.TypeInfo.CreateIndeterminateValue());
         }
 
         // an object that is indexed is a call of its default member: `c(1)` is `c.Item(1)`.
