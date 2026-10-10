@@ -154,6 +154,17 @@ In any case, the role of this abstraction layer is to configure the _capabilitie
 >
 > `describe-ext` reflects the extension executable's advertised capabilities (its `[assembly: ProvidesCorePlatformClientCapability<T>]` declarations) into the manifest. `PlatformPublish.ps1` runs it once per extension while assembling the platform.
 
+> [!IMPORTANT]
+> 📚 **Referenced libraries** (`Excel`, `Word`, `Access`, `ADODB`, `Scripting`, …) are known to a project by their _name_, as if the library were VBA code, and what each declares ships with the platform as a _library description_ in `Symbols/<Name>.json` (format: [LibraryDescription](api/RDCore.SDK.Runtime.Libraries.LibraryDescription.html)). A project is checked against the description, so it can be analyzed on a machine that does not have the library. A library that the platform has no description of is a reference that cannot be resolved, and the types that name it are compile errors. Libraries that depend on one another are rejected, not resolved.
+>
+> A description is generated, never written by hand, on a Windows machine that has the library, by the CLI in _command mode_:
+>
+> ```
+> rdc.exe export-library Excel --dependencies --output Symbols
+> ```
+>
+> `export-library` takes a file (`scrrun.dll`), the identifier the machine gave the library, or its name; when several versions of a library are registered, the latest is described. `--dependencies` describes the libraries it depends on too, which a project needs in order to reference it.
+
 
 ### Capabilities
 

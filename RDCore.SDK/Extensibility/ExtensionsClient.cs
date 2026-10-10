@@ -125,6 +125,13 @@ public class ExtensionsClient(
     public IEnumerable<ExtensionInfo> Discover()
     {
         var manifestFileName = options.Value.Platform.Extensions.Manifest;
+
+        // a platform that has no folder of extensions has none: a process that is not run from within a platform (a verb run from a build folder) is not an error.
+        if (!ExtensionsFolder.Exists)
+        {
+            yield break;
+        }
+
         foreach (var folder in ExtensionsFolder.EnumerateDirectories())
         {
             var title = folder.Name;

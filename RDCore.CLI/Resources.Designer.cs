@@ -159,6 +159,62 @@ namespace RDCore.CLI {
             }
         }
         
+        /// <summary>Looks up a localized string similar to Export Library.</summary>
+        public static string ExportLibrary_Title {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Title", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to Describes a type library of this machine as a library description file that a project can reference by name..</summary>
+        public static string ExportLibrary_Summary {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Summary", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to Type libraries are read from the registry and files of a Windows machine: this command only runs on Windows..</summary>
+        public static string ExportLibrary_WindowsOnly {
+            get {
+                return ResourceManager.GetString("ExportLibrary_WindowsOnly", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to This machine has no type library &apos;{0}&apos;..</summary>
+        public static string ExportLibrary_NotFound {
+            get {
+                return ResourceManager.GetString("ExportLibrary_NotFound", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to Library &apos;{0}&apos; described: {1}.</summary>
+        public static string ExportLibrary_Written {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Written", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to {0} class(es), {1} enumeration(s), {2} member(s)..</summary>
+        public static string ExportLibrary_Counts {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Counts", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to Depends on: {0}..</summary>
+        public static string ExportLibrary_DependsOn {
+            get {
+                return ResourceManager.GetString("ExportLibrary_DependsOn", resourceCulture);
+            }
+        }
+
+        /// <summary>Looks up a localized string similar to Not described: {0}..</summary>
+        public static string ExportLibrary_Skipped {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Skipped", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Reflects an extension executable&apos;s advertised capabilities into an extension manifest..
         /// </summary>

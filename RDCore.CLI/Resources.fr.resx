@@ -200,6 +200,30 @@
   <data name="DescribeExtension_Summary" xml:space="preserve">
     <value>Génère un manifeste d'extension à partir des capacités déclarées par l'exécutable d'extension.</value>
   </data>
+  <data name="ExportLibrary_Title" xml:space="preserve">
+    <value>Exporter une bibliothèque</value>
+  </data>
+  <data name="ExportLibrary_Summary" xml:space="preserve">
+    <value>Décrit une bibliothèque de types de cette machine dans un fichier de description qu'un projet peut référencer par son nom.</value>
+  </data>
+  <data name="ExportLibrary_WindowsOnly" xml:space="preserve">
+    <value>Les bibliothèques de types sont lues dans le registre et les fichiers d'une machine Windows : cette commande ne s'exécute que sous Windows.</value>
+  </data>
+  <data name="ExportLibrary_NotFound" xml:space="preserve">
+    <value>Cette machine n'a aucune bibliothèque de types '{0}'. Une bibliothèque se donne par un fichier, par l'identifiant que la machine lui a donné, ou par son nom.</value>
+  </data>
+  <data name="ExportLibrary_Written" xml:space="preserve">
+    <value>Bibliothèque '{0}' décrite : {1}</value>
+  </data>
+  <data name="ExportLibrary_Counts" xml:space="preserve">
+    <value>{0} classe(s), {1} énumération(s), {2} membre(s).</value>
+  </data>
+  <data name="ExportLibrary_DependsOn" xml:space="preserve">
+    <value>Dépend de : {0}. Un projet ne peut pas référencer cette bibliothèque sans elles; exportez-les aussi (--dependencies).</value>
+  </data>
+  <data name="ExportLibrary_Skipped" xml:space="preserve">
+    <value>Non décrit : {0}.</value>
+  </data>
   <data name="DescribeExtension_DevModeRequired" xml:space="preserve">
     <value>Cette commande requiert le commutateur --unsafe-dev-mode.</value>
   </data>
