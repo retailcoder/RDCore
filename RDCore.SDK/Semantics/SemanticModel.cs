@@ -42,6 +42,12 @@ public sealed record class ProcedureSemanticModel(SemanticId Procedure, Immutabl
     public Flow.ReturnValueFact? ReturnValue { get; init; }
 
     /// <summary>
+    /// What the language core states about the conversions and operations of the procedure's code, or <see langword="null"/> when the procedure has not been
+    /// evaluated yet: which is not to say that the code has none.
+    /// </summary>
+    public Facts.RuntimeFacts? Runtime { get; init; }
+
+    /// <summary>
     /// Whether the static pass found nothing wrong with the procedure.
     /// </summary>
     public bool IsValid => CompileErrors.IsEmpty;

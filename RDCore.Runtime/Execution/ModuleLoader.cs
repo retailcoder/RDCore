@@ -80,6 +80,8 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
         var options = new InstructionLoweringOptions(deadRanges, IsReleaseBuild: !session.IsDebugBuild(), Language: session.Environment.Language);
         var procedures = new List<KeyValuePair<SemanticId, InstructionList>>();
         var procedureModels = ImmutableArray.CreateBuilder<ProcedureSemanticModel>();
+        var sweepable = new List<(VBTypeMemberSymbol Procedure, InstructionList Body)>();
+        var sweptAt = new Dictionary<SemanticId, int>();
         foreach (var declaration in syntaxTree.Children.OfType<MemberDeclarationNode>())
         {
             if (FindMember(members, declaration) is not { } procedure)
@@ -100,6 +102,18 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
             // the code paths are those of the lowered body, which only the loader has next to what the static pass found out about it.
             procedureModels.Add(model with { ReturnValue = ReturnValueAnalysis.Of(declaration, model, lowering.InstructionList) });
             procedures.Add(new(procedure.SemanticId, lowering.InstructionList));
+            // a declaration that repeats another resolves to the symbol of the first, whose code is the one the session has: the repeat is an error of
+            // the declarations, and its code is not evaluated for it.
+            if (model.IsValid && sweptAt.TryAdd(procedure.SemanticId, procedureModels.Count - 1))
+            {
+                sweepable.Add((procedure, lowering.InstructionList));
+            }
+        }
+
+        // what the language core states about the code is found out by evaluating it, which only a procedure with nothing wrong with it can be.
+        foreach (var (id, facts) in ModuleSweep.Evaluate(session, sweepable, messages))
+        {
+            procedureModels[sweptAt[id]] = procedureModels[sweptAt[id]] with { Runtime = facts };
         }
 
         // a module is valid when what it declares is, as well as every procedure of it.

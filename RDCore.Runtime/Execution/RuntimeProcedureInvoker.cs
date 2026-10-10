@@ -46,6 +46,39 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 {
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult Invoke(VBTypeMemberSymbol procedure, ISymbolResolver resolver, IRuntimeValue[] arguments)
+        => Activate(procedure, arguments, (frame, body) => Executor.Run(Session, frame, body, new RuntimeEvaluationContext(procedure.Uri)));
+
+    /// <summary>
+    /// Evaluates every instruction of <paramref name="procedure"/> once, as the entry point of an analysis (<see cref="ProcedureExecutor.Sweep"/>).
+    /// </summary>
+    /// <param name="procedure">The <c>Sub</c>, <c>Function</c> or property accessor to evaluate.</param>
+    /// <returns>Whether every instruction was evaluated.</returns>
+    /// <remarks>
+    /// The procedure is entered as any procedure is, with a parameter for each of its own, and no caller to say what they hold: each is
+    /// its type's default, which an analysis does not trust (<see cref="RuntimeExpressionEvaluator.AssumesVariables"/>). A member of a class is
+    /// entered with a <c>Me</c> that is an instance of its class, made for the occasion and not initialized.
+    /// </remarks>
+    public bool Sweep(VBTypeMemberSymbol procedure)
+        => Activate(procedure, [.. GetParameters(procedure).Select(AssumedArgument(procedure))],
+            (frame, body) => Executor.Sweep(Session, frame, body, new RuntimeEvaluationContext(procedure.Uri))
+                ? RuntimeExecutionOutcome.ExitProcedure
+                : RuntimeExecutionOutcome.InternalError).IsSuccess;
+
+    private Func<VBParameterSymbol, IRuntimeValue> AssumedArgument(VBTypeMemberSymbol procedure) => parameter =>
+    {
+        if (parameter.Name == "Me" && Session.Symbols.TryResolveValue(procedure.ParentUri.Fragment.TrimStart('#'), GlobalSymbols.UnresolvedSymbol, out var parent)
+            && parent is VBClassModuleSymbol classModule)
+        {
+            var objectId = Session.Objects.CreateObject();
+            Session.Symbols.CreateInstance(objectId, classModule);
+            return new VBObjectValue(objectId).RuntimeValue;
+        }
+
+        return SymbolAddressTable.BoxedValue(parameter.ResolvedType.DefaultValue);
+    };
+
+    private RuntimeSemanticsEvaluationResult Activate(
+        VBTypeMemberSymbol procedure, IRuntimeValue[] arguments, Func<CallStackFrame, InstructionList, RuntimeExecutionOutcome> run)
     {
         if (!Bodies.TryGetValue(procedure.SemanticId, out var body))
         {
@@ -118,7 +151,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
         HoistLocals(Session, frame, GetLocals(procedure));
 
-        var outcome = Executor.Run(Session, frame, body, new RuntimeEvaluationContext(procedure.Uri));
+        var outcome = run(frame, body);
 
         // a program that was stopped does not unwind: the objects its locals held are not let go of, because that is where a Terminate would run, and an End
         // runs none. What it leaves is the session's to clear (ISessionSymbols.ResetStorage) when it is over, or to keep when it is only broken.

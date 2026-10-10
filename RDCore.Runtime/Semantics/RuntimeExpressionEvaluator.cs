@@ -239,7 +239,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             // names the function, from anywhere, and is a call.
             return nameOfEnclosingFunctionIsItsResult
                 && returningMember.Uri.AbsoluteUri == context.Scope.AbsoluteUri && session.CallStack.Current is { } enclosing
-                    ? RuntimeSemanticsEvaluationResult.Success(enclosing.ReturnValue!)
+                    ? Assumed(RuntimeSemanticsEvaluationResult.Success(enclosing.ReturnValue!))
                     : InvokeProcedure(session, context, returningMember, []);
         }
 
@@ -267,9 +267,22 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         // why `Is Nothing` of it can never be true.
         return symbol.GetProperty(SymbolProperties.AutoInstantiated) && value is VBObjectValue { } held && held.IsNothing()
             && typed.ResolvedType is VBClassType { Symbol: { } classModule }
-                ? AutoInstantiate(session, handle, classModule)
-                : RuntimeSemanticsEvaluationResult.Success(value);
+                ? Assumed(AutoInstantiate(session, handle, classModule))
+                : Assumed(RuntimeSemanticsEvaluationResult.Success(value));
     }
+
+    /// <summary>
+    /// Whether what a variable holds is assumed rather than read: a read of a variable gives the value its declared type allows, which is not known
+    /// (<see cref="VBTypedValue.IsIndeterminate"/>), whatever the variable was last assigned.
+    /// </summary>
+    /// <remarks>
+    /// 👉 An evaluation of code that does not follow its paths cannot say which assignment a read sees. A value that was assigned along one path is no
+    /// fact about a read on another, so no read is trusted; what is written is still written, and the evaluation of the assignment is still observed.
+    /// </remarks>
+    public bool AssumesVariables { get; set; }
+
+    private RuntimeSemanticsEvaluationResult Assumed(RuntimeSemanticsEvaluationResult read)
+        => AssumesVariables && read.IsSuccess && read.Result is { } value ? RuntimeSemanticsEvaluationResult.Success(value.AsIndeterminate()) : read;
 
     private static RuntimeSemanticsEvaluationResult AutoInstantiate(IRuntimeSession session, IBindingHandle handle, VBClassModuleSymbol classModule)
     {
@@ -784,7 +797,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
 
     // A late-bound Variant/Object member, and a call through a Property/Function/Sub member, are both
     // invocations, not reads - only a Field/Variable-kind member is readable this way.
-    private static RuntimeSemanticsEvaluationResult EvaluateInstanceField(IRuntimeSession session, VBTypedValue owner, string memberName)
+    private RuntimeSemanticsEvaluationResult EvaluateInstanceField(IRuntimeSession session, VBTypedValue owner, string memberName)
     {
         // a UDT field is not reached through an instance the session knows about: a UDT has location identity
         // but no instance record, and its fields live on the value itself (MS-VBAL §2.1 - a UDT data value is
@@ -808,7 +821,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             .FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase));
 
         return member is { Kind: SymbolKindExt.Field or SymbolKindExt.Variable }
-            ? RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member).ForReading()))
+            ? Assumed(RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member).ForReading())))
             : RuntimeSemanticsEvaluationResult.InternalError();
     }
 

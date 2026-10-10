@@ -62,6 +62,26 @@ internal static class ModuleWorkspace
     }
 
     /// <summary>
+    /// Loads the workspace like <see cref="LoadErrorsAsync"/>, and gives the model of a module as the host keeps it, before it travels.
+    /// </summary>
+    /// <param name="classes">The class modules of the workspace.</param>
+    /// <param name="program">The source of the <c>Program</c> standard module.</param>
+    /// <param name="moduleName">The module whose model is given.</param>
+    /// <param name="language">The language the code is written in; RD-VBA unless said otherwise.</param>
+    public static async Task<SDK.Semantics.ModuleSemanticModel> ModelAsync(
+        IReadOnlyList<(string Name, string Source)> classes, string program, string moduleName = "Program", SupportedLanguage? language = null)
+    {
+        SDK.Semantics.ModuleSemanticModel? model = null;
+        await RunCoreAsync(classes, program, errorsOnly: true, afterLoading: sessionProvider =>
+        {
+            model = sessionProvider.Image.Semantics.All.Single(candidate => candidate.Module.Fragment.TrimStart('#') == moduleName);
+            return Task.CompletedTask;
+        }, language: language);
+
+        return model!;
+    }
+
+    /// <summary>
     /// Runs <c>Program.Main</c> like <see cref="RunAsync"/>, and hands what came of it to <paramref name="inspect"/> instead of requiring that it completed: the
     /// outcome, whatever it was, the session it ran in, and a way to run the entry point again in that same session.
     /// </summary>
