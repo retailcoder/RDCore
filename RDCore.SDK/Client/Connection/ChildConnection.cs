@@ -39,9 +39,10 @@ public sealed record class ChildConnectionRequest
     public required Action OnPeerExited { get; init; }
 
     /// <summary>
-    /// When <c>true</c>, the child is <c>rdc.exe</c> launched in environment-host mode.
+    /// The mode the child is launched in when it is <c>rdc.exe</c> (<see cref="RDCoreServerProcess.HostMode"/>, <see cref="RDCoreServerProcess.ExternalMode"/>);
+    /// <see langword="null"/> for any other server.
     /// </summary>
-    public bool HostMode { get; init; }
+    public string? Mode { get; init; }
 
     /// <summary>
     /// The component the caller expects to be connecting to (sent in the platform handshake).
@@ -100,6 +101,11 @@ public sealed class ChildConnection(
     private LanguageClient? _client;
     private volatile bool _shuttingDown;
     private bool _disposed;
+
+    /// <summary>
+    /// The operating-system identifier of the child process; <c>0</c> before it is started.
+    /// </summary>
+    public int ProcessId => serverProcess.ProcessId;
 
     /// <summary>
     /// The current lifecycle state of the connection.
@@ -289,7 +295,7 @@ public sealed class ChildConnection(
     private async Task AttemptConnectAsync(CancellationToken ct)
     {
         Transition(ConnectionState.Spawning);
-        await serverProcess.StartAsync(_request!.ServerExecutablePath, _request.PipeName, _connectionCts, _request.HostMode);
+        await serverProcess.StartAsync(_request!.ServerExecutablePath, _request.PipeName, _connectionCts, _request.Mode);
 
         Transition(ConnectionState.Connecting);
         if (_pipe is not null)
