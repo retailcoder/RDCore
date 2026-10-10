@@ -126,13 +126,14 @@ public sealed class ReferencedLibrariesTests
     [TestMethod]
     public void TheFolderOfDescriptions_IsASource_ByTheNameOfTheFile()
     {
+        var folder = Path.Combine(Path.GetTempPath(), "platform", "Symbols");
         var files = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [@"c:\platform\Symbols\Widgets.json"] = new(LibraryJson.Write(Widgets)),
-            [@"c:\platform\Symbols\Misnamed.json"] = new(LibraryJson.Write(Widgets)),
-            [@"c:\platform\Symbols\Broken.json"] = new("{ not json"),
+            [Path.Combine(folder, "Widgets.json")] = new(LibraryJson.Write(Widgets)),
+            [Path.Combine(folder, "Misnamed.json")] = new(LibraryJson.Write(Widgets)),
+            [Path.Combine(folder, "Broken.json")] = new("{ not json"),
         });
-        var source = new DirectoryLibrarySource(files, @"c:\platform\Symbols");
+        var source = new DirectoryLibrarySource(files, folder);
 
         Assert.IsTrue(source.TryGet("WIDGETS", out var found));
         Assert.AreEqual("Widgets", found.Name);
@@ -144,5 +145,5 @@ public sealed class ReferencedLibrariesTests
 
     [TestMethod]
     public void AFolderThatIsNotThere_HasNoLibraries()
-        => Assert.IsFalse(new DirectoryLibrarySource(new MockFileSystem(), @"c:\platform\Symbols").TryGet("Widgets", out _));
+        => Assert.IsFalse(new DirectoryLibrarySource(new MockFileSystem(), Path.Combine(Path.GetTempPath(), "platform", "Symbols")).TryGet("Widgets", out _));
 }
