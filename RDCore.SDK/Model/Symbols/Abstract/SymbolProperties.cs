@@ -111,6 +111,11 @@ public static class SymbolProperties
     /// </remarks>
     public static readonly SymbolProperty<string> ExternalTarget = new(nameof(ExternalTarget));
     /// <summary>
+    /// The name an object of a class of a referenced library is created by from a string - <c>CreateObject("Scripting.Dictionary")</c> - on a class
+    /// that can be created.
+    /// </summary>
+    public static readonly SymbolProperty<string> ProgId = new(nameof(ProgId));
+    /// <summary>
     /// Whether a variable is declared with the <c>WithEvents</c> modifier (<strong>MS-VBAL §5.2.3.1.2</strong>): its
     /// declared type is a class with events, and the procedures of the module that are named for the variable and an
     /// event of the class handle that event of whatever object the variable currently holds.

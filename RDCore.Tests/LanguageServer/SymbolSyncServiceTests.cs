@@ -26,6 +26,14 @@ public sealed class SymbolSyncServiceTests
     private static ModuleParseResult Parse(string source)
         => new ModuleParser().Parse(new Uri(Path.Combine(Root, "src", "Mod1.bas")), source);
 
+    // a project that references no library but the standard library.
+    private sealed class NoLibraries : IReferencedLibraryService
+    {
+        public RDCore.SDK.Runtime.Libraries.ReferencedLibraries Libraries => RDCore.SDK.Runtime.Libraries.ReferencedLibraries.None;
+
+        public IReadOnlyList<RDCore.SDK.Model.Symbols.Abstract.Symbol> SymbolsUnder(Uri workspaceRoot) => [];
+    }
+
     private static (SymbolSyncService Sut, IRDCoreClientApp Host) Build(
         ModuleParseResult? cached, bool providesCapability = true, DefineSymbolsResult? response = null,
         ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure)
@@ -60,7 +68,7 @@ public sealed class SymbolSyncServiceTests
 
         var sut = new SymbolSyncService(
             orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(implicitScope),
-            NullLogger<SymbolSyncService>.Instance);
+            NullLogger<SymbolSyncService>.Instance, new NoLibraries());
         return (sut, host);
     }
 
@@ -181,7 +189,7 @@ public sealed class SymbolSyncServiceTests
                 return false;
             });
 
-        var sut = new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance);
+        var sut = new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance, new NoLibraries());
 
         await sut.SyncWorkspaceAsync(CancellationToken.None);
 
@@ -224,7 +232,7 @@ public sealed class SymbolSyncServiceTests
                 return true;
             });
 
-        var sut = new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance);
+        var sut = new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance, new NoLibraries());
 
         await sut.SyncWorkspaceAsync(CancellationToken.None);
 
@@ -268,7 +276,7 @@ public sealed class SymbolSyncServiceTests
         parsing.TryGetCached(Arg.Any<Uri>(), Arg.Any<int>(), out Arg.Any<ModuleParseResult>())
             .Returns(call => { call[2] = parse1; return changedParseIsCurrent; });
 
-        return (new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance), requests);
+        return (new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance, new NoLibraries()), requests);
     }
 
     [TestMethod]
@@ -295,7 +303,7 @@ public sealed class SymbolSyncServiceTests
         documents.WorkspaceRoot.Returns(Root);
 
         return (new SymbolSyncService(
-            orchestration, Substitute.For<IParsingClientService>(), documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance), host);
+            orchestration, Substitute.For<IParsingClientService>(), documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance, new NoLibraries()), host);
     }
 
     [TestMethod]

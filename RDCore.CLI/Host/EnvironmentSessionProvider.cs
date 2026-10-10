@@ -3,6 +3,7 @@ using RDCore.CLI.Host.Symbols;
 using RDCore.Runtime.Execution;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.Libraries;
 using RDCore.SDK.Runtime.StdLib;
 using RDCore.SDK.Workspace;
 using System.IO.Abstractions;
@@ -82,7 +83,8 @@ public interface IEnvironmentSessionProvider
 public sealed class EnvironmentSessionProvider(
     IRuntimeEnvironmentProfile environment,
     IFileSystem fileSystem,
-    ILogger<EnvironmentSessionProvider> logger) : IEnvironmentSessionProvider
+    ILogger<EnvironmentSessionProvider> logger,
+    ILibrarySource? librarySource = null) : IEnvironmentSessionProvider
 {
     private IRuntimeSession? _session;
 
@@ -120,7 +122,17 @@ public sealed class EnvironmentSessionProvider(
         // the language server bound to one of them binds to the same symbol here.
         var stdLib = new StdLibSymbolProvider(workspaceRoot, environment.Is64Bit);
 
-        _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, stdLib, modules], Output);
+        // and the libraries the project references, by name: the same symbols the language server bound the workspace's names to.
+        var referenced = LibrarySymbolProvider.Load(librarySource ?? new DirectoryLibrarySource(fileSystem, string.Empty), project.References);
+        foreach (var problem in referenced.Problems)
+        {
+            logger.LogWarning("📚 The library '{library}' could not be loaded ({kind}{related}); a type of it is not a type of the project.",
+                problem.Name, problem.Kind, problem.Related.IsEmpty ? string.Empty : ": " + string.Join(" → ", problem.Related));
+        }
+
+        var libraries = new LibrarySymbolProvider(workspaceRoot, referenced, environment.Is64Bit);
+
+        _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, stdLib, libraries, modules], Output);
         Image = new ProgramImage();
         Execution = new ProgramExecution(this);
         ProjectName = project.Name;

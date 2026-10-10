@@ -110,7 +110,8 @@ Write-Host ""
 $PlatformFolders = @(
     "Config",
     "Extensions",
-    "Logs"
+    "Logs",
+    "Symbols"
 )
 
 foreach ($folder in $PlatformFolders)
@@ -119,6 +120,14 @@ foreach ($folder in $PlatformFolders)
         (Join-Path $PlatformRoot $folder) `
         -ItemType Directory `
         -Force | Out-Null
+}
+
+# the descriptions of the libraries a project can reference are part of the platform: <repo>\Symbols\<Library>.json is deployed to <platform>\Symbols,
+# where a library is found by its name. A platform that ships none has an empty folder.
+$SymbolFiles = Join-Path $RepoRoot "Symbols\*.json"
+if (Test-Path $SymbolFiles)
+{
+    Copy-Item -Path $SymbolFiles -Destination (Join-Path $PlatformRoot "Symbols") -Force
 }
 
 foreach ($project in $Projects)

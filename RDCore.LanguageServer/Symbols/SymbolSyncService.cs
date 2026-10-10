@@ -86,7 +86,8 @@ internal sealed class SymbolSyncService(
     IWorkspaceDocumentService documents,
     ISymbolResolver resolver,
     IOptions<SdkAppOptions> options,
-    ILogger<SymbolSyncService> logger) : ISymbolSyncService
+    ILogger<SymbolSyncService> logger,
+    IReferencedLibraryService referencedLibraries) : ISymbolSyncService
 {
     // where the variable an undeclared name declares lives is the environment's to say, and every extraction pass
     // - the resolver's own two, and the one that defines the symbols - has to agree on it.
@@ -100,7 +101,8 @@ internal sealed class SymbolSyncService(
         var workspaceRoot = new Uri(documents.WorkspaceRoot);
         var moduleUri = new UriBuilder(workspaceRoot) { Fragment = moduleName }.Uri;
         var workspaceResolver = WorkspaceSymbolResolver.Compose(
-            workspaceRoot, [(moduleUri, ModuleType.StdModule, parseResult)], resolver, implicitScope: ImplicitScope);
+            workspaceRoot, [(moduleUri, ModuleType.StdModule, parseResult)], resolver, implicitScope: ImplicitScope,
+            libraries: referencedLibraries.SymbolsUnder(workspaceRoot));
 
         // a module the client keeps editing is defined again every time it is run, so the newest
         // definition has to win rather than being skipped as a duplicate. Its parse result travels with the request to
@@ -137,7 +139,7 @@ internal sealed class SymbolSyncService(
 
             var workspaceResolver = WorkspaceSymbolResolver.Compose(
                 workspaceRoot, modules.Select(module => (module.Uri, module.Kind, module.Parse)), resolver,
-                implicitScope: ImplicitScope);
+                implicitScope: ImplicitScope, libraries: referencedLibraries.SymbolsUnder(workspaceRoot));
 
             var totalDefined = 0;
             foreach (var module in modules)
@@ -265,7 +267,8 @@ internal sealed class SymbolSyncService(
         // the module is defined again with the newest definition winning, in the workspace as it is now - what the other modules declare is what its names are
         // bound against - and then its code is loaded, which is checked against the same.
         var workspaceResolver = WorkspaceSymbolResolver.Compose(
-            workspaceRoot, modules.Select(module => (module.Uri, module.Kind, module.Parse)), resolver, implicitScope: ImplicitScope);
+            workspaceRoot, modules.Select(module => (module.Uri, module.Kind, module.Parse)), resolver, implicitScope: ImplicitScope,
+            libraries: referencedLibraries.SymbolsUnder(workspaceRoot));
         await DefineModuleSymbolsAsync(workspaceRoot, changed.Uri, changed.Name, changed.Kind, changed.Parse, workspaceResolver, replace: true, withCode: false, token);
         await SendModuleCodeAsync(workspaceRoot, changed.Uri, changed.Name, changed.Parse, token);
     }

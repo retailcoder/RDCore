@@ -7,6 +7,7 @@ using RDCore.Parsing;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime;
+using RDCore.SDK.Runtime.Libraries;
 using RDCore.SDK.Services.VerboseMessages;
 using RDCore.SDK.Workspace;
 using System.IO.Abstractions.TestingHelpers;
@@ -40,6 +41,25 @@ internal static class ModuleWorkspace
     /// <returns>The errors of every module, one each; empty when every module loaded.</returns>
     public static Task<string[]> LoadErrorsAsync(IReadOnlyList<(string Name, string Source)> classes, string program)
         => RunCoreAsync(classes, program, errorsOnly: true);
+
+    /// <summary>
+    /// The libraries a workspace's project references, and the source they are found in. A library is known by its name, as the project's reference says.
+    /// </summary>
+    /// <param name="References">The names of the libraries the project references, in order, after the standard library.</param>
+    /// <param name="Source">Where the descriptions of the libraries are.</param>
+    public sealed record WorkspaceLibraries(IReadOnlyList<string> References, ILibrarySource Source);
+
+    /// <summary>
+    /// Loads the workspace like <see cref="LoadErrorsAsync(IReadOnlyList{ValueTuple{string, string}}, string)"/>, for a project that references libraries.
+    /// </summary>
+    public static Task<string[]> LoadErrorsAsync(IReadOnlyList<(string Name, string Source)> classes, string program, WorkspaceLibraries libraries)
+        => RunCoreAsync(classes, program, errorsOnly: true, libraries: libraries);
+
+    /// <summary>
+    /// Runs <c>Program.Main</c> like <see cref="RunAsync"/>, for a project that references libraries.
+    /// </summary>
+    public static Task<string[]> RunAsync(IReadOnlyList<(string Name, string Source)> classes, string program, WorkspaceLibraries libraries)
+        => RunCoreAsync(classes, program, errorsOnly: false, libraries: libraries);
 
     /// <summary>
     /// Loads the workspace like <see cref="LoadErrorsAsync"/>, and asks the host what the semantic analysis pass found out about it, as the language server does.
@@ -107,7 +127,8 @@ internal static class ModuleWorkspace
     private static async Task<string[]> RunCoreAsync(
         IReadOnlyList<(string Name, string Source)> classes, string program, bool errorsOnly, Func<EnvironmentSessionProvider, Task>? afterLoading = null,
         SupportedLanguage? language = null,
-        Func<EnvironmentSessionProvider, ExecuteSessionResult, Func<Task<ExecuteSessionResult>>, Task>? inspect = null, TimeSpan? cancelAfter = null, bool debug = false)
+        Func<EnvironmentSessionProvider, ExecuteSessionResult, Func<Task<ExecuteSessionResult>>, Task>? inspect = null, TimeSpan? cancelAfter = null, bool debug = false,
+        WorkspaceLibraries? libraries = null)
     {
         var loadErrors = new List<string>();
         (string Name, string Extension, ModuleType Type, string Source)[] modules =
@@ -120,6 +141,7 @@ internal static class ModuleWorkspace
         {
             Name = "Project1",
             Modules = [.. modules.Select(module => new RDCoreModule { RelativeUri = $"{module.Name}.{module.Extension}" })],
+            References = [RDCoreReference.VBStandardLibrary, .. (libraries?.References ?? []).Select(name => new RDCoreReference { Name = name })],
         });
         var files = new Dictionary<string, MockFileData> { [Path.Combine(Root, ProjectFile.FileName)] = new(JsonSerializer.Serialize(project)) };
         foreach (var module in modules)
@@ -128,7 +150,8 @@ internal static class ModuleWorkspace
         }
 
         var sessionProvider = new EnvironmentSessionProvider(
-            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false, SourceLanguage: language), new MockFileSystem(files), NullLogger<EnvironmentSessionProvider>.Instance);
+            new RuntimeEnvironmentProfile(Is64Bit: true, 0, 1252, false, SourceLanguage: language), new MockFileSystem(files), NullLogger<EnvironmentSessionProvider>.Instance,
+            libraries?.Source);
         var workspaceRoot = new Uri(Root);
         sessionProvider.Compose(project.ProjectInfo, workspaceRoot);
 
@@ -139,8 +162,13 @@ internal static class ModuleWorkspace
             return (Module: module, Uri: new UriBuilder(workspaceRoot) { Fragment = module.Name }.Uri, Parse: parse);
         }).ToArray();
 
+        // the language server binds the workspace's names among the libraries the project references, as the host's session has them.
+        var librarySymbols = libraries is null
+            ? null
+            : (IReadOnlyList<RDCore.SDK.Model.Symbols.Abstract.Symbol>)[.. new LibrarySymbolProvider(
+                workspaceRoot, LibrarySymbolProvider.Load(libraries.Source, project.ProjectInfo.References)).ProvideSymbols()];
         var resolver = WorkspaceSymbolResolver.Compose(
-            workspaceRoot, parsed.Select(module => (module.Uri, module.Module.Type, module.Parse)), new IntrinsicSymbolResolver());
+            workspaceRoot, parsed.Select(module => (module.Uri, module.Module.Type, module.Parse)), new IntrinsicSymbolResolver(), libraries: librarySymbols);
 
         // as the language server does: every module is defined, and then the code of each is sent.
         foreach (var module in parsed)

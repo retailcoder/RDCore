@@ -48,10 +48,24 @@ public sealed record class VBProjectSymbol(Uri WorkspaceRoot, string Name)
 
         return resolver.ResolveQualifier(qualifier, ScopeKind.Global, handle).Symbol switch
         {
-            VBProjectSymbol project => resolver.ResolveType(name, ScopeKind.Global, project.WorkspaceRoot),
+            VBProjectSymbol project => ResolveTypeOfProject(resolver, project, name),
             VBModuleSymbol module => ResolveTypeOfModule(resolver, module, name, handle),
             _ => SymbolResolutionResult.Unbound,
         };
+    }
+
+    // The type is the project's own: a type that the project tier has because another project - the standard library, or a library the project references - declared it
+    // is not a type of this one, and `Excel.Collection` does not mean the standard library's. The enclosing project and a library are told apart by the library
+    // the symbols say they are of (SymbolProperties.Library), which the enclosing project's own are not of any.
+    // 🚧 TODO: two libraries that declare a type of the same name collide in the project tier before this can tell them apart; the library tier of the resolver
+    // (a precedence order of the references) is what resolves that, for the unqualified name as well.
+    private static SymbolResolutionResult ResolveTypeOfProject(ISymbolResolver resolver, VBProjectSymbol project, string name)
+    {
+        var found = resolver.ResolveType(name, ScopeKind.Global, project.WorkspaceRoot);
+        return found.Symbol is { } type
+            && string.Equals(type.GetProperty(SymbolProperties.Library) ?? string.Empty, project.GetProperty(SymbolProperties.Library) ?? string.Empty, StringComparison.Ordinal)
+                ? found
+                : SymbolResolutionResult.Unbound;
     }
 
     // MS-VBAL §5.6.12: "<l-expression> is classified as a procedural module or a type referencing a class defined in a class module", and the module has an
