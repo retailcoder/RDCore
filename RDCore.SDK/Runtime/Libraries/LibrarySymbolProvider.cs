@@ -45,5 +45,5 @@ public sealed class LibrarySymbolProvider : ISymbolProvider
         => ReferencedLibraries.Load(source, references.Select(reference => reference.Name), [StdLibSymbolProvider.LibraryName]);
 
     /// <inheritdoc/>
-    public IEnumerable<Symbol> ProvideSymbols() => new LibrarySymbolReader(_workspaceRoot, _is64Bit).Read(Libraries.Libraries);
+    public IEnumerable<Symbol> ProvideSymbols() => new LibrarySymbolReader(_workspaceRoot, _is64Bit).Read(Libraries.Libraries, Libraries.Priorities);
 }

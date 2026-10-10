@@ -1,5 +1,7 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace RDCore.SDK.Runtime.Libraries;
 
@@ -22,7 +24,20 @@ public static class LibraryJson
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { SkipEmptyLists } },
     };
+
+    // a list that has nothing in it is not stated, as nothing else that is not stated is.
+    private static void SkipEmptyLists(JsonTypeInfo type)
+    {
+        foreach (var property in type.Properties.Where(property => property.PropertyType.IsGenericType
+            && property.PropertyType.GetGenericTypeDefinition() == typeof(ImmutableArray<>)))
+        {
+            property.ShouldSerialize = (_, value) => value is not null
+                && value.GetType().GetProperty(nameof(ImmutableArray<int>.IsDefault))!.GetValue(value) is false
+                && ((System.Collections.ICollection)value).Count > 0;
+        }
+    }
 
     /// <summary>
     /// The version of the format this writes and reads.
@@ -51,10 +66,20 @@ public static class LibraryJson
             throw new InvalidDataException("The library description states no name.");
         }
 
-        return description.FormatVersion == CurrentFormatVersion
-            ? description
-            : throw new InvalidDataException(
+        if (description.FormatVersion != CurrentFormatVersion)
+        {
+            throw new InvalidDataException(
                 $"The library description of '{description.Name}' is of format version {description.FormatVersion}, and this reads version {CurrentFormatVersion}.");
+        }
+
+        // a name is one type of the library, whatever its case: VBA names are not case sensitive, and a library that declares one twice is not one a project can be
+        // checked against.
+        var twice = description.Classes.Select(declared => declared.Name).Concat(description.Enums.Select(declared => declared.Name))
+            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        return twice is null
+            ? description
+            : throw new InvalidDataException($"The library description of '{description.Name}' declares '{twice.Key}' more than once.");
     }
 
     /// <summary>

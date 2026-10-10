@@ -60,6 +60,12 @@ public static class SymbolProperties
     /// </remarks>
     public static readonly SymbolProperty<string> Library = new(nameof(Library));
     /// <summary>
+    /// The precedence of the library a symbol is of among the libraries of a project: of two libraries that declare a name, the one with the higher number is the
+    /// one the name means. The standard library, which has none, is the lowest; a library a project references comes after it, in the order of the project's
+    /// references; and one that is only loaded because another depends on it comes before the ones the project references.
+    /// </summary>
+    public static readonly SymbolProperty<int> LibraryPriority = new(nameof(LibraryPriority));
+    /// <summary>
     /// The value of the <c>VB_Exposed</c> attribute of a <see cref="VBClassModuleSymbol"/>
     /// </summary>
     public static readonly SymbolProperty<bool> Exposed = new(nameof(Exposed));

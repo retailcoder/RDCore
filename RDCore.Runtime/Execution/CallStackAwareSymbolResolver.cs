@@ -49,6 +49,9 @@ public sealed class CallStackAwareSymbolResolver(ICallStack callStack, ISymbolRe
     public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle) => inner.ResolveQualifier(name, scope, handle);
 
     /// <inheritdoc/>
+    public SymbolResolutionResult ResolveProjectType(VBProjectSymbol project, string name) => inner.ResolveProjectType(project, name);
+
+    /// <inheritdoc/>
     public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
         => inner.ResolveConditionalConstant(name, scope, handle);
 

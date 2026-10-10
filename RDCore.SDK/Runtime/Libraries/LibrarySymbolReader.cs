@@ -50,7 +50,11 @@ public sealed class LibrarySymbolReader(Uri workspaceRoot, bool is64Bit = true)
     /// Reads the symbols of libraries.
     /// </summary>
     /// <param name="libraries">The libraries, each after those it depends on (<see cref="ReferencedLibraries.Libraries"/>).</param>
-    public ImmutableArray<Symbol> Read(IReadOnlyList<LibraryDescription> libraries)
+    /// <param name="priorities">
+    /// The precedence of each library (<see cref="ReferencedLibraries.Priorities"/>), which every symbol that is a name of the project carries
+    /// (<see cref="SymbolProperties.LibraryPriority"/>). The position of a library among the others when omitted.
+    /// </param>
+    public ImmutableArray<Symbol> Read(IReadOnlyList<LibraryDescription> libraries, IReadOnlyDictionary<string, int>? priorities = null)
     {
         var symbols = ImmutableArray.CreateBuilder<Symbol>();
         var enums = new Dictionary<(string Library, string Name), VBEnumType>(TypeKeyComparer.Instance);
@@ -105,7 +109,12 @@ public sealed class LibrarySymbolReader(Uri workspaceRoot, bool is64Bit = true)
             }
         }
 
-        return symbols.ToImmutable();
+        // what shadows what is read off the symbols that are names of the project - the library's project, its module of enumerations, the enumerations and their
+        // constants, the classes. The members of a class are reached through an object, and no name of the project is one of them.
+        var rankOf = priorities ?? libraries.Select((library, index) => (library.Name, Rank: index + 1)).ToDictionary(entry => entry.Name, entry => entry.Rank, StringComparer.OrdinalIgnoreCase);
+        return [.. symbols.Select(symbol => symbol.GetProperty(SymbolProperties.Library) is { } library && rankOf.TryGetValue(library, out var rank)
+            ? symbol.With(SymbolProperties.LibraryPriority, rank)
+            : symbol)];
     }
 
     // the names, without the library, of the types of this library that a class declares its members and events as.

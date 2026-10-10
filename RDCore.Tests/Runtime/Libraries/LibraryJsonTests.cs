@@ -59,6 +59,17 @@ public sealed class LibraryJsonTests
         => Assert.Throws<InvalidDataException>(() => LibraryJson.Read(text));
 
     [TestMethod]
+    [DataRow("""{ "name": "Twice", "classes": [ { "name": "Same" }, { "name": "same" } ] }""", DisplayName = "a class declared twice, in another case")]
+    [DataRow("""{ "name": "Twice", "enums": [ { "name": "Same" }, { "name": "SAME" } ] }""", DisplayName = "an enumeration declared twice")]
+    [DataRow("""{ "name": "Twice", "classes": [ { "name": "Same" } ], "enums": [ { "name": "Same" } ] }""", DisplayName = "a class and an enumeration of one name")]
+    public void ALibraryThatDeclaresANameTwice_IsRefused_NotQuietlyCollapsed(string text)
+    {
+        var exception = Assert.Throws<InvalidDataException>(() => LibraryJson.Read(text));
+
+        StringAssert.Contains(exception.Message, "more than once");
+    }
+
+    [TestMethod]
     public void AFormatThisDoesNotKnow_IsRefused_NotMisread()
     {
         var exception = Assert.Throws<InvalidDataException>(() => LibraryJson.Read("{ \"formatVersion\": 7, \"name\": \"Future\" }"));

@@ -48,16 +48,30 @@ public sealed record class LibraryProblem(string Name, LibraryProblemKind Kind, 
 /// </remarks>
 public sealed class ReferencedLibraries
 {
-    private ReferencedLibraries(ImmutableArray<LibraryDescription> libraries, ImmutableArray<LibraryProblem> problems)
+    private ReferencedLibraries(ImmutableArray<LibraryDescription> libraries, ImmutableArray<LibraryProblem> problems, ImmutableDictionary<string, int> priorities)
     {
         Libraries = libraries;
         Problems = problems;
+        Priorities = priorities;
     }
 
     /// <summary>
     /// No libraries, and no problems.
     /// </summary>
-    public static ReferencedLibraries None { get; } = new([], []);
+    public static ReferencedLibraries None { get; } = new([], [], ImmutableDictionary<string, int>.Empty.WithComparers(StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The precedence of each library that was loaded, by its name: of two libraries that declare a name, the one with the higher number is the one the name means
+    /// (<see cref="Model.Symbols.Abstract.SymbolProperties.LibraryPriority"/>).
+    /// </summary>
+    /// <remarks>
+    /// A library the project references comes after the ones it references before, as the references of a project are in the order of their precedence
+    /// (<strong>RD-VBAL §2.3.1.2</strong>); a library that is loaded only because another depends on it comes before all of them, in the order it was loaded.
+    /// The standard library, which the platform provides and which is lowest of all, has none.
+    /// </remarks>
+    public ImmutableDictionary<string, int> Priorities { get; }
+
+    private const int ExplicitPriorityBase = 1000;
 
     /// <summary>
     /// The libraries that were loaded, each after the libraries it depends on.
@@ -80,12 +94,27 @@ public sealed class ReferencedLibraries
     public static ReferencedLibraries Load(ILibrarySource source, IEnumerable<string> references, IReadOnlyCollection<string> provided)
     {
         var loader = new Loader(source, provided);
-        foreach (var reference in references)
+        var referenced = references.Where(reference => !provided.Contains(reference, StringComparer.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        foreach (var reference in referenced)
         {
             loader.Load(reference, []);
         }
 
-        return new ReferencedLibraries([.. loader.Loaded], [.. loader.Problems]);
+        var priorities = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < loader.Loaded.Count; i++)
+        {
+            priorities[loader.Loaded[i].Name] = i + 1;
+        }
+
+        for (var i = 0; i < referenced.Length; i++)
+        {
+            if (priorities.ContainsKey(referenced[i]))
+            {
+                priorities[referenced[i]] = ExplicitPriorityBase + i;
+            }
+        }
+
+        return new ReferencedLibraries([.. loader.Loaded], [.. loader.Problems], priorities.ToImmutable());
     }
 
     private sealed class Loader(ILibrarySource source, IReadOnlyCollection<string> provided)

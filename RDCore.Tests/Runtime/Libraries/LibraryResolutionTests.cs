@@ -2,6 +2,7 @@ using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Runtime.Libraries;
+using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Runtime.StdLib;
 using static RDCore.Tests.Runtime.Libraries.LibraryFixtures;
 
@@ -67,6 +68,73 @@ public sealed class LibraryResolutionTests
         var constant = ResolverOf(Widgets).ResolveValue("wgOn", ScopeKind.Local, Program.Uri).Symbol;
 
         Assert.IsInstanceOfType<VBEnumConstMemberSymbol>(constant);
+    }
+
+    // two libraries that each declare a class `Application`, as a host library and the library of its editor do; `Zulu` also declares a class of its own.
+    private static LibraryDescription Hosting(string name, params string[] others)
+        => new()
+        {
+            Name = name,
+            Classes = [new ClassDescription { Name = "Application" }, .. others.Select(other => new ClassDescription { Name = other })],
+        };
+
+    private static ScopeTreeSymbolResolver ResolverOfReferences(string[] references, params LibraryDescription[] available)
+    {
+        var libraries = ReferencedLibraries.Load(new Runtime.Libraries.InMemoryLibrarySource(available), references, ["VBA"]);
+        Assert.IsEmpty(libraries.Problems);
+
+        List<Symbol> symbols =
+        [
+            Program,
+            new VBClassModuleSymbol(Root, Root, "Local"),
+            new VBClassModuleSymbol(Root, Root, "Mine"),
+            .. new StdLibSymbolProvider(Root).ProvideSymbols(),
+            .. new LibrarySymbolProvider(Root, libraries).ProvideSymbols(),
+        ];
+
+        return new ScopeTreeSymbolResolver(ScopeTreeBuilder.Build(symbols));
+    }
+
+    private static string? LibraryOf(SymbolResolutionResult result) => result.Symbol?.GetProperty(SymbolProperties.Library);
+
+    [TestMethod]
+    public void TheTypeOfAProject_IsOneOfThatProject_WhateverOtherProjectsDeclareTheName()
+    {
+        var resolver = ResolverOfReferences(["Excel", "Word"], Hosting("Excel", "Range"), Hosting("Word", "Document"));
+
+        Assert.AreEqual("Excel", LibraryOf(VBProjectSymbol.ResolveQualifiedType(resolver, "Excel", "Application", Program.Uri)));
+        Assert.AreEqual("Word", LibraryOf(VBProjectSymbol.ResolveQualifiedType(resolver, "Word", "Application", Program.Uri)));
+        Assert.IsTrue(VBProjectSymbol.ResolveQualifiedType(resolver, "Excel", "Document", Program.Uri).IsUnbound, "Document is Word's");
+    }
+
+    [TestMethod]
+    public void OfTwoLibrariesThatDeclareAName_TheOneReferencedLaterIsWhatTheNameMeans()
+    {
+        var excelFirst = ResolverOfReferences(["Excel", "Word"], Hosting("Excel"), Hosting("Word"));
+        var wordFirst = ResolverOfReferences(["Word", "Excel"], Hosting("Excel"), Hosting("Word"));
+
+        Assert.AreEqual("Word", LibraryOf(VBProjectSymbol.ResolveQualifiedType(excelFirst, null, "Application", Program.Uri)));
+        Assert.AreEqual("Excel", LibraryOf(VBProjectSymbol.ResolveQualifiedType(wordFirst, null, "Application", Program.Uri)));
+    }
+
+    [TestMethod]
+    public void ALibraryOnlyLoadedForAnother_IsShadowedByTheOnesTheProjectReferences()
+    {
+        // Excel depends on Editor, and both declare Application: the project referenced Excel, so it is Excel's.
+        var excel = Hosting("Excel") with { DependsOn = ["Editor"] };
+        var resolver = ResolverOfReferences(["Excel"], excel, Hosting("Editor"));
+
+        Assert.AreEqual("Excel", LibraryOf(VBProjectSymbol.ResolveQualifiedType(resolver, null, "Application", Program.Uri)));
+        Assert.AreEqual("Editor", LibraryOf(VBProjectSymbol.ResolveQualifiedType(resolver, "Editor", "Application", Program.Uri)));
+    }
+
+    [TestMethod]
+    public void AClassOfTheWorkspace_ShadowsTheClassOfAnyLibraryOfItsName_AndTheLibraryQualifiesItsOwn()
+    {
+        var resolver = ResolverOfReferences(["Widgets"], new LibraryDescription { Name = "Widgets", Classes = [new ClassDescription { Name = "Mine" }] });
+
+        Assert.IsNull(LibraryOf(VBProjectSymbol.ResolveQualifiedType(resolver, null, "Mine", Program.Uri)), "the workspace's own");
+        Assert.AreEqual("Widgets", LibraryOf(VBProjectSymbol.ResolveQualifiedType(resolver, "Widgets", "Mine", Program.Uri)));
     }
 
     [TestMethod]

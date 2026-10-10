@@ -47,11 +47,12 @@ public sealed class VBProjectSymbolTests
         var field = Field("Total");
         var resolver = Substitute.For<ISymbolResolver>();
         resolver.ResolveQualifier("MyProject", ScopeKind.Global, callerScope).Returns(SymbolResolutionResult.Resolved(project));
-        resolver.ResolveType("Total", ScopeKind.Global, Root).Returns(SymbolResolutionResult.Resolved(field));
+        resolver.ResolveProjectType(project, "Total").Returns(SymbolResolutionResult.Resolved(field));
 
         var result = VBProjectSymbol.ResolveQualifiedType(resolver, "MyProject", "Total", callerScope);
 
         Assert.AreEqual(field, result.Symbol);
+        resolver.DidNotReceive().ResolveType("Total", Arg.Any<ScopeKind>(), callerScope);
     }
 
     [TestMethod]
@@ -65,7 +66,7 @@ public sealed class VBProjectSymbolTests
         var resolver = Substitute.For<ISymbolResolver>();
         resolver.ResolveType("MyProject", ScopeKind.Global, callerScope).Returns(SymbolResolutionResult.Resolved(Field("MyProject")));
         resolver.ResolveQualifier("MyProject", ScopeKind.Global, callerScope).Returns(SymbolResolutionResult.Resolved(project));
-        resolver.ResolveType("Total", ScopeKind.Global, Root).Returns(SymbolResolutionResult.Resolved(field));
+        resolver.ResolveProjectType(project, "Total").Returns(SymbolResolutionResult.Resolved(field));
 
         var result = VBProjectSymbol.ResolveQualifiedType(resolver, "MyProject", "Total", callerScope);
 
