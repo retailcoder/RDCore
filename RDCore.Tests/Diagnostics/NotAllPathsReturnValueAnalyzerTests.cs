@@ -45,7 +45,7 @@ public sealed class NotAllPathsReturnValueAnalyzerTests
     private static async Task<AnalyzerFinding[]> FindAsync(string source)
     {
         var uri = TestUri.TestModuleUri();
-        var payload = await ModuleWorkspace.SemanticsAsync([], source.Replace("\n", "\r\n") + "\r\n");
+        var payload = await ModuleWorkspace.SemanticsAsync([], source.ReplaceLineEndings("\r\n") + "\r\n");
 
         return [.. new NotAllPathsReturnValueAnalyzer()
             .Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), payload.Modules.Single()))
@@ -94,7 +94,7 @@ public sealed class NotAllPathsReturnValueAnalyzerTests
     [TestMethod]
     public async Task ASub_ReturnsNoValue_AndTheHostStatesNothingOfIt()
     {
-        var payload = await ModuleWorkspace.SemanticsAsync([], Source.Replace("\n", "\r\n") + "\r\n");
+        var payload = await ModuleWorkspace.SemanticsAsync([], Source.ReplaceLineEndings("\r\n") + "\r\n");
 
         var work = payload.Modules.Single().Procedures.Single(procedure => procedure.Procedure.Fragment.EndsWith(".Work", StringComparison.Ordinal));
         Assert.IsNull(work.ReturnValue);

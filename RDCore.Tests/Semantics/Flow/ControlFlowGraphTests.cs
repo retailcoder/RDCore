@@ -15,7 +15,7 @@ public sealed class ControlFlowGraphTests
 {
     private static ControlFlowGraph Graph(string body)
     {
-        var source = $"Public Sub S(ByVal c As Boolean, ByVal n As Long)\r\n{body.Replace("\n", "\r\n")}\r\nEnd Sub\r\n";
+        var source = $"Public Sub S(ByVal c As Boolean, ByVal n As Long)\r\n{body.ReplaceLineEndings("\r\n")}\r\nEnd Sub\r\n";
         var result = new ModuleParser().Parse(TestUri.TestModuleUri(), source);
         Assert.IsEmpty(result.SyntaxErrors);
         var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
