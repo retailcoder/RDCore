@@ -154,21 +154,61 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
     /// <inheritdoc/>
     public void Advise(object source, IAutomationEventSink sink) => OnApartment<object?>(() =>
     {
-        // an object is listened to through the connection point of its default source interface, which it names itself; one that names none raises nothing to listen to.
-        if (_connections.ContainsKey(source) || source is not IProvideClassInfo2 info || source is not IConnectionPointContainer container
-            || info.GetGUID(DefaultSourceInterface, out var identifier) != 0)
+        // an object is listened to through the connection point of the interface its events are declared by; one that has none raises nothing to listen to.
+        if (_connections.ContainsKey(source) || source is not IConnectionPointContainer container || ConnectionOf(source, container) is not var (point, events, declaring))
         {
             return null;
         }
 
-        container.FindConnectionPoint(ref identifier, out var point);
         var receiver = new EventReceiver(
-            EventsOf(info, identifier),
+            declaring,
+            events,
             (name, arguments) => AutomationEvents.Deliver(sink, name, arguments, Volatile.Read(ref _inCall) > 0, Serve));
         point.Advise(receiver, out var cookie);
         _connections[source] = new Connection(point, cookie, receiver);
         return null;
     });
+
+    // The connection point to listen to, and the events it raises by the identifier they are raised with. An object that says which interface is its default source
+    // (IProvideClassInfo2) is asked; one that does not - Excel's do not - has the connection points it has, each of an interface its own type library describes.
+    private static (IConnectionPoint Point, Dictionary<int, string> Events, Guid Interface)? ConnectionOf(object source, IConnectionPointContainer container)
+    {
+        if (source is IProvideClassInfo2 info && info.GetGUID(DefaultSourceInterface, out var identifier) == 0)
+        {
+            container.FindConnectionPoint(ref identifier, out var named);
+            return (named, EventsOf(info, identifier), identifier);
+        }
+
+        if (source is not IDispatchTypeInformation dispatch)
+        {
+            return null;
+        }
+
+        ITypeLib library;
+        try
+        {
+            dispatch.GetTypeInfo(0, 0, out var typeInfo);
+            typeInfo.GetContainingTypeLib(out library, out _);
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+
+        container.EnumConnectionPoints(out var points);
+        var found = new IConnectionPoint[1];
+        while (points.Next(1, found, IntPtr.Zero) == 0)
+        {
+            found[0].GetConnectionInterface(out var interfaceId);
+            library.GetTypeInfoOfGuid(ref interfaceId, out var declaring);
+            if (declaring is not null)
+            {
+                return (found[0], EventsOfInterface(declaring), interfaceId);
+            }
+        }
+
+        return null;
+    }
 
     /// <inheritdoc/>
     public void Unadvise(object source) => OnApartment<object?>(() =>
@@ -216,23 +256,34 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
             coclass.GetRefTypeOfImplType(index, out var reference);
             coclass.GetRefTypeInfo(reference, out var candidate);
             candidate.GetTypeAttr(out var attributes);
-            var attribute = Marshal.PtrToStructure<TYPEATTR>(attributes);
+            var matches = Marshal.PtrToStructure<TYPEATTR>(attributes).guid == identifier;
             candidate.ReleaseTypeAttr(attributes);
-            if (attribute.guid != identifier)
+            if (matches)
             {
-                continue;
+                events = EventsOfInterface(candidate);
             }
+        }
 
-            for (var function = 0; function < attribute.cFuncs; function++)
-            {
-                candidate.GetFuncDesc(function, out var description);
-                var memberId = Marshal.PtrToStructure<FUNCDESC>(description).memid;
-                candidate.ReleaseFuncDesc(description);
+        return events;
+    }
 
-                var names = new string[1];
-                candidate.GetNames(memberId, names, 1, out _);
-                events[memberId] = names[0];
-            }
+    // the functions of a dispinterface by their dispatch identifiers: what a server raises an event with, and the name of the event.
+    private static Dictionary<int, string> EventsOfInterface(ITypeInfo declaring)
+    {
+        var events = new Dictionary<int, string>();
+        declaring.GetTypeAttr(out var attributes);
+        var functions = Marshal.PtrToStructure<TYPEATTR>(attributes).cFuncs;
+        declaring.ReleaseTypeAttr(attributes);
+
+        for (var function = 0; function < functions; function++)
+        {
+            declaring.GetFuncDesc(function, out var description);
+            var memberId = Marshal.PtrToStructure<FUNCDESC>(description).memid;
+            declaring.ReleaseFuncDesc(description);
+
+            var names = new string[1];
+            declaring.GetNames(memberId, names, 1, out _);
+            events[memberId] = names[0];
         }
 
         return events;
@@ -273,8 +324,7 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
         int GetTypeInfo(int index, int locale, out IntPtr typeInfo);
 
         [PreserveSig]
-        int GetIDsOfNames(ref Guid identifier, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr)] string[] names, int count, int locale,
-            [Out, MarshalAs(UnmanagedType.LPArray)] int[] identifiers);
+        int GetIDsOfNames(ref Guid identifier, IntPtr names, int count, int locale, IntPtr identifiers);
 
         [PreserveSig]
         int Invoke(int member, ref Guid identifier, int locale, ushort flags, ref DispatchParameters parameters, IntPtr result, IntPtr exception, IntPtr argumentError);
@@ -282,8 +332,25 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
 
     [ComVisible(true)]
     [ClassInterface(ClassInterfaceType.None)]
-    private sealed class EventReceiver(IReadOnlyDictionary<int, string> events, Action<string, object?[]> raise) : IEventDispatch
+    private sealed class EventReceiver(Guid declaring, IReadOnlyDictionary<int, string> events, Action<string, object?[]> raise) : IEventDispatch, ICustomQueryInterface
     {
+        // A server asks a sink for the interface its events are declared by, not for IDispatch, and refuses one that does not have it. That interface is a dispinterface, which
+        // is nothing but IDispatch with the names a type library gives it: the sink is IDispatch, and says so for that identifier.
+        private static readonly Guid Dispatch = new("00020400-0000-0000-C000-000000000046");
+
+        public CustomQueryInterfaceResult GetInterface(ref Guid iid, out IntPtr interfacePointer)
+        {
+            // the runtime offers no IDispatch of its own for a managed object, so the one the class implements is the only one there is.
+            if (iid == declaring || iid == Dispatch)
+            {
+                interfacePointer = Marshal.GetComInterfaceForObject(this, typeof(IEventDispatch), CustomQueryInterfaceMode.Ignore);
+                return CustomQueryInterfaceResult.Handled;
+            }
+
+            interfacePointer = IntPtr.Zero;
+            return CustomQueryInterfaceResult.NotHandled;
+        }
+
         private const int NotImplemented = unchecked((int)0x80004001);
         private const int MemberNotFound = unchecked((int)0x80020003);
         private const ushort ByReference = 0x4000;
@@ -300,14 +367,20 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
             return NotImplemented;
         }
 
-        public int GetIDsOfNames(ref Guid identifier, string[] names, int count, int locale, int[] identifiers)
+        // The arrays are the caller's, of the length it says: the marshaller cannot be told that of a parameter it reads, so they are read here.
+        public int GetIDsOfNames(ref Guid identifier, IntPtr names, int count, int locale, IntPtr identifiers)
         {
-            foreach (var index in Enumerable.Range(0, Math.Min(count, identifiers.Length)))
+            const int Unknown = -1;
+            var all = true;
+            for (var index = 0; index < count; index++)
             {
-                identifiers[index] = events.FirstOrDefault(known => string.Equals(known.Value, names[index], StringComparison.OrdinalIgnoreCase)).Key;
+                var name = Marshal.PtrToStringUni(Marshal.ReadIntPtr(names, index * IntPtr.Size));
+                var found = events.Where(known => string.Equals(known.Value, name, StringComparison.OrdinalIgnoreCase)).Select(known => (int?)known.Key).FirstOrDefault();
+                Marshal.WriteInt32(identifiers, index * sizeof(int), found ?? Unknown);
+                all &= found is not null;
             }
 
-            return 0;
+            return all ? 0 : unchecked((int)0x80020006); // DISP_E_UNKNOWNNAME
         }
 
         public int Invoke(int member, ref Guid identifier, int locale, ushort flags, ref DispatchParameters parameters, IntPtr result, IntPtr exception, IntPtr argumentError)
@@ -325,7 +398,22 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
             var arguments = locations.Select(Marshal.GetObjectForNativeVariant).ToArray();
             var sent = (object?[])arguments.Clone();
 
-            raise(name, arguments);
+            var outer = _handlingEvent;
+            _handlingEvent = true;
+            try
+            {
+                raise(name, arguments);
+            }
+            catch (Exception failure)
+            {
+                // an exception must not cross into the server that called: it is the server's call that failed.
+                LastFailure = failure;
+                return unchecked((int)0x80004005);
+            }
+            finally
+            {
+                _handlingEvent = outer;
+            }
 
             // what the handlers left in an argument that was passed by reference is what the server reads when this returns.
             for (var index = 0; index < count; index++)
@@ -338,6 +426,8 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
 
             return 0;
         }
+
+        public static Exception? LastFailure { get; private set; }
 
         private static void WriteBack(IntPtr location, object? value, ushort byReference)
         {
@@ -493,10 +583,17 @@ public sealed class ComAutomationServer : IAutomationServer, IDisposable
     }
 
     // runs it on the apartment and waits: the pipeline is synchronous, and the object that a call is made on is on that thread.
+    // A server calls the sink of its events on a thread of its own, not on the apartment, which is busy - it is inside the call that raised the event, waiting for the handlers.
+    // What the handlers call is therefore called from where they run: COM carries it to the apartment, which handles it while it waits for the server, and the
+    // server's objects can be used from a thread that handles an event as they can from the apartment's. Queueing it for the apartment instead would wait on a thread
+    // that waits for this one.
+    [ThreadStatic]
+    private static bool _handlingEvent;
+
     private T? OnApartment<T>(Func<T?> call)
     {
         _ = _apartment.Value;
-        if (Environment.CurrentManagedThreadId == _apartment.Value.ManagedThreadId)
+        if (_handlingEvent || Environment.CurrentManagedThreadId == _apartment.Value.ManagedThreadId)
         {
             return Counted(call);
         }
