@@ -54,6 +54,10 @@ internal sealed class RuntimeSession(
 
     public IExternalDispatcher? External { get; set; }
 
+    public ISessionTurn Turn { get; } = new SessionTurn();
+
+    public ICallableBindingFactory? Callables { get; set; }
+
     public bool ReleaseReference(VBRuntimeObjectId instance, IBindingHandle handle)
     {
         if (Objects.RemoveRef(instance, handle) != 0)

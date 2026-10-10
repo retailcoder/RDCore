@@ -46,6 +46,16 @@ public sealed class UnavailableAutomationServer : IAutomationServer
     public void Reset(object enumerator) => throw Unavailable();
 
     /// <inheritdoc/>
+    public void Advise(object source, IAutomationEventSink sink)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void Unadvise(object source)
+    {
+    }
+
+    /// <inheritdoc/>
     public void Release(object handle)
     {
     }

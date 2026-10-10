@@ -48,6 +48,14 @@ public sealed class LibraryNamesInTheHostTests
         {
         }
 
+        public void Advise(object source, IAutomationEventSink sink)
+        {
+        }
+
+        public void Unadvise(object source)
+        {
+        }
+
         public void Release(object handle)
         {
         }

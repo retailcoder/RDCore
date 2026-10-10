@@ -117,6 +117,49 @@ public sealed class EnvironmentSessionProvider(
     /// <inheritdoc/>
     public Action<IReadOnlyList<string>, long>? OutputStreamed { get; set; }
 
+    private readonly Lock _eventLinesLock = new();
+    private readonly List<string> _eventLines = [];
+    private long _eventLinesSaid;
+
+    /// <summary>
+    /// What the handlers of events printed while no program was running, in order.
+    /// </summary>
+    /// <remarks>
+    /// The events of a server's object are raised when the server pleases, and nothing is waiting for an answer to read what their handlers print. It is said as it is printed
+    /// (<see cref="OutputStreamed"/>) to whoever listens, and kept here for whoever asks.
+    /// </remarks>
+    public IReadOnlyList<string> EventLines
+    {
+        get
+        {
+            lock (_eventLinesLock)
+            {
+                return [.. _eventLines];
+            }
+        }
+    }
+
+    private IDisposable BeginEvent()
+    {
+        var previous = Output.Target;
+        Output.Target = new RuntimeOutputBuffer(line =>
+        {
+            lock (_eventLinesLock)
+            {
+                _eventLines.Add(line);
+            }
+
+            OutputStreamed?.Invoke([line], Interlocked.Increment(ref _eventLinesSaid));
+        });
+
+        return new Restore(() => Output.Target = previous);
+    }
+
+    private sealed class Restore(Action restore) : IDisposable
+    {
+        public void Dispose() => restore();
+    }
+
     /// <inheritdoc/>
     public IRuntimeSession Session => _session ?? throw new InvalidOperationException(
         "The runtime session has not been composed yet; it is composed on the LSP initialize handshake.");
@@ -147,6 +190,8 @@ public sealed class EnvironmentSessionProvider(
         var libraries = new LibrarySymbolProvider(workspaceRoot, referenced, environment.Is64Bit);
 
         _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, stdLib, libraries, modules], Output);
+        // an event that something outside the workspace raises while no program runs prints where this host says: said as it is printed, and kept.
+        _session.Turn.EventScope = BeginEvent;
         Image = new ProgramImage();
         Execution = new ProgramExecution(this);
         ProjectName = project.Name;

@@ -43,6 +43,8 @@ namespace RDCore.Runtime.Execution.External.Automation;
 /// <param name="server">What reaches the automation servers of this machine.</param>
 public sealed class AutomationCallProvider(IRuntimeSession session, IAutomationServer server) : IExternalCallProvider
 {
+    private readonly ServerObjects _objects = new(session, server);
+
     // The enumerator that a server's enumeration member returns is an object of the standard library's IEnumVARIANT, whose members the loop calls by name: those are
     // the library's, and this provider answers them for the enumerators it holds - which is why it comes before the library's own provider.
     private static readonly string MoveNextKey = EnumeratorKey(nameof(IStdEnumVariantClass.MoveNext));
@@ -91,7 +93,14 @@ public sealed class AutomationCallProvider(IRuntimeSession session, IAutomationS
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        session.ExternalObjects.Bind(identity, server, server.CreateObject(progId));
+        // the program waits for the server, and gives its turn up while it does: what the server raises meanwhile is answered inside the call.
+        object created;
+        using (session.Turn.Yield())
+        {
+            created = server.CreateObject(progId);
+        }
+
+        session.ExternalObjects.Bind(identity, server, created);
         return RuntimeSemanticsEvaluationResult.Success(VBVoidValue.Void);
     }
 
@@ -103,14 +112,24 @@ public sealed class AutomationCallProvider(IRuntimeSession session, IAutomationS
 
         if (key == MoveNextKey)
         {
-            var moved = server.MoveNext(enumerator, out var current);
+            bool moved;
+            object? current;
+            using (session.Turn.Yield())
+            {
+                moved = server.MoveNext(enumerator, out current);
+            }
+
             Moved.AddOrUpdate(enumerator, new StrongBox<object?>(current));
             return RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(moved));
         }
 
         if (key == ResetKey)
         {
-            server.Reset(enumerator);
+            using (session.Turn.Yield())
+            {
+                server.Reset(enumerator);
+            }
+
             return RuntimeSemanticsEvaluationResult.Success(VBVoidValue.Void);
         }
 
@@ -141,7 +160,11 @@ public sealed class AutomationCallProvider(IRuntimeSession session, IAutomationS
 
         // the array the server is given is the one it writes the arguments passed by reference back into.
         var values = passed.Values.ToArray();
-        var result = server.Invoke(target, name, invocation, values, [.. passed.ByReference], session.Environment.Culture);
+        object? result;
+        using (session.Turn.Yield())
+        {
+            result = server.Invoke(target, name, invocation, values, [.. passed.ByReference], session.Environment.Culture);
+        }
 
         WriteBack(passed, values, parameters, resolver);
 
@@ -157,16 +180,7 @@ public sealed class AutomationCallProvider(IRuntimeSession session, IAutomationS
             result, member.ResolvedType, (value, declared) => enumeration ? WrapEnumerator(value, resolver) : Wrap(value, declared, resolver)));
     }
 
-    private VBTypedValue WrapEnumerator(object enumerator, ISymbolResolver resolver)
-    {
-        var classModule = Current(resolver, StdLibSymbolProvider.LibraryName, "IEnumVARIANT")
-            ?? throw new AutomationException(unchecked((int)0x80020005), "The standard library has no enumerator to enumerate with.");
-
-        var identity = session.Objects.CreateObject();
-        session.Symbols.CreateInstance(identity, classModule);
-        session.ExternalObjects.Bind(identity, server, enumerator);
-        return new VBObjectValue(identity);
-    }
+    private VBTypedValue WrapEnumerator(object enumerator, ISymbolResolver resolver) => _objects.WrapEnumerator(enumerator, resolver);
 
     private sealed class PassedArguments
     {
@@ -256,49 +270,9 @@ public sealed class AutomationCallProvider(IRuntimeSession session, IAutomationS
         }
     }
 
-    // the object the language holds for an object a server returned. The same server object is the same object to the program, which is what `Is` asks.
-    private VBTypedValue Wrap(object value, VBType declared, ISymbolResolver resolver)
-    {
-        if (session.ExternalObjects.TryFind(server, value, out var existing))
-        {
-            return new VBObjectValue(existing);
-        }
+    private VBTypedValue Wrap(object value, VBType declared, ISymbolResolver resolver) => _objects.Wrap(value, declared, resolver);
 
-        var classModule = ClassOf(value, declared, resolver)
-            ?? throw new AutomationException(unchecked((int)0x80020005), "The class of an object the server returned is not one of the referenced libraries'.");
-
-        var identity = session.Objects.CreateObject();
-        session.Symbols.CreateInstance(identity, classModule);
-        session.ExternalObjects.Bind(identity, server, value);
-        return new VBObjectValue(identity);
-    }
-
-    // The class an object is an instance of: the one its member declares to return, as the project has it now, or - for a member that is declared to return an
-    // Object, as `ActiveSheet` is - the one the server says it is, which is how late binding finds the members.
-    private VBClassModuleSymbol? ClassOf(object value, VBType declared, ISymbolResolver resolver)
-    {
-        if (declared is VBClassType { Symbol: { } named })
-        {
-            return Current(resolver, named.GetProperty(SymbolProperties.Library), named.Name) ?? named;
-        }
-
-        if (server.ClassNameOf(value) is not { Length: > 0 } qualified)
-        {
-            return null;
-        }
-
-        // `Excel._Worksheet`: the interface of a class is named for it, with a leading underscore the library's description leaves out.
-        var dot = qualified.IndexOf('.');
-        var library = dot < 0 ? null : qualified[..dot];
-        var className = (dot < 0 ? qualified : qualified[(dot + 1)..]).TrimStart('_');
-        return Current(resolver, library, className);
-    }
-
-    private static VBClassModuleSymbol? Current(ISymbolResolver resolver, string? library, string name)
-        => VBProjectSymbol.ResolveQualifiedType(resolver, library, name, StaticSymbol.GlobalUri).Symbol as VBClassModuleSymbol;
-
-    private object? HandleOf(VBRuntimeObjectId identity)
-        => session.ExternalObjects.TryGet(identity, out var owner, out var handle) && ReferenceEquals(owner, server) ? handle : null;
+    private object? HandleOf(VBRuntimeObjectId identity) => _objects.HandleOf(identity);
 
     private static VBRuntimeObjectId? IdentityOf(IRuntimeValue value)
         => value is VBRuntimeValue<VBRuntimeObjectId> identity ? identity.StoredValue : null;

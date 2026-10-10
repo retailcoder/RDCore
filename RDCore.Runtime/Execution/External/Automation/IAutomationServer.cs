@@ -122,4 +122,89 @@ public interface IAutomationServer : SDK.Runtime.Abstract.Execution.IExternalObj
     /// <param name="enumerator">The handle of the enumerator.</param>
     /// <exception cref="AutomationException">The enumerator cannot be reset.</exception>
     void Reset(object enumerator);
+
+    /// <summary>
+    /// Starts listening to the events of an object.
+    /// </summary>
+    /// <remarks>
+    /// An object that raises none, or that does not say which, is listened to for nothing and is not an error. Every event it raises is handed to
+    /// <paramref name="sink"/> by <see cref="AutomationEvents.Deliver"/>, which is what keeps an event that no call is waiting for from being handled in the middle of a procedure.
+    /// </remarks>
+    /// <param name="source">The handle of the object that raises the events.</param>
+    /// <param name="sink">Where they go.</param>
+    void Advise(object source, IAutomationEventSink sink);
+
+    /// <summary>
+    /// Stops listening to the events of an object. An object that is not listened to is left as it is.
+    /// </summary>
+    /// <param name="source">The handle of the object that raises the events.</param>
+    void Unadvise(object source);
+}
+
+/// <summary>
+/// Where the events of a server's object go.
+/// </summary>
+/// <remarks>
+/// The session's side of an event: it is told which event, and with what, on whatever thread the server raised it on.
+/// </remarks>
+public interface IAutomationEventSink
+{
+    /// <summary>
+    /// Whether an event that no call is waiting for may be handled now - <see cref="ISessionTurn.IsOpenForEvents"/>.
+    /// </summary>
+    bool IsOpenForEvents { get; }
+
+    /// <summary>
+    /// Says that an event that no call is waiting for waits to be handled, until the returned scope is disposed.
+    /// </summary>
+    IDisposable Waiting();
+
+    /// <summary>
+    /// Handles an event: the procedures that handle it run, and return.
+    /// </summary>
+    /// <param name="name">The name of the event.</param>
+    /// <param name="arguments">
+    /// What the server raised it with, in the order of the event's parameters. An argument the server passed by reference holds, when this returns, what the procedures left
+    /// in it - the <c>Cancel</c> of an event that can be cancelled.
+    /// </param>
+    void OnEvent(string name, object?[] arguments);
+}
+
+/// <summary>
+/// How a server hands an event over.
+/// </summary>
+public static class AutomationEvents
+{
+    /// <summary>
+    /// Hands an event to its sink, when it may be handled.
+    /// </summary>
+    /// <remarks>
+    /// A <em>synchronous</em> event is the answer to a call that was made and is waited for: it is handled at once, inside the call. Any other event is <em>asynchronous</em>,
+    /// and is handled between two activations: it waits until nothing runs, or until the program pumps (<c>DoEvents</c>). It waits on the thread of the server, which has
+    /// the program's own calls to make in the meantime - a program that is running makes them, and blocking the thread they are made on would keep it from ever pumping -
+    /// so <paramref name="serve"/> is what the thread does with the time it waits.
+    /// </remarks>
+    /// <param name="sink">Where the event goes.</param>
+    /// <param name="name">The name of the event.</param>
+    /// <param name="arguments">What the server raised it with.</param>
+    /// <param name="synchronous">Whether a call that the program waits for is what raised it.</param>
+    /// <param name="serve">Waits up to the given time, doing the work that is asked of the thread meanwhile.</param>
+    public static void Deliver(IAutomationEventSink sink, string name, object?[] arguments, bool synchronous, Action<TimeSpan> serve)
+    {
+        if (synchronous)
+        {
+            sink.OnEvent(name, arguments);
+            return;
+        }
+
+        using (sink.Waiting())
+        {
+            while (!sink.IsOpenForEvents)
+            {
+                serve(TimeSpan.FromMilliseconds(10));
+            }
+
+            sink.OnEvent(name, arguments);
+        }
+    }
 }

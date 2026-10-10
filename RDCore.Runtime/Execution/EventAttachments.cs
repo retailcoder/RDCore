@@ -1,3 +1,4 @@
+using RDCore.Runtime.Execution.External.Automation;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -70,6 +71,7 @@ internal static class EventAttachments
         if (held is { } source && !source.IsNothing())
         {
             session.Objects.DetachEventHandlers(source.Value, owner, variable);
+            ExternalEvents.StopWhenUnheard(session, source.Value);
         }
     }
 
@@ -101,6 +103,7 @@ internal static class EventAttachments
         if (assigned is { } source && !source.IsNothing())
         {
             session.Objects.AttachEventHandlers(source.Value, owner, variable);
+            ExternalEvents.Listen(session, source.Value);
         }
     }
 }
