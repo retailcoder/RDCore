@@ -110,10 +110,11 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
             }
         }
 
-        // a module is valid when what it declares is, as well as every procedure of it.
+        // a module is valid when what it declares is, as well as every procedure of it. The types it declares are asked to be names that resolve: its code is
+        // only sent once everything the workspace and its references declare is defined, which is what a name that is declared after the one that uses it needs.
         var declarationErrors = precompiled.Errors
             .AddRange(DeclarationStaticSemanticsEvaluator.CheckSyntax(syntaxTree, blocks))
-            .AddRange(DeclarationStaticSemanticsEvaluator.Evaluate(module, members, session.Symbols.Resolver));
+            .AddRange(DeclarationStaticSemanticsEvaluator.Evaluate(module, members, session.Symbols.Resolver, DeclarationRules.DeclaredTypes));
         var moduleModel = new ModuleSemanticModel(module.Uri, declarationErrors, procedureModels.ToImmutable())
         {
             // a language that has no such directive has no fact to state about it.

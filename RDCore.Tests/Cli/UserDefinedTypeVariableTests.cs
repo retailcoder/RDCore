@@ -20,6 +20,18 @@ public sealed class UserDefinedTypeVariableTests
             "Public Sub Main()", "Dim p As TPoint", "p.X = 4", "p.Y = 5", "Debug.Print p.X + p.Y", "End Sub"));
 
     [TestMethod]
+    public async Task ALocal_OfAUserDefinedTypeQualifiedByItsModule_HasItsFields()
+        => CollectionAssert.AreEqual(new[] { "9" }, await RunAsync(
+            "Public Type TPoint", "X As Long", "Y As Long", "End Type",
+            "Public Sub Main()", "Dim p As Program.TPoint", "p.X = 4", "p.Y = 5", "Debug.Print p.X + p.Y", "End Sub"));
+
+    [TestMethod]
+    public async Task ALocal_OfAUserDefinedTypeOfAClassModule_HasItsFields()
+        => CollectionAssert.AreEqual(new[] { "7" }, await ModuleWorkspace.RunAsync(
+            [("Shapes", ModuleWorkspace.ClassModule("Shapes", "Public Type TPoint", "X As Long", "End Type"))],
+            Program("Public Sub Main()", "Dim p As Shapes.TPoint", "p.X = 7", "Debug.Print p.X", "End Sub")));
+
+    [TestMethod]
     public async Task AVariableOfTheModule_OfAUserDefinedType_HasItsFields()
         => CollectionAssert.AreEqual(new[] { "5" }, await RunAsync(
             "Private Type TPoint", "X As Long", "Y As Long", "End Type",

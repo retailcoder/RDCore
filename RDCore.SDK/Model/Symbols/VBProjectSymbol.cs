@@ -46,8 +46,34 @@ public sealed record class VBProjectSymbol(Uri WorkspaceRoot, string Name)
             return resolver.ResolveType(name, ScopeKind.Global, handle);
         }
 
-        return resolver.ResolveQualifier(qualifier, ScopeKind.Global, handle).Symbol is VBProjectSymbol project
-            ? resolver.ResolveType(name, ScopeKind.Global, project.WorkspaceRoot)
-            : SymbolResolutionResult.Unbound;
+        return resolver.ResolveQualifier(qualifier, ScopeKind.Global, handle).Symbol switch
+        {
+            VBProjectSymbol project => resolver.ResolveType(name, ScopeKind.Global, project.WorkspaceRoot),
+            VBModuleSymbol module => ResolveTypeOfModule(resolver, module, name, handle),
+            _ => SymbolResolutionResult.Unbound,
+        };
+    }
+
+    // MS-VBAL §5.6.12: "<l-expression> is classified as a procedural module or a type referencing a class defined in a class module", and the module has an
+    // accessible UDT or Enum definition of the name. The type is the module's own: a type that the module's scope reaches by being the project's is not the
+    // module's, and one that is Private to the module is not accessible to anything outside it.
+    private static SymbolResolutionResult ResolveTypeOfModule(ISymbolResolver resolver, VBModuleSymbol module, string name, Uri handle)
+    {
+        var found = resolver.ResolveType(name, ScopeKind.Global, module.Uri);
+        if (found.Symbol is not { } type || !string.Equals(type.ParentUri.AbsoluteUri, module.Uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
+        {
+            return SymbolResolutionResult.Unbound;
+        }
+
+        return IsWithin(handle, module) || ScopeTreeBuilder.IsProjectVisible(type) ? found : SymbolResolutionResult.Unbound;
+    }
+
+    // the symbol at the handle is the module, or declared in it: a symbol's address is its parent's with the fragment extended by its own name.
+    private static bool IsWithin(Uri handle, VBModuleSymbol module)
+    {
+        var inside = handle.Fragment.TrimStart('#');
+        var path = module.Uri.Fragment.TrimStart('#');
+        return handle.GetLeftPart(UriPartial.Path) == module.Uri.GetLeftPart(UriPartial.Path)
+            && (string.Equals(inside, path, StringComparison.OrdinalIgnoreCase) || inside.StartsWith(path + ".", StringComparison.OrdinalIgnoreCase));
     }
 }

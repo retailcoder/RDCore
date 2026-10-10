@@ -619,6 +619,24 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to The declared type '{0}' could not be resolved.
+        /// </summary>
+        public static string VBCompileError_DeclaredTypeNotResolved_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_DeclaredTypeNotResolved_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The declared type '{0}' could not be resolved: '{1}' is not a project or a module that this project can see.
+        /// </summary>
+        public static string VBCompileError_DeclaredTypeQualifierNotResolved_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_DeclaredTypeQualifierNotResolved_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to A RaiseEvent argument cannot be written with ByVal: the keyword is valid only in the argument list of an external procedure's invocation (MS-VBAL §5.6.13.1).
         /// </summary>
         public static string VBCompileError_RaiseEventByVal_Verbose {
