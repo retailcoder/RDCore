@@ -77,10 +77,20 @@ public interface ISessionErrorState
 
     /// <summary>
     /// <strong>MS-VBAL §6.1.3.2.2.4</strong> <c>Err.LastDllError</c>: the system error code of the last
-    /// call into a dynamic-link library. Read-only, and <c>0</c> for as long as a <c>Declare</c>d
-    /// procedure cannot be executed at all.
+    /// call into a dynamic-link library. Read-only to a program: it is the call that sets it
+    /// (<see cref="RecordDllError"/>), and <c>0</c> until one has.
     /// </summary>
     int LastDllError { get; }
+
+    /// <summary>
+    /// Records the system error code a call into a dynamic-link library left, as <see cref="LastDllError"/> reports it until the next such call.
+    /// </summary>
+    /// <remarks>
+    /// Every call sets it, whether it failed or not, as MS-VBA does: what the library's own documentation says the code means depends on what it returned,
+    /// and that is the program's to read.
+    /// </remarks>
+    /// <param name="code">The system error code the call left.</param>
+    void RecordDllError(int code);
 
     /// <summary>
     /// 🎯 <strong>RD-VBAL</strong> The <em>line number</em> the current error was raised at - the nearest

@@ -1,6 +1,7 @@
 using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Execution.External;
 using RDCore.Runtime.Execution.External.Automation;
+using RDCore.Runtime.Execution.External.Native;
 using RDCore.Runtime.StdLib;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Operators;
@@ -232,7 +233,9 @@ public sealed class RuntimeExecutionPipeline
         var external = analysis
             ? new ExternalCallPipeline(session, [], [StdLibDispatcher.For(session), new OutsideWorldCallProvider()])
             // the servers' provider is asked first: it answers the members of the standard library's enumerator for the enumerators it holds, and for nothing else of it.
-            : ExternalCallPipeline.For(session, [new AutomationCallProvider(session, automation ?? AutomationServers.Machine), StdLibDispatcher.For(session)]);
+            // A Declare'd procedure is a native library's, and is called when the policy over library imports lets it through.
+            : ExternalCallPipeline.For(session,
+                [new AutomationCallProvider(session, automation ?? AutomationServers.Machine), StdLibDispatcher.For(session), new DeclaredProcedureProvider(session)]);
         var bindings = new RuntimeCallableBindingFactory(invoker, external);
         expressions.ProcedureInvoker = invoker;
         expressions.Bindings = bindings;
