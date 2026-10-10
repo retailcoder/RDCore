@@ -38,6 +38,15 @@ public sealed record class AnalyzerFinding(RDCoreDiagnosticId Id, SourceRange Ra
 public interface IModuleAnalyzer
 {
     /// <summary>
+    /// The phase in which the analyzer is asked: the earliest that has everything it reads (<see cref="AnalysisPhase"/>).
+    /// </summary>
+    /// <remarks>
+    /// An analyzer that reads the syntax tree, or the facts of the static pass, is asked as soon as they are there and is not kept waiting for slower facts. One
+    /// that reads <see cref="RDCore.SDK.Platform.Protocol.ProcedureSemanticsDto.Runtime"/> overrides this to say so.
+    /// </remarks>
+    AnalysisPhase Phase => AnalysisPhase.Static;
+
+    /// <summary>
     /// What the analyzer has to say about the module.
     /// </summary>
     /// <param name="context">The module, and what is known of it.</param>

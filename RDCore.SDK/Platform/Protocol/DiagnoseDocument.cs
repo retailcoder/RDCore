@@ -3,6 +3,7 @@ using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.SDK.Client;
 using RDCore.SDK.Model.AST;
+using RDCore.SDK.Model.Diagnostics;
 
 namespace RDCore.SDK.Platform.Protocol;
 
@@ -45,7 +46,12 @@ public record class DiagnoseDocumentRequest : IRequest, IRequest<DiagnoseDocumen
 /// What the environment host's semantic analysis pass found out about the module (<strong>RD-VBAL §5.0.3</strong>): the facts an analyzer decides what to say of.
 /// <see langword="null"/> when the host has none, because it is not part of the platform or the module's code has not been loaded.
 /// </param>
-public record class DiagnoseDocumentPayload(Uri DocumentUri, int SourceVersion, ModuleParseResult ParseResult, ModuleSemanticsDto? Semantics = null);
+/// <param name="Phase">
+/// Which phase of the analysis the provider is asked for (<see cref="AnalysisPhase"/>): what it answers is the findings of that phase only, and the language server
+/// puts the phases together. Every phase, when not said.
+/// </param>
+public record class DiagnoseDocumentPayload(
+    Uri DocumentUri, int SourceVersion, ModuleParseResult ParseResult, ModuleSemanticsDto? Semantics = null, AnalysisPhase Phase = AnalysisPhase.All);
 
 /// <summary>
 /// Response to <c>rdcore/diagnostics/document</c>: the diagnostics a provider found, already projected

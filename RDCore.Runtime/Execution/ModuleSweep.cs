@@ -17,42 +17,59 @@ namespace RDCore.Runtime.Execution;
 /// is stated as a fact (<see cref="RuntimeExecutionPipeline.CreateForSweep"/>).
 /// </para>
 /// <para>
-/// The evaluation happens in a session of its own that shares the declarations of the session it is given (<see cref="RuntimeSessionComposer.ComposeForAnalysis"/>):
-/// nothing the code does reaches the session the program runs in.
+/// It happens in two steps because it is not done where it is asked for. <see cref="Prepare"/> is done on the thread that owns the session the program runs
+/// in, and takes what the evaluation needs of it as it is at that moment (<see cref="RuntimeSessionComposer.ComposeForAnalysis"/>); <see cref="Evaluate"/> then
+/// reads nothing but what <see cref="Prepare"/> took, and can run on any thread, while the session goes on changing.
 /// </para>
 /// </remarks>
-public static class ModuleSweep
+public sealed class ModuleSweep
 {
+    private readonly IRuntimeSession _analysis;
+    private readonly IReadOnlyList<(VBTypeMemberSymbol Procedure, InstructionList Body)> _procedures;
+    private readonly IVerboseMessageBuilder _messages;
+
+    private ModuleSweep(IRuntimeSession analysis, IReadOnlyList<(VBTypeMemberSymbol Procedure, InstructionList Body)> procedures, IVerboseMessageBuilder messages)
+    {
+        _analysis = analysis;
+        _procedures = procedures;
+        _messages = messages;
+    }
+
     /// <summary>
-    /// Evaluates <paramref name="procedures"/>.
+    /// Takes what the evaluation of <paramref name="procedures"/> needs of <paramref name="session"/>, as it is now.
     /// </summary>
     /// <param name="session">A session whose symbols are declared: the context the code is evaluated in. It is not changed.</param>
     /// <param name="procedures">The procedures to evaluate with their lowered bodies.</param>
     /// <param name="messages">Builds the verbose half of the errors the evaluation raises.</param>
+    public static ModuleSweep Prepare(
+        IRuntimeSession session, IReadOnlyList<(VBTypeMemberSymbol Procedure, InstructionList Body)> procedures, IVerboseMessageBuilder messages)
+        => new(RuntimeSessionComposer.ComposeForAnalysis(session), procedures, messages);
+
+    /// <summary>
+    /// Evaluates the procedures.
+    /// </summary>
     /// <param name="cancellation">Stops the evaluation between instructions.</param>
     /// <returns>
     /// The facts of each procedure, by the <see cref="Symbol.SemanticId"/> of the procedure. A procedure that could not be evaluated in full has the facts
     /// that were stated before it stopped, and says it was not fully analyzed.
     /// </returns>
-    public static ImmutableDictionary<SemanticId, RuntimeFacts> Evaluate(
-        IRuntimeSession session,
-        IReadOnlyList<(VBTypeMemberSymbol Procedure, InstructionList Body)> procedures,
-        IVerboseMessageBuilder messages,
-        CancellationToken cancellation = default)
+    /// <exception cref="OperationCanceledException">The evaluation was cancelled: there is no answer to give, and what was found is not kept.</exception>
+    public ImmutableDictionary<SemanticId, RuntimeFacts> Evaluate(CancellationToken cancellation = default)
     {
         var facts = ImmutableDictionary.CreateBuilder<SemanticId, RuntimeFacts>();
-        if (procedures.Count == 0)
+        if (_procedures.Count == 0)
         {
             return facts.ToImmutable();
         }
 
         var collector = new AnalysisFactCollector();
-        var analysis = RuntimeSessionComposer.ComposeForAnalysis(session);
-        var bodies = procedures.ToDictionary(entry => entry.Procedure.SemanticId, entry => entry.Body);
-        var pipeline = RuntimeExecutionPipeline.CreateForSweep(analysis, bodies, messages, collector, cancellation);
+        var bodies = _procedures.ToDictionary(entry => entry.Procedure.SemanticId, entry => entry.Body);
+        var pipeline = RuntimeExecutionPipeline.CreateForSweep(_analysis, bodies, _messages, collector, cancellation);
 
-        foreach (var (procedure, _) in procedures)
+        foreach (var (procedure, _) in _procedures)
         {
+            cancellation.ThrowIfCancellationRequested();
+
             var complete = false;
             try
             {
@@ -63,6 +80,9 @@ public static class ModuleSweep
                 // a defect in the evaluation is the platform's, not the code's: what was stated before it is true, and the procedure says it is not all.
                 complete = false;
             }
+
+            // a sweep that was stopped did not finish the procedure it was in, and there is no telling which of the others it had not yet reached.
+            cancellation.ThrowIfCancellationRequested();
 
             facts[procedure.SemanticId] = collector.Take(complete);
         }

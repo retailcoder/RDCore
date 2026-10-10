@@ -62,6 +62,13 @@ internal static class ModuleWorkspace
     }
 
     /// <summary>
+    /// Loads the workspace like <see cref="LoadErrorsAsync"/>, and hands the host's session provider to <paramref name="inspect"/>.
+    /// </summary>
+    public static Task WithHostAsync(
+        IReadOnlyList<(string Name, string Source)> classes, string program, Func<EnvironmentSessionProvider, Task> inspect)
+        => RunCoreAsync(classes, program, errorsOnly: true, afterLoading: inspect);
+
+    /// <summary>
     /// Loads the workspace like <see cref="LoadErrorsAsync"/>, and gives the model of a module as the host keeps it, before it travels.
     /// </summary>
     /// <param name="classes">The class modules of the workspace.</param>
@@ -72,10 +79,11 @@ internal static class ModuleWorkspace
         IReadOnlyList<(string Name, string Source)> classes, string program, string moduleName = "Program", SupportedLanguage? language = null)
     {
         SDK.Semantics.ModuleSemanticModel? model = null;
-        await RunCoreAsync(classes, program, errorsOnly: true, afterLoading: sessionProvider =>
+        await RunCoreAsync(classes, program, errorsOnly: true, afterLoading: async sessionProvider =>
         {
+            // the facts of the code are evaluated in the background, after the model is stored.
+            await sessionProvider.Image.Semantics.WhenAllEvaluatedAsync();
             model = sessionProvider.Image.Semantics.All.Single(candidate => candidate.Module.Fragment.TrimStart('#') == moduleName);
-            return Task.CompletedTask;
         }, language: language);
 
         return model!;

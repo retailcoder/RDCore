@@ -5,6 +5,7 @@ using RDCore.LanguageServer.Diagnostics;
 using RDCore.LanguageServer.Parsing;
 using RDCore.LanguageServer.Symbols;
 using RDCore.SDK.Model.AST.Declarations;
+using RDCore.SDK.Model.Diagnostics;
 
 namespace RDCore.LanguageServer.Workspace.Services;
 
@@ -212,10 +213,24 @@ internal sealed class DocumentLifecycleService(
                 return;
             }
 
-            var result = await diagnostics.GetAsync(documentUri, previousResultId: null, token);
-            if (!IsSuperseded(documentUri, version, token))
+            // what is ready is not held back for what is not: the phases of the analysis are asked for in turn, and what each finds is published as soon as it is
+            // there, together with what the earlier ones found - a publication replaces the one before it. The static findings reach the client while the facts
+            // that come of evaluating the code are still being found out.
+            var published = new List<Diagnostic>();
+            foreach (var phase in new[] { AnalysisPhase.Static, AnalysisPhase.Runtime })
             {
-                publisher.Publish(documentUri, version, result.Diagnostics);
+                var result = await diagnostics.GetPhaseAsync(documentUri, phase, token);
+                if (IsSuperseded(documentUri, version, token))
+                {
+                    return;
+                }
+
+                // a phase that found nothing changes nothing, except that the first one is what clears what the text had before.
+                if (result.Diagnostics.Count > 0 || phase == AnalysisPhase.Static)
+                {
+                    published.AddRange(result.Diagnostics);
+                    publisher.Publish(documentUri, version, [.. published]);
+                }
             }
         }
         catch (OperationCanceledException)

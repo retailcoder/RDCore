@@ -3,6 +3,7 @@ using OmniSharp.Extensions.JsonRpc;
 using RDCore.SDK.Client;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
+using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Semantics;
@@ -28,6 +29,13 @@ public record class HostSemanticsParams : IRequest, IRequest<HostSemanticsResult
     /// The name of the module whose model is asked for, or empty for the model of every module of the workspace.
     /// </summary>
     public string ModuleName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// What the answer waits for. <see cref="AnalysisPhase.Static"/> is answered at once with whatever the host has: the facts that are ready when the module
+    /// is loaded, and the ones that come later if they happen to be there. Anything that includes <see cref="AnalysisPhase.Runtime"/> is not answered until
+    /// the host has evaluated the code of the modules asked for, or the request is cancelled.
+    /// </summary>
+    public AnalysisPhase Phase { get; init; } = AnalysisPhase.All;
 }
 
 /// <summary>

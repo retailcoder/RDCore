@@ -62,8 +62,8 @@ public static class RuntimeSessionComposer
     }
 
     /// <summary>
-    /// Composes a session to <em>analyze</em> code in: it shares the declared symbols of <paramref name="staticContext"/> and holds the run-time state
-    /// of its own.
+    /// Composes a session to <em>analyze</em> code in: it has the declared symbols of <paramref name="staticContext"/> as they are now and holds the run-time
+    /// state of its own.
     /// </summary>
     /// <param name="staticContext">A session whose symbols are declared: the context the code is analyzed in. It is not changed, and nothing the
     /// analysis does reaches it.</param>
@@ -71,14 +71,14 @@ public static class RuntimeSessionComposer
     /// never touches the real one.</param>
     /// <remarks>
     /// <para>
-    /// What the symbols declare is not copied - a project that references anything declares thousands of them, and an analysis does not change a
-    /// declaration. Everything that happens when code runs belongs to the new session alone: its storage, its objects, its call stack, its error state,
-    /// its files. Its output is discarded.
+    /// The declarations are those of <paramref name="staticContext"/> as they are when this is called, and stay so: the symbols are immutable and are not
+    /// copied, only the table that holds them, so a declaration that is made or replaced afterwards is not seen by the analysis. That is what makes it safe to
+    /// run on another thread while the session it was composed from goes on changing. Everything that happens when code runs belongs to the new session
+    /// alone: its storage, its objects, its call stack, its error state, its files. Its output is discarded.
     /// </para>
     /// <para>
     /// Its storage is allocated when the pipeline for it is composed (<see cref="RuntimeExecutionPipeline.CreateForAnalysis"/>), because what a variable
-    /// starts as is the analysis's to say. The declarations must be done changing before they are shared, and are not to be changed while a session
-    /// composed over them is in use.
+    /// starts as is the analysis's to say.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="staticContext"/> is not a session this composer composed.</exception>
@@ -89,11 +89,8 @@ public static class RuntimeSessionComposer
             throw new ArgumentException("The static context of an analysis is a session that this composer composed.", nameof(staticContext));
         }
 
-        // the scope tree is built when it is first needed after a change: it is built here, once, before anything else reads the table through it.
-        _ = declared.Table.ScopeTree;
-
         return Compose(
-            staticContext.Environment, staticContext.References, declared.Table, NullRuntimeOutput.Instance,
+            staticContext.Environment, staticContext.References, declared.Table.Snapshot(), NullRuntimeOutput.Instance,
             fileSystem ?? new MockFileSystem(new Dictionary<string, MockFileData>(), OperatingSystem.IsWindows() ? @"C:\" : "/"));
     }
 

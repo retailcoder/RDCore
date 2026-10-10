@@ -12,6 +12,7 @@ using RDCore.Parsing;
 using RDCore.SDK.Client;
 using RDCore.SDK.Extensibility;
 using RDCore.SDK.Model.AST;
+using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Platform.Protocol;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -224,6 +225,41 @@ public sealed class DocumentDiagnosticsServiceTests
         Assert.IsTrue(semantics.OptionExplicit);
         await host.Received(1).SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(
             Arg.Is<HostSemanticsParams>(request => request.ModuleName.Contains("Mod1")), Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task APhaseThatIsAskedFor_IsAskedOfTheHostAndOfTheProvider_AndOfNoOther()
+    {
+        var document = Document();
+        WorkspaceHas(document);
+        ParseYields();
+        var host = HostThatProvidesSemantics(PlatformJson.Serialize(new SemanticsPayload([new ModuleSemanticsDto(new Uri("file://rdcore-test#Mod1"), true, [], [], [])])));
+        var provider = Provider("RDCore.Diagnostics", 1, Diag(1));
+        ProvidersAre(provider);
+
+        var result = await Sut().GetPhaseAsync(document.Id.Uri.ToUri(), AnalysisPhase.Static, CancellationToken.None);
+
+        Assert.AreEqual(AnalysisPhase.Static, PayloadSentTo(provider).Phase, "the extension is told which phase to find");
+        await host.Received(1).SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(
+            Arg.Is<HostSemanticsParams>(request => request.Phase == AnalysisPhase.Static), Arg.Any<CancellationToken>());
+        Assert.AreEqual(1, result.Diagnostics.Count);
+    }
+
+    [TestMethod]
+    public async Task AnAnswerForEverything_IsAskedForEveryPhase_InOneRequestEach()
+    {
+        var document = Document();
+        WorkspaceHas(document);
+        ParseYields();
+        var host = HostThatProvidesSemantics(PlatformJson.Serialize(new SemanticsPayload([])));
+        var provider = Provider("RDCore.Diagnostics", 1);
+        ProvidersAre(provider);
+
+        await Sut().GetAsync(document.Id.Uri.ToUri(), previousResultId: null, CancellationToken.None);
+
+        Assert.AreEqual(AnalysisPhase.All, PayloadSentTo(provider).Phase);
+        await host.Received(1).SendRequestAsync<HostSemanticsParams, HostSemanticsResult>(
+            Arg.Is<HostSemanticsParams>(request => request.Phase == AnalysisPhase.All), Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
