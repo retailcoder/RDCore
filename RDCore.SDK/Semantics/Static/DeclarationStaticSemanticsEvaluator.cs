@@ -161,8 +161,13 @@ public static class DeclarationStaticSemanticsEvaluator
             return;
         }
 
-        errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.UserDefinedTypeNotDefined, new SourceLocation(document, range),
-            $"The declared type '{name}' could not be resolved."));
+        // a qualifier that is nothing this project can see is most likely a library that is not referenced: the error says so, where the name alone would not.
+        var qualifier = name.LastIndexOf('.') is >= 0 and var split ? name[..split] : null;
+        var verbose = qualifier is not null && resolver.ResolveQualifier(qualifier, ScopeKind.Global, module.Uri).Symbol is null
+            ? string.Format(Exceptions.VBCompileError_DeclaredTypeQualifierNotResolved_Verbose, name, qualifier)
+            : string.Format(Exceptions.VBCompileError_DeclaredTypeNotResolved_Verbose, name);
+
+        errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.UserDefinedTypeNotDefined, new SourceLocation(document, range), verbose));
     }
 
     // the name a declared type was written with, when it did not resolve; for an array, its element's.

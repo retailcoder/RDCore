@@ -300,6 +300,12 @@
   <data name="VBCompileError_NumericLiteralOverflow_Verbose" xml:space="preserve">
     <value>La valeur du littéral numérique est hors des limites de son type.</value>
   </data>
+  <data name="VBCompileError_DeclaredTypeNotResolved_Verbose" xml:space="preserve">
+    <value>Le type déclaré '{0}' n'a pas pu être résolu.</value>
+  </data>
+  <data name="VBCompileError_DeclaredTypeQualifierNotResolved_Verbose" xml:space="preserve">
+    <value>Le type déclaré '{0}' n'a pas pu être résolu : '{1}' n'est pas un projet ou un module que ce projet peut voir. S'il s'agit d'une bibliothèque, elle manque peut-être dans les références du projet.</value>
+  </data>
   <data name="VBCompileError_RaiseEventByVal_Verbose" xml:space="preserve">
     <value>Un argument de RaiseEvent ne peut pas être écrit avec ByVal : le mot clé n'est valide que dans la liste d'arguments de l'appel d'une procédure externe (MS-VBAL §5.6.13.1).</value>
   </data>
