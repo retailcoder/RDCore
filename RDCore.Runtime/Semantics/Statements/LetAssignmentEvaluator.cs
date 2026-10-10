@@ -271,9 +271,40 @@ public sealed class LetAssignmentEvaluator(
             return failure;
         }
 
-        return owner is VBObjectValue objectOwner
-            ? AssignObjectMember(session, context, statement, memberAccess, indexArguments, objectOwner, source, value, isSet)
-            : RuntimeExecutionOutcome.InternalError;
+        return owner switch
+        {
+            VBObjectValue objectOwner => AssignObjectMember(session, context, statement, memberAccess, indexArguments, objectOwner, source, value, isSet),
+            VBUserDefinedTypeValue record when isSet && indexArguments.IsEmpty => SetField(session, memberAccess, record, source, value),
+            _ => RuntimeExecutionOutcome.InternalError,
+        };
+    }
+
+    // MS-VBAL §5.4.3.9 with a <member-access-expression> target whose owner is a UDT: the field is Set-coerced to its declared type and holds the
+    // object. Like Let (AssignField) the field lives on the value, and not in storage of its own, so the object the field held is let go of
+    // through the field's cell.
+    private RuntimeExecutionOutcome SetField(
+        IRuntimeSession session, MemberAccessExpressionNode memberAccess, VBUserDefinedTypeValue record, ExpressionNode source, VBTypedValue value)
+    {
+        var name = memberAccess.Member.IdentifierName;
+        if (record.Fields.FirstOrDefault(field => field.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is not { ResolvedType: { } fieldType } declared
+            || record.GetFieldHandle(declared.Name) is not { } handle
+            || expressions.SetCoercion is not { } setCoercion)
+        {
+            return RuntimeExecutionOutcome.InternalError;
+        }
+
+        var setResult = setCoercion.EvaluateSetCoercion(session, source, value, fieldType);
+        if (!setResult.IsSuccess)
+        {
+            return RuntimeExecutionOutcome.Error(setResult.ErrorInfo!);
+        }
+
+        // a value is a view of its handle, which is about to be written to: what the field held is its object's identity as of now.
+        var previous = fieldType.CreateValue(handle) is VBObjectValue held ? new VBObjectValue(held.Value) : null;
+
+        handle.Store(session.Symbols.Resolver, setResult.Result!);
+        ObjectReferences.Rebind(session, handle, previous, setResult.Result as VBObjectValue);
+        return RuntimeExecutionOutcome.Next;
     }
 
     private RuntimeExecutionOutcome AssignObjectMember(
