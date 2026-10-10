@@ -1,4 +1,4 @@
-using RDCore.SDK.Model.Values.Runtime;
+﻿using RDCore.SDK.Model.Values.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
 namespace RDCore.SDK.Runtime.Abstract.Execution;

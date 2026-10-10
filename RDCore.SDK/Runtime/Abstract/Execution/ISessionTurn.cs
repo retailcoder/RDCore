@@ -1,4 +1,4 @@
-namespace RDCore.SDK.Runtime.Abstract.Execution;
+﻿namespace RDCore.SDK.Runtime.Abstract.Execution;
 
 /// <summary>
 /// Whose turn it is to run code in a session: the program that is running, or an event that something outside the workspace raised.

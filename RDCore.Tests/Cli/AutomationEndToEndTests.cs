@@ -1,4 +1,4 @@
-using RDCore.SDK.Runtime.Libraries;
+﻿using RDCore.SDK.Runtime.Libraries;
 using System.IO.Abstractions;
 using static RDCore.Tests.Cli.ModuleWorkspace;
 

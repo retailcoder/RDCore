@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using RDCore.SDK.Runtime.Libraries;
 using System.Collections.Immutable;
 using System.Globalization;

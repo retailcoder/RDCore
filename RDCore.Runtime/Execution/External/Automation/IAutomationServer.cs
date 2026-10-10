@@ -1,4 +1,4 @@
-namespace RDCore.Runtime.Execution.External.Automation;
+﻿namespace RDCore.Runtime.Execution.External.Automation;
 
 /// <summary>
 /// How a member of an automation server is reached.

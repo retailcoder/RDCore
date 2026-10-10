@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using RDCore.SDK.Runtime.Libraries;
 
 namespace RDCore.Tests.Runtime.Libraries;
