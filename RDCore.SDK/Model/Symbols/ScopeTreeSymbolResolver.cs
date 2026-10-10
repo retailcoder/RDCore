@@ -88,7 +88,19 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
     /// an accessible user-defined type or Enum declared in another module of the project. The procedure
     /// scope is never consulted — no local is a type. <paramref name="scope"/> is not consulted.
     /// </summary>
-    public SymbolResolutionResult ResolveType(string name, ScopeKind scope, Uri handle)
+    public SymbolResolutionResult ResolveType(string name, ScopeKind scope, Uri handle) => ResolveType(name, handle, _ => true);
+
+    /// <summary>
+    /// Resolves the type <paramref name="name"/> that <paramref name="project"/> declares (<strong>MS-VBAL §5.6.12</strong>): the candidates are the project's
+    /// own before the name is decided to be ambiguous, so the types of the other projects that share the tier are not in the way.
+    /// </summary>
+    public SymbolResolutionResult ResolveProjectType(VBProjectSymbol project, string name)
+    {
+        var library = project.GetProperty(SymbolProperties.Library) ?? string.Empty;
+        return ResolveType(name, project.WorkspaceRoot, symbol => string.Equals(symbol.GetProperty(SymbolProperties.Library) ?? string.Empty, library, StringComparison.Ordinal));
+    }
+
+    private SymbolResolutionResult ResolveType(string name, Uri handle, Func<Symbol, bool> isOfProject)
     {
         var origin = scopeTree.ScopeFor(handle).SelfAndAncestors().ToArray();
         (LexicalScope? Tier, Func<Symbol, bool> IsCandidate)[] tiers =
@@ -100,7 +112,7 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
 
         foreach (var (tier, isCandidate) in tiers)
         {
-            if (tier is not null && SelectTier(tier, tier.DeclaredAs(name).Where(isCandidate)) is { } result)
+            if (tier is not null && SelectTier(tier, tier.DeclaredAs(name).Where(isCandidate).Where(isOfProject)) is { } result)
             {
                 return result;
             }
@@ -233,6 +245,14 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
             return null;
         }
 
+        // at the project and global tiers the candidates are of different projects - the workspace's own and each library's - and a name that several of them
+        // declare means the one that shadows the others: the workspace's declaration shadows every library's, and a library that is referenced later shadows
+        // one that is referenced earlier (RD-VBAL §2.3.1.2). Candidates of one rank are still a collision.
+        if (matches.Length > 1 && lexicalScope.Kind is LexicalScopeKind.Project or LexicalScopeKind.Global)
+        {
+            matches = Shadowing(matches);
+        }
+
         // checked ahead of the single-match fast path too: a lone Property Let/Set with no parameters
         // at all is invalid on its own (VBC09321), not only when it collides with other accessors.
         if (TryResolvePropertyAccessors(matches) is { } propertyResult)
@@ -251,6 +271,15 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
         return lexicalScope.Kind is LexicalScopeKind.Project or LexicalScopeKind.Global
             ? SymbolResolutionResult.Ambiguous(matches)
             : SymbolResolutionResult.Duplicate(matches);
+    }
+
+    // what shadows: a symbol of no library is the workspace's own and outranks any library's; a library's rank is the precedence of its reference.
+    private static Symbol[] Shadowing(Symbol[] candidates)
+    {
+        static int Rank(Symbol symbol) => symbol.GetProperty(SymbolProperties.Library) is null ? int.MaxValue : symbol.GetProperty(SymbolProperties.LibraryPriority);
+
+        var highest = candidates.Max(Rank);
+        return [.. candidates.Where(candidate => Rank(candidate) == highest)];
     }
 
     // MS-VBAL §5.6.10 lists no user-defined type and no class module among the default binding context's

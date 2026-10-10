@@ -33,6 +33,10 @@ public sealed class CompositeSymbolResolver(params ISymbolResolver[] resolvers) 
         => FirstBound(resolver => resolver.ResolveQualifier(name, scope, handle));
 
     /// <inheritdoc/>
+    public SymbolResolutionResult ResolveProjectType(VBProjectSymbol project, string name)
+        => FirstBound(resolver => resolver.ResolveProjectType(project, name));
+
+    /// <inheritdoc/>
     public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
         => FirstBound(resolver => resolver.ResolveConditionalConstant(name, scope, handle));
 

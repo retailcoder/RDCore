@@ -155,6 +155,17 @@ Dans tous les cas, le rôle de ce niveau d'abstraction est de configurer les _ca
 >
 > `describe-ext` reflète les capacités déclarées par l'exécutable d'extension (ses déclarations `[assembly: ProvidesCorePlatformClientCapability<T>]`) dans le manifest. `PlatformPublish.ps1` l'exécute une fois par extension lors de l'assemblage de la plateforme.
 
+> [!IMPORTANT]
+> 📚 **Les bibliothèques référencées** (`Excel`, `Word`, `Access`, `ADODB`, `Scripting`, …) sont connues d'un projet par leur _nom_, comme si la bibliothèque était du code VBA, et ce que chacune déclare est livré avec la plateforme sous forme de _description de bibliothèque_ dans `Symbols/<Nom>.json` (format : [LibraryDescription](./api/RDCore.SDK.Runtime.Libraries.LibraryDescription.html)). Un projet est vérifié contre la description : il peut donc être analysé sur une machine qui n'a pas la bibliothèque. Une bibliothèque dont la plateforme n'a pas de description est une référence qui ne peut pas être résolue, et les types qui la nomment sont des erreurs de compilation. Les bibliothèques qui dépendent les unes des autres sont rejetées, non résolues.
+>
+> Une description est générée, jamais écrite à la main, sur une machine Windows qui a la bibliothèque, par la CLI en _mode commande_ :
+>
+> ```
+> rdc.exe export-library Excel --dependencies --output Symbols
+> ```
+>
+> `export-library` accepte un fichier (`scrrun.dll`), l'identifiant que la machine a donné à la bibliothèque, ou son nom; quand plusieurs versions d'une bibliothèque sont enregistrées, la plus récente est décrite. `--dependencies` décrit aussi les bibliothèques dont elle dépend, qu'un projet doit avoir pour la référencer.
+
 
 ### Capacités
 

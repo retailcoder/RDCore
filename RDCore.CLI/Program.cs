@@ -312,6 +312,7 @@ internal class RDCoreConsoleCommandHost : AppHost<RDCoreConsoleCommandApp>
             // a native verb wins a name collision.
             .AddSingleton<ICliCommand, DescribeExtensionCommand>()
             .AddSingleton<ICliCommand, NewWorkspaceCommand>()
+            .AddSingleton<ICliCommand, ExportLibraryCommand>()
             .AddSingleton<ICliCommandProvider, NativeCliCommandProvider>()
             .AddSingleton<ICliCommandProvider, ExtensionCliCommandProvider>()
             .AddSingleton<ICliCommandDispatcher, CliCommandDispatcher>();

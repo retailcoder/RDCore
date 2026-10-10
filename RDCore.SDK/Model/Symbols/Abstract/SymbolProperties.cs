@@ -60,6 +60,12 @@ public static class SymbolProperties
     /// </remarks>
     public static readonly SymbolProperty<string> Library = new(nameof(Library));
     /// <summary>
+    /// The precedence of the library a symbol is of among the libraries of a project: of two libraries that declare a name, the one with the higher number is the
+    /// one the name means. The standard library, which has none, is the lowest; a library a project references comes after it, in the order of the project's
+    /// references; and one that is only loaded because another depends on it comes before the ones the project references.
+    /// </summary>
+    public static readonly SymbolProperty<int> LibraryPriority = new(nameof(LibraryPriority));
+    /// <summary>
     /// The value of the <c>VB_Exposed</c> attribute of a <see cref="VBClassModuleSymbol"/>
     /// </summary>
     public static readonly SymbolProperty<bool> Exposed = new(nameof(Exposed));
@@ -110,6 +116,11 @@ public static class SymbolProperties
     /// apart at the point of invocation.
     /// </remarks>
     public static readonly SymbolProperty<string> ExternalTarget = new(nameof(ExternalTarget));
+    /// <summary>
+    /// The name an object of a class of a referenced library is created by from a string - <c>CreateObject("Scripting.Dictionary")</c> - on a class
+    /// that can be created.
+    /// </summary>
+    public static readonly SymbolProperty<string> ProgId = new(nameof(ProgId));
     /// <summary>
     /// Whether a variable is declared with the <c>WithEvents</c> modifier (<strong>MS-VBAL §5.2.3.1.2</strong>): its
     /// declared type is a class with events, and the procedures of the module that are named for the variable and an

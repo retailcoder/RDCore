@@ -48,7 +48,7 @@ public sealed record class VBProjectSymbol(Uri WorkspaceRoot, string Name)
 
         return resolver.ResolveQualifier(qualifier, ScopeKind.Global, handle).Symbol switch
         {
-            VBProjectSymbol project => resolver.ResolveType(name, ScopeKind.Global, project.WorkspaceRoot),
+            VBProjectSymbol project => resolver.ResolveProjectType(project, name),
             VBModuleSymbol module => ResolveTypeOfModule(resolver, module, name, handle),
             _ => SymbolResolutionResult.Unbound,
         };

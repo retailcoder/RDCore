@@ -45,11 +45,15 @@ internal static class WorkspaceSymbolResolver
     /// binding context) can resolve <c>Project</c> to something. <c>null</c> omits it — same as before
     /// this parameter existed, only unqualified names resolve.
     /// </param>
+    /// <param name="libraries">
+    /// The symbols of the libraries the project references (<see cref="LibrarySymbolProvider"/>), which the workspace's names are bound among: a type of a
+    /// library resolves as the standard library's do, by its own name and qualified by the library's.
+    /// </param>
     public static ISymbolResolver Compose(
         Uri workspaceRoot, IEnumerable<(Uri ModuleUri, ModuleType ModuleType, ModuleParseResult Parse)> modules,
         ISymbolResolver fallback, string? projectName = null,
-        ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure)
-        => ComposeWithScopes(workspaceRoot, modules, fallback, projectName, implicitScope).Resolver;
+        ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure, IReadOnlyList<Symbol>? libraries = null)
+        => ComposeWithScopes(workspaceRoot, modules, fallback, projectName, implicitScope, libraries).Resolver;
 
     /// <summary>
     /// Composes the workspace like <see cref="Compose"/> and also returns the scope tree the resolver
@@ -58,17 +62,17 @@ internal static class WorkspaceSymbolResolver
     public static WorkspaceComposition ComposeWithScopes(
         Uri workspaceRoot, IEnumerable<(Uri ModuleUri, ModuleType ModuleType, ModuleParseResult Parse)> modules,
         ISymbolResolver fallback, string? projectName = null,
-        ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure)
+        ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure, IReadOnlyList<Symbol>? libraries = null)
     {
         var parsed = modules.ToList();
 
         // the discovery pass runs with the intrinsics alone, where no workspace or library name
         // resolves — so it must not do implicit declaration, which would take every reference in every
         // procedure for an undeclared name.
-        var declared = BuildSymbols(workspaceRoot, parsed, fallback, projectName, withImplicitDeclarations: false);
+        var declared = BuildSymbols(workspaceRoot, parsed, fallback, projectName, withImplicitDeclarations: false, libraries: libraries);
         var declaredResolver = new CompositeSymbolResolver(new ScopeTreeSymbolResolver(ScopeTreeBuilder.Build(declared)), fallback);
 
-        var bound = BuildSymbols(workspaceRoot, parsed, declaredResolver, projectName, implicitScope: implicitScope);
+        var bound = BuildSymbols(workspaceRoot, parsed, declaredResolver, projectName, implicitScope: implicitScope, libraries: libraries);
         var scopeTree = ScopeTreeBuilder.Build(bound);
         return new WorkspaceComposition(new CompositeSymbolResolver(new ScopeTreeSymbolResolver(scopeTree), fallback), scopeTree);
     }
@@ -78,7 +82,7 @@ internal static class WorkspaceSymbolResolver
     private static List<Symbol> BuildSymbols(
         Uri workspaceRoot, IReadOnlyList<(Uri ModuleUri, ModuleType ModuleType, ModuleParseResult Parse)> modules,
         ISymbolResolver typeResolver, string? projectName, bool withImplicitDeclarations = true,
-        ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure)
+        ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure, IReadOnlyList<Symbol>? libraries = null)
     {
         var symbols = new List<Symbol>();
         if (projectName is not null)
@@ -89,6 +93,9 @@ internal static class WorkspaceSymbolResolver
         // the standard library and the globals the environment provides itself, so a reference to one
         // resolves instead of being taken for an undeclared name (MS-VBAL 5.6.10 would then declare it).
         symbols.AddRange(new StdLibSymbolProvider(workspaceRoot).ProvideSymbols());
+
+        // and the libraries the project references, which resolve the same way.
+        symbols.AddRange(libraries ?? []);
 
         foreach (var (moduleUri, moduleType, parseResult) in modules)
         {

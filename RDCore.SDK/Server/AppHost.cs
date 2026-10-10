@@ -262,6 +262,9 @@ public abstract class AppHost<TApp>() : IDisposable
             .AddSingleton<IProjectFileLoader, ProjectFileLoader>()
             .AddSingleton<IProjectFileWriter, ProjectFileWriter>()
             .AddSingleton<IPlatformEnvironment, PlatformEnvironment>()
+            // the descriptions of the libraries a project can reference ship with the platform, in its Symbols folder.
+            .AddSingleton<RDCore.SDK.Runtime.Libraries.ILibrarySource>(provider => new RDCore.SDK.Runtime.Libraries.DirectoryLibrarySource(
+                provider.GetRequiredService<IFileSystem>(), provider.GetRequiredService<IPlatformEnvironment>().Resolve(PlatformEnvironment.SymbolsDirectory)))
             .AddSingleton<IPlatformCompositionService, PlatformCompositionService>()
             .AddSingleton<IExtensionsProvider, ExtensionsClient>()
             .AddSingleton<IExtensionManifestValidationService, ExtensionManifestValidationService>()

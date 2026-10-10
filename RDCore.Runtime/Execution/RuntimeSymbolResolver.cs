@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
@@ -30,6 +31,9 @@ public sealed class RuntimeSymbolResolver(ISymbolResolver names, ISessionStorage
 
     /// <inheritdoc/>
     public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle) => names.ResolveQualifier(name, scope, handle);
+
+    /// <inheritdoc/>
+    public SymbolResolutionResult ResolveProjectType(VBProjectSymbol project, string name) => names.ResolveProjectType(project, name);
 
     /// <inheritdoc/>
     public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)

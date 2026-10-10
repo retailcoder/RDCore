@@ -180,6 +180,9 @@ internal sealed class SymbolTable
         public SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle)
             => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveQualifier(name, scope, handle);
 
+        public SymbolResolutionResult ResolveProjectType(VBProjectSymbol project, string name)
+            => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveProjectType(project, name);
+
         public SymbolResolutionResult ResolveConditionalConstant(string name, ScopeKind scope, Uri handle)
             => new ScopeTreeSymbolResolver(owner.ScopeTree).ResolveConditionalConstant(name, scope, handle);
 

@@ -1,0 +1,1810 @@
+{
+  "formatVersion": 1,
+  "name": "Scripting",
+  "description": "Microsoft Scripting Runtime",
+  "origin": {
+    "guid": "{420B2830-E718-11CF-893D-00A0C9054228}",
+    "version": "1.0",
+    "file": "scrrun.dll",
+    "exportedBy": "rdc export-library 0.1"
+  },
+  "enums": [
+    {
+      "name": "CompareMethod",
+      "members": [
+        {
+          "name": "BinaryCompare"
+        },
+        {
+          "name": "TextCompare",
+          "value": 1
+        },
+        {
+          "name": "DatabaseCompare",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "IOMode",
+      "members": [
+        {
+          "name": "ForReading",
+          "value": 1
+        },
+        {
+          "name": "ForWriting",
+          "value": 2
+        },
+        {
+          "name": "ForAppending",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "name": "Tristate",
+      "members": [
+        {
+          "name": "TristateTrue",
+          "value": -1
+        },
+        {
+          "name": "TristateFalse"
+        },
+        {
+          "name": "TristateUseDefault",
+          "value": -2
+        },
+        {
+          "name": "TristateMixed",
+          "value": -2
+        }
+      ]
+    },
+    {
+      "name": "__MIDL___MIDL_itf_scrrun_0000_0000_0001",
+      "members": [
+        {
+          "name": "Normal"
+        },
+        {
+          "name": "ReadOnly",
+          "value": 1
+        },
+        {
+          "name": "Hidden",
+          "value": 2
+        },
+        {
+          "name": "System",
+          "value": 4
+        },
+        {
+          "name": "Volume",
+          "value": 8
+        },
+        {
+          "name": "Directory",
+          "value": 16
+        },
+        {
+          "name": "Archive",
+          "value": 32
+        },
+        {
+          "name": "Alias",
+          "value": 1024
+        },
+        {
+          "name": "Compressed",
+          "value": 2048
+        }
+      ]
+    },
+    {
+      "name": "__MIDL___MIDL_itf_scrrun_0001_0001_0001",
+      "members": [
+        {
+          "name": "UnknownType"
+        },
+        {
+          "name": "Removable",
+          "value": 1
+        },
+        {
+          "name": "Fixed",
+          "value": 2
+        },
+        {
+          "name": "Remote",
+          "value": 3
+        },
+        {
+          "name": "CDRom",
+          "value": 4
+        },
+        {
+          "name": "RamDisk",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "name": "__MIDL___MIDL_itf_scrrun_0001_0001_0002",
+      "members": [
+        {
+          "name": "WindowsFolder"
+        },
+        {
+          "name": "SystemFolder",
+          "value": 1
+        },
+        {
+          "name": "TemporaryFolder",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "__MIDL___MIDL_itf_scrrun_0001_0001_0003",
+      "members": [
+        {
+          "name": "StdIn"
+        },
+        {
+          "name": "StdOut",
+          "value": 1
+        },
+        {
+          "name": "StdErr",
+          "value": 2
+        }
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "name": "Dictionary",
+      "description": "Scripting.Dictionary",
+      "progId": "Scripting.Dictionary",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Item",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "dispId": 0,
+          "description": "Set or get the item for a given key",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Item",
+          "kind": "propertyLet",
+          "dispId": 0,
+          "description": "Set or get the item for a given key",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            },
+            {
+              "name": "Value",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Item",
+          "kind": "propertySet",
+          "dispId": 0,
+          "description": "Set or get the item for a given key",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            },
+            {
+              "name": "Value",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Add",
+          "description": "Add a new key and item to the dictionary.",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            },
+            {
+              "name": "Item",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Get the number of items in the dictionary."
+        },
+        {
+          "name": "Exists",
+          "type": "Boolean",
+          "description": "Determine if a given key is in the dictionary.",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Items",
+          "type": "Variant",
+          "description": "Get an array containing all items in the dictionary."
+        },
+        {
+          "name": "Key",
+          "kind": "propertyLet",
+          "description": "Change a key to a different key.",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            },
+            {
+              "name": "Value",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Keys",
+          "type": "Variant",
+          "description": "Get an array containing all keys in the dictionary."
+        },
+        {
+          "name": "Remove",
+          "description": "Remove a given key from the dictionary.",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "RemoveAll",
+          "description": "Remove all information from the dictionary."
+        },
+        {
+          "name": "CompareMode",
+          "kind": "propertyGet",
+          "type": "CompareMethod",
+          "description": "Set or get the string comparison method."
+        },
+        {
+          "name": "CompareMode",
+          "kind": "propertyLet",
+          "description": "Set or get the string comparison method.",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "CompareMethod",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "HashVal",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "isHidden": true,
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IFileSystem",
+      "description": "FileSystemObject",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Drives",
+          "kind": "propertyGet",
+          "type": "Drives",
+          "description": "Get drives collection"
+        },
+        {
+          "name": "BuildPath",
+          "type": "String",
+          "description": "Generate a path from an existing path and a name",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Name",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetDriveName",
+          "type": "String",
+          "description": "Return drive from a path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetParentFolderName",
+          "type": "String",
+          "description": "Return path to the parent folder",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetFileName",
+          "type": "String",
+          "description": "Return the file name from a path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetBaseName",
+          "type": "String",
+          "description": "Return base name from a path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetExtensionName",
+          "type": "String",
+          "description": "Return extension from path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetAbsolutePathName",
+          "type": "String",
+          "description": "Return the canonical representation of the path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetTempName",
+          "type": "String",
+          "description": "Generate name that can be used to name a temporary file"
+        },
+        {
+          "name": "DriveExists",
+          "type": "Boolean",
+          "description": "Check if a drive or a share exists",
+          "parameters": [
+            {
+              "name": "DriveSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "FileExists",
+          "type": "Boolean",
+          "description": "Check if a file exists",
+          "parameters": [
+            {
+              "name": "FileSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "FolderExists",
+          "type": "Boolean",
+          "description": "Check if a path exists",
+          "parameters": [
+            {
+              "name": "FolderSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetDrive",
+          "type": "Drive",
+          "description": "Get drive or UNC share",
+          "parameters": [
+            {
+              "name": "DriveSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetFile",
+          "type": "File",
+          "description": "Get file",
+          "parameters": [
+            {
+              "name": "FilePath",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetFolder",
+          "type": "Folder",
+          "description": "Get folder",
+          "parameters": [
+            {
+              "name": "FolderPath",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetSpecialFolder",
+          "type": "Folder",
+          "description": "Get location of various system folders",
+          "parameters": [
+            {
+              "name": "SpecialFolder",
+              "type": "__MIDL___MIDL_itf_scrrun_0001_0001_0002",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "DeleteFile",
+          "description": "Delete a file",
+          "parameters": [
+            {
+              "name": "FileSpec",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Force",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "DeleteFolder",
+          "description": "Delete a folder",
+          "parameters": [
+            {
+              "name": "FolderSpec",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Force",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "MoveFile",
+          "description": "Move a file",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "MoveFolder",
+          "description": "Move a folder",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CopyFile",
+          "description": "Copy a file",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "OverWriteFiles",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            }
+          ]
+        },
+        {
+          "name": "CopyFolder",
+          "description": "Copy a folder",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "OverWriteFiles",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            }
+          ]
+        },
+        {
+          "name": "CreateFolder",
+          "type": "Folder",
+          "description": "Create a folder",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CreateTextFile",
+          "type": "TextStream",
+          "description": "Create a file as a TextStream",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Overwrite",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            },
+            {
+              "name": "Unicode",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "OpenTextFile",
+          "type": "TextStream",
+          "description": "Open a file as a TextStream",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "IOMode",
+              "type": "IOMode",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "1"
+            },
+            {
+              "name": "Create",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            },
+            {
+              "name": "Format",
+              "type": "Tristate",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FileSystemObject",
+      "description": "FileSystem Object",
+      "progId": "Scripting.FileSystemObject",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Drives",
+          "kind": "propertyGet",
+          "type": "Drives",
+          "description": "Get drives collection"
+        },
+        {
+          "name": "BuildPath",
+          "type": "String",
+          "description": "Generate a path from an existing path and a name",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Name",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetDriveName",
+          "type": "String",
+          "description": "Return drive from a path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetParentFolderName",
+          "type": "String",
+          "description": "Return path to the parent folder",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetFileName",
+          "type": "String",
+          "description": "Return the file name from a path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetBaseName",
+          "type": "String",
+          "description": "Return base name from a path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetExtensionName",
+          "type": "String",
+          "description": "Return extension from path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetAbsolutePathName",
+          "type": "String",
+          "description": "Return the canonical representation of the path",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetTempName",
+          "type": "String",
+          "description": "Generate name that can be used to name a temporary file"
+        },
+        {
+          "name": "DriveExists",
+          "type": "Boolean",
+          "description": "Check if a drive or a share exists",
+          "parameters": [
+            {
+              "name": "DriveSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "FileExists",
+          "type": "Boolean",
+          "description": "Check if a file exists",
+          "parameters": [
+            {
+              "name": "FileSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "FolderExists",
+          "type": "Boolean",
+          "description": "Check if a path exists",
+          "parameters": [
+            {
+              "name": "FolderSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetDrive",
+          "type": "Drive",
+          "description": "Get drive or UNC share",
+          "parameters": [
+            {
+              "name": "DriveSpec",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetFile",
+          "type": "File",
+          "description": "Get file",
+          "parameters": [
+            {
+              "name": "FilePath",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetFolder",
+          "type": "Folder",
+          "description": "Get folder",
+          "parameters": [
+            {
+              "name": "FolderPath",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "GetSpecialFolder",
+          "type": "Folder",
+          "description": "Get location of various system folders",
+          "parameters": [
+            {
+              "name": "SpecialFolder",
+              "type": "__MIDL___MIDL_itf_scrrun_0001_0001_0002",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "DeleteFile",
+          "description": "Delete a file",
+          "parameters": [
+            {
+              "name": "FileSpec",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Force",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "DeleteFolder",
+          "description": "Delete a folder",
+          "parameters": [
+            {
+              "name": "FolderSpec",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Force",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "MoveFile",
+          "description": "Move a file",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "MoveFolder",
+          "description": "Move a folder",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CopyFile",
+          "description": "Copy a file",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "OverWriteFiles",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            }
+          ]
+        },
+        {
+          "name": "CopyFolder",
+          "description": "Copy a folder",
+          "parameters": [
+            {
+              "name": "Source",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "OverWriteFiles",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            }
+          ]
+        },
+        {
+          "name": "CreateFolder",
+          "type": "Folder",
+          "description": "Create a folder",
+          "parameters": [
+            {
+              "name": "Path",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CreateTextFile",
+          "type": "TextStream",
+          "description": "Create a file as a TextStream",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Overwrite",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            },
+            {
+              "name": "Unicode",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "OpenTextFile",
+          "type": "TextStream",
+          "description": "Open a file as a TextStream",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "IOMode",
+              "type": "IOMode",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "1"
+            },
+            {
+              "name": "Create",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            },
+            {
+              "name": "Format",
+              "type": "Tristate",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "0"
+            }
+          ]
+        },
+        {
+          "name": "GetStandardStream",
+          "type": "TextStream",
+          "description": "Retrieve the standard input, output or error stream",
+          "parameters": [
+            {
+              "name": "StandardStreamType",
+              "type": "__MIDL___MIDL_itf_scrrun_0001_0001_0003",
+              "isByVal": true
+            },
+            {
+              "name": "Unicode",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "GetFileVersion",
+          "type": "String",
+          "description": "Retrieve the file version of the specified file into a string",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Drive",
+      "description": "Drive Object",
+      "members": [
+        {
+          "name": "Path",
+          "kind": "propertyGet",
+          "type": "String",
+          "dispId": 0,
+          "description": "Path"
+        },
+        {
+          "name": "DriveLetter",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Drive letter"
+        },
+        {
+          "name": "ShareName",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Share name"
+        },
+        {
+          "name": "DriveType",
+          "kind": "propertyGet",
+          "type": "__MIDL___MIDL_itf_scrrun_0001_0001_0001",
+          "description": "Drive type"
+        },
+        {
+          "name": "RootFolder",
+          "kind": "propertyGet",
+          "type": "Folder",
+          "description": "Root folder"
+        },
+        {
+          "name": "AvailableSpace",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "description": "Get available space"
+        },
+        {
+          "name": "FreeSpace",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "description": "Get drive free space"
+        },
+        {
+          "name": "TotalSize",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "description": "Get total drive size"
+        },
+        {
+          "name": "VolumeName",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Name of volume"
+        },
+        {
+          "name": "VolumeName",
+          "kind": "propertyLet",
+          "description": "Name of volume",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "FileSystem",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Filesystem type"
+        },
+        {
+          "name": "SerialNumber",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Serial number"
+        },
+        {
+          "name": "IsReady",
+          "kind": "propertyGet",
+          "type": "Boolean",
+          "description": "Check if disk is available"
+        }
+      ]
+    },
+    {
+      "name": "Drives",
+      "description": "Collection of drives associated with drive letters",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "propertyGet",
+          "type": "Drive",
+          "dispId": 0,
+          "description": "Get drive",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "_NewEnum",
+          "kind": "propertyGet",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Number of drives"
+        }
+      ]
+    },
+    {
+      "name": "Folder",
+      "description": "Folder object",
+      "members": [
+        {
+          "name": "Path",
+          "kind": "propertyGet",
+          "type": "String",
+          "dispId": 0,
+          "description": "Path to folder"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Get name of folder"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "description": "Get name of folder",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ShortPath",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Short path"
+        },
+        {
+          "name": "ShortName",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Short name"
+        },
+        {
+          "name": "Drive",
+          "kind": "propertyGet",
+          "type": "Drive",
+          "description": "Get drive that contains folder"
+        },
+        {
+          "name": "ParentFolder",
+          "kind": "propertyGet",
+          "type": "Folder",
+          "description": "Get parent folder"
+        },
+        {
+          "name": "Attributes",
+          "kind": "propertyGet",
+          "type": "__MIDL___MIDL_itf_scrrun_0000_0000_0001",
+          "description": "Folder attributes"
+        },
+        {
+          "name": "Attributes",
+          "kind": "propertyLet",
+          "description": "Folder attributes",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "__MIDL___MIDL_itf_scrrun_0000_0000_0001",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "DateCreated",
+          "kind": "propertyGet",
+          "type": "Date",
+          "description": "Date folder was created"
+        },
+        {
+          "name": "DateLastModified",
+          "kind": "propertyGet",
+          "type": "Date",
+          "description": "Date folder was last modified"
+        },
+        {
+          "name": "DateLastAccessed",
+          "kind": "propertyGet",
+          "type": "Date",
+          "description": "Date folder was last accessed"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Type description"
+        },
+        {
+          "name": "Delete",
+          "description": "Delete this folder",
+          "parameters": [
+            {
+              "name": "Force",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "Copy",
+          "description": "Copy this folder",
+          "parameters": [
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "OverWriteFiles",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            }
+          ]
+        },
+        {
+          "name": "Move",
+          "description": "Move this folder",
+          "parameters": [
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "IsRootFolder",
+          "kind": "propertyGet",
+          "type": "Boolean",
+          "description": "True if folder is root"
+        },
+        {
+          "name": "Size",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "description": "Sum of files and subfolders"
+        },
+        {
+          "name": "SubFolders",
+          "kind": "propertyGet",
+          "type": "Folders",
+          "description": "Get folders collection"
+        },
+        {
+          "name": "Files",
+          "kind": "propertyGet",
+          "type": "Files",
+          "description": "Get files collection"
+        },
+        {
+          "name": "CreateTextFile",
+          "type": "TextStream",
+          "description": "Create a file as a TextStream",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Overwrite",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            },
+            {
+              "name": "Unicode",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Folders",
+      "description": "Collection of subfolders in a folder",
+      "members": [
+        {
+          "name": "Add",
+          "type": "Folder",
+          "description": "Create a new folder",
+          "parameters": [
+            {
+              "name": "Name",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Item",
+          "kind": "propertyGet",
+          "type": "Folder",
+          "dispId": 0,
+          "description": "Get folder",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "_NewEnum",
+          "kind": "propertyGet",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Number of folders"
+        }
+      ]
+    },
+    {
+      "name": "File",
+      "description": "File object",
+      "members": [
+        {
+          "name": "Path",
+          "kind": "propertyGet",
+          "type": "String",
+          "dispId": 0,
+          "description": "Path to the file"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Get name of file"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "description": "Get name of file",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ShortPath",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Short path"
+        },
+        {
+          "name": "ShortName",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Short name"
+        },
+        {
+          "name": "Drive",
+          "kind": "propertyGet",
+          "type": "Drive",
+          "description": "Get drive that contains file"
+        },
+        {
+          "name": "ParentFolder",
+          "kind": "propertyGet",
+          "type": "Folder",
+          "description": "Get folder that contains file"
+        },
+        {
+          "name": "Attributes",
+          "kind": "propertyGet",
+          "type": "__MIDL___MIDL_itf_scrrun_0000_0000_0001",
+          "description": "File attributes"
+        },
+        {
+          "name": "Attributes",
+          "kind": "propertyLet",
+          "description": "File attributes",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "__MIDL___MIDL_itf_scrrun_0000_0000_0001",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "DateCreated",
+          "kind": "propertyGet",
+          "type": "Date",
+          "description": "Date file was created"
+        },
+        {
+          "name": "DateLastModified",
+          "kind": "propertyGet",
+          "type": "Date",
+          "description": "Date file was last modified"
+        },
+        {
+          "name": "DateLastAccessed",
+          "kind": "propertyGet",
+          "type": "Date",
+          "description": "Date file was last accessed"
+        },
+        {
+          "name": "Size",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "description": "File size"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "String",
+          "description": "Type description"
+        },
+        {
+          "name": "Delete",
+          "description": "Delete this file",
+          "parameters": [
+            {
+              "name": "Force",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "Copy",
+          "description": "Copy this file",
+          "parameters": [
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "OverWriteFiles",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "True"
+            }
+          ]
+        },
+        {
+          "name": "Move",
+          "description": "Move this file",
+          "parameters": [
+            {
+              "name": "Destination",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "OpenAsTextStream",
+          "type": "TextStream",
+          "description": "Open a file as a TextStream",
+          "parameters": [
+            {
+              "name": "IOMode",
+              "type": "IOMode",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "1"
+            },
+            {
+              "name": "Format",
+              "type": "Tristate",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Files",
+      "description": "Collection of files in a folder",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "propertyGet",
+          "type": "File",
+          "dispId": 0,
+          "description": "Get file",
+          "parameters": [
+            {
+              "name": "Key",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "_NewEnum",
+          "kind": "propertyGet",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Number of folders"
+        }
+      ]
+    },
+    {
+      "name": "TextStream",
+      "description": "TextStream object",
+      "members": [
+        {
+          "name": "Line",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Current line number"
+        },
+        {
+          "name": "Column",
+          "kind": "propertyGet",
+          "type": "Long",
+          "description": "Current column number"
+        },
+        {
+          "name": "AtEndOfStream",
+          "kind": "propertyGet",
+          "type": "Boolean",
+          "description": "Is the current position at the end of the stream?"
+        },
+        {
+          "name": "AtEndOfLine",
+          "kind": "propertyGet",
+          "type": "Boolean",
+          "description": "Is the current position at the end of a line?"
+        },
+        {
+          "name": "Read",
+          "type": "String",
+          "description": "Read a specific number of characters into a string",
+          "parameters": [
+            {
+              "name": "Characters",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ReadLine",
+          "type": "String",
+          "description": "Read an entire line into a string"
+        },
+        {
+          "name": "ReadAll",
+          "type": "String",
+          "description": "Read the entire stream into a string"
+        },
+        {
+          "name": "Write",
+          "description": "Write a string to the stream",
+          "parameters": [
+            {
+              "name": "Text",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "WriteLine",
+          "description": "Write a string and an end of line to the stream",
+          "parameters": [
+            {
+              "name": "Text",
+              "type": "String",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "\u0022\u0022"
+            }
+          ]
+        },
+        {
+          "name": "WriteBlankLines",
+          "description": "Write a number of blank lines to the stream",
+          "parameters": [
+            {
+              "name": "Lines",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Skip",
+          "description": "Skip a specific number of characters",
+          "parameters": [
+            {
+              "name": "Characters",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "SkipLine",
+          "description": "Skip a line"
+        },
+        {
+          "name": "Close",
+          "description": "Close a text stream"
+        }
+      ]
+    },
+    {
+      "name": "Encoder",
+      "description": "Script Encoder Object",
+      "progId": "Scripting.Encoder",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "EncodeScriptFile",
+          "type": "String",
+          "dispId": 0,
+          "description": "Call the Encoder determined by szExt, passing bstrStreamIn and optional arguments",
+          "parameters": [
+            {
+              "name": "szExt",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "bstrStreamIn",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "cFlags",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "bstrDefaultLang",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

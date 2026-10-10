@@ -1,0 +1,2659 @@
+{
+  "formatVersion": 1,
+  "name": "VBIDE",
+  "description": "Microsoft Visual Basic for Applications Extensibility 5.3",
+  "origin": {
+    "guid": "{0002E157-0000-0000-C000-000000000046}",
+    "version": "5.3",
+    "file": "VBE6EXT.OLB",
+    "exportedBy": "rdc export-library 0.1"
+  },
+  "dependsOn": [
+    "Office"
+  ],
+  "enums": [
+    {
+      "name": "vbextFileTypes",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "vbextFileTypeForm"
+        },
+        {
+          "name": "vbextFileTypeModule",
+          "value": 1
+        },
+        {
+          "name": "vbextFileTypeClass",
+          "value": 2
+        },
+        {
+          "name": "vbextFileTypeProject",
+          "value": 3
+        },
+        {
+          "name": "vbextFileTypeExe",
+          "value": 4
+        },
+        {
+          "name": "vbextFileTypeFrx",
+          "value": 5
+        },
+        {
+          "name": "vbextFileTypeRes",
+          "value": 6
+        },
+        {
+          "name": "vbextFileTypeUserControl",
+          "value": 7
+        },
+        {
+          "name": "vbextFileTypePropertyPage",
+          "value": 8
+        },
+        {
+          "name": "vbextFileTypeDocObject",
+          "value": 9
+        },
+        {
+          "name": "vbextFileTypeBinary",
+          "value": 10
+        },
+        {
+          "name": "vbextFileTypeGroupProject",
+          "value": 11
+        },
+        {
+          "name": "vbextFileTypeDesigners",
+          "value": 12
+        }
+      ]
+    },
+    {
+      "name": "vbext_WindowType",
+      "members": [
+        {
+          "name": "vbext_wt_CodeWindow"
+        },
+        {
+          "name": "vbext_wt_Designer",
+          "value": 1
+        },
+        {
+          "name": "vbext_wt_Browser",
+          "value": 2
+        },
+        {
+          "name": "vbext_wt_Watch",
+          "value": 3
+        },
+        {
+          "name": "vbext_wt_Locals",
+          "value": 4
+        },
+        {
+          "name": "vbext_wt_Immediate",
+          "value": 5
+        },
+        {
+          "name": "vbext_wt_ProjectWindow",
+          "value": 6
+        },
+        {
+          "name": "vbext_wt_PropertyWindow",
+          "value": 7
+        },
+        {
+          "name": "vbext_wt_Find",
+          "value": 8
+        },
+        {
+          "name": "vbext_wt_FindReplace",
+          "value": 9
+        },
+        {
+          "name": "vbext_wt_Toolbox",
+          "value": 10
+        },
+        {
+          "name": "vbext_wt_LinkedWindowFrame",
+          "value": 11
+        },
+        {
+          "name": "vbext_wt_MainWindow",
+          "value": 12
+        },
+        {
+          "name": "vbext_wt_ToolWindow",
+          "value": 15
+        }
+      ]
+    },
+    {
+      "name": "vbext_WindowState",
+      "members": [
+        {
+          "name": "vbext_ws_Normal"
+        },
+        {
+          "name": "vbext_ws_Minimize",
+          "value": 1
+        },
+        {
+          "name": "vbext_ws_Maximize",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "vbext_ProjectType",
+      "members": [
+        {
+          "name": "vbext_pt_HostProject",
+          "value": 100
+        },
+        {
+          "name": "vbext_pt_StandAlone",
+          "value": 101
+        }
+      ]
+    },
+    {
+      "name": "vbext_ProjectProtection",
+      "members": [
+        {
+          "name": "vbext_pp_none"
+        },
+        {
+          "name": "vbext_pp_locked",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "vbext_VBAMode",
+      "members": [
+        {
+          "name": "vbext_vm_Run"
+        },
+        {
+          "name": "vbext_vm_Break",
+          "value": 1
+        },
+        {
+          "name": "vbext_vm_Design",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "vbext_ComponentType",
+      "members": [
+        {
+          "name": "vbext_ct_StdModule",
+          "value": 1
+        },
+        {
+          "name": "vbext_ct_ClassModule",
+          "value": 2
+        },
+        {
+          "name": "vbext_ct_MSForm",
+          "value": 3
+        },
+        {
+          "name": "vbext_ct_ActiveXDesigner",
+          "value": 11
+        },
+        {
+          "name": "vbext_ct_Document",
+          "value": 100
+        }
+      ]
+    },
+    {
+      "name": "vbext_ProcKind",
+      "members": [
+        {
+          "name": "vbext_pk_Proc"
+        },
+        {
+          "name": "vbext_pk_Let",
+          "value": 1
+        },
+        {
+          "name": "vbext_pk_Set",
+          "value": 2
+        },
+        {
+          "name": "vbext_pk_Get",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "name": "vbext_CodePaneview",
+      "members": [
+        {
+          "name": "vbext_cv_ProcedureView"
+        },
+        {
+          "name": "vbext_cv_FullModuleView",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "vbext_RefKind",
+      "members": [
+        {
+          "name": "vbext_rk_TypeLib"
+        },
+        {
+          "name": "vbext_rk_Project",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "name": "Application",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Version",
+          "kind": "propertyGet",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "name": "VBE",
+      "members": [
+        {
+          "name": "Version",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "VBProjects",
+          "kind": "propertyGet",
+          "type": "VBProjects"
+        },
+        {
+          "name": "CommandBars",
+          "kind": "propertyGet",
+          "type": "Office.CommandBars"
+        },
+        {
+          "name": "CodePanes",
+          "kind": "propertyGet",
+          "type": "CodePanes"
+        },
+        {
+          "name": "Windows",
+          "kind": "propertyGet",
+          "type": "Windows"
+        },
+        {
+          "name": "Events",
+          "kind": "propertyGet",
+          "type": "Events"
+        },
+        {
+          "name": "ActiveVBProject",
+          "kind": "propertyGet",
+          "type": "VBProject"
+        },
+        {
+          "name": "ActiveVBProject",
+          "kind": "propertySet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "VBProject",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "SelectedVBComponent",
+          "kind": "propertyGet",
+          "type": "VBComponent"
+        },
+        {
+          "name": "MainWindow",
+          "kind": "propertyGet",
+          "type": "Window"
+        },
+        {
+          "name": "ActiveWindow",
+          "kind": "propertyGet",
+          "type": "Window"
+        },
+        {
+          "name": "ActiveCodePane",
+          "kind": "propertyGet",
+          "type": "CodePane"
+        },
+        {
+          "name": "ActiveCodePane",
+          "kind": "propertySet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "CodePane",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Addins",
+          "kind": "propertyGet",
+          "type": "Addins"
+        }
+      ]
+    },
+    {
+      "name": "Window",
+      "members": [
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "Windows"
+        },
+        {
+          "name": "Close"
+        },
+        {
+          "name": "Caption",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Visible",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Visible",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Left",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Left",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Top",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Top",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Width",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Width",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Height",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Height",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "WindowState",
+          "kind": "propertyGet",
+          "type": "vbext_WindowState"
+        },
+        {
+          "name": "WindowState",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "vbext_WindowState",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "SetFocus"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "vbext_WindowType"
+        },
+        {
+          "name": "LinkedWindows",
+          "kind": "propertyGet",
+          "type": "LinkedWindows"
+        },
+        {
+          "name": "LinkedWindowFrame",
+          "kind": "propertyGet",
+          "type": "Window"
+        },
+        {
+          "name": "HWnd",
+          "kind": "propertyGet",
+          "type": "Long",
+          "isHidden": true
+        }
+      ]
+    },
+    {
+      "name": "_Windows_old",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Application"
+        },
+        {
+          "name": "Item",
+          "type": "Window",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        }
+      ]
+    },
+    {
+      "name": "Windows",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Application"
+        },
+        {
+          "name": "Item",
+          "type": "Window",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "CreateToolWindow",
+          "type": "Window",
+          "parameters": [
+            {
+              "name": "AddInInst",
+              "type": "AddIn",
+              "isByVal": true
+            },
+            {
+              "name": "ProgId",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Caption",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "GuidPosition",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "DocObj",
+              "type": "Object"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LinkedWindows",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Window",
+          "isHidden": true
+        },
+        {
+          "name": "Item",
+          "type": "Window",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Remove",
+          "parameters": [
+            {
+              "name": "Window",
+              "type": "Window",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Add",
+          "parameters": [
+            {
+              "name": "Window",
+              "type": "Window",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "members": [
+        {
+          "name": "ReferencesEvents",
+          "kind": "propertyGet",
+          "type": "ReferencesEvents",
+          "parameters": [
+            {
+              "name": "VBProject",
+              "type": "VBProject",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CommandBarEvents",
+          "kind": "propertyGet",
+          "type": "CommandBarEvents",
+          "parameters": [
+            {
+              "name": "CommandBarControl",
+              "type": "Object",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_VBProjectsEvents"
+    },
+    {
+      "name": "_dispVBProjectsEvents",
+      "members": [
+        {
+          "name": "ItemAdded",
+          "parameters": [
+            {
+              "name": "VBProject",
+              "type": "VBProject",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemRemoved",
+          "parameters": [
+            {
+              "name": "VBProject",
+              "type": "VBProject",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemRenamed",
+          "parameters": [
+            {
+              "name": "VBProject",
+              "type": "VBProject",
+              "isByVal": true
+            },
+            {
+              "name": "OldName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemActivated",
+          "parameters": [
+            {
+              "name": "VBProject",
+              "type": "VBProject",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_VBComponentsEvents"
+    },
+    {
+      "name": "_dispVBComponentsEvents",
+      "members": [
+        {
+          "name": "ItemAdded",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemRemoved",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemRenamed",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            },
+            {
+              "name": "OldName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemSelected",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemActivated",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemReloaded",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ReferencesEvents",
+      "isCreatable": true,
+      "events": [
+        {
+          "name": "ItemAdded",
+          "parameters": [
+            {
+              "name": "Reference",
+              "type": "Reference",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemRemoved",
+          "parameters": [
+            {
+              "name": "Reference",
+              "type": "Reference",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CommandBarEvents",
+      "isCreatable": true,
+      "events": [
+        {
+          "name": "Click",
+          "parameters": [
+            {
+              "name": "CommandBarControl",
+              "type": "Object",
+              "isByVal": true
+            },
+            {
+              "name": "handled",
+              "type": "Boolean"
+            },
+            {
+              "name": "CancelDefault",
+              "type": "Boolean"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ProjectTemplate",
+      "isCreatable": true,
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        }
+      ]
+    },
+    {
+      "name": "_VBProject_Old",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "HelpFile",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "HelpFile",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "HelpContextID",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "HelpContextID",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Description",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Description",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Mode",
+          "kind": "propertyGet",
+          "type": "vbext_VBAMode"
+        },
+        {
+          "name": "References",
+          "kind": "propertyGet",
+          "type": "References"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "VBProjects"
+        },
+        {
+          "name": "Protection",
+          "kind": "propertyGet",
+          "type": "vbext_ProjectProtection"
+        },
+        {
+          "name": "Saved",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "VBComponents",
+          "kind": "propertyGet",
+          "type": "VBComponents"
+        }
+      ]
+    },
+    {
+      "name": "VBProject",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "HelpFile",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "HelpFile",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "HelpContextID",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "HelpContextID",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Description",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Description",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Mode",
+          "kind": "propertyGet",
+          "type": "vbext_VBAMode"
+        },
+        {
+          "name": "References",
+          "kind": "propertyGet",
+          "type": "References"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "VBProjects"
+        },
+        {
+          "name": "Protection",
+          "kind": "propertyGet",
+          "type": "vbext_ProjectProtection"
+        },
+        {
+          "name": "Saved",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "VBComponents",
+          "kind": "propertyGet",
+          "type": "VBComponents"
+        },
+        {
+          "name": "SaveAs",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "MakeCompiledFile"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "vbext_ProjectType"
+        },
+        {
+          "name": "FileName",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "BuildFileName",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "BuildFileName",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_VBProjects_Old",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "VBProject",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        }
+      ]
+    },
+    {
+      "name": "VBProjects",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "VBProject",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Add",
+          "type": "VBProject",
+          "parameters": [
+            {
+              "name": "Type",
+              "type": "vbext_ProjectType",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Remove",
+          "parameters": [
+            {
+              "name": "lpc",
+              "type": "VBProject",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Open",
+          "type": "VBProject",
+          "parameters": [
+            {
+              "name": "bstrPath",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SelectedComponents",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "Component",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBProject"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        }
+      ]
+    },
+    {
+      "name": "Components",
+      "isCreatable": true,
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "Component",
+          "dispId": 0,
+          "isHidden": true,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBProject"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Remove",
+          "parameters": [
+            {
+              "name": "Component",
+              "type": "Component",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Add",
+          "type": "Component",
+          "parameters": [
+            {
+              "name": "ComponentType",
+              "type": "vbext_ComponentType",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Import",
+          "type": "Component",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        }
+      ]
+    },
+    {
+      "name": "_VBComponents_Old",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "VBComponent",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBProject"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Remove",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Add",
+          "type": "VBComponent",
+          "parameters": [
+            {
+              "name": "ComponentType",
+              "type": "vbext_ComponentType",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Import",
+          "type": "VBComponent",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        }
+      ]
+    },
+    {
+      "name": "VBComponents",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "VBComponent",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBProject"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Remove",
+          "parameters": [
+            {
+              "name": "VBComponent",
+              "type": "VBComponent",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Add",
+          "type": "VBComponent",
+          "parameters": [
+            {
+              "name": "ComponentType",
+              "type": "vbext_ComponentType",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Import",
+          "type": "VBComponent",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "AddCustom",
+          "type": "VBComponent",
+          "parameters": [
+            {
+              "name": "ProgId",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "AddMTDesigner",
+          "type": "VBComponent",
+          "isHidden": true,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Long",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Component",
+      "isCreatable": true,
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Components",
+          "isHidden": true
+        },
+        {
+          "name": "IsDirty",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "IsDirty",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "_VBComponent_Old",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Saved",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Designer",
+          "kind": "propertyGet",
+          "type": "Object"
+        },
+        {
+          "name": "CodeModule",
+          "kind": "propertyGet",
+          "type": "CodeModule"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "vbext_ComponentType"
+        },
+        {
+          "name": "Export",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "VBComponents"
+        },
+        {
+          "name": "HasOpenDesigner",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Properties",
+          "kind": "propertyGet",
+          "type": "Properties"
+        },
+        {
+          "name": "DesignerWindow",
+          "type": "Window"
+        },
+        {
+          "name": "Activate"
+        }
+      ]
+    },
+    {
+      "name": "VBComponent",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Saved",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Designer",
+          "kind": "propertyGet",
+          "type": "Object"
+        },
+        {
+          "name": "CodeModule",
+          "kind": "propertyGet",
+          "type": "CodeModule"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "vbext_ComponentType"
+        },
+        {
+          "name": "Export",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "VBComponents"
+        },
+        {
+          "name": "HasOpenDesigner",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Properties",
+          "kind": "propertyGet",
+          "type": "Properties"
+        },
+        {
+          "name": "DesignerWindow",
+          "type": "Window"
+        },
+        {
+          "name": "Activate"
+        },
+        {
+          "name": "DesignerID",
+          "kind": "propertyGet",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "name": "Property",
+      "members": [
+        {
+          "name": "Value",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "dispId": 0
+        },
+        {
+          "name": "Value",
+          "kind": "propertyLet",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "IndexedValue",
+          "kind": "propertyGet",
+          "type": "Variant",
+          "parameters": [
+            {
+              "name": "Index1",
+              "type": "Variant",
+              "isByVal": true
+            },
+            {
+              "name": "Index2",
+              "type": "Variant",
+              "isByVal": true,
+              "isOptional": true
+            },
+            {
+              "name": "Index3",
+              "type": "Variant",
+              "isByVal": true,
+              "isOptional": true
+            },
+            {
+              "name": "Index4",
+              "type": "Variant",
+              "isByVal": true,
+              "isOptional": true
+            }
+          ]
+        },
+        {
+          "name": "IndexedValue",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Index1",
+              "type": "Variant",
+              "isByVal": true
+            },
+            {
+              "name": "Index2",
+              "type": "Variant",
+              "isByVal": true,
+              "isOptional": true
+            },
+            {
+              "name": "Index3",
+              "type": "Variant",
+              "isByVal": true,
+              "isOptional": true
+            },
+            {
+              "name": "Index4",
+              "type": "Variant",
+              "isByVal": true,
+              "isOptional": true
+            },
+            {
+              "name": "Value",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "NumIndices",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Properties",
+          "isHidden": true
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "Properties"
+        },
+        {
+          "name": "Object",
+          "kind": "propertyGet",
+          "type": "Object"
+        },
+        {
+          "name": "Object",
+          "kind": "propertySet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Object",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Properties",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "Property",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Application",
+          "kind": "propertyGet",
+          "type": "Application",
+          "isHidden": true
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Object"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        }
+      ]
+    },
+    {
+      "name": "Addins",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Item",
+          "type": "AddIn",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "Object"
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Update"
+        }
+      ]
+    },
+    {
+      "name": "AddIn",
+      "members": [
+        {
+          "name": "Description",
+          "kind": "propertyGet",
+          "type": "String",
+          "dispId": 0
+        },
+        {
+          "name": "Description",
+          "kind": "propertyLet",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "Addins"
+        },
+        {
+          "name": "ProgId",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Guid",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Connect",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Connect",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Object",
+          "kind": "propertyGet",
+          "type": "Object"
+        },
+        {
+          "name": "Object",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Object",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CodeModule",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBComponent"
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String",
+          "dispId": 0,
+          "isHidden": true
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "dispId": 0,
+          "isHidden": true,
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "AddFromString",
+          "parameters": [
+            {
+              "name": "String",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "AddFromFile",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Lines",
+          "kind": "propertyGet",
+          "type": "String",
+          "parameters": [
+            {
+              "name": "StartLine",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "Count",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CountOfLines",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "InsertLines",
+          "parameters": [
+            {
+              "name": "Line",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "String",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "DeleteLines",
+          "parameters": [
+            {
+              "name": "StartLine",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "Count",
+              "type": "Long",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "1"
+            }
+          ]
+        },
+        {
+          "name": "ReplaceLine",
+          "parameters": [
+            {
+              "name": "Line",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "String",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ProcStartLine",
+          "kind": "propertyGet",
+          "type": "Long",
+          "parameters": [
+            {
+              "name": "ProcName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "ProcKind",
+              "type": "vbext_ProcKind",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ProcCountLines",
+          "kind": "propertyGet",
+          "type": "Long",
+          "parameters": [
+            {
+              "name": "ProcName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "ProcKind",
+              "type": "vbext_ProcKind",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ProcBodyLine",
+          "kind": "propertyGet",
+          "type": "Long",
+          "parameters": [
+            {
+              "name": "ProcName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "ProcKind",
+              "type": "vbext_ProcKind",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ProcOfLine",
+          "kind": "propertyGet",
+          "type": "String",
+          "parameters": [
+            {
+              "name": "Line",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "ProcKind",
+              "type": "vbext_ProcKind"
+            }
+          ]
+        },
+        {
+          "name": "CountOfDeclarationLines",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "CreateEventProc",
+          "type": "Long",
+          "parameters": [
+            {
+              "name": "EventName",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "ObjectName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Find",
+          "type": "Boolean",
+          "parameters": [
+            {
+              "name": "Target",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "StartLine",
+              "type": "Long"
+            },
+            {
+              "name": "StartColumn",
+              "type": "Long"
+            },
+            {
+              "name": "EndLine",
+              "type": "Long"
+            },
+            {
+              "name": "EndColumn",
+              "type": "Long"
+            },
+            {
+              "name": "WholeWord",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            },
+            {
+              "name": "MatchCase",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            },
+            {
+              "name": "PatternSearch",
+              "type": "Boolean",
+              "isByVal": true,
+              "isOptional": true,
+              "defaultValue": "False"
+            }
+          ]
+        },
+        {
+          "name": "CodePane",
+          "kind": "propertyGet",
+          "type": "CodePane"
+        }
+      ]
+    },
+    {
+      "name": "CodePanes",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Item",
+          "type": "CodePane",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "Current",
+          "kind": "propertyGet",
+          "type": "CodePane",
+          "isHidden": true
+        },
+        {
+          "name": "Current",
+          "kind": "propertyLet",
+          "isHidden": true,
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "CodePane",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CodePane",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "CodePanes"
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Window",
+          "kind": "propertyGet",
+          "type": "Window"
+        },
+        {
+          "name": "GetSelection",
+          "parameters": [
+            {
+              "name": "StartLine",
+              "type": "Long"
+            },
+            {
+              "name": "StartColumn",
+              "type": "Long"
+            },
+            {
+              "name": "EndLine",
+              "type": "Long"
+            },
+            {
+              "name": "EndColumn",
+              "type": "Long"
+            }
+          ]
+        },
+        {
+          "name": "SetSelection",
+          "parameters": [
+            {
+              "name": "StartLine",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "StartColumn",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "EndLine",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "EndColumn",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "TopLine",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "TopLine",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "CountOfVisibleLines",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "CodeModule",
+          "kind": "propertyGet",
+          "type": "CodeModule"
+        },
+        {
+          "name": "Show"
+        },
+        {
+          "name": "CodePaneView",
+          "kind": "propertyGet",
+          "type": "vbext_CodePaneview"
+        }
+      ]
+    },
+    {
+      "name": "Reference",
+      "members": [
+        {
+          "name": "Collection",
+          "kind": "propertyGet",
+          "type": "References"
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Guid",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Major",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Minor",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "FullPath",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "BuiltIn",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "IsBroken",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "vbext_RefKind"
+        },
+        {
+          "name": "Description",
+          "kind": "propertyGet",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "name": "References",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Parent",
+          "kind": "propertyGet",
+          "type": "VBProject"
+        },
+        {
+          "name": "VBE",
+          "kind": "propertyGet",
+          "type": "VBE"
+        },
+        {
+          "name": "Item",
+          "type": "Reference",
+          "dispId": 0,
+          "parameters": [
+            {
+              "name": "index",
+              "type": "Variant",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "_NewEnum",
+          "type": "Object",
+          "dispId": -4,
+          "isHidden": true
+        },
+        {
+          "name": "AddFromGuid",
+          "type": "Reference",
+          "parameters": [
+            {
+              "name": "Guid",
+              "type": "String",
+              "isByVal": true
+            },
+            {
+              "name": "Major",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "Minor",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "AddFromFile",
+          "type": "Reference",
+          "parameters": [
+            {
+              "name": "FileName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Remove",
+          "parameters": [
+            {
+              "name": "Reference",
+              "type": "Reference",
+              "isByVal": true
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "name": "ItemAdded",
+          "parameters": [
+            {
+              "name": "Reference",
+              "type": "Reference",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ItemRemoved",
+          "parameters": [
+            {
+              "name": "Reference",
+              "type": "Reference",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

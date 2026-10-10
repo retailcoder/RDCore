@@ -44,6 +44,12 @@ public sealed class PlatformEnvironment : IPlatformEnvironment
     /// </summary>
     public const string RootEnvironmentVariable = "RDCORE_PLATFORM_ROOT";
 
+    /// <summary>
+    /// Name of the folder of the platform root that holds the descriptions of the libraries a project can reference
+    /// (<see cref="Runtime.Libraries.DirectoryLibrarySource"/>).
+    /// </summary>
+    public const string SymbolsDirectory = "Symbols";
+
     private static readonly Lazy<IPlatformEnvironment> _default = new(() => new PlatformEnvironment(new FileSystem()));
 
     /// <summary>

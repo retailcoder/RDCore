@@ -1,0 +1,709 @@
+{
+  "formatVersion": 1,
+  "name": "stdole",
+  "description": "OLE Automation",
+  "origin": {
+    "guid": "{00020430-0000-0000-C000-000000000046}",
+    "version": "2.0",
+    "file": "stdole2.tlb",
+    "exportedBy": "rdc export-library 0.1"
+  },
+  "enums": [
+    {
+      "name": "OLE_TRISTATE",
+      "members": [
+        {
+          "name": "Unchecked"
+        },
+        {
+          "name": "Checked",
+          "value": 1
+        },
+        {
+          "name": "Gray",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "LoadPictureConstants",
+      "members": [
+        {
+          "name": "Default"
+        },
+        {
+          "name": "Monochrome",
+          "value": 1
+        },
+        {
+          "name": "VgaColor",
+          "value": 2
+        },
+        {
+          "name": "Color",
+          "value": 4
+        }
+      ]
+    }
+  ],
+  "classes": [
+    {
+      "name": "IEnumVARIANT",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Next",
+          "parameters": [
+            {
+              "name": "celt",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "rgvar",
+              "type": "Variant"
+            },
+            {
+              "name": "pceltFetched",
+              "type": "Long"
+            }
+          ]
+        },
+        {
+          "name": "Skip",
+          "parameters": [
+            {
+              "name": "celt",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Reset"
+        },
+        {
+          "name": "Clone",
+          "parameters": [
+            {
+              "name": "ppenum",
+              "type": "IEnumVARIANT"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IFont",
+      "description": "Font Object",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String"
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pname",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Size",
+          "kind": "propertyGet",
+          "type": "Currency"
+        },
+        {
+          "name": "Size",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "psize",
+              "type": "Currency",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Bold",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Bold",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pbold",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Italic",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Italic",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pitalic",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Underline",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Underline",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "punderline",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Strikethrough",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Strikethrough",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pstrikethrough",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Weight",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Weight",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pweight",
+              "type": "Integer",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Charset",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Charset",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pcharset",
+              "type": "Integer",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "hFont",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Clone",
+          "parameters": [
+            {
+              "name": "ppfont",
+              "type": "IFont"
+            }
+          ]
+        },
+        {
+          "name": "IsEqual",
+          "parameters": [
+            {
+              "name": "pfontOther",
+              "type": "IFont",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "SetRatio",
+          "parameters": [
+            {
+              "name": "cyLogical",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cyHimetric",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "AddRefHfont",
+          "parameters": [
+            {
+              "name": "hFont",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "ReleaseHfont",
+          "parameters": [
+            {
+              "name": "hFont",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "StdFont",
+      "progId": "StdFont",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Name",
+          "kind": "propertyGet",
+          "type": "String",
+          "dispId": 0
+        },
+        {
+          "name": "Name",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Size",
+          "kind": "propertyGet",
+          "type": "Currency"
+        },
+        {
+          "name": "Size",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Currency",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Bold",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Bold",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Italic",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Italic",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Underline",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Underline",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Strikethrough",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "Strikethrough",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Weight",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Weight",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Integer",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Charset",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Charset",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Integer",
+              "isByVal": true
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "name": "FontChanged",
+          "parameters": [
+            {
+              "name": "PropertyName",
+              "type": "String",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "IPicture",
+      "description": "Picture Object",
+      "isHidden": true,
+      "members": [
+        {
+          "name": "Handle",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "hPal",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "hPal",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "phpal",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Width",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Height",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Render",
+          "parameters": [
+            {
+              "name": "hdc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "x",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "y",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cx",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cy",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "xSrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "ySrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cxSrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cySrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "prcWBounds",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "CurDC",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "SelectPicture",
+          "parameters": [
+            {
+              "name": "hdcIn",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "phdcOut",
+              "type": "Long"
+            },
+            {
+              "name": "phbmpOut",
+              "type": "Long"
+            }
+          ]
+        },
+        {
+          "name": "KeepOriginalFormat",
+          "kind": "propertyGet",
+          "type": "Boolean"
+        },
+        {
+          "name": "KeepOriginalFormat",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "pfkeep",
+              "type": "Boolean",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "PictureChanged"
+        },
+        {
+          "name": "SaveAsFile",
+          "parameters": [
+            {
+              "name": "pstm",
+              "type": "Variant"
+            },
+            {
+              "name": "fSaveMemCopy",
+              "type": "Boolean",
+              "isByVal": true
+            },
+            {
+              "name": "pcbSize",
+              "type": "Long"
+            }
+          ]
+        },
+        {
+          "name": "Attributes",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "SetHdc",
+          "parameters": [
+            {
+              "name": "hdc",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "StdPicture",
+      "progId": "StdPicture",
+      "isCreatable": true,
+      "members": [
+        {
+          "name": "Render",
+          "parameters": [
+            {
+              "name": "hdc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "x",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "y",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cx",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cy",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "xSrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "ySrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cxSrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "cySrc",
+              "type": "Long",
+              "isByVal": true
+            },
+            {
+              "name": "prcWBounds",
+              "type": "Variant"
+            }
+          ]
+        },
+        {
+          "name": "Handle",
+          "kind": "propertyGet",
+          "type": "Long",
+          "dispId": 0
+        },
+        {
+          "name": "hPal",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "hPal",
+          "kind": "propertyLet",
+          "parameters": [
+            {
+              "name": "Value",
+              "type": "Long",
+              "isByVal": true
+            }
+          ]
+        },
+        {
+          "name": "Type",
+          "kind": "propertyGet",
+          "type": "Integer"
+        },
+        {
+          "name": "Width",
+          "kind": "propertyGet",
+          "type": "Long"
+        },
+        {
+          "name": "Height",
+          "kind": "propertyGet",
+          "type": "Long"
+        }
+      ]
+    }
+  ]
+}

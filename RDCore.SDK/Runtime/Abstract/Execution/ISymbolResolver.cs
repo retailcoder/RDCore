@@ -75,6 +75,31 @@ public interface ISymbolResolver
     SymbolResolutionResult ResolveQualifier(string name, ScopeKind scope, Uri handle);
 
     /// <summary>
+    /// Resolves the type <paramref name="name"/> that a <em>project</em> declares: the last part of <c>Project.Name</c>
+    /// (<strong>MS-VBAL §5.6.12</strong>).
+    /// </summary>
+    /// <remarks>
+    /// The project tier is shared by the enclosing project and every library the project references, and the types of two of them can be of one name - a host
+    /// library and the library of its editor both have an <c>Application</c>. What the qualifier says is which of the candidates is meant, so the candidates are
+    /// those of the project and no others <em>before</em> it is decided that the name is ambiguous. A project is told from another by the library its symbols
+    /// say they are of (<see cref="SymbolProperties.Library"/>), which the enclosing project's own are not of any.
+    /// <para>
+    /// The default asks <see cref="ResolveType"/> and accepts what it gives if it is the project's, which is right for a resolver that has one candidate of a
+    /// name to give; one that decides ambiguity itself overrides it.
+    /// </para>
+    /// </remarks>
+    /// <param name="project">The project, as <see cref="ResolveQualifier"/> bound it.</param>
+    /// <param name="name">The name of the type.</param>
+    SymbolResolutionResult ResolveProjectType(VBProjectSymbol project, string name)
+    {
+        var found = ResolveType(name, ScopeKind.Global, project.WorkspaceRoot);
+        return found.Symbol is { } type
+            && string.Equals(type.GetProperty(SymbolProperties.Library) ?? string.Empty, project.GetProperty(SymbolProperties.Library) ?? string.Empty, StringComparison.Ordinal)
+                ? found
+                : SymbolResolutionResult.Unbound;
+    }
+
+    /// <summary>
     /// Resolves the specified <em>identifier name</em> as a reference to a <em>conditional compilation
     /// constant</em>, as seen from the scope the symbol at <paramref name="handle"/> belongs to.
     /// </summary>

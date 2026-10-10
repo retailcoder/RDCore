@@ -211,6 +211,30 @@ Long Live the Cucumber (Latin)</comment>
   <data name="DescribeExtension_Written" xml:space="preserve">
     <value>Extension manifest written: {0}</value>
   </data>
+  <data name="ExportLibrary_Title" xml:space="preserve">
+    <value>Export Library</value>
+  </data>
+  <data name="ExportLibrary_Summary" xml:space="preserve">
+    <value>Describes a type library of this machine as a library description file that a project can reference by name.</value>
+  </data>
+  <data name="ExportLibrary_WindowsOnly" xml:space="preserve">
+    <value>Type libraries are read from the registry and files of a Windows machine: this command only runs on Windows.</value>
+  </data>
+  <data name="ExportLibrary_NotFound" xml:space="preserve">
+    <value>This machine has no type library '{0}'. A library is given as a file, as the identifier the machine gave it, or by its name.</value>
+  </data>
+  <data name="ExportLibrary_Written" xml:space="preserve">
+    <value>Library '{0}' described: {1}</value>
+  </data>
+  <data name="ExportLibrary_Counts" xml:space="preserve">
+    <value>{0} class(es), {1} enumeration(s), {2} member(s).</value>
+  </data>
+  <data name="ExportLibrary_DependsOn" xml:space="preserve">
+    <value>Depends on: {0}. A project cannot reference this library without them; export them too (--dependencies).</value>
+  </data>
+  <data name="ExportLibrary_Skipped" xml:space="preserve">
+    <value>Not described: {0}.</value>
+  </data>
   <data name="Command_Unknown" xml:space="preserve">
     <value>Unknown command.</value>
   </data>
