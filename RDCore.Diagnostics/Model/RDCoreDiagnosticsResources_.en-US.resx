@@ -138,9 +138,6 @@
   <data name="ImplicitLetCoercion_message" xml:space="preserve">
     <value>Implicit `Let` coercion (`{toType.Name}`) from `{fromType.Name}`; invoking the object's default member explicitly avoids "magic" procedure calls that are hard to follow and to fully understand without tracing obscure hidden attributes.</value>
   </data>
-  <data name="ImplicitNarrowingConversion_Message" xml:space="preserve">
-    <value>Implicit narrowing conversion from a numeric type to another with a smaller range - watch out, arithmetic overflow is technically possible here.</value>
-  </data>
   <data name="ImplicitNumericCoercion_Message" xml:space="preserve">
     <value>Implicit numeric coercion (`{toType.Name}`) from `{fromType.Name}`; using an explicit type conversion function would improve the traceability of the involved data types.</value>
   </data>
@@ -194,6 +191,12 @@
   </data>
   <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
     <value>'{0}' implicitly returns a Variant. State its return type with an As clause (As Variant, if that is intended).</value>
+  </data>
+  <data name="ImplicitNarrowingConversion_Message" xml:space="preserve">
+    <value>A value of type {0} is implicitly converted to {1}, and it may not fit. If the conversion is intended, say so with a conversion function.</value>
+  </data>
+  <data name="ImplicitNarrowingConversion_Lossy_Message" xml:space="preserve">
+    <value>A value of type {0} is implicitly converted to {1}, and its fractional part is rounded (to the even number when it is exactly halfway). If the conversion is intended, say so with a conversion function.</value>
   </data>
   <data name="IntegerDataTypeDeclaration_Message" xml:space="preserve">
     <value>Integer is a 16-bit type that overflows at 32,767. Use a Long, unless an Integer is what a procedure or a file format expects.</value>

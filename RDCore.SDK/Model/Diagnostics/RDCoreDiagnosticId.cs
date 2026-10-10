@@ -31,12 +31,12 @@ public enum RDCoreDiagnosticId
     ImplicitVariantDeclaration = 106,
     ImplicitVariantReturnType = 107,
 
-    ImplicitStringCoercion,
-    ImplicitNumericCoercion,
-    ImplicitLetCoercion,
-    ImplicitDateSerialConversion,
-    ImplicitNarrowingConversion,
-    ImplicitWideningConversion,
+    ImplicitStringCoercion = 108,
+    ImplicitNumericCoercion = 109,
+    ImplicitLetCoercion = 110,
+    ImplicitDateSerialConversion = 111,
+    ImplicitNarrowingConversion = 112, // a value converted into a type that holds less of it, with no conversion function to say so
+    ImplicitWideningConversion = 113,
 
     IntegerDataTypeDeclaration = 201,
     ModuleScopeDimDeclaration = 202,

@@ -256,6 +256,8 @@
   href: rdc00106.md
 - name: RDC00107 — Implicit Variant return type
   href: rdc00107.md
+- name: RDC00112 — Implicit narrowing conversion
+  href: rdc00112.md
 - name: RDC00201 — Integer data type declaration
   href: rdc00201.md
 - name: RDC00202 — Module-scope Dim declaration
