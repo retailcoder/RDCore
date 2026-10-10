@@ -125,8 +125,9 @@ internal static class ModuleWorkspace
     /// began to be composed. Never, when omitted.</param>
     public static Task InspectAsync(
         IReadOnlyList<(string Name, string Source)> classes, string program,
-        Func<EnvironmentSessionProvider, ExecuteSessionResult, Func<Task<ExecuteSessionResult>>, Task> inspect, TimeSpan? cancelAfter = null, bool debug = false)
-        => RunCoreAsync(classes, program, errorsOnly: false, inspect: inspect, cancelAfter: cancelAfter, debug: debug);
+        Func<EnvironmentSessionProvider, ExecuteSessionResult, Func<Task<ExecuteSessionResult>>, Task> inspect, TimeSpan? cancelAfter = null, bool debug = false,
+        WorkspaceLibraries? libraries = null)
+        => RunCoreAsync(classes, program, errorsOnly: false, inspect: inspect, cancelAfter: cancelAfter, debug: debug, libraries: libraries);
 
     private static async Task<string[]> RunCoreAsync(
         IReadOnlyList<(string Name, string Source)> classes, string program, bool errorsOnly, Func<EnvironmentSessionProvider, Task>? afterLoading = null,

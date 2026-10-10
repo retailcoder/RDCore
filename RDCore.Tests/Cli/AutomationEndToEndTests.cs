@@ -1,4 +1,4 @@
-using RDCore.SDK.Runtime.Libraries;
+﻿using RDCore.SDK.Runtime.Libraries;
 using System.IO.Abstractions;
 using static RDCore.Tests.Cli.ModuleWorkspace;
 
@@ -40,6 +40,67 @@ public sealed class AutomationEndToEndTests
             "Debug.Print d.Item(\"a\")",
             "Debug.Print d.Exists(\"b\")",
             "Debug.Print d.Exists(\"c\")"));
+
+    /// <summary>
+    /// An event Excel raises while a call is made is handled inside the call: the handler of a workbook's <c>BeforeClose</c> cancels it by setting an argument Excel passed
+    /// by reference, and Excel finds it set when the handler returns. Skipped on a machine that does not have Excel.
+    /// </summary>
+    [TestMethod]
+    public async Task AnEventOfExcel_IsHandledByTheProgram_AndTheHandlerAnswersIt()
+    {
+        if (Type.GetTypeFromProgID("Excel.Application") is null)
+        {
+            Assert.Inconclusive("Excel is not installed on this machine.");
+        }
+
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "RDCore.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        var libraries = new WorkspaceLibraries(["Excel"], new DirectoryLibrarySource(new FileSystem(), Path.Combine(directory!.FullName, "Symbols")));
+        var watcher = ClassModule(
+            "Watcher",
+            "Private WithEvents Book As Excel.Workbook",
+            "Private WithEvents App As Excel.Application",
+            "Public Sub Watch(ByVal workbook As Excel.Workbook, ByVal application As Excel.Application)",
+            "    Set Book = workbook",
+            "    Set App = application",
+            "End Sub",
+            "Public Sub Unwatch()",
+            "    Set Book = Nothing",
+            "    Set App = Nothing",
+            "End Sub",
+            "Private Sub Book_BeforeClose(Cancel As Boolean)",
+            "    Debug.Print \"closing\"",
+            "    Cancel = True",
+            "End Sub",
+            "Private Sub App_NewWorkbook(ByVal Wb As Excel.Workbook)",
+            "    Debug.Print \"new workbook \" & Wb.Worksheets.Count",
+            "End Sub");
+
+        var output = await RunAsync([("Watcher", watcher)], "Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\n" + string.Join("\r\n",
+            "Dim app As New Excel.Application",
+            "app.SheetsInNewWorkbook = 2",
+            "Dim book As Excel.Workbook",
+            "Set book = app.Workbooks.Add",
+            "Dim spy As New Watcher",
+            "spy.Watch book, app",
+            "Dim other As Excel.Workbook",
+            "Set other = app.Workbooks.Add",
+            "book.Close False",
+            "Debug.Print app.Workbooks.Count",
+            "spy.Unwatch",
+            "book.Close False",
+            "other.Close False",
+            "Debug.Print app.Workbooks.Count",
+            "app.Quit") + "\r\nEnd Sub\r\n", libraries);
+
+        // the new workbook was announced, the close was asked for and cancelled by the handler (so both workbooks are still open), and once the variables let go
+        // of Excel's objects the close goes through.
+        CollectionAssert.AreEqual(new[] { "new workbook 2", "closing", "2", "0" }, output);
+    }
 
     /// <summary>
     /// The object model of a host application, from the sidelines: an Excel of its own is started, a workbook is made, cells are written and read, an enumeration

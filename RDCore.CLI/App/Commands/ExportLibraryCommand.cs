@@ -1,4 +1,4 @@
-using CommandLine;
+﻿using CommandLine;
 using RDCore.CLI.Libraries;
 using RDCore.SDK.ConsoleIO;
 using RDCore.SDK.ConsoleIO.Model;

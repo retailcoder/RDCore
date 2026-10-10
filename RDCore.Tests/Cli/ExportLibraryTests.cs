@@ -1,4 +1,4 @@
-using RDCore.CLI.Libraries;
+﻿using RDCore.CLI.Libraries;
 using RDCore.SDK.Runtime.Libraries;
 
 namespace RDCore.Tests.Cli;

@@ -63,6 +63,17 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     private readonly ProgramInspector _inspector = new(provider);
     private bool _streaming;
     private long _streamed;
+    private bool _inTurn;
+
+    // gives the turn back when the program is over. Called with the lock held, or by what ends the program.
+    private void LeaveTurn(IRuntimeSession session)
+    {
+        if (_inTurn)
+        {
+            _inTurn = false;
+            session.Turn.Exit();
+        }
+    }
 
     // the output of a stretch of the program under a debugger: said as it is printed when the run asked for that and somebody listens, kept for the answer otherwise.
     private RuntimeOutputBuffer NewSegmentOutput()
@@ -128,6 +139,14 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             _idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _terminating = false;
             _streaming = debug && streamOutput;
+        }
+
+        // the program is in its turn for as long as it runs or waits at a Stop: an event that something outside the workspace raises is handled between two programs and not
+        // in the middle of one (ISessionTurn). It waits here for the handlers of an event that is being handled, which are short.
+        session.Turn.Enter();
+        lock (_sync)
+        {
+            _inTurn = true;
         }
 
         // a program starts as one that was never stopped, whatever the one before it did: what a Stop left of its activations is let go of.
@@ -635,6 +654,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
         _inspector.Forget();
         provider.Output.Target = NullRuntimeOutput.Instance;
         session.Memory.Reclaim();
+        LeaveTurn(session);
         _idle.TrySetResult();
     }
 
@@ -650,6 +670,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
         {
             _state = ProgramState.Idle;
             _inspector.Forget();
+            LeaveTurn(session);
             _idle.TrySetResult();
         }
     }

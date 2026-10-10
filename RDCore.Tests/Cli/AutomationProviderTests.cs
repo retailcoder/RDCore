@@ -1,4 +1,4 @@
-using RDCore.Runtime.Execution.External.Automation;
+﻿using RDCore.Runtime.Execution.External.Automation;
 using RDCore.SDK.Runtime.Libraries;
 using RDCore.Tests.Runtime.Libraries;
 using System.Globalization;
@@ -173,6 +173,14 @@ public sealed class AutomationProviderTests
         }
 
         public void Reset(object enumerator) => ((System.Collections.IEnumerator)enumerator).Reset();
+
+        public void Advise(object source, IAutomationEventSink sink)
+        {
+        }
+
+        public void Unadvise(object source)
+        {
+        }
     }
 
     private static async Task<(string[] Output, FakeServer Server)> Run(bool allowAutomation, params string[] lines)

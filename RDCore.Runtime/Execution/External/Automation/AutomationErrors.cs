@@ -1,4 +1,4 @@
-using RDCore.SDK.Model.Errors;
+﻿using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Source;
 

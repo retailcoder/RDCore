@@ -1,4 +1,4 @@
-using RDCore.SDK.Runtime.Libraries;
+﻿using RDCore.SDK.Runtime.Libraries;
 using static RDCore.Tests.Runtime.Libraries.LibraryFixtures;
 
 namespace RDCore.Tests.Runtime.Libraries;

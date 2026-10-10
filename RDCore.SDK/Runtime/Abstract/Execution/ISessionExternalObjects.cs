@@ -1,4 +1,4 @@
-using RDCore.SDK.Model.Values.Runtime;
+﻿using RDCore.SDK.Model.Values.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
 namespace RDCore.SDK.Runtime.Abstract.Execution;
@@ -41,6 +41,18 @@ public interface ISessionExternalObjects
     /// <param name="handle">The handle, compared by reference.</param>
     /// <param name="objectId">The identity of the object.</param>
     bool TryFind(IExternalObjectOwner owner, object handle, out VBRuntimeObjectId objectId);
+
+    /// <summary>
+    /// Records that the events of the external object behind <paramref name="objectId"/> are now listened to.
+    /// </summary>
+    /// <returns><see langword="true"/> when they were not, and the caller is the one to start listening.</returns>
+    bool TryBeginListening(VBRuntimeObjectId objectId);
+
+    /// <summary>
+    /// Records that the events of the external object behind <paramref name="objectId"/> are no longer listened to.
+    /// </summary>
+    /// <returns><see langword="true"/> when they were, and the caller is the one to stop listening.</returns>
+    bool TryEndListening(VBRuntimeObjectId objectId);
 
     /// <summary>
     /// Lets go of the external object behind <paramref name="objectId"/>, if it has one: its provider is told, and the object is no longer known here.

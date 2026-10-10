@@ -128,6 +128,18 @@ public interface IRuntimeSession
     /// whatever composes the execution pipeline. It is what <c>New</c> asks to create an object of a referenced library.
     /// </summary>
     IExternalDispatcher? External { get; set; }
+
+    /// <summary>
+    /// Whose turn it is to run code in this session: the program, or an event that something outside the workspace raised.
+    /// </summary>
+    ISessionTurn Turn { get; }
+
+    /// <summary>
+    /// What binds a member to the code that runs it, as the pipeline composed last has it, or <see langword="null"/> while nothing can run code against the session yet.
+    /// Set by whatever composes the execution pipeline. It is what runs the procedure that handles an event which something outside the workspace raises, when no program
+    /// is calling.
+    /// </summary>
+    Model.Values.Bindings.ICallableBindingFactory? Callables { get; set; }
 }
 
 /// <summary>

@@ -249,6 +249,8 @@ public sealed class RuntimeExecutionPipeline
         session.Lifecycle = new ClassLifecycle(session, bindings);
         // an object of a library's class is made by whatever reaches that library, through the same pipeline as every call into it.
         session.External = external;
+        // and an event that something outside the workspace raises, when nothing runs, is handled by the procedures this pipeline binds.
+        session.Callables = bindings;
         // a fixed-size array is as big as its declaration says, which takes evaluating its bounds: this is what can.
         var defaults = new DeclaredVariableDefaults(session, new ArrayBoundEvaluator(expressions, letCoercion));
         if (analysis)

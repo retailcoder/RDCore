@@ -1,4 +1,4 @@
-using RDCore.SDK.Model;
+﻿using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;

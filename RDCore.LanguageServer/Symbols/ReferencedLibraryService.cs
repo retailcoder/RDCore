@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Model.Symbols.Abstract;

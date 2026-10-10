@@ -1,4 +1,4 @@
-using RDCore.SDK.Runtime.Abstract.Execution;
+﻿using RDCore.SDK.Runtime.Abstract.Execution;
 
 namespace RDCore.Runtime.Execution.External.Automation;
 
@@ -44,6 +44,16 @@ public sealed class UnavailableAutomationServer : IAutomationServer
 
     /// <inheritdoc/>
     public void Reset(object enumerator) => throw Unavailable();
+
+    /// <inheritdoc/>
+    public void Advise(object source, IAutomationEventSink sink)
+    {
+    }
+
+    /// <inheritdoc/>
+    public void Unadvise(object source)
+    {
+    }
 
     /// <inheritdoc/>
     public void Release(object handle)

@@ -1,4 +1,4 @@
-using RDCore.Runtime.Execution.External.Automation;
+﻿using RDCore.Runtime.Execution.External.Automation;
 using RDCore.SDK.Runtime.Libraries;
 using RDCore.Tests.Runtime.Libraries;
 using System.Globalization;
@@ -45,6 +45,14 @@ public sealed class LibraryNamesInTheHostTests
         }
 
         public void Reset(object enumerator)
+        {
+        }
+
+        public void Advise(object source, IAutomationEventSink sink)
+        {
+        }
+
+        public void Unadvise(object source)
         {
         }
 

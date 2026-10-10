@@ -1,4 +1,4 @@
-using RDCore.SDK.Model.Values.Runtime;
+﻿using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using System.Diagnostics.CodeAnalysis;
 
@@ -15,6 +15,13 @@ internal sealed class SessionExternalObjects : ISessionExternalObjects
 
     private readonly Dictionary<VBRuntimeObjectId, Binding> _bound = [];
     private readonly Dictionary<object, VBRuntimeObjectId> _identities = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<VBRuntimeObjectId> _listened = [];
+
+    /// <inheritdoc/>
+    public bool TryBeginListening(VBRuntimeObjectId objectId) => _bound.ContainsKey(objectId) && _listened.Add(objectId);
+
+    /// <inheritdoc/>
+    public bool TryEndListening(VBRuntimeObjectId objectId) => _listened.Remove(objectId);
 
     /// <inheritdoc/>
     public void Bind(VBRuntimeObjectId objectId, IExternalObjectOwner owner, object handle)
@@ -49,6 +56,7 @@ internal sealed class SessionExternalObjects : ISessionExternalObjects
         }
 
         _identities.Remove(binding.Handle);
+        _listened.Remove(objectId);
         binding.Owner.Release(binding.Handle);
     }
 
@@ -58,6 +66,7 @@ internal sealed class SessionExternalObjects : ISessionExternalObjects
         var all = _bound.Values.ToArray();
         _bound.Clear();
         _identities.Clear();
+        _listened.Clear();
         foreach (var binding in all)
         {
             binding.Owner.Release(binding.Handle);
