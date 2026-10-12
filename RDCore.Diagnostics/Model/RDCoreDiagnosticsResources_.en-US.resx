@@ -121,7 +121,7 @@
     <value>Both operands are `String` values; using the `&amp;` string concatenation operator here would be more explicit about the intent here.</value>
   </data>
   <data name="BitwiseOperator_Message" xml:space="preserve">
-    <value>The result of this operation is resolved using bitwise arithmetic. This could produce unexpected results if the expectation is conventional logic here. If this isn't intentional, it could be a bug.</value>
+    <value>The result of this operation is resolved using bitwise arithmetic. This could produce unexpected results if the expectation is conventional '{0}' logic here. If this isn't intentional, it could be a bug.</value>
   </data>
   <data name="EmptyCodeBlock_Message" xml:space="preserve">
     <value>Empty code block; implement a body or consider removing it.</value>

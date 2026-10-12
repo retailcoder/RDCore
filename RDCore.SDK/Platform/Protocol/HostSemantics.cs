@@ -6,10 +6,12 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Source;
+using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Semantics.Flow;
+using RDCore.SDK.Semantics.Runtime.Operators;
 using System.Collections.Immutable;
 
 namespace RDCore.SDK.Platform.Protocol;
@@ -129,14 +131,41 @@ public record class ConversionFactDto(
     RuntimeErrorDto? Error);
 
 /// <summary>
+/// An <see cref="OperatorFact"/>, as it travels.
+/// </summary>
+/// <param name="Node">The syntax node the conversion is evaluated for.</param>
+/// <param name="Location">Where the conversion is.</param>
+/// <param name="Site">The construct that asks for the conversion.</param>
+/// <param name="IsValueKnown">Whether the value that is converted is known, as opposed to a value its type merely allows.</param>
+/// <param name="ArithmeticOpSemanticFlags">What is known about an arithmetic operation.</param>
+/// <param name="ConcatOpSemanticflags">What is known about a concatenation operation.</param>
+/// <param name="ComparisonOperatorSemanticFlags">What is known about a comparison operation.</param>
+/// <param name="LogicalOpSemanticFlags">What is known about a logical operation.</param>
+/// <param name="MemberAccessOpSemanticFlags">What is known about a member access operation.</param>
+/// <param name="Error">The run-time error the conversion raises, when it is guaranteed to.</param>
+public record class OperatorFactDto(
+    SyntaxNodeId Node,
+    SourceLocation Location,
+    string Operator,
+    VBType? EffectiveType,
+    bool IsValueKnown,
+    ArithmeticOperatorSemanticFlags? ArithmeticOpSemanticFlags,
+    ConcatOperationSemanticFlags? ConcatOpSemanticflags,
+    ComparisonOperatorSemanticFlags? ComparisonOpSemanticFlags,
+    LogicalOperatorSemanticFlags? LogicalOpSemanticFlags,
+    MemberAccessOperationSemanticFlags? MemberAccessOpSemanticFlags,
+    RuntimeErrorDto? Error);
+
+/// <summary>
 /// A <see cref="RuntimeFacts"/>, as it travels.
 /// </summary>
 /// <remarks>
 /// The conversions travel; the operations do not yet: no analyzer reads them.
 /// </remarks>
 /// <param name="Conversions">Every conversion the code of the procedure asks for.</param>
+/// <param name="Operations">Every operation the code of the procedure asks for.</param>
 /// <param name="IsFullyAnalyzed">Whether every instruction of the procedure was evaluated.</param>
-public record class RuntimeFactsDto(ImmutableArray<ConversionFactDto> Conversions, bool IsFullyAnalyzed);
+public record class RuntimeFactsDto(ImmutableArray<ConversionFactDto> Conversions, ImmutableArray<OperatorFactDto> Operations, bool IsFullyAnalyzed);
 
 /// <summary>
 /// A <see cref="ProcedureSemanticModel"/>, as it travels.
@@ -146,7 +175,7 @@ public record class RuntimeFactsDto(ImmutableArray<ConversionFactDto> Conversion
 /// <param name="CompileErrors">What the static pass found wrong with the body.</param>
 /// <param name="Expressions">What it found out about each expression.</param>
 /// <param name="ReturnValue">On how many code paths a function or a property getter assigns its return value, when the pass could tell.</param>
-/// <param name="Runtime">What the language core states about the conversions of the code, or <see langword="null"/> when the procedure has not been evaluated.</param>
+/// <param name="Runtime">What the language core states about the code, or <see langword="null"/> when the procedure has not been evaluated.</param>
 public record class ProcedureSemanticsDto(
     Uri Procedure, bool IsFullyAnalyzed, ImmutableArray<CompileErrorDto> CompileErrors, ImmutableArray<ExpressionFactDto> Expressions, ReturnValueFact? ReturnValue = null,
     RuntimeFactsDto? Runtime = null);
@@ -202,12 +231,30 @@ public record class ModuleSemanticsDto(
             procedure.ReturnValue,
             procedure.Runtime is null ? null : new RuntimeFactsDto(
                 [.. procedure.Runtime.Conversions.Select(conversion => new ConversionFactDto(
-                    conversion.Node, conversion.Location, conversion.Site, conversion.Source.Name, conversion.Destination.Name, conversion.Flags, conversion.IsValueKnown,
+                    conversion.Node,
+                    conversion.Location,
+                    conversion.Site,
+                    conversion.Source.Name,
+                    conversion.Destination.Name,
+                    conversion.Flags,
+                    conversion.IsValueKnown,
                     conversion.Error is null ? null : new RuntimeErrorDto(conversion.Error.ErrorId, conversion.Error.Description, conversion.Error.Verbose)))],
+                [.. procedure.Runtime.Operations.Select(op => new OperatorFactDto(
+                    op.Node,
+                    op.Location,
+                    op.Operator,
+                    op.EffectiveType,
+                    op.IsValueKnown,
+                    ArithmeticOpSemanticFlags: (op as ArithmeticOperatorFact)?.Flags,
+                    ConcatOpSemanticflags: (op as ConcatOperatorFact)?.Flags,
+                    ComparisonOpSemanticFlags: (op as ComparisonOperatorFact)?.Flags,
+                    LogicalOpSemanticFlags: (op as LogicalOperatorFact)?.Flags,
+                    MemberAccessOpSemanticFlags: null, // FIXME member access flags need to arrive here
+                    op.Error is null ? null : new RuntimeErrorDto(op.Error.ErrorId, op.Error.Description, op.Error.Verbose)
+                    ))],
                 procedure.Runtime.IsFullyAnalyzed)))],
         [.. model.Declarations.Select(declaration => new DeclarationFactDto(
-            declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References,
-            declaration.Role))],
+            declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References, declaration.Role))],
         model.Language);
 
     private static CompileErrorDto ErrorOf(VBCompileErrorInfo error) => new(error.VBCompileErrorId, error.Location, error.Verbose);
