@@ -347,4 +347,75 @@ public sealed class SymbolSyncServiceTests
 
         Assert.IsEmpty(requests);
     }
+
+    [TestMethod]
+    [Timeout(10_000, CooperativeCancellation = true)]
+    public async Task WhatIsDoneUnderAHold_IsNotInterleavedWithTheWorkspaceSync()
+    {
+        // the workspace sync defines every module, then loads the code of each: the host takes its time over the code of the scaffold. What is recorded is
+        // what the host has done, in the order it is done.
+        var done = new List<string>();
+        var loading = new TaskCompletionSource();
+        var release = new TaskCompletionSource();
+        var host = Substitute.For<IRDCoreClientApp>();
+        host.WaitForReadyAsync(Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        host.PlatformInfo.Returns(new PlatformInitializeResult { Provided = [nameof(DefineSymbols)] });
+        host.SendRequestAsync<DefineSymbolsParams, DefineSymbolsResult>(Arg.Any<DefineSymbolsParams>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var request = call.Arg<DefineSymbolsParams>();
+                var what = $"{(request.Replace || request.ParseResultJson.Contains("Analyzed") ? "fragment" : "workspace")} {(request.CodeOnly ? "code" : "symbols")}";
+                if (what == "workspace code")
+                {
+                    loading.TrySetResult();
+                    return release.Task.ContinueWith(_ => Done(what), TaskScheduler.Default);
+                }
+
+                return Task.FromResult(Done(what));
+            });
+
+        DefineSymbolsResult Done(string what)
+        {
+            lock (done)
+            {
+                done.Add(what);
+            }
+
+            return new DefineSymbolsResult { Defined = 1 };
+        }
+
+        var orchestration = Substitute.For<IPlatformOrchestrationService>();
+        orchestration.RuntimeEnvironment.Returns(host);
+        var documents = Substitute.For<IWorkspaceDocumentService>();
+        documents.GetAllDocuments().Returns([new WorkspaceDocument("src/Program.bas", Root, "Public Sub Main()\r\nEnd Sub")]);
+        documents.WorkspaceRoot.Returns(Root);
+        var scaffold = new ModuleParser().Parse(new Uri(Path.Combine(Root, "src", "Program.bas")), "Public Sub Main()\r\nEnd Sub");
+        var parsing = Substitute.For<IParsingClientService>();
+        parsing.TryGetCached(Arg.Any<Uri>(), out Arg.Any<ModuleParseResult>()).Returns(call => { call[1] = scaffold; return true; });
+        var sut = new SymbolSyncService(orchestration, parsing, documents, new IntrinsicSymbolResolver(), Options(), NullLogger<SymbolSyncService>.Instance, new NoLibraries());
+
+        var workspace = sut.SyncWorkspaceAsync(CancellationToken.None);
+        await loading.Task;
+
+        // a client's own text of the same module, defined and loaded to be asked about, while the workspace sync is not done.
+        var fragment = Task.Run(async () =>
+        {
+            var analyzed = new ModuleParser().Parse(new Uri(Path.Combine(Root, "src", "Program.bas")), "Public Sub Main()\r\n    Dim Analyzed As Long\r\nEnd Sub");
+            await using (await sut.HoldAsync(CancellationToken.None))
+            {
+                await sut.SyncModuleAsync("Program", analyzed, CancellationToken.None);
+                await sut.LoadModuleCodeAsync("Program", analyzed, CancellationToken.None);
+            }
+        });
+
+        // time enough for the fragment to be done, if nothing holds it back.
+        await Task.WhenAny(fragment, Task.Delay(300));
+        release.SetResult();
+        await Task.WhenAll(workspace, fragment);
+
+        CollectionAssert.AreEqual(
+            new[] { "workspace symbols", "workspace code", "fragment symbols", "fragment code" },
+            done,
+            string.Join(" | ", done) + ": the scaffold's code is not loaded over the client's text while the client is between defining it and asking about it");
+    }
 }

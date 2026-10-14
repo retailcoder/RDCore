@@ -154,6 +154,9 @@ internal sealed class DocumentDiagnosticsService(
             return null;
         }
 
+        // the host holds one module by this name, which the workspace may be sending its own text of (the shell's scaffold of the program is one): what is asked
+        // about is what was sent only if nothing else is sent until the answer is in, the evaluation of the code included.
+        await using var hold = await symbols.HoldAsync(token);
         try
         {
             await symbols.SyncModuleAsync(moduleName, parseResult, token);

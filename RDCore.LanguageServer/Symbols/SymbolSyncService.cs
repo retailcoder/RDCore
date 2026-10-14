@@ -78,6 +78,20 @@ internal interface ISymbolSyncService
     /// <returns>What the host took out; nothing when the host cannot be told.</returns>
     /// <param name="endProgram">Whether the program that is running or waits is ended too, and the session wiped: what clearing a program asks (<c>NEW</c>, <c>LOAD</c>).</param>
     Task<DiscardSessionResult> DiscardModuleAsync(string moduleName, CancellationToken token, bool endProgram = false);
+
+    /// <summary>
+    /// Keeps every other sync from the environment host until the hold is disposed, so that what the caller sends and then asks about is what the host holds
+    /// when it answers.
+    /// </summary>
+    /// <remarks>
+    /// The host holds one module by a name. A client's own text of a module (<see cref="SyncModuleAsync"/>, <see cref="LoadModuleCodeAsync"/>) and the workspace's
+    /// text of the same module (<see cref="SyncWorkspaceAsync"/>, <see cref="SyncDocumentAsync"/>) are sent apart, step by step; without a hold, a step of one can
+    /// land between the steps of the other, and the model the host answers with is of the other text. The syncs that send the workspace's text take the same hold
+    /// themselves. A hold is not reentrant: what is done under one calls none of those that take it.
+    /// </remarks>
+    /// <param name="token">A token that cancels the wait for the hold.</param>
+    /// <returns>The hold, which is released when it is disposed.</returns>
+    Task<IAsyncDisposable> HoldAsync(CancellationToken token);
 }
 
 internal sealed class SymbolSyncService(
@@ -92,6 +106,30 @@ internal sealed class SymbolSyncService(
     // where the variable an undeclared name declares lives is the environment's to say, and every extraction pass
     // - the resolver's own two, and the one that defines the symbols - has to agree on it.
     private ImplicitDeclarationScope ImplicitScope => options.Value.Workspace.SupportedLanguage.ImplicitDeclarationScope;
+
+    // one at a time: what goes to the host to change what it holds, and what is asked of it in the same breath.
+    private readonly SemaphoreSlim _hold = new(1, 1);
+
+    public async Task<IAsyncDisposable> HoldAsync(CancellationToken token)
+    {
+        await _hold.WaitAsync(token).ConfigureAwait(false);
+        return new Hold(_hold);
+    }
+
+    private sealed class Hold(SemaphoreSlim held) : IAsyncDisposable
+    {
+        private int _released;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _released, 1) == 0)
+            {
+                held.Release();
+            }
+
+            return ValueTask.CompletedTask;
+        }
+    }
 
     public async Task<Uri> SyncModuleAsync(string moduleName, ModuleParseResult parseResult, CancellationToken token)
     {
@@ -119,6 +157,9 @@ internal sealed class SymbolSyncService(
         {
             var host = orchestration.RuntimeEnvironment;
             await host.WaitForReadyAsync(token);
+
+            // every module is defined before the code of any is loaded: nothing else is sent to the host in between, or what it would send is overwritten.
+            await using var hold = await HoldAsync(token);
 
             if (host.PlatformInfo?.Provides<DefineSymbols>() != true)
             {
@@ -248,6 +289,7 @@ internal sealed class SymbolSyncService(
     {
         var host = orchestration.RuntimeEnvironment;
         await host.WaitForReadyAsync(token);
+        await using var hold = await HoldAsync(token);
 
         if (host.PlatformInfo?.Provides<DefineSymbols>() != true
             || !documents.TryGetDocument(documentUri, out var document)
@@ -282,6 +324,7 @@ internal sealed class SymbolSyncService(
         }
 
         await host.WaitForReadyAsync(token);
+        await using var hold = await HoldAsync(token);
         if (host.PlatformInfo?.Provides<SessionDiscard>() != true)
         {
             // the host cannot be told: what it holds stays, as it did before there was a way to say otherwise.
