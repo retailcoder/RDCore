@@ -1,6 +1,7 @@
 using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics.Abstract;
 using RDCore.Runtime.Semantics.LetCoercion;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Errors;
@@ -52,6 +53,11 @@ public sealed record class FixedAssignmentRuntimeSemantics(
     private const char Padding = ' ';
 
     /// <summary>
+    /// The observation of the analysis the statement is evaluated for, if it is: told what the statement is (<see cref="FixedAssignmentStatementFact"/>).
+    /// </summary>
+    public AnalysisObservation? Observation { get; init; }
+
+    /// <summary>
     /// Executes an <c>LSet</c> or <c>RSet</c> statement.
     /// </summary>
     /// <param name="session">The session the statement runs in.</param>
@@ -81,6 +87,10 @@ public sealed record class FixedAssignmentRuntimeSemantics(
         var builder = new SemanticContextFlagsBuilder<FixedAssignmentSemanticContext, FixedAssignmentSemanticFlags>();
         Analyze(session, new ConversionOperationSemanticContext(), builder, assignment, current, source);
         var semantics = builder.Build();
+
+        // what the statement is depends on the types of the target and the source, and not on their values: it is a fact whatever they hold.
+        Observation?.OnStatement(new FixedAssignmentStatementFact(
+            assignment.Identity, assignment.SourceLocation, assignment.Kind is AssignmentKind.LSet ? Tokens.LSet : Tokens.RSet, semantics.Flags));
 
         var result = Evaluate(session, semantics, assignment, current, source);
         if (!result.IsSuccess)

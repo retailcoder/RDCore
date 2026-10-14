@@ -1,3 +1,4 @@
+using RDCore.Runtime.Semantics;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Values;
@@ -21,10 +22,14 @@ namespace RDCore.Runtime.Execution;
 /// which no read of a variable is in an analysis that assumes them.
 /// </para>
 /// </remarks>
-public sealed class AssumedProcedureInvoker : IProcedureInvoker
+/// <param name="observation">Told that the call was assumed rather than made: what the callee raises is not known not to be raised.</param>
+public sealed class AssumedProcedureInvoker(AnalysisObservation? observation = null) : IProcedureInvoker
 {
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult Invoke(VBTypeMemberSymbol procedure, ISymbolResolver resolver, IRuntimeValue[] arguments)
-        => RuntimeSemanticsEvaluationResult.Success(
+    {
+        observation?.Assume();
+        return RuntimeSemanticsEvaluationResult.Success(
             procedure is VBReturningMemberSymbol returning ? returning.ResolvedType.CreateIndeterminateValue() : VBVoidValue.Void);
+    }
 }

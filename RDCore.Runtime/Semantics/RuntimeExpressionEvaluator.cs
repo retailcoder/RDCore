@@ -10,6 +10,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Errors;
+using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
@@ -28,6 +29,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Facts;
+using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Semantics.Static;
 using RDCore.SDK.Semantics.Static.Abstract;
 using System.Collections.Immutable;
@@ -302,8 +304,139 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     /// </remarks>
     public bool AssumesVariables { get; set; }
 
+    /// <summary>
+    /// The observation of the analysis the evaluator belongs to, if it belongs to one: told of every member the code accesses, and of every read that is
+    /// <see cref="AssumesVariables">assumed</see>.
+    /// </summary>
+    public AnalysisObservation? Observation { get; set; }
+
     private RuntimeSemanticsEvaluationResult Assumed(RuntimeSemanticsEvaluationResult read)
-        => AssumesVariables && read.IsSuccess && read.Result is { } value ? RuntimeSemanticsEvaluationResult.Success(value.AsIndeterminate()) : read;
+    {
+        if (!AssumesVariables || !read.IsSuccess || read.Result is not { } value)
+        {
+            return read;
+        }
+
+        Observation?.Assume();
+        return RuntimeSemanticsEvaluationResult.Success(value.AsIndeterminate());
+    }
+
+    /// <summary>
+    /// How many times the evaluation has assumed something, so far: what <see cref="ObserveMemberAccess"/> is given, taken before the member is accessed.
+    /// </summary>
+    internal long AssumedSoFar => Observation?.Assumptions ?? 0;
+
+    /// <summary>
+    /// States a member access that was just evaluated as a <see cref="MemberAccessFact"/>, if the evaluation is observed.
+    /// </summary>
+    /// <remarks>
+    /// The object the member is accessed on carries what it is, and nothing of how it is declared, which is what makes an access late-bound: the declared type
+    /// of the expression it is reached through is asked of the same rules that type it at compile time, as an interface member is.
+    /// </remarks>
+    /// <param name="session">The session the access was evaluated in.</param>
+    /// <param name="context">The scope of the access; its <c>With</c> block, for an access that names no object.</param>
+    /// <param name="access">The expression the access is evaluated for.</param>
+    /// <param name="token">The operator of the access: <see cref="Tokens.MemberAccess"/> or <see cref="Tokens.DictionaryAccess"/>.</param>
+    /// <param name="ownerExpression">The expression of the object, or <see langword="null"/> for the object of the enclosing <c>With</c> block.</param>
+    /// <param name="owner">The object, as it was evaluated.</param>
+    /// <param name="memberName">The name the code gives the member, or <see langword="null"/> when it gives none.</param>
+    /// <param name="kind">What the access is, of what the code writes: <c>Explicit</c>, or <c>Implicit</c> with the member it implies.</param>
+    /// <param name="assumedBefore">What <see cref="AssumedSoFar"/> was before the member was accessed.</param>
+    /// <param name="result">What the access evaluated to: its error, if it is the code's, is the fact's.</param>
+    internal void ObserveMemberAccess(
+        IRuntimeSession session,
+        RuntimeEvaluationContext context,
+        ExpressionNode access,
+        string token,
+        ExpressionNode? ownerExpression,
+        VBTypedValue? owner,
+        string? memberName,
+        MemberAccessOperationSemanticFlags kind,
+        long assumedBefore,
+        RuntimeSemanticsEvaluationResult result)
+    {
+        if (Observation is not { IsSuspended: false } observation)
+        {
+            return;
+        }
+
+        var flags = kind | (ownerExpression is null ? MemberAccessOperationSemanticFlags.WithBlockVariable : 0);
+        var declared = DeclaredTypeOfOwner(session, context, ownerExpression ?? context.EnclosingWithTargetExpression);
+
+        VBTypeMemberSymbol? member = null;
+        if (declared is VBVariantType or VBObjectType)
+        {
+            flags |= MemberAccessOperationSemanticFlags.LateBound;
+        }
+        else if (declared is IVBMemberOwnerType { Members: var members })
+        {
+            var defaultMember = (declared as VBClassType)?.DefaultMember;
+            member = memberName is not null
+                ? members.FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase))
+                : kind.HasFlag(MemberAccessOperationSemanticFlags.DefaultMember) ? defaultMember
+                : kind.HasFlag(MemberAccessOperationSemanticFlags.NewEnumMember) && declared is VBClassType { Symbol: var classModule } ? EnumerationMemberOf(classModule)
+                : null;
+            if (member is not null && defaultMember is not null && defaultMember.SemanticId == member.SemanticId)
+            {
+                flags |= MemberAccessOperationSemanticFlags.DefaultMember;
+            }
+        }
+
+        // the error is the access's when the object it is accessed on is known, and nothing it took to access the member was assumed.
+        var isKnown = owner is { IsIndeterminate: false };
+        var error = isKnown && observation.Assumptions == assumedBefore ? StatedErrors.Of(result.ErrorInfo) : null;
+
+        observation.OnOperation(new MemberAccessFact(
+            access.Identity,
+            access.Location,
+            token,
+            (member as ITypedSymbol)?.ResolvedType,
+            isKnown,
+            error,
+            memberName ?? member?.Name,
+            flags));
+    }
+
+    /// <summary>
+    /// States the access of the enumeration member of the object a <c>For Each</c> goes through (<strong>MS-VBAL 5.4.2.4</strong>) as a
+    /// <see cref="MemberAccessFact"/>, if the evaluation is observed: an array is enumerated without one, and so is not.
+    /// </summary>
+    /// <param name="session">The session the statement was evaluated in.</param>
+    /// <param name="context">The scope of the statement.</param>
+    /// <param name="collectionExpression">The expression of what is enumerated.</param>
+    /// <param name="collection">What it evaluated to.</param>
+    /// <param name="assumedBefore">What <see cref="AssumedSoFar"/> was before the enumeration began.</param>
+    /// <param name="error">What the enumeration raised, if it did.</param>
+    internal void ObserveEnumeration(
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode collectionExpression, VBTypedValue collection, long assumedBefore, IVBRaisableError? error)
+    {
+        if (Observation is null || UnwrappedOwner(collection) is VBArrayValue)
+        {
+            return;
+        }
+
+        // an object that is not known is still declared as one: anything else that is not known may be an array.
+        if (UnwrappedOwner(collection) is not VBObjectValue
+            && !(collection.IsIndeterminate && DeclaredTypeOfOwner(session, context, collectionExpression) is VBClassType or VBObjectType))
+        {
+            return;
+        }
+
+        ObserveMemberAccess(session, context, collectionExpression, Tokens.MemberAccess, collectionExpression, collection, null,
+            MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.NewEnumMember, assumedBefore,
+            error is null ? RuntimeSemanticsEvaluationResult.Success(VBVoidValue.Void) : RuntimeSemanticsEvaluationResult.Error(error));
+    }
+
+    private static VBType? DeclaredTypeOfOwner(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? ownerExpression)
+    {
+        if (ownerExpression is null)
+        {
+            return null;
+        }
+
+        var scope = new LexicalScope(context.Scope, LexicalScopeKind.Procedure, null, []);
+        return ExpressionStaticSemanticsEvaluator.Evaluate(new StaticEvaluationContext(session.Symbols.Resolver, scope), ownerExpression).Result;
+    }
 
     private static RuntimeSemanticsEvaluationResult AutoInstantiate(IRuntimeSession session, IBindingHandle handle, VBClassModuleSymbol classModule)
     {
@@ -531,7 +664,50 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
 
         var owner = ownerResult.Result!;
         var memberName = memberAccess.Member.IdentifierName;
+        var assumedBefore = AssumedSoFar;
+        var result = AccessMember(session, context, memberAccess, owner, memberName);
+        ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, memberAccess.Owner, owner, memberName,
+            MemberAccessOperationSemanticFlags.Explicit, assumedBefore, result);
+        return result;
+    }
 
+    private RuntimeSemanticsEvaluationResult CallDefaultMember(
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, IndexExpressionNode indexExpression, VBObjectValue indexed)
+    {
+        if (indexed.IsNothing())
+        {
+            return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+                VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, expression.Location, Exceptions.VBMemberAccess_ObjectVariableNotSet_Verbose));
+        }
+
+        return TryResolveDefaultMember(session, indexed) is { } defaultMember
+            ? InvokeProcedure(session, context, defaultMember.Member, indexExpression.Arguments, defaultMember.Receiver)
+            : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+                VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, expression.Location, "The object has no default member to index."));
+    }
+
+    // a member of an object called with the arguments of the index (IsCall), or read to be indexed by them: a function that declares no parameters returns what is indexed.
+    private (RuntimeSemanticsEvaluationResult Result, bool IsCall) CallMember(
+        IRuntimeSession session, RuntimeEvaluationContext context, IndexExpressionNode indexExpression, MemberAccessExpressionNode qualified, VBTypedValue owner)
+    {
+        if (ObjectNotSet(qualified, owner) is { } notSet)
+        {
+            return (notSet, true);
+        }
+
+        if (TryResolveInvocableMember(session, context, qualified.Owner, owner, qualified.Member.IdentifierName) is not { } found)
+        {
+            return (EvaluateInstanceField(session, owner, qualified.Member.IdentifierName), false);
+        }
+
+        return ReturnsToBeIndexed(found.Member, found.Receiver, indexExpression.Arguments)
+            ? (InvokeProcedure(session, context, found.Member, [], found.Receiver), false)
+            : (InvokeProcedure(session, context, found.Member, indexExpression.Arguments, found.Receiver), true);
+    }
+
+    private RuntimeSemanticsEvaluationResult AccessMember(
+        IRuntimeSession session, RuntimeEvaluationContext context, MemberAccessExpressionNode memberAccess, VBTypedValue owner, string memberName)
+    {
         if (ObjectNotSet(memberAccess, owner) is { } notSet)
         {
             return notSet;
@@ -935,24 +1111,16 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 return ownerResult;
             }
 
-            if (ObjectNotSet(qualified, ownerResult.Result!) is { } notSet)
+            var assumedBefore = AssumedSoFar;
+            var (accessed, isCall) = CallMember(session, context, indexExpression, qualified, ownerResult.Result!);
+            ObserveMemberAccess(session, context, qualified, Tokens.MemberAccess, qualified.Owner, ownerResult.Result!, qualified.Member.IdentifierName,
+                MemberAccessOperationSemanticFlags.Explicit, assumedBefore, accessed);
+            if (isCall)
             {
-                return notSet;
+                return accessed;
             }
 
-            if (TryResolveInvocableMember(session, context, qualified.Owner, ownerResult.Result!, qualified.Member.IdentifierName) is { } found)
-            {
-                if (!ReturnsToBeIndexed(found.Member, found.Receiver, indexExpression.Arguments))
-                {
-                    return InvokeProcedure(session, context, found.Member, indexExpression.Arguments, found.Receiver);
-                }
-
-                calleeResult = InvokeProcedure(session, context, found.Member, [], found.Receiver);
-            }
-            else
-            {
-                calleeResult = EvaluateInstanceField(session, ownerResult.Result!, qualified.Member.IdentifierName);
-            }
+            calleeResult = accessed;
         }
         else
         {
@@ -977,6 +1145,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
         // known, and the error it would raise is the assumed value's. The arguments are the code's, and are evaluated as they would be.
         if (calleeResult.Result!.IsIndeterminate && calleeValue is not VBArrayValue)
         {
+            var assumedBefore = AssumedSoFar;
             foreach (var argument in indexExpression.Arguments)
             {
                 if (EvaluateIndexArgument(session, argument, context) is { IsSuccess: false } failed)
@@ -985,22 +1154,26 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 }
             }
 
-            return RuntimeSemanticsEvaluationResult.Success(VBVariantType.TypeInfo.CreateIndeterminateValue());
+            var unknown = RuntimeSemanticsEvaluationResult.Success(VBVariantType.TypeInfo.CreateIndeterminateValue());
+
+            // what is not known is still declared: an object that is indexed is a call of its default member, whichever object it is.
+            if (Observation is not null && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is VBClassType or VBObjectType)
+            {
+                ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, indexExpression.Callee, calleeResult.Result, null,
+                    MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember, assumedBefore, unknown);
+            }
+
+            return unknown;
         }
 
         // an object that is indexed is a call of its default member: `c(1)` is `c.Item(1)`.
         if (calleeValue is VBObjectValue indexed)
         {
-            if (indexed.IsNothing())
-            {
-                return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
-                    VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, expression.Location, Exceptions.VBMemberAccess_ObjectVariableNotSet_Verbose));
-            }
-
-            return TryResolveDefaultMember(session, indexed) is { } defaultMember
-                ? InvokeProcedure(session, context, defaultMember.Member, indexExpression.Arguments, defaultMember.Receiver)
-                : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
-                    VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, expression.Location, "The object has no default member to index."));
+            var assumedBefore = AssumedSoFar;
+            var called = CallDefaultMember(session, context, expression, indexExpression, indexed);
+            ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, indexExpression.Callee, calleeResult.Result, null,
+                MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember, assumedBefore, called);
+            return called;
         }
 
         if (calleeValue is not VBArrayValue array)
@@ -1651,8 +1824,18 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             return ownerResult;
         }
 
-        var owner = ownerResult.Result;
-        while (owner is VBVariantValue { TypedValue: var wrapped })
+        var assumedBefore = AssumedSoFar;
+        var result = CallThroughDictionary(session, context, expression, dictionaryAccess, ownerResult.Result!);
+        ObserveMemberAccess(session, context, expression, Tokens.DictionaryAccess, dictionaryAccess.Owner, ownerResult.Result, null,
+            MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember | MemberAccessOperationSemanticFlags.DictionaryAccess,
+            assumedBefore, result);
+        return result;
+    }
+
+    private RuntimeSemanticsEvaluationResult CallThroughDictionary(
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, DictionaryAccessExpressionNode dictionaryAccess, VBTypedValue owner)
+    {
+        while (owner is VBVariantValue { TypedValue: { } wrapped })
         {
             owner = wrapped;
         }

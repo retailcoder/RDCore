@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Semantics.Facts;
 
 namespace RDCore.Runtime.Semantics;
@@ -14,6 +15,10 @@ namespace RDCore.Runtime.Semantics;
 /// is why every part of one pipeline shares one instance rather than each holding the observer.
 /// </para>
 /// <para>
+/// It also counts what the evaluation <see cref="Assume">assumed</see>: the error an instruction raises is a fact only when nothing the instruction did
+/// was assumed, which is something only the parts of the pipeline that assume it can say.
+/// </para>
+/// <para>
 /// Like the pipeline it belongs to, an observation is for one analysis at a time: it is not thread-safe.
 /// </para>
 /// </remarks>
@@ -26,6 +31,22 @@ public sealed class AnalysisObservation(IAnalysisObserver observer)
     /// Whether facts are being held back, because one is being described.
     /// </summary>
     public bool IsSuspended => _suspensions > 0;
+
+    /// <summary>
+    /// How many times the evaluation assumed something it does not know, since the observation began. Only ever grows: what is of interest is whether it
+    /// grew while something was evaluated.
+    /// </summary>
+    public long Assumptions { get; private set; }
+
+    /// <summary>
+    /// Notes that the evaluation relied on something it does not know: the value of a variable, what a call that is not made returns, the state of the outside
+    /// world or of the standard library, the state another instruction left behind.
+    /// </summary>
+    /// <remarks>
+    /// 👉 An error raised by an evaluation that assumed something could be the assumption's rather than the code's: it is not stated
+    /// (<see cref="OnError"/>). Counted whether or not the observation is suspended: describing a fact is part of evaluating the instruction it is about.
+    /// </remarks>
+    public void Assume() => Assumptions++;
 
     /// <summary>
     /// Tells the observer of a conversion, unless the observation is suspended.
@@ -48,6 +69,31 @@ public sealed class AnalysisObservation(IAnalysisObserver observer)
         if (!IsSuspended)
         {
             observer.OnOperation(fact);
+        }
+    }
+
+    /// <summary>
+    /// Tells the observer of a statement, unless the observation is suspended.
+    /// </summary>
+    /// <param name="fact">The statement.</param>
+    public void OnStatement(StatementFact fact)
+    {
+        if (!IsSuspended)
+        {
+            observer.OnStatement(fact);
+        }
+    }
+
+    /// <summary>
+    /// Tells the observer of the run-time error an instruction raised, unless the observation is suspended or the error is not the code's
+    /// (<see cref="StatedErrors"/>).
+    /// </summary>
+    /// <param name="error">The error the instruction raised.</param>
+    public void OnError(IVBRaisableError error)
+    {
+        if (!IsSuspended && StatedErrors.Of(error) is { } stated)
+        {
+            observer.OnError(stated);
         }
     }
 

@@ -206,20 +206,24 @@ public sealed class RuntimeExecutionPipeline
             assignments, new InputListEvaluator(assignments));
         var statements = new StatementRuntimeSemanticsProvider(
             expressions, assignments, setCoercion, print, conditions, files,
-            new FixedAssignmentRuntimeSemantics(expressions, letCoercion, assignments),
+            new FixedAssignmentRuntimeSemantics(expressions, letCoercion, assignments) { Observation = observation },
             new ArrayStatementRuntimeSemantics(expressions, letCoercion, assignments),
-            new MidStatementRuntimeSemantics(expressions, letCoercion, assignments));
+            new MidStatementRuntimeSemantics(expressions, letCoercion, assignments))
+        {
+            Observation = observation,
+        };
 
         var executor = new ProcedureExecutor(
             statements,
             conditions,
-            new WithTargetEvaluator(expressions, new WithStatementRuntimeSemantics(setCoercion, letCoercion)),
+            new WithTargetEvaluator(expressions, new WithStatementRuntimeSemantics(setCoercion, letCoercion), observation),
             new CaseMatchEvaluator(expressions, operators),
             new ForLoopEvaluator(expressions, operators),
             new ForEachEvaluator(expressions, operators, setCoercion),
             new JumpTableEvaluator(expressions, letCoercion),
             new ErrorHandlingEvaluator(expressions, letCoercion),
-            cancellation);
+            cancellation,
+            observation);
 
         // the evaluator needs the invoker, which needs the executor, which needs the evaluator: the
         // last edge of the cycle is closed by assignment rather than by construction.
@@ -227,13 +231,13 @@ public sealed class RuntimeExecutionPipeline
         // composed here with the rest of the pipeline rather than being something a caller opts into.
         var running = new RuntimeProcedureInvoker(session, bodies, executor);
         // a sweep calls nothing: it enters each procedure itself, and a call is the value that the procedure is declared to return.
-        IProcedureInvoker invoker = mode is PipelineMode.Sweep ? new AssumedProcedureInvoker() : running;
+        IProcedureInvoker invoker = mode is PipelineMode.Sweep ? new AssumedProcedureInvoker(observation) : running;
         // every external call goes through the pipeline: the interceptors see it and may refuse it, then
         // whichever provider can reach it runs it.
         // an analysis does not make a call the platform does not run itself, and no policy decides whether it may: the outside world answers
-        // with a value that is not known.
+        // with a value that is not known. What the library does depends on state the analysis does not have, which the observation is told of.
         var external = analysis
-            ? new ExternalCallPipeline(session, [], [StdLibDispatcher.For(session), new OutsideWorldCallProvider()])
+            ? new ExternalCallPipeline(session, observation is null ? [] : [new AssumedCallInterceptor(observation)], [StdLibDispatcher.For(session), new OutsideWorldCallProvider()])
             // the servers' provider is asked first: it answers the members of the standard library's enumerator for the enumerators it holds, and for nothing else of it.
             // A Declare'd procedure is a native library's, and is called when the policy over library imports lets it through.
             : ExternalCallPipeline.For(session,
@@ -246,6 +250,7 @@ public sealed class RuntimeExecutionPipeline
         expressions.ProcedureInvoker = invoker;
         expressions.Bindings = bindings;
         expressions.AssumesVariables = mode is PipelineMode.Sweep;
+        expressions.Observation = observation;
         // a default member is invoked the same way any member is, and it was reaching neither engine before:
         // nothing assigned these, so every default-member Let-coercion reported an internal error.
         objectCoercion.ProcedureInvoker = invoker;

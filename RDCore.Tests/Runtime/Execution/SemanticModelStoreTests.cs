@@ -21,7 +21,7 @@ public sealed class SemanticModelStoreTests
         => new(Module, [], [.. procedures.Select(procedure => new ProcedureSemanticModel(procedure, []))]);
 
     private static ImmutableDictionary<SemanticId, RuntimeFacts> Facts(bool isFullyAnalyzed = true)
-        => ImmutableDictionary<SemanticId, RuntimeFacts>.Empty.Add(Procedure, new RuntimeFacts([], [], isFullyAnalyzed));
+        => ImmutableDictionary<SemanticId, RuntimeFacts>.Empty.Add(Procedure, new RuntimeFacts([], [], [], [], isFullyAnalyzed));
 
     private static RuntimeFacts? RuntimeOf(SemanticModelStore store, int procedure = 0)
         => store.TryGet(Module, out var model) ? model.Procedures[procedure].Runtime : throw new AssertFailedException("no model");

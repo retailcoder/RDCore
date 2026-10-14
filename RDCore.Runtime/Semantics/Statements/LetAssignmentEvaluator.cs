@@ -4,6 +4,7 @@ using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Operators;
 using RDCore.SDK;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Errors;
@@ -13,6 +14,7 @@ using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Complex;
+using RDCore.SDK.Model.Values;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -23,6 +25,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Facts;
+using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Runtime.Semantics.Statements;
 
@@ -312,6 +315,40 @@ public sealed class LetAssignmentEvaluator(
         System.Collections.Immutable.ImmutableArray<ExpressionNode> indexArguments, VBObjectValue owner, ExpressionNode source,
         VBTypedValue value, bool isSet)
     {
+        var assumedBefore = expressions.AssumedSoFar;
+        var outcome = AssignMemberOf(session, context, statement, memberAccess, indexArguments, owner, source, value, isSet);
+        return ObservedAccess(session, context, memberAccess, owner, assumedBefore, outcome);
+    }
+
+    // the member of an object or of a record that an assignment writes is a member the code accesses, and is stated as one (MemberAccessFact).
+    private RuntimeExecutionOutcome ObservedAccess(
+        IRuntimeSession session, RuntimeEvaluationContext context, MemberAccessExpressionNode memberAccess, VBTypedValue owner, long assumedBefore,
+        RuntimeExecutionOutcome outcome)
+    {
+        if (expressions.Observation is not null)
+        {
+            // what the access raises is that there is no object, or no such member on it: the error of the conversion of the value, or of the Property Let that
+            // is invoked, is not the access's, and is a fact of its own.
+            var result = outcome switch
+            {
+                { Kind: RuntimeExecutionOutcomeKind.Error, ErrorInfo: { ErrorId: (int)VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet
+                    or (int)VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod } error } => RuntimeSemanticsEvaluationResult.Error(error),
+                { Kind: RuntimeExecutionOutcomeKind.InternalError } => RuntimeSemanticsEvaluationResult.InternalError(),
+                _ => RuntimeSemanticsEvaluationResult.Success(VBVoidValue.Void),
+            };
+
+            expressions.ObserveMemberAccess(session, context, memberAccess, Tokens.MemberAccess, memberAccess.Owner, owner, memberAccess.Member.IdentifierName,
+                MemberAccessOperationSemanticFlags.Explicit, assumedBefore, result);
+        }
+
+        return outcome;
+    }
+
+    private RuntimeExecutionOutcome AssignMemberOf(
+        IRuntimeSession session, RuntimeEvaluationContext context, StatementNode statement, MemberAccessExpressionNode memberAccess,
+        System.Collections.Immutable.ImmutableArray<ExpressionNode> indexArguments, VBObjectValue owner, ExpressionNode source,
+        VBTypedValue value, bool isSet)
+    {
         // an object variable that holds no object has no member to assign: error 91.
         if (owner.IsNothing())
         {
@@ -429,6 +466,9 @@ public sealed class LetAssignmentEvaluator(
         {
             return RuntimeExecutionOutcome.InternalError;
         }
+
+        // the field of a record is there to be written, whatever is written to it.
+        ObservedAccess(session, context, memberAccess, owner, expressions.AssumedSoFar, RuntimeExecutionOutcome.Next);
 
         // "the source is Let-coerced to the target's declared type" - a field's declared type is its own, and
         // the coercion is the same one an assignment to a variable of that type would apply.

@@ -83,3 +83,28 @@ public sealed record class ConcatOperatorFact(
     VBErrorInfo? Error,
     ConcatOperationSemanticFlags Flags)
     : OperatorFact(Node, Location, Operator, EffectiveType, IsValueKnown, Error);
+
+/// <summary>
+/// A <em>member access</em> (<strong>MS-VBAL 5.6.12</strong>), a <em>dictionary access</em> (<strong>MS-VBAL 5.6.14</strong>), or the access of a member that the
+/// code does not name: the default member of an object that is indexed (<strong>MS-VBAL 5.6.13</strong>), the enumeration member of the object a
+/// <c>For Each</c> goes through (<strong>MS-VBAL 5.4.2.4</strong>).
+/// </summary>
+/// <remarks>
+/// 👉 <see cref="OperatorFact.Operator"/> is <c>Tokens.MemberAccess</c> for a member access and a member the code does not name, and
+/// <c>Tokens.DictionaryAccess</c> for a dictionary access. <see cref="OperatorFact.EffectiveType"/> is the declared type of the member, when it is known.
+/// <see cref="OperatorFact.IsValueKnown"/> says whether the object is.
+/// </remarks>
+/// <param name="Member">The name of the member that is accessed, as the code writes it or, when the code does not name it, as the class declares it;
+/// <see langword="null"/> when there is no telling which member it is (the object is not known, or is late-bound).</param>
+/// <param name="Flags">What is known of the access.</param>
+/// <inheritdoc cref="OperatorFact"/>
+public sealed record class MemberAccessFact(
+    SyntaxNodeId Node,
+    SourceLocation Location,
+    string Operator,
+    VBType? EffectiveType,
+    bool IsValueKnown,
+    VBErrorInfo? Error,
+    string? Member,
+    MemberAccessOperationSemanticFlags Flags)
+    : OperatorFact(Node, Location, Operator, EffectiveType, IsValueKnown, Error);
