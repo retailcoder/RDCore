@@ -191,6 +191,8 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00405](rdc00405.md)|Implementations should be private — a Public implementation of an interface member or handler of an event|
 |[RDC01001](rdc01001.md)|Use meaningful identifier names — a name too short, ending with a digit, or without a vowel|
 |[RDC01002](rdc01002.md)|Hungarian notation — a name that begins with a prefix that states its type|
+|[RDC11005](rdc11005.md)|Bitwise operator — a logical operator given numbers, which works on their bits|
+|[RDC11006](rdc11006.md)|Ambiguous concatenation — two String values joined with +|
 
 ---
 > ⏭️ [**VBC00001** Syntax error](vbc00001.md)

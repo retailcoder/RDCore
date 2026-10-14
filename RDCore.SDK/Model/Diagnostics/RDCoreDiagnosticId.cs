@@ -73,8 +73,8 @@ public enum RDCoreDiagnosticId
     UnintendedUnconditionalStatement,
     SuspiciousValueAssignment,
     TypeCastConversion,
-    BitwiseOperator,
-    AmbiguousConcatenation,
+    BitwiseOperator = 11005, // a logical operator over numbers works on their bits
+    AmbiguousConcatenation = 11006, // + of two String values concatenates them, which & says
     PreferErrRaiseOverErrorStatement,
     EnumerationOverArray,
     LateBoundMemberAccess,

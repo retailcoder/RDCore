@@ -56,9 +56,33 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00405`](../diagnostics/rdc00405.md)|Implementations should be private|Information|`DeclarationFact.Role` and `DeclarationFact.Access`|
 |[`RDC01001`](../diagnostics/rdc01001.md)|Use meaningful identifier names|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.MeaningfulNames`|
 |[`RDC01002`](../diagnostics/rdc01002.md)|Hungarian notation|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.HungarianNotation`|
+|[`RDC11005`](../diagnostics/rdc11005.md)|Bitwise operator|Hint|`ProcedureSemanticModel.Runtime`: `LogicalOperatorSemanticFlags.IsBitwiseSemantics` of the `LogicalOperatorFact`s|
+|[`RDC11006`](../diagnostics/rdc11006.md)|Ambiguous concatenation|Warning|`ProcedureSemanticModel.Runtime`: `ArithmeticOperatorSemanticFlags.VBStringEffectiveType` of the `ArithmeticOperatorFact`s of `+`|
 
 What the host's static pass found wrong with the code is not an opinion: it is reported as the `VBC` compile error it is, by the same
-extension, from the same model.
+extension, from the same model. Likewise, a run-time error that evaluating the code finds an instruction raises *whenever it runs* (`RuntimeFacts.Errors`) is reported
+in the runtime phase as the `VBR` error it is, where the instruction is, with the severity of an error: `n = 5678` into a `Byte` is
+[`VBR00006`](../diagnostics/vbr00006.md) before the program runs. An error the code raises for itself (`Error`, `Err.Raise`) is a fact an analyzer may read, and is not
+reported; see [**RD-VBAL §2.6.3** Runtime Errors](rd-vbal.2.6.3.runtime-errors.md).
+
+### Runtime facts
+
+What an analyzer of the runtime phase reads is `ProcedureSemanticModel.Runtime` ([`RuntimeFacts`](../api/RDCore.SDK.Semantics.Facts.RuntimeFacts.html)), which travels
+as [`RuntimeFactsDto`](../api/RDCore.SDK.Platform.Protocol.RuntimeFactsDto.html). Every fact is stated by the runtime semantics themselves, as they evaluate each
+instruction of the procedure once (the *sweep*), and only when it is true of the code however the procedure is called:
+
+|Facts|What they say|Flags|
+|---|---|---|
+|`Conversions` ([`ConversionFact`](../api/RDCore.SDK.Semantics.Facts.ConversionFact.html))|every let-coercion the code asks for, its site and operand|`ConversionSemanticFlags`|
+|`Operations` ([`OperatorFact`](../api/RDCore.SDK.Semantics.Facts.OperatorFact.html))|every operation of an operator, with its effective type; a comparison says how `String` values compare (`Option Compare`)|`ArithmeticOperatorSemanticFlags`, `ConcatOperationSemanticFlags`, `ComparisonOperatorSemanticFlags`, `LogicalOperatorSemanticFlags`|
+|`Operations` ([`MemberAccessFact`](../api/RDCore.SDK.Semantics.Facts.MemberAccessFact.html))|every member the code accesses: named (`a.b`, `.b`), a dictionary access (`a!b`), the default member of an indexed object, the enumeration member a `For Each` uses, and the member an assignment writes|`MemberAccessOperationSemanticFlags`|
+|`Statements` ([`StatementFact`](../api/RDCore.SDK.Semantics.Facts.StatementFact.html))|what an `LSet`, `RSet` or `With` statement is|`FixedAssignmentSemanticFlags`, `WithStatementSemanticFlags`|
+|`Errors`|every run-time error an instruction raises whenever it runs|-|
+
+An error is stated only when nothing the instruction did was *assumed*: the value of a variable or a parameter, what a procedure that is not called returns, the
+state of the standard library or of the outside world (files, `Rnd`, `CreateObject`), or what another instruction left behind (a loop's counter, a `With` block's
+target). `Dim c As Collection: c.Add 1` raises error 91 when it runs, but the sweep does not follow paths and cannot tell that nothing set `c`, so it says nothing.
+`MemberAccessOperationSemanticFlags.CallByNameAccess` is not stated yet: a `CallByName` call is a call of the library, which the sweep does not look into.
 
 ## Language Core Conditions and Analyzer Opinions
 

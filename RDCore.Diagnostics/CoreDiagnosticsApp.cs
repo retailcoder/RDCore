@@ -53,6 +53,8 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, ObsoleteCallStatementAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, NotAllPathsReturnValueAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ImplicitNarrowingConversionAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, BitwiseSemanticsAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, AmbiguousConcatenationAnalyzer>();
 
         // the ones that read how the module is written.
         services.AddSingleton<IModuleAnalyzer, OptionBaseAnalyzer>();

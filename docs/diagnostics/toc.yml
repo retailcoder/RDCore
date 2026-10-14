@@ -292,3 +292,7 @@
   href: rdc01001.md
 - name: RDC01002 — Hungarian notation
   href: rdc01002.md
+- name: RDC11005 — Bitwise operator
+  href: rdc11005.md
+- name: RDC11006 — Ambiguous concatenation
+  href: rdc11006.md
