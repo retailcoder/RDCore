@@ -41,7 +41,23 @@ public sealed record class WithStatementRuntimeSemantics(
         ConversionOperationSemanticContext conversionContext,
         ISemanticFlagsAccumulator<WithStatementSemanticFlags> builder,
         SyntaxNode node,
-        params VBTypedValue[] inputs) => builder; // TODO: With-statement-specific semantic flags, once a caller (an analyzer) actually needs them.
+        params VBTypedValue[] inputs)
+    {
+        if (node is not WithStatementNode || inputs is not [{ } target])
+        {
+            return builder;
+        }
+
+        // the same two forms Evaluate tells apart; anything else is no form of the statement.
+        builder.AddFlags(target switch
+        {
+            VBObjectValue => WithStatementSemanticFlags.ClassTarget,
+            VBUserDefinedTypeValue => WithStatementSemanticFlags.UserDefinedTypeTarget,
+            _ => WithStatementSemanticFlags.Failed,
+        });
+
+        return builder;
+    }
 
     public override RuntimeSemanticsEvaluationResult Evaluate(
         IRuntimeSession session,

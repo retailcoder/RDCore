@@ -220,4 +220,33 @@ public sealed class DiagnoseDocumentHandlerTests
     [TestMethod]
     public void TheAnalyzerThatReadsWhatEvaluatingTheCodeFound_IsOfTheRuntimePhase()
         => Assert.AreEqual(AnalysisPhase.Runtime, new ImplicitNarrowingConversionAnalyzer().Phase);
+
+    private const string OverflowModule = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPublic Sub Main()\r\n    Dim n As Byte\r\n    n = 5678\r\n    Error 5\r\nEnd Sub\r\n";
+
+    // what the language says of the module: the analyzer is there to show that it is not what is asserted.
+    private static async Task<Diagnostic[]> LanguageDiagnosticsAsync(AnalysisPhase phase)
+    {
+        var semantics = (await Cli.ModuleWorkspace.SemanticsAsync([], OverflowModule)).Modules.Single();
+        var result = await HandleAsync(RequestFor(OverflowModule, out _, semantics: semantics, phase: phase), new SaysSomething(AnalysisPhase.All, 0));
+        return [.. result.Diagnostics.Where(diagnostic => diagnostic.Code!.Value.String!.StartsWith("VB"))];
+    }
+
+    [TestMethod]
+    public async Task ARunTimeErrorTheCodeRaisesWheneverItRuns_IsAnError_WhereItIsRaised()
+    {
+        var diagnostic = (await LanguageDiagnosticsAsync(AnalysisPhase.Runtime)).Single();
+
+        Assert.AreEqual("VBR00006", diagnostic.Code!.Value.String);
+        Assert.AreEqual(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.AreEqual(4, diagnostic.Range.Start.Line, "the assignment that cannot hold its value");
+        Assert.AreEqual("https://rubberduck-vba.github.io/RDCore/diagnostics/vbr00006.html", diagnostic.CodeDescription!.Href.ToString());
+    }
+
+    [TestMethod]
+    public async Task ARunTimeError_IsOfTheRuntimePhase()
+        => Assert.IsEmpty(await LanguageDiagnosticsAsync(AnalysisPhase.Static));
+
+    [TestMethod]
+    public async Task AnErrorTheCodeRaisesForItself_IsNotReported()
+        => Assert.IsFalse((await LanguageDiagnosticsAsync(AnalysisPhase.Runtime)).Any(diagnostic => diagnostic.Range.Start.Line == 5), "Error 5 is what the code is there to do");
 }

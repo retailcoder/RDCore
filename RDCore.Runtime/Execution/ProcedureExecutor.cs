@@ -11,6 +11,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -87,7 +88,7 @@ namespace RDCore.Runtime.Execution;
 /// mechanism generalizes for free once S9 exists).
 /// </para>
 /// </remarks>
-public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider statements, ConditionEvaluator conditions, WithTargetEvaluator withTargets, CaseMatchEvaluator cases, ForLoopEvaluator forLoop, ForEachEvaluator forEach, JumpTableEvaluator jumpTable, ErrorHandlingEvaluator errorHandling, CancellationToken cancellation = default)
+public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider statements, ConditionEvaluator conditions, WithTargetEvaluator withTargets, CaseMatchEvaluator cases, ForLoopEvaluator forLoop, ForEachEvaluator forEach, JumpTableEvaluator jumpTable, ErrorHandlingEvaluator errorHandling, CancellationToken cancellation = default, AnalysisObservation? observation = null)
 {
     // set once a program that waited for the cancellation was resumed: a cancelled token stays cancelled, and it was one break.
     private bool _cancellationAcknowledged;
@@ -145,10 +146,17 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             }
 
             activation.Pc = instruction.Offset;
+            var assumedBefore = observation?.Assumptions ?? 0;
             RuntimeExecutionOutcome? outcome;
             try
             {
-                outcome = SweepInstruction(session, ResolveContext(context, activation, list, instruction), instruction, activation);
+                var instructionContext = ResolveContext(context, activation, list, instruction);
+                if (ReliesOnAnotherInstruction(instruction, instructionContext))
+                {
+                    observation?.Assume();
+                }
+
+                outcome = SweepInstruction(session, instructionContext, instruction, activation);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -158,11 +166,26 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 outcome = RuntimeExecutionOutcome.InternalError;
             }
 
-            complete &=outcome is not { Kind: RuntimeExecutionOutcomeKind.InternalError };
+            complete &= outcome is not { Kind: RuntimeExecutionOutcomeKind.InternalError };
+
+            // the error of an instruction whose evaluation assumed nothing is the code's: the instruction raises it whenever it runs. One that assumed
+            // something may have raised the assumption's error instead, and says nothing about the code.
+            if (observation is not null && outcome is { Kind: RuntimeExecutionOutcomeKind.Error, ErrorInfo: { } error } && observation.Assumptions == assumedBefore)
+            {
+                observation.OnError(error);
+            }
         }
 
         return complete;
     }
+
+    // what an instruction evaluates with is the state another instruction left behind, which a sweep that follows no path does not know to be the one it
+    // would find: the counter and the bounds of a loop are its opener's, and the target of a With block is the With statement's. The block variable holds
+    // the object without saying whether it was assumed, so every instruction in a block is taken to rely on an assumption.
+    // TODO an instruction of a With block whose target is known (With New Collection) could state its error, once the block variable says it is known.
+    private static bool ReliesOnAnotherInstruction(Instruction instruction, RuntimeEvaluationContext context)
+        => instruction.Kind is InstructionKind.ForNext or InstructionKind.ForEachNext
+            || context.EnclosingWithTarget is not null;
 
     // the outcome of evaluating the instruction, or null when there was nothing to evaluate. What an instruction does to the program counter is of
     // no interest here, and a Return, a Resume or an On Error evaluates no expression of the code.
@@ -824,7 +847,16 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         // a Variant holding an array (or an object) reports its own TypeInfo as the wrapped value's,
         // but stays a VBVariantValue instance - unwrap it here (recursively) so "For Each x In v" on a
         // Variant works the same as on a declared array/object collection.
-        var collection = collectionResult.Result;
+        var assumedBefore = forEach.AssumedSoFar;
+        var outcome = StartEnumeration(session, context, instruction, activation, forEachStatement, control, collectionResult.Result!);
+        forEach.ObserveEnumeration(session, context, forEachStatement.CollectionExpression, collectionResult.Result!, assumedBefore, outcome);
+        return outcome;
+    }
+
+    private RuntimeExecutionOutcome? StartEnumeration(
+        IRuntimeSession session, RuntimeEvaluationContext context, Instruction instruction, CallStackFrame activation, ForEachStatementNode forEachStatement,
+        ITypedSymbol control, VBTypedValue? collection)
+    {
         while (collection is VBVariantValue { TypedValue: var wrapped })
         {
             collection = wrapped;

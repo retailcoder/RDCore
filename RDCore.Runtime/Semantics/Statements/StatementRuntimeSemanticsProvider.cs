@@ -80,27 +80,27 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
             DebugPrintStatementNode print => _printOutput.Execute(session, context, print.Items),
             DebugAssertStatementNode assert => ExecuteAssert(session, context, assert),
             // MS-VBAL §5.4.5.1/.2: the statements that associate and disassociate a file number.
-            OpenStatementNode open => _files.ExecuteOpen(session, context, open),
-            KeywordStatementNode { Token: Tokens.Close or Tokens.Reset } close => _files.ExecuteClose(session, context, close),
+            OpenStatementNode open => OnFiles(_files.ExecuteOpen(session, context, open)),
+            KeywordStatementNode { Token: Tokens.Close or Tokens.Reset } close => OnFiles(_files.ExecuteClose(session, context, close)),
             // MS-VBAL §5.4.5.8: Print to a file channel. The channel exists now; writing to one does not yet,
             // and the bare object-relative form needs an enclosing form or report, which does not either.
             // MS-VBAL §5.4.5.8-9. The bare object-relative form needs an enclosing form or report, which does
             // not exist; ExecutePrint reports that itself.
-            PrintStatementNode print => _files.ExecutePrint(session, context, print),
+            PrintStatementNode print => OnFiles(_files.ExecutePrint(session, context, print)),
             // MS-VBAL §5.4.5.6: Line Input # reads one line and Let-assigns it.
-            KeywordStatementNode { Token: Tokens.LineInput } lineInput => _files.ExecuteLineInput(session, context, lineInput),
+            KeywordStatementNode { Token: Tokens.LineInput } lineInput => OnFiles(_files.ExecuteLineInput(session, context, lineInput)),
             // MS-VBAL §5.4.5.10: Input # reads a field per variable and Let-assigns each.
-            KeywordStatementNode { Token: Tokens.Input } input => _files.ExecuteInput(session, context, input),
+            KeywordStatementNode { Token: Tokens.Input } input => OnFiles(_files.ExecuteInput(session, context, input)),
             // MS-VBAL §5.4.5.3/.7: the statements that reposition a channel and set its line width.
-            KeywordStatementNode { Token: Tokens.Seek } seek => _files.ExecuteSeek(session, context, seek),
-            KeywordStatementNode { Token: Tokens.Width } width => _files.ExecuteWidth(session, context, width),
+            KeywordStatementNode { Token: Tokens.Seek } seek => OnFiles(_files.ExecuteSeek(session, context, seek)),
+            KeywordStatementNode { Token: Tokens.Width } width => OnFiles(_files.ExecuteWidth(session, context, width)),
             // RD-VBAL §5.4.5.13: Name renames a file or a directory; it is not in MS-VBAL.
-            KeywordStatementNode { Token: Tokens.Name } name => _files.ExecuteName(session, context, name),
+            KeywordStatementNode { Token: Tokens.Name } name => OnFiles(_files.ExecuteName(session, context, name)),
             // MS-VBAL §5.4.5.11-12: the record statements, which move bytes rather than characters.
-            KeywordStatementNode { Token: Tokens.Put } put => _files.ExecutePut(session, context, put),
-            KeywordStatementNode { Token: Tokens.Get } get => _files.ExecuteGet(session, context, get),
+            KeywordStatementNode { Token: Tokens.Put } put => OnFiles(_files.ExecutePut(session, context, put)),
+            KeywordStatementNode { Token: Tokens.Get } get => OnFiles(_files.ExecuteGet(session, context, get)),
             // MS-VBAL §5.4.5.4-5: Lock and Unlock, which share a node because they share a record range.
-            FileLockStatementNode fileLock => _files.ExecuteLock(session, context, fileLock),
+            FileLockStatementNode fileLock => OnFiles(_files.ExecuteLock(session, context, fileLock)),
             // MS-VBAL §5.4.2.20: invokes the procedures that handle an event of the object whose code this is.
             KeywordStatementNode { Token: Tokens.RaiseEvent } raise => ExecuteRaiseEvent(session, context, raise),
             // RD-VBAL: Circle, Line, PSet and Scale are methods of an object that can be drawn on.
@@ -108,6 +108,19 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
             CallStatementNode call => ExecuteCall(session, context, call),
             _ => RuntimeExecutionOutcome.InternalError,
         };
+
+    /// <summary>
+    /// The observation of the analysis the statements are evaluated for, if they are: told that a file statement relied on what it does not know.
+    /// </summary>
+    public AnalysisObservation? Observation { get; init; }
+
+    // the files and the channels a file statement works with are the outside world's, and the state the statements before it left them in, which an analysis
+    // does not know to be what the code would find: what the statement raises is not known to be the code's.
+    private RuntimeExecutionOutcome OnFiles(RuntimeExecutionOutcome outcome)
+    {
+        Observation?.Assume();
+        return outcome;
+    }
 
     // The object is evaluated, because naming one that is not there is an error of its own; and then it is asked for a method it does not have, because the
     // objects of the platform are not surfaces. The statement with no object at all never gets here (GraphicsStatementStaticSemantics).

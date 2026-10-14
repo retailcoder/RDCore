@@ -16,6 +16,15 @@ Regardless of the error message content, RD-VBA must still raise the MS-VBA equi
 
 On a run-time error, the interactive shell renders an icon, the title with the program's own line number, the diagnostic code and description, `Err.Source`, and the stack trace; see [**RD-VBAL §2.0.2** Client/Server Capabilities](rd-vbal.2.0.2.client-server-capabilities.md).
 
+## Run-time Errors Reported Before the Code Runs
+
+A run-time error that an instruction raises *whenever it runs* is a fact about the code, and is reported as a diagnostic of the runtime phase without the program
+being run: `Dim n As Byte` then `n = 5678` is `VBR00006` (*Overflow*) on the assignment, in an editor and in the shell's `ANALYZE`. The environment host finds it by
+evaluating every instruction of every procedure once, through the runtime semantics, and states it only when nothing the instruction did was assumed (a variable,
+a call it does not make, the state of the library or of the outside world, the state another instruction left behind); see
+[**RD-VBAL §2.6.4** Rubberduck Core Diagnostics](rd-vbal.2.6.4.rubberduck-core-diagnostics.md). An error the code raises for itself is not reported: `Error 5` is
+what the statement is there to do.
+
 ## Run-time Errors Referenced by Statement Semantics
 
 |Error|`VBRuntimeErrorId`|Raised when|See|

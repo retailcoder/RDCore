@@ -3,6 +3,7 @@ using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.SDK.Client;
 using RDCore.SDK.Model.Diagnostics;
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Platform.Protocol;
 
 namespace RDCore.Diagnostics.Handlers;
@@ -31,6 +32,16 @@ internal sealed class DiagnoseDocumentHandler(
                     .Concat(semantics.Procedures.SelectMany(procedure => procedure.CompileErrors))
                     .Select(error => diagnostics.FromVBCompileError(error.ToInfo())));
             }
+        }
+
+        // what the host's evaluation of the code found it raises whenever it runs, which is the language's to say too: a run-time error is an error. One that the
+        // code raises for itself (Error, Err.Raise) is what the code is there to do, and is a fact for an analyzer to read rather than something wrong with it.
+        if (payload.Phase.HasFlag(AnalysisPhase.Runtime) && payload.Semantics is { } evaluated)
+        {
+            diagnosticList.AddRange(evaluated.Procedures
+                .SelectMany(procedure => procedure.Runtime?.Errors ?? [])
+                .Where(error => !error.IsApplicationError)
+                .Select(error => diagnostics.FromVBRuntimeError((VBRuntimeErrorInfo)error.ToInfo())));
         }
 
         // and what the analyzers find worth saying, from the same facts.

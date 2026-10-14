@@ -1,0 +1,62 @@
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using RDCore.Diagnostics.Analyzers;
+using RDCore.Parsing;
+using RDCore.SDK.Model.Diagnostics;
+using RDCore.Tests.Cli;
+
+namespace RDCore.Tests.Diagnostics;
+
+/// <summary>
+/// <c>RDC11005</c> and <c>RDC11006</c>: analyzers that read what the host states about the operations of the code (<see cref="RDCore.SDK.Platform.Protocol.OperatorFactDto"/>).
+/// </summary>
+[TestClass]
+public sealed class OperatorFactAnalyzerTests
+{
+    private static async Task<AnalyzerFinding[]> FindAsync(IModuleAnalyzer analyzer, string parameters, params string[] body)
+    {
+        var uri = TestUri.TestModuleUri();
+        var source = $"Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPublic Sub Main({parameters})\r\n{string.Join("\r\n", body)}\r\nEnd Sub\r\n";
+        var payload = await ModuleWorkspace.SemanticsAsync([], source);
+
+        return [.. analyzer.Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), payload.Modules.Single()))];
+    }
+
+    [TestMethod]
+    public async Task TheAdditionOfTwoStrings_IsAConcatenation_ThatTheConcatenationOperatorSays()
+    {
+        var finding = (await FindAsync(new AmbiguousConcatenationAnalyzer(), "ByVal s As String, ByVal t As String", "Dim r As String", "r = s + t")).Single();
+
+        Assert.AreEqual(RDCoreDiagnosticId.AmbiguousConcatenation, finding.Id);
+        Assert.AreEqual(DiagnosticSeverity.Warning, finding.Severity);
+        Assert.AreEqual(4, finding.Range.Start.Line);
+    }
+
+    [TestMethod]
+    [DataRow("ByVal a As Long, ByVal b As Long", DisplayName = "two numbers")]
+    [DataRow("ByVal a As String, ByVal b As Long", DisplayName = "a String and a number")]
+    public async Task AnAdditionThatAdds_IsNotAConcatenation(string parameters)
+    {
+        Assert.IsEmpty(await FindAsync(new AmbiguousConcatenationAnalyzer(), parameters, "Dim r As Variant", "r = a + b"));
+    }
+
+    [TestMethod]
+    public async Task TheConcatenationOperator_IsNotReported()
+    {
+        Assert.IsEmpty(await FindAsync(new AmbiguousConcatenationAnalyzer(), "ByVal s As String, ByVal t As String", "Dim r As String", "r = s & t"));
+    }
+
+    [TestMethod]
+    public async Task ALogicalOperatorOverNumbers_WorksOnTheirBits()
+    {
+        var finding = (await FindAsync(new BitwiseSemanticsAnalyzer(), "ByVal a As Long, ByVal b As Long", "Dim r As Long", "r = a And b")).Single();
+
+        Assert.AreEqual(RDCoreDiagnosticId.BitwiseOperator, finding.Id);
+        Assert.AreEqual(DiagnosticSeverity.Hint, finding.Severity);
+    }
+
+    [TestMethod]
+    public async Task ALogicalOperatorOverBooleans_IsLogic()
+    {
+        Assert.IsEmpty(await FindAsync(new BitwiseSemanticsAnalyzer(), "ByVal a As Boolean, ByVal b As Boolean", "Dim r As Boolean", "r = a And b"));
+    }
+}

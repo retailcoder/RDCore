@@ -35,6 +35,25 @@ public sealed class ForEachEvaluator(RuntimeExpressionEvaluator expressionEvalua
         => expressionEvaluator.Evaluate(session, expression, context);
 
     /// <summary>
+    /// How many times the evaluation has assumed something, so far: taken before the enumeration begins, for <see cref="ObserveEnumeration"/>.
+    /// </summary>
+    public long AssumedSoFar => expressionEvaluator.AssumedSoFar;
+
+    /// <summary>
+    /// States the enumeration of an object as the access of its enumeration member, when the evaluation is observed.
+    /// </summary>
+    /// <param name="session">The session the statement was evaluated in.</param>
+    /// <param name="context">The scope of the statement.</param>
+    /// <param name="expression">The collection expression.</param>
+    /// <param name="collection">What it evaluated to.</param>
+    /// <param name="assumedBefore">What <see cref="AssumedSoFar"/> was before the enumeration began.</param>
+    /// <param name="outcome">How the enumeration began: its error, if it is the code's, is the fact's.</param>
+    public void ObserveEnumeration(
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, VBTypedValue collection, long assumedBefore, RuntimeExecutionOutcome? outcome)
+        => expressionEvaluator.ObserveEnumeration(session, context, expression, collection, assumedBefore,
+            outcome is { Kind: RuntimeExecutionOutcomeKind.Error, ErrorInfo: { } error } ? error : null);
+
+    /// <summary>
     /// Assigns <paramref name="element"/> to <paramref name="control"/> — Set-assigns when
     /// <paramref name="useSetAssignment"/> (the array's own item type is <see cref="VBObjectType"/>),
     /// Let-assigns otherwise.
