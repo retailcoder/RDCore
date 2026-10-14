@@ -14,7 +14,9 @@ namespace RDCore.Diagnostics.Analyzers;
 /// conversion function or the explicit let-coercion operator, is the author saying so and is not reported. Nothing is reported for a procedure that was not evaluated.
 /// <para>
 /// A value that is known - a literal, or a constant - and that fits the type it is converted to without losing anything is not reported either: <c>b = 10</c> into a
-/// <c>Byte</c> needs no conversion function to say it is meant. One that is known and loses its fraction is.
+/// <c>Byte</c> needs no conversion function to say it is meant. One that is known and loses its fraction is. One that is known and cannot fit at all is not a
+/// warning: the conversion raises a run-time error whenever it runs, which the language reports as such (<c>VBR00006</c>, from
+/// <see cref="RDCore.SDK.Platform.Protocol.RuntimeFactsDto.Errors"/>).
 /// </para>
 /// </remarks>
 internal sealed class ImplicitNarrowingConversionAnalyzer : IModuleAnalyzer
@@ -27,7 +29,7 @@ internal sealed class ImplicitNarrowingConversionAnalyzer : IModuleAnalyzer
         => (context.Semantics?.Procedures ?? [])
             .SelectMany(procedure => procedure.Runtime?.Conversions ?? [])
             .Where(conversion => conversion.Flags.HasFlag(Reported) && !conversion.Flags.HasFlag(ConversionSemanticFlags.Explicit))
-            .Where(conversion => !conversion.IsValueKnown || conversion.Flags.HasFlag(ConversionSemanticFlags.Lossy) || conversion.Error is not null)
+            .Where(conversion => conversion.Error is null && (!conversion.IsValueKnown || conversion.Flags.HasFlag(ConversionSemanticFlags.Lossy)))
             .Select(conversion => new AnalyzerFinding(
                 RDCoreDiagnosticId.ImplicitNarrowingConversion,
                 conversion.Location.Range,

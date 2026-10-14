@@ -81,7 +81,7 @@ public sealed class ImplicitNarrowingConversionAnalyzerTests
     }
 
     [TestMethod]
-    public async Task AKnownValueThatFitsAndLosesNothing_NeedsNoConversionFunction_ButOneThatDoesNot_Does()
+    public async Task AKnownValueThatFitsAndLosesNothing_NeedsNoConversionFunction_ButOneThatLosesItsFraction_Does()
     {
         var findings = await FindAsync("""
             Attribute VB_Name = "Program"
@@ -97,8 +97,8 @@ public sealed class ImplicitNarrowingConversionAnalyzerTests
             End Sub
             """);
 
-        // b = 10 and b = Limit fit; n = 2.5 loses its fraction; b = 300 cannot fit.
-        CollectionAssert.AreEqual(new[] { 8, 9 }, Lines(findings));
+        // b = 10 and b = Limit fit; n = 2.5 loses its fraction; b = 300 cannot fit, which is a run-time error the language reports (VBR00006), not a warning.
+        CollectionAssert.AreEqual(new[] { 8 }, Lines(findings));
     }
 
     [TestMethod]
