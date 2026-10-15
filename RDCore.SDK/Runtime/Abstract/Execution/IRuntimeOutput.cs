@@ -84,6 +84,21 @@ public sealed class RuntimeOutputBuffer(Action<string>? completed = null) : IRun
     /// </summary>
     public IReadOnlyList<string> Lines => _current.Length == 0 ? _lines : [.. _lines, _current.ToString()];
 
+    /// <summary>
+    /// The lines that are complete and kept, without the line in progress.
+    /// </summary>
+    /// <remarks>
+    /// What has been printed in full so far, for a caller that shows it before the program goes on - a dialog the program opens is to come after what it printed
+    /// before opening it - and then <see cref="ForgetCompleted"/>s it, so that it is not said twice.
+    /// </remarks>
+    public IReadOnlyList<string> CompletedLines => [.. _lines];
+
+    /// <summary>
+    /// Forgets the first <paramref name="count"/> completed lines, which have been said some other way (<see cref="CompletedLines"/>).
+    /// </summary>
+    /// <param name="count">How many of the completed lines to forget, from the first.</param>
+    public void ForgetCompleted(int count) => _lines.RemoveRange(0, Math.Clamp(count, 0, _lines.Count));
+
     /// <inheritdoc/>
     public void Write(string text) => _current.Append(text);
 

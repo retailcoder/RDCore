@@ -143,6 +143,24 @@ internal static class RuntimeSourceHarness
     public static (IRuntimeSession Session, RuntimeExecutionOutcome Outcome) Run(
         IFileSystem? fileSystem, IEnumerable<Symbol> symbols, IRuntimeOutput? output, bool standardLibrary,
         Action<IRuntimeSession>? arrange, ModuleDirectives directives, IAnalysisObserver? observer, bool analyze, params string[] body)
+        => Run(fileSystem, symbols, output, standardLibrary, arrange, directives, observer, analyze, outside: null, body);
+
+    /// <summary>
+    /// <inheritdoc cref="Run(IFileSystem?, IEnumerable{Symbol}, string[])" path="/summary"/>
+    /// </summary>
+    /// <param name="fileSystem">The file system the session's file channels open against.</param>
+    /// <param name="symbols">The symbols the source refers to.</param>
+    /// <param name="output">Where the body's <c>Debug.Print</c> output goes, or <c>null</c> to discard it.</param>
+    /// <param name="standardLibrary">Whether the library's own symbols are defined too.</param>
+    /// <param name="arrange">What to do to the composed session before the body runs.</param>
+    /// <param name="directives">The module dials the body runs under.</param>
+    /// <param name="observer">Told of every conversion and operation the body evaluates, or <c>null</c> to run it unobserved.</param>
+    /// <param name="analyze">Whether the body is analyzed rather than run.</param>
+    /// <param name="outside">What the body reaches outside the platform - dialogs, desktop, settings - or <c>null</c> for none of it. Ignored by an analysis, which reaches none.</param>
+    /// <param name="body">The statements, one per line.</param>
+    public static (IRuntimeSession Session, RuntimeExecutionOutcome Outcome) Run(
+        IFileSystem? fileSystem, IEnumerable<Symbol> symbols, IRuntimeOutput? output, bool standardLibrary,
+        Action<IRuntimeSession>? arrange, ModuleDirectives directives, IAnalysisObserver? observer, bool analyze, RDCore.External.ExternalWorld? outside, params string[] body)
     {
         // resolution walks the scope tree, so the module and the procedure have to be in it as symbols and
         // not only as a call frame: a name resolved from a procedure Uri no node exists for resolves to
@@ -200,7 +218,7 @@ internal static class RuntimeSourceHarness
             ? RuntimeExecutionPipeline.CreateForAnalysis(
                 session, new Dictionary<SemanticId, InstructionList>(), Substitute.For<IVerboseMessageBuilder>(), observer ?? new RecordingAnalysisObserver())
             : RuntimeExecutionPipeline.Create(
-                session, new Dictionary<SemanticId, InstructionList>(), Substitute.For<IVerboseMessageBuilder>(), observer: observer);
+                session, new Dictionary<SemanticId, InstructionList>(), Substitute.For<IVerboseMessageBuilder>(), observer: observer, outside: outside);
 
         var procedureUri = procedure.Uri;
         var nodeId = new SyntaxNodeId(procedureUri.AbsolutePath, [1]);

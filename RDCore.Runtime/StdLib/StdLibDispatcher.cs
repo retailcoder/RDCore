@@ -1,3 +1,4 @@
+using RDCore.External;
 using RDCore.Runtime.Execution;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.Errors;
@@ -48,7 +49,12 @@ public sealed class StdLibDispatcher : IExternalCallProvider
     /// </para>
     /// </remarks>
     /// <param name="session">The session the implementations read their state from.</param>
-    public static StdLibDispatcher For(IRuntimeSession session)
+    /// <param name="outside">
+    /// What the members that reach outside the platform reach - the dialogs, the desktop, the settings (<see cref="StdInteraction"/>). None of it unless said
+    /// otherwise (<see cref="ExternalWorld.None"/>), which is what an analysis is composed with.
+    /// </param>
+    /// <param name="cancellation">The run's cancellation, which stops a member that waits - a dialog - from waiting.</param>
+    public static StdLibDispatcher For(IRuntimeSession session, ExternalWorld? outside = null, CancellationToken cancellation = default)
     {
         // a collection makes the enumerator its For Each is driven by, which is an object of a class of its own.
         var enumerators = new StdEnumVariant(session);
@@ -63,7 +69,7 @@ public sealed class StdLibDispatcher : IExternalCallProvider
             [typeof(IStdErrClass)] = new ErrObject(session),
             [typeof(IStdConversionModule)] = new StdConversion(session),
             [typeof(IStdHiddenModule)] = new StdHidden(session),
-            [typeof(IStdInteractionModule)] = new StdInteraction(),
+            [typeof(IStdInteractionModule)] = new StdInteraction(session, outside, cancellation),
             [typeof(IStdCollectionClass)] = new StdCollection(session, enumerators),
             [typeof(IStdEnumVariantClass)] = enumerators,
         });
@@ -171,8 +177,10 @@ public sealed class StdLibDispatcher : IExternalCallProvider
         // an argument the caller did not supply is an omitted Optional: the implementation's own default
         // stands in, which for a VBTypedValue parameter is null - the "Missing" its signature declares. The
         // interpreter itself never leaves one out: it fills an omitted Optional with the parameter's default
-        // value - Empty for a Variant, and a typed one's own type's default, such as False, never null - so an
-        // implementation reads null and Empty alike as omitted, and cannot tell a typed one from its default.
+        // value - Missing for a Variant, and a typed one's own type's default, such as False, never null. A Missing
+        // argument is an omitted one, as it is to any COM member, whether the call left it out or passed on a
+        // parameter that was itself omitted; so it is marshalled as null too, and an implementation reads null and
+        // Empty alike as omitted, and cannot tell a typed one from its default.
         if (supplied.Length > parameters.Length)
         {
             return false;
@@ -181,7 +189,7 @@ public sealed class StdLibDispatcher : IExternalCallProvider
         for (var index = 0; index < parameters.Length; index++)
         {
             var parameter = parameters[index];
-            if (index >= supplied.Length)
+            if (index >= supplied.Length || parameter.IsOptional && TypedValue(supplied[index]) is VBMissingValue)
             {
                 arguments[index] = parameter.HasDefaultValue ? parameter.DefaultValue : null;
                 continue;
@@ -293,6 +301,8 @@ public sealed class StdLibDispatcher : IExternalCallProvider
         VBRuntimeHResult error => new VBErrorValue(Convert.ToInt32(error.BoxedValue)),
         // an object is the identity of one: what the argument is the storage of, as with the rest.
         VBRuntimeValue<VBRuntimeObjectId> identity => new VBObjectValue(identity.StoredValue),
+        // vbNullString is a String bound to no characters at all, and boxes nothing: it is the default the interpreter fills an omitted Optional String with.
+        VBRuntimeValue<string> { StoredValue: null } => VBStringValue.VBNullString,
         _ => argument.BoxedValue switch
         {
             // a Variant stores the whole typed value it wraps, and an array and a UDT are each boxed around

@@ -15,6 +15,7 @@ namespace RDCore.SDK.Runtime;
 /// <param name="AllowDllImports">Whether a <c>Declare</c>'d library import may be called; <c>true</c> unless said otherwise.</param>
 /// <param name="AllowAutomation">Whether a program may create and call the objects of a referenced library, a host application among them; <c>true</c> unless said otherwise.</param>
 /// <param name="SourceLanguage">The language the code is written in; RD-VBA unless said otherwise.</param>
+/// <param name="LegacyRegistrySettings">Whether the legacy settings members use the Windows Registry rather than the workspace application settings; <c>false</c> unless said otherwise.</param>
 public sealed record class RuntimeEnvironmentProfile(
     bool Is64Bit,
     int Lcid,
@@ -24,7 +25,8 @@ public sealed record class RuntimeEnvironmentProfile(
     Abstract.Execution.VBErlLineNumbering ErlLineNumbering = Abstract.Execution.VBErlLineNumbering.DocumentLine,
     bool AllowDllImports = true,
     Workspace.SupportedLanguage? SourceLanguage = null,
-    bool AllowAutomation = true) : IRuntimeEnvironmentProfile
+    bool AllowAutomation = true,
+    bool LegacyRegistrySettings = false) : IRuntimeEnvironmentProfile
 {
     /// <inheritdoc/>
     public Workspace.SupportedLanguage Language => SourceLanguage ?? Workspace.SupportedLanguages.RDVBA;
@@ -42,7 +44,8 @@ public sealed record class RuntimeEnvironmentProfile(
     /// <summary>Builds a profile from bound <c>appsettings.json</c> options, for code written in <paramref name="language"/>.</summary>
     public static RuntimeEnvironmentProfile From(Server.Configuration.SdkEnvironmentOptions options, Workspace.SupportedLanguage? language = null)
         => new(options.Is64Bit, options.Lcid, options.AnsiCodePage, options.SupportsOptionCompareDatabase, options.DatabaseCompare,
-            options.ErlLineNumbering, options.AllowDllImports, language, options.AllowAutomation);
+            options.ErlLineNumbering, options.AllowDllImports, language, options.AllowAutomation,
+            options.LegacyRegistrySettings);
 
     /// <inheritdoc/>
     public CultureInfo Culture => Lcid == 0 ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo(Lcid);

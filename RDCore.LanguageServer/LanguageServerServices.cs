@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using RDCore.LanguageServer.Debugging;
 using RDCore.LanguageServer.Diagnostics;
 using RDCore.LanguageServer.Parsing;
+using RDCore.LanguageServer.Runtime;
 using RDCore.LanguageServer.SemanticTokens;
 using RDCore.LanguageServer.Server;
 using RDCore.LanguageServer.Symbols;
@@ -63,7 +64,8 @@ internal static class LanguageServerServices
             .AddSingleton<IReferencedLibraryService, ReferencedLibraryService>()
             .AddSingleton<ISymbolSyncService, SymbolSyncService>()
             .AddSingleton<IProgramDebugService, ProgramDebugService>()
-            .AddSingleton<IHostOutputRelay, HostOutputRelay>();
+            .AddSingleton<IHostOutputRelay, HostOutputRelay>()
+            .AddSingleton<IClientInteractionRelay, ClientInteractionRelay>();
         return services;
     }
 

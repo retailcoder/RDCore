@@ -243,7 +243,7 @@ public sealed class RuntimeExecutionPipeline
             : ExternalCallPipeline.For(session,
                 [
                     new AutomationCallProvider(session, (outside ?? ExternalWorld.None).Automation),
-                    StdLibDispatcher.For(session),
+                    StdLibDispatcher.For(session, outside, cancellation),
                     new DeclaredProcedureProvider(session, (outside ?? ExternalWorld.None).Libraries),
                 ]);
         var bindings = new RuntimeCallableBindingFactory(invoker, external);
