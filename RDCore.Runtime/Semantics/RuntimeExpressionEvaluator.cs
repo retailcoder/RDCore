@@ -957,17 +957,17 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     /// <param name="session">The session the call runs in.</param>
     /// <param name="context">The scope the arguments are written in.</param>
     /// <param name="accessor">The accessor.</param>
-    /// <param name="receiver">The object it is invoked on.</param>
+    /// <param name="receiver">The object it is invoked on; <see langword="null"/> for a property of a standard module, which is invoked on none.</param>
     /// <param name="indexArguments">The arguments written between the property's name and the assignment.</param>
     /// <param name="value">The value assigned, which is Let- or Set-coerced to the type of the accessor's value parameter.</param>
     /// <param name="source">The expression the value came from, for the location of an error.</param>
     /// <param name="isSet">Whether it is a <c>Set</c> assignment.</param>
     public RuntimeSemanticsEvaluationResult InvokeAssignment(
-        IRuntimeSession session, RuntimeEvaluationContext context, VBTypeMemberSymbol accessor, IRuntimeValue receiver,
+        IRuntimeSession session, RuntimeEvaluationContext context, VBTypeMemberSymbol accessor, IRuntimeValue? receiver,
         ImmutableArray<ExpressionNode> indexArguments, VBTypedValue value, ExpressionNode source, bool isSet)
     {
         var parameters = RuntimeProcedureInvoker.GetParameters(accessor);
-        parameters = parameters is [{ Name: "Me" }, ..] ? parameters.RemoveAt(0) : parameters;
+        parameters = receiver is not null && parameters is [{ Name: "Me" }, ..] ? parameters.RemoveAt(0) : parameters;
         if (ProcedureInvoker is null || LetCoercionProvider is null || parameters.IsEmpty)
         {
             // static semantics rejects a Property Let or Set with no value parameter (VBC09321).
@@ -1015,7 +1015,7 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             coerced = letResult.Result!;
         }
 
-        IRuntimeValue[] callArguments = [receiver, .. arguments, coerced.RuntimeValue];
+        IRuntimeValue[] callArguments = receiver is null ? [.. arguments, coerced.RuntimeValue] : [receiver, .. arguments, coerced.RuntimeValue];
         return Bindings is { } bindings
             ? bindings.ForMember(accessor).Call(session.Symbols.Resolver, callArguments)
             : ProcedureInvoker.Invoke(accessor, session.Symbols.Resolver, callArguments);
@@ -1485,11 +1485,11 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                     continue;
                 }
 
-                bound[i] = parameter.ResolvedType.DefaultValue.RuntimeValue;
+                bound[i] = RuntimeProcedureInvoker.OmittedArgumentValue(parameter).RuntimeValue;
                 continue;
             }
 
-            var aliased = RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || external && parameter.ResolvedType is VBStringType;
+            var aliased =RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || external && parameter.ResolvedType is VBStringType;
             if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, out var reference, external))
             {
                 bound[i] = reference;
@@ -1509,12 +1509,13 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
             // an object passed to a parameter declared as a class or as Object is Set-assigned to the parameter's new
             // local (MS-VBAL §5.3.1.11): the parameter holds the reference, and nothing asks the object for a value. So is
             // one passed to a Variant, which holds the object itself: "if the value type of the argument is a specific class
-            // or Nothing, its data value is Set-assigned" to the local - not what the object's default member returns.
+            // or Nothing, its data value is Set-assigned" to the local - not what the object's default member returns. That is
+            // the argument's value type, which is the object's class whether the object is held by an object variable or by a Variant.
             if (SetCoercion is { } setCoercion
-                && argumentResult.Value.Result is VBObjectValue
+                && HeldObject(argumentResult.Value.Result) is { } passedObject
                 && parameter.ResolvedType is VBClassType or VBObjectType or VBVariantType)
             {
-                var setResult = setCoercion.EvaluateSetCoercion(session, argumentNode, argumentResult.Value.Result!, parameter.ResolvedType);
+                var setResult = setCoercion.EvaluateSetCoercion(session, argumentNode, passedObject, parameter.ResolvedType);
                 if (!setResult.IsSuccess)
                 {
                     return RuntimeSemanticsEvaluationResult.Error(setResult.ErrorInfo!);
@@ -1622,6 +1623,14 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
     }
 
     private readonly record struct ArgumentMapResult(ExpressionNode?[]? Mapped, ImmutableArray<ExpressionNode> ParamArrayArguments, RuntimeSemanticsEvaluationResult? Error);
+
+    // the object a value is, or a Variant holds - however many Variants deep.
+    private static VBObjectValue? HeldObject(VBTypedValue? value) => value switch
+    {
+        VBObjectValue reference => reference,
+        VBVariantValue variant => HeldObject(variant.TypedValue),
+        _ => null,
+    };
 
     // MS-VBAL §5.3.1.11 argument mapping. A trailing ParamArray parameter collects every positional
     // argument from its own position onward instead of mapping 1:1 - never targetable by name, and
