@@ -21,6 +21,7 @@ using RDCore.SDK.Semantics.Builders;
 using RDCore.SDK.Semantics.Context;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Semantics.Plans;
 using RDCore.SDK.Services.VerboseMessages;
 using System.Numerics;
 
@@ -166,109 +167,30 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
         return base.ValidateOperand(resolver, expression, frame, index);
     }
 
+    /// <summary>
+    /// The operator: one of the <c>Tokens</c> relational operators, which is what its <see cref="OperationPlan"/> is made for.
+    /// </summary>
+    protected abstract string Operator { get; }
+
+    /// <remarks>
+    /// The effective type is the operation's plan (<see cref="OperationPlanner"/>), made once for each pair of value types and kept - but for the comparison of
+    /// two Variants that ranks a number below a <c>String</c>, which depends on more than their types (<see cref="RanksVariantNumberBelowString"/>).
+    /// </remarks>
     protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
         ISymbolResolver resolver,
         BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags> context,
         ExpressionNode expression,
         OperatorEvaluationFrame frame)
-    {
-        if (IsVariantStringNumericException(frame, out _))
-        {
-            return DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo);
-        }
+        => IsVariantStringNumericException(frame, out _)
+            ? DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo)
+            : PlannedEffectiveType(expression, frame);
 
-        var lhs = frame.Operands[(int)InputIndex.BinaryLeftOperand].GetTargetType();
-        var rhs = frame.Operands[(int)InputIndex.BinaryRightOperand].GetTargetType();
-        return lhs switch
-        {
-            VBByteType when rhs is VBByteType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBByteType.TypeInfo),
-            VBByteType or VBStringType or VBEmptyType when rhs is VBByteType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBByteType.TypeInfo),
-
-            VBBooleanType when rhs is VBBooleanType or VBStringType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBBooleanType.TypeInfo),
-            VBBooleanType or VBStringType when rhs is VBBooleanType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBBooleanType.TypeInfo),
-
-            VBIntegerType when rhs is VBByteType or VBBooleanType or VBIntegerType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-            VBByteType or VBBooleanType or VBIntegerType or VBStringType or VBEmptyType when rhs is VBIntegerType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-            VBBooleanType when rhs is VBByteType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-            VBByteType or VBEmptyType when rhs is VBBooleanType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-
-            VBByteType or VBBooleanType or VBIntegerType or VBStringType or VBEmptyType when rhs is VBIntegerType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-
-            VBBooleanType when rhs is VBByteType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-            VBByteType or VBEmptyType when rhs is VBBooleanType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-
-            VBEmptyType when rhs is VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-
-            VBLongType when rhs is VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBLongType.TypeInfo),
-            VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBStringType or VBEmptyType when rhs is VBLongType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBLongType.TypeInfo),
-
-            VBLongLongType when rhs is IIntegralNumericType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBLongLongType.TypeInfo),
-            IIntegralNumericType or VBStringType or VBEmptyType when rhs is VBLongLongType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBLongLongType.TypeInfo),
-
-            VBSingleType when rhs is VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBDoubleType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBSingleType.TypeInfo),
-            VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBDoubleType or VBStringType or VBEmptyType when rhs is VBSingleType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBSingleType.TypeInfo),
-
-            VBSingleType when rhs is VBLongType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDoubleType.TypeInfo),
-            VBLongType when rhs is VBSingleType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDoubleType.TypeInfo),
-            VBDoubleType when rhs is IIntegralNumericType or VBDoubleType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDoubleType.TypeInfo),
-            IIntegralNumericType or VBDoubleType or VBStringType or VBEmptyType when rhs is VBDoubleType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDoubleType.TypeInfo),
-
-            VBStringType when rhs is VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBStringType.TypeInfo),
-            VBStringType or VBEmptyType when rhs is VBStringType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBStringType.TypeInfo),
-
-            VBCurrencyType when rhs is IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBCurrencyType.TypeInfo),
-            IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType when rhs is VBCurrencyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBCurrencyType.TypeInfo),
-
-            VBDateType when rhs is IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDateType.TypeInfo),
-
-            IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType when rhs is VBDateType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDateType.TypeInfo),
-
-            VBDecimalType when rhs is INumericType or VBStringType or VBDateType or VBEmptyType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDecimalType.TypeInfo),
-            INumericType or VBStringType or VBDateType or VBEmptyType when rhs is VBDecimalType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBDecimalType.TypeInfo),
-
-            VBNullType when rhs is INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBNullType.TypeInfo),
-            INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType when rhs is VBNullType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBNullType.TypeInfo),
-
-            VBErrorType when rhs is VBErrorType 
-                => DetermineOperatorEffectiveTypeResult.Success(VBErrorType.TypeInfo),
-
-            // MS-VBAL 5.6.9.5: no effective type is defined for any other pair of operands - a type mismatch.
-            _ => DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
-                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", [lhs.Name, rhs.Name]))))
-        };
-    }
+    /// <summary>
+    /// The effective type the plan of the operation says, for the value types of its operands.
+    /// </summary>
+    protected DetermineOperatorEffectiveTypeResult PlannedEffectiveType(ExpressionNode expression, OperatorEvaluationFrame frame)
+        => EffectiveTypeOf(OperationPlanner.ForValues(
+            Operator, frame[InputIndex.BinaryLeftOperand].GetTargetType(), frame[InputIndex.BinaryRightOperand].GetTargetType()), expression);
 
     protected override RuntimeSemanticsEvaluationResult EvaluateBinaryOperatorExpressionResult(
         ISymbolResolver resolver,

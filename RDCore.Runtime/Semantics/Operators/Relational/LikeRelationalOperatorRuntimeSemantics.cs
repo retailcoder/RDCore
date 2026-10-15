@@ -1,6 +1,7 @@
 using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Types;
@@ -26,26 +27,14 @@ public sealed record class LikeRelationalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryRelationalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
+    /// <remarks>
+    /// MS-VBAL 5.6.9.6: if either operand's value is Null, the result is Null; otherwise both operands are Let-coerced to String regardless of their own value
+    /// type — unlike the other relational operators, Like has no table of numeric and date effective types (<see cref="RDCore.SDK.Semantics.Plans.OperationPlanner"/>).
+    /// </remarks>
+    protected override string Operator => Tokens.CompareLikeOp;
+
     // MS-VBAL 5.6.9.6: Like let-coerces both operands to String, whatever a Variant holds.
     protected override bool RanksVariantNumberBelowString => false;
-
-    /// <summary>
-    /// MS-VBAL 5.6.9.6: if either operand's value is Null, the result is Null; otherwise both
-    /// operands are Let-coerced to String regardless of their own value type — unlike the other
-    /// relational operators, Like never resolves an effective type off the base numeric/date table.
-    /// </summary>
-    protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
-        ISymbolResolver resolver,
-        BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags> context,
-        ExpressionNode expression,
-        OperatorEvaluationFrame frame)
-    {
-        var lhs = frame.Operands[(int)InputIndex.BinaryLeftOperand].GetTargetType();
-        var rhs = frame.Operands[(int)InputIndex.BinaryRightOperand].GetTargetType();
-
-        return DetermineOperatorEffectiveTypeResult.Success(
-            lhs is VBNullType || rhs is VBNullType ? VBNullType.TypeInfo : VBStringType.TypeInfo);
-    }
 
     protected override RuntimeSemanticsEvaluationResult EvaluateBinaryOperatorExpressionResult(
         ISymbolResolver resolver,

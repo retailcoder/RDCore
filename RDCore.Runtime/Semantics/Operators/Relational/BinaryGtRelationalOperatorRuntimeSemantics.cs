@@ -1,4 +1,5 @@
 ﻿using RDCore.Runtime.Semantics.LetCoercion;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Services.VerboseMessages;
@@ -13,6 +14,8 @@ public sealed record class BinaryGtRelationalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryRelationalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
+    protected override string Operator => Tokens.CompareGreaterThanOp;
+
     protected override bool ComparisonOp(VBStringValue lhs, VBStringValue rhs, StringComparisonRules rules) => rules.Compare(lhs, rhs) > 0;
     protected override bool ComparisonOp<T>(T lhs, T rhs) => lhs > rhs;
 }

@@ -1,9 +1,8 @@
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.LetCoercion;
-using RDCore.SDK;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
-using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
@@ -20,6 +19,7 @@ using RDCore.SDK.Semantics.Context;
 using RDCore.SDK.Semantics.Context.Abstract;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Semantics.Plans;
 using RDCore.SDK.Services.VerboseMessages;
 
 namespace RDCore.Runtime.Semantics.Operators;
@@ -85,42 +85,20 @@ public record class BinaryConcatOperatorRuntimeSemantics(
         });
     }
 
+    /// <remarks>
+    /// The effective type is the operation's plan (<see cref="OperationPlanner"/>), made once for each pair of value types and kept.
+    /// </remarks>
     protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
         ISymbolResolver resolver,
         ConcatOperationSemanticContext context,
         ExpressionNode expression,
         OperatorEvaluationFrame frame)
-    {
-        var lhsOperand = frame[InputIndex.BinaryLeftOperand];
-        var rhsOperand = frame[InputIndex.BinaryRightOperand];
-        var lhs = lhsOperand.TypeInfo;
-        var rhs = rhsOperand.TypeInfo;
-        return lhs switch
-        {
-            // 🎯 the specification's table has no Boolean row, which would make `"Done: " & True` a type mismatch; MS-VBA concatenates
-            // it as "Done: True", the Boolean Let-coerced to a String like the rest (MS-VBAL 5.5.1.2.4).
-            VBNumericType or VBBooleanType or VBStringType or VBDateType or VBNullType or VBEmptyType
-                when rhs is VBNumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType
-                    => DetermineOperatorEffectiveTypeResult.Success(VBStringType.TypeInfo),
+        => EffectiveTypeOf(OperationPlanner.ForValues(
+            Tokens.ConcatOp, ValueTypeOf(frame[InputIndex.BinaryLeftOperand]), ValueTypeOf(frame[InputIndex.BinaryRightOperand])), expression);
 
-            VBNumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType
-                when rhs is VBNumericType or VBBooleanType or VBStringType or VBDateType or VBNullType or VBEmptyType
-                    => DetermineOperatorEffectiveTypeResult.Success(VBStringType.TypeInfo),
-
-            // A Byte() array's own TypeInfo always collapses to the generic VBArrayType (VBArrayValue's
-            // base constructor tags every array with it, regardless of ItemType), so the pair can't be
-            // recognized through lhs/rhs above - it's checked against the actual operand values instead.
-            _ when IsByteArray(lhsOperand) && IsByteArray(rhsOperand)
-                => DetermineOperatorEffectiveTypeResult.Success(VBStringType.TypeInfo),
-
-            VBNullType
-                when rhs is VBNullType
-                    => DetermineOperatorEffectiveTypeResult.Success(VBNullType.TypeInfo),
-
-            _ => DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
-                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", [lhs.Name, rhs.Name]))))
-        };
-    }
+    // a Byte() array's own TypeInfo always collapses to the generic VBArrayType (VBArrayValue's base constructor tags every array with it, regardless of
+    // ItemType): the type of its value is told by its elements.
+    private static VBType ValueTypeOf(VBTypedValue operand) => IsByteArray(operand) ? VBResizableByteArrayType.TypeInfo : operand.TypeInfo;
 
     // a Variant holding a Byte array reports its own TypeInfo as the array's, but stays a VBVariantValue
     // instance - unwrap it (recursively) the same way every other Variant-holding-a-complex-value site does.

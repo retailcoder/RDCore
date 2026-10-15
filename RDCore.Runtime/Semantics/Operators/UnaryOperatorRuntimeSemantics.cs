@@ -1,10 +1,8 @@
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.Abstract;
 using RDCore.Runtime.Semantics.LetCoercion;
-using RDCore.SDK;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
-using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -56,47 +54,14 @@ where TFlags : struct, Enum
         TContext context, 
         ExpressionNode expression, 
         OperatorEvaluationFrame frame)
-    {
-        var result = DetermineOperatorEffectiveType(resolver, expression, frame);
-        if (result.IsApplicable)
-        {
-            // a more specialized implementation is in charge.
-            return result;
-        }
-
-        // the base rules are the verbatim specifications for
-        // unary arithmetic operators (5.6.9.3.1 runtime semantics):
-        var effectiveType = frame[InputIndex.UnaryOperand].TypeInfo switch
-        {
-            VBByteType => VBByteType.TypeInfo,
-            VBBooleanType or VBIntegerType or VBEmptyType => VBIntegerType.TypeInfo,
-            VBLongType => VBLongType.TypeInfo,
-            VBLongLongType => VBLongLongType.TypeInfo,
-            VBSingleType => VBSingleType.TypeInfo,
-            VBDoubleType or VBStringType => VBDoubleType.TypeInfo,
-            VBCurrencyType => VBCurrencyType.TypeInfo,
-            VBDateType => VBDateType.TypeInfo, // NOTE: operand is then let-coerced to VBDoubleType at validation, for evaluation semantics
-            VBDecimalType => VBDecimalType.TypeInfo,
-
-            VBNullType => VBNullType.TypeInfo,
-
-            _ => VBUnknownType.TypeInfo
-        };
-
-        return effectiveType is not VBUnknownType
-            ? DetermineOperatorEffectiveTypeResult.Success(effectiveType)
-            // if no effective type can be determined, it's a type mismatch error:
-            : DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
-                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", frame[InputIndex.UnaryOperand].TypeInfo.Name)));
-    }
+        => DetermineOperatorEffectiveType(resolver, expression, frame);
 
     /// <summary>
-    /// MS-VBAL 5.6.9.3 Arithmetic Operators (runtime semantics) 
-    /// The operator has the declared type returned by this method, based on the declared type of its operands.
+    /// The effective type of the operation, based on the type of its operand.
     /// </summary>
     /// <remarks>
-    /// ⚠️ <strong>Must</strong> return <c>DetermineOperatorEffectiveTypeResult.NotApplicable()</c> in a fallback case,
-    /// to allow the base logic to resolve an <em>effective type</em> when the more specialized logic does not yield a data type.
+    /// 👉 The answer is the whole answer, a type mismatch included: an operator that has a table of effective types has it in the
+    /// <see cref="RDCore.SDK.Semantics.Plans.OperationPlanner"/>, and there is no other table to fall back on.
     /// </remarks>
     /// <param name="resolver">The execution context and memory space to operate in. ⚠️ in most situations this access is restrained to <c>ISymbolResolver</c>.</param>
     /// <param name="expression">The <c>VBUnaryOperatorExpression</c> to be evaluated.</param>

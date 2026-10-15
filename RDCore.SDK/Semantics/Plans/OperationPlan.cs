@@ -1,3 +1,4 @@
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 
@@ -34,10 +35,12 @@ public sealed record class OperationPlan(string Operator, IReadOnlyList<VBType> 
     /// <summary>
     /// What a non-<c>Null</c> operand is let-coerced to before the operation is evaluated: the effective type, except that a <c>Date</c> operation is evaluated in
     /// <c>Double</c> (<strong>MS-VBAL §5.6.9.3</strong>). <see langword="null"/> when nothing is coerced - a <c>Null</c> effective type, whose result is
-    /// <c>Null</c> whatever the other operand is, and a plan with no effective type.
+    /// <c>Null</c> whatever the other operand is, a plan with no effective type, and <c>Is</c>, which compares two object references as they are
+    /// (<strong>§5.6.9.7</strong>).
     /// </summary>
     public VBType? OperandDestination => EffectiveType switch
     {
+        _ when Operator == Tokens.CompareIsOp => null,
         VBDateType => VBDoubleType.TypeInfo,
         VBNullType or null => null,
         var effective => effective,

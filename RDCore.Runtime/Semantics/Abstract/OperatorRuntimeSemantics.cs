@@ -22,6 +22,7 @@ using RDCore.SDK.Semantics.Context;
 using RDCore.SDK.Semantics.Context.Abstract;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Semantics.Plans;
 using RDCore.SDK.Services.VerboseMessages;
 using System.Diagnostics;
 
@@ -182,6 +183,17 @@ where TFlags : struct, Enum
         TContext context, 
         ExpressionNode expression,
         OperatorEvaluationFrame frame);
+
+    /// <summary>
+    /// The effective type of an operation, as its <see cref="OperationPlan"/> says: run-time error 13 (<em>Type mismatch</em>) when the plan has none.
+    /// </summary>
+    /// <param name="plan">The plan of the operation, made for the value types of its operands (<see cref="OperationPlanner"/>).</param>
+    /// <param name="expression">The operator expression being evaluated, which the error is raised at.</param>
+    protected static DetermineOperatorEffectiveTypeResult EffectiveTypeOf(OperationPlan plan, ExpressionNode expression)
+        => plan.EffectiveType is { } effectiveType
+            ? DetermineOperatorEffectiveTypeResult.Success(effectiveType)
+            : DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
+                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", plan.Operands.Select(operand => operand.Name)))));
 
     /// <summary>
     /// Evaluates the specified <c>expression</c> in the specified execution context, using the specified operands.

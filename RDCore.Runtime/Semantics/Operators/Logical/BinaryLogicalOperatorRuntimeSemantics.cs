@@ -1,10 +1,8 @@
 ﻿using RDCore.Runtime.Execution.Frames;
-using RDCore.SDK;
 using RDCore.SDK.Model.Values.Meta;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
-using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
@@ -21,6 +19,7 @@ using RDCore.SDK.Semantics.Context;
 using RDCore.SDK.Semantics.Context.Abstract;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Semantics.Plans;
 using RDCore.SDK.Services.VerboseMessages;
 using System.Numerics;
 
@@ -105,57 +104,22 @@ public abstract record class BinaryLogicalOperatorRuntimeSemantics(
         StringComparisonRules comparison, bool isValueKnown, VBErrorInfo? error)
         => new LogicalOperatorFact(expression.Identity, expression.Location, token, effectiveType, isValueKnown, error, flags);
 
-    protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
+    /// <summary>
+    /// The operator: one of the <c>Tokens</c> logical operators, which is what its <see cref="OperationPlan"/> is made for.
+    /// </summary>
+    protected abstract string Operator { get; }
+
+    /// <remarks>
+    /// The effective type is the operation's plan (<see cref="OperationPlanner"/>), made once for each pair of value types and kept. A Boolean operation is
+    /// evaluated over the -1/0 of its operands, which are let-coerced to Boolean.
+    /// </remarks>
+    protected sealed override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
         ISymbolResolver resolver,
         BinaryLogicalOperatorSemanticContext context,
         ExpressionNode expression,
         OperatorEvaluationFrame frame)
-    {
-        var lhs = frame[InputIndex.BinaryLeftOperand].GetTargetType();
-        var rhs = frame[InputIndex.BinaryRightOperand].GetTargetType();
-
-        // MS-VBAL 5.6.9.8: logical operators are first resolved as simple data operators; a dedicated
-        // table applies when either operand is Null. The effective value type is always Byte, Boolean,
-        // Integer, Long, LongLong, Variant or Null — floating-/fixed-point and Date operands resolve
-        // to Long (or LongLong), never to their own type.
-        var effectiveType = (lhs, rhs) switch
-        {
-            (VBByteType, VBByteType or VBNullType) or (VBNullType, VBByteType)
-                => VBByteType.TypeInfo,
-
-            // Boolean stays Boolean; operands are let-coerced to Integer for the bitwise step.
-            (VBBooleanType, VBBooleanType or VBNullType) or (VBNullType, VBBooleanType)
-                => VBBooleanType.TypeInfo,
-
-            (VBByteType or VBBooleanType or VBIntegerType or VBEmptyType or VBNullType,
-                VBByteType or VBBooleanType or VBIntegerType or VBEmptyType)
-                or (VBByteType or VBBooleanType or VBIntegerType or VBEmptyType,
-                    VBByteType or VBBooleanType or VBIntegerType or VBEmptyType or VBNullType)
-                => VBIntegerType.TypeInfo,
-
-            (VBLongLongType, INumericType or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType)
-                or (INumericType or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType, VBLongLongType)
-                => VBLongLongType.TypeInfo,
-
-            (IFloatingPointNumericType or IFixedPointNumericType or VBLongType or VBStringType or VBFixedStringType or VBDateType,
-                (INumericType and not VBLongLongType) or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType)
-                or ((INumericType and not VBLongLongType) or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType,
-                    IFloatingPointNumericType or IFixedPointNumericType or VBLongType or VBStringType or VBFixedStringType or VBDateType)
-                => VBLongType.TypeInfo,
-
-            (VBNullType, VBNullType) => VBNullType.TypeInfo,
-
-            (VBVariantType, not (VBArrayType or VBUserDefinedType)) or (not (VBArrayType or VBUserDefinedType), VBVariantType)
-                => VBVariantType.TypeInfo,
-
-            _ => (VBType?)null,
-        };
-
-        return effectiveType is not null
-            ? DetermineOperatorEffectiveTypeResult.Success(effectiveType)
-            : DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
-                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", [lhs.Name, rhs.Name]))));
-    }
+        => EffectiveTypeOf(OperationPlanner.ForValues(
+            Operator, frame[InputIndex.BinaryLeftOperand].GetTargetType(), frame[InputIndex.BinaryRightOperand].GetTargetType()), expression);
 
     protected override RuntimeSemanticsEvaluationResult EvaluateBinaryOperatorExpressionResult(
         ISymbolResolver resolver,

@@ -2,6 +2,7 @@
 using RDCore.SDK.Model.Values.Runtime;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types;
@@ -28,14 +29,17 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryRelationalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
+    protected override string Operator => Tokens.CompareIsOp;
+
     protected override bool ComparisonOp(VBStringValue lhs, VBStringValue rhs, StringComparisonRules rules) => throw new NotSupportedException();
     protected override bool ComparisonOp<T>(T lhs, T rhs) => throw new NotSupportedException();
 
+    // two object references are compared as they are, whatever a Variant holds: the plan of the operation is the whole answer.
     protected override DetermineOperatorEffectiveTypeResult DetermineBinaryOperatorEffectiveType(
         ISymbolResolver resolver,
         BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags> context,
         ExpressionNode expression,
-        OperatorEvaluationFrame frame) => DetermineOperatorEffectiveTypeResult.Success(VBBooleanType.TypeInfo);
+        OperatorEvaluationFrame frame) => PlannedEffectiveType(expression, frame);
 
     // the operands are object references compared as they are (MS-VBAL 5.6.9.7): the Boolean effective type of the result is
     // not a type to let-coerce them to - which would coerce an object to a Boolean, and fail.

@@ -1,5 +1,6 @@
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.LetCoercion;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types.Abstract;
@@ -23,6 +24,8 @@ public record class BinaryOrLogicalOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService)
     : BinaryLogicalOperatorRuntimeSemantics(LetCoercionSemanticsProvider, FormatterService)
 {
+    protected override string Operator => Tokens.LogicalOrOp;
+
     protected override T EvaluateBitwiseOp<T>(T lhs, T rhs) => lhs | rhs;
 
     protected override RuntimeSemanticsEvaluationResult EvaluateSemanticallly(

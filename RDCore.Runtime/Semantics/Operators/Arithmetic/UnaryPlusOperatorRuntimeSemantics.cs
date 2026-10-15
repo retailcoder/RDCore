@@ -1,5 +1,6 @@
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.LetCoercion;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types;
@@ -27,21 +28,13 @@ public sealed record class UnaryPlusOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService) 
     : UnaryArithmeticOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
+    /// <remarks>
+    /// The <em>effective type</em> runtime semantics of the unary '+' operator are inferred to match those of MS-VBAL 5.6.9.3.1: the planner has the same
+    /// table for both.
+    /// </remarks>
+    protected override string Operator => Tokens.AdditionOp;
+
     protected override T EvaluateNumericOp<T>(T operand) => +operand;
-
-    /// <summary>
-    /// Explicitly defines the <em>effective type</em> runtime semantics of the unary '+' operator, 
-    /// here inferred to match those of MS-VBAL 5.6.9.3.1 runtime semantics.
-    /// </summary>
-    protected override DetermineOperatorEffectiveTypeResult DetermineOperatorEffectiveType(
-        ISymbolResolver resolver,
-        ExpressionNode expression,
-        OperatorEvaluationFrame frame) => frame[InputIndex.UnaryOperand].TypeInfo switch
-        {
-            VBByteType => DetermineOperatorEffectiveTypeResult.Success(VBIntegerType.TypeInfo),
-
-            _ => DetermineOperatorEffectiveTypeResult.NotApplicable()
-        };
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(
         ISymbolResolver resolver,

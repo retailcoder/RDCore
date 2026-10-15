@@ -1,5 +1,6 @@
 ﻿using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.LetCoercion;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Types;
@@ -24,6 +25,8 @@ public record class UnaryNotOperatorRuntimeSemantics(
     IVerboseMessageBuilder FormatterService) 
     : UnaryLogicalOperatorRuntimeSemantics(LetCoercionProvider, FormatterService)
 {
+    protected override string Operator => Tokens.LogicalNotOp;
+
     protected override T EvaluateBitwiseOp<T>(T operand) => ~operand;
 
     protected override RuntimeSemanticsEvaluationResult EvaluateExpressionResult(ISymbolResolver resolver,

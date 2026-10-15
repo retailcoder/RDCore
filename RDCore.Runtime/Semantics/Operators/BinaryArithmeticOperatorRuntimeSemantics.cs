@@ -113,17 +113,7 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
         BinaryArithmeticOperatorSemanticContext context, 
         ExpressionNode expression,
         OperatorEvaluationFrame frame)
-    {
-        var leftType = frame[InputIndex.BinaryLeftOperand].TypeInfo;
-        var rightType = frame[InputIndex.BinaryRightOperand].TypeInfo;
-        var plan = OperationPlanner.ForValues(Operator, leftType, rightType);
-
-        return plan.EffectiveType is { } effectiveType
-            ? DetermineOperatorEffectiveTypeResult.Success(effectiveType)
-            // if no effective type can be determined, it's a type mismatch error:
-            : DetermineOperatorEffectiveTypeResult.Error(OnRuntimeError(VBRuntimeErrorId.TypeMismatch, expression,
-                Exceptions.VBRuntimeTypeMismatch_OperationEffectiveType_Verbose.Replace("{$OPERANDS}", string.Join(", ", [leftType.Name, rightType.Name]))));
-    }
+        => EffectiveTypeOf(OperationPlanner.ForValues(Operator, frame[InputIndex.BinaryLeftOperand].TypeInfo, frame[InputIndex.BinaryRightOperand].TypeInfo), expression);
 
     // MS-VBAL 5.6.9.3: "If the value type of any operand is an array, UDT or Error, runtime error 13 (Type mismatch) is raised."
     protected override LetCoercionResult ValidateOperand(ISymbolResolver resolver, ExpressionNode expression, OperatorEvaluationFrame frame, InputIndex index)

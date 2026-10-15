@@ -1,12 +1,14 @@
 using RDCore.SDK.Model;
+using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Semantics.Plans;
 
 namespace RDCore.Tests.Semantics;
 
 /// <summary>
 /// The plan of an operation (IR lowering §3.2): decided from the types of the operands alone, once, by the one table the binder and the interpreter both consult.
-/// What each arithmetic operation yields is pinned by <c>ArithmeticOperatorsGoldenMasterTests</c>; this is what a plan is.
+/// What each operation yields is pinned by <c>ArithmeticOperatorsGoldenMasterTests</c> and <c>OtherOperatorsGoldenMasterTests</c>; this is what a plan is.
 /// </summary>
 [TestClass]
 public sealed class OperationPlannerTests
@@ -102,10 +104,135 @@ public sealed class OperationPlannerTests
     }
 
     [TestMethod]
-    public void AnOperatorThatIsNotPlannedYet_IsAMistakeToAskFor()
+    public void EveryOperator_IsPlanned()
     {
-        Assert.ThrowsExactly<NotSupportedException>(() => OperationPlanner.ForValues(Tokens.ConcatOp, VBStringType.TypeInfo, VBStringType.TypeInfo));
-        Assert.ThrowsExactly<NotSupportedException>(() => OperationPlanner.ForValue(Tokens.LogicalNotOp, VBBooleanType.TypeInfo));
+        string[] binary =
+        [
+            Tokens.AdditionOp, Tokens.SubtractionOp, Tokens.MultiplicationOp, Tokens.DivisionOp, Tokens.IntegerDivisionOp, Tokens.ModuloOp, Tokens.PowerOp,
+            Tokens.ConcatOp, Tokens.CompareEqualOp, Tokens.CompareNotEqualOp, Tokens.CompareLessThanOp, Tokens.CompareLessThanOrEqualOp,
+            Tokens.CompareGreaterThanOp, Tokens.CompareGreaterThanOrEqualOp, Tokens.CompareLikeOp, Tokens.CompareIsOp,
+            Tokens.LogicalAndOp, Tokens.LogicalOrOp, Tokens.LogicalXOrOp, Tokens.LogicalEqvOp, Tokens.LogicalImpOp,
+        ];
+        foreach (var token in binary)
+        {
+            Assert.IsNotNull(OperationPlanner.ForValues(token, VBLongType.TypeInfo, VBLongType.TypeInfo).EffectiveType, token);
+        }
+
+        foreach (var token in new[] { Tokens.NegationOp, Tokens.AdditionOp, Tokens.LogicalNotOp })
+        {
+            Assert.IsNotNull(OperationPlanner.ForValue(token, VBLongType.TypeInfo).EffectiveType, token);
+        }
+    }
+
+    [TestMethod]
+    public void AConversion_HasNoPlan_AndIsAMistakeToAskFor()
+    {
+        // a let-assignment and a pair of parentheses evaluate as operators, and are conversions: there is no table of effective types for either.
+        Assert.ThrowsExactly<NotSupportedException>(() => OperationPlanner.ForValues(OperatorSymbolNames.BinaryAssignmentValueOp, VBLongType.TypeInfo, VBLongType.TypeInfo));
+        Assert.ThrowsExactly<NotSupportedException>(() => OperationPlanner.ForValue(OperatorSymbolNames.UnaryLetCoerceOp, VBLongType.TypeInfo));
+    }
+
+    [TestMethod]
+    public void TheRelationalOperators_ShareATable()
+    {
+        foreach (var token in new[] { Tokens.CompareNotEqualOp, Tokens.CompareLessThanOp, Tokens.CompareLessThanOrEqualOp, Tokens.CompareGreaterThanOp, Tokens.CompareGreaterThanOrEqualOp })
+        {
+            foreach (var (left, right) in new (VBType, VBType)[]
+                {
+                    (VBIntegerType.TypeInfo, VBStringType.TypeInfo), (VBLongType.TypeInfo, VBSingleType.TypeInfo), (VBDateType.TypeInfo, VBStringType.TypeInfo),
+                    (VBNullType.TypeInfo, VBLongType.TypeInfo), (VBErrorType.TypeInfo, VBLongType.TypeInfo),
+                })
+            {
+                Assert.AreEqual(
+                    OperationPlanner.ForValues(Tokens.CompareEqualOp, left, right).EffectiveType,
+                    OperationPlanner.ForValues(token, left, right).EffectiveType, $"{left.Name} {token} {right.Name}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void AComparison_HasItsOwnTable_AndComparesDatesAsDoubles()
+    {
+        // a Boolean is compared to a String as a Boolean, a Long to a Single as a Double, two Errors by their values; a Date comparison compares Doubles.
+        Assert.AreEqual(VBBooleanType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareEqualOp, VBBooleanType.TypeInfo, VBStringType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareLessThanOp, VBLongType.TypeInfo, VBSingleType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBErrorType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareEqualOp, VBErrorType.TypeInfo, VBErrorType.TypeInfo).EffectiveType);
+
+        var date = OperationPlanner.ForValues(Tokens.CompareGreaterThanOp, VBDateType.TypeInfo, VBStringType.TypeInfo);
+        Assert.AreEqual(VBDateType.TypeInfo, date.EffectiveType);
+        Assert.AreEqual(VBDoubleType.TypeInfo, date.OperandDestination);
+    }
+
+    [TestMethod]
+    public void Like_MatchesAnythingButNull_AsStrings()
+    {
+        Assert.AreEqual(VBStringType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareLikeOp, VBLongType.TypeInfo, VBDateType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBNullType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareLikeOp, VBStringType.TypeInfo, VBNullType.TypeInfo).EffectiveType);
+    }
+
+    [TestMethod]
+    public void Is_ComparesObjectReferences_AsTheyAre()
+    {
+        var plan = OperationPlanner.ForValues(Tokens.CompareIsOp, VBObjectType.TypeInfo, VBLongType.TypeInfo);
+        Assert.AreEqual(VBBooleanType.TypeInfo, plan.EffectiveType, "an operand that is not an object is the evaluation's error, not the plan's");
+        Assert.IsNull(plan.OperandDestination, "nothing is let-coerced to the Boolean the comparison yields");
+    }
+
+    [TestMethod]
+    public void AConcatenation_IsAString_OfAnythingThatConvertsToOne()
+    {
+        Assert.AreEqual(VBStringType.TypeInfo, OperationPlanner.ForValues(Tokens.ConcatOp, VBBooleanType.TypeInfo, VBDateType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBStringType.TypeInfo, OperationPlanner.ForValues(Tokens.ConcatOp, VBNullType.TypeInfo, VBLongType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBNullType.TypeInfo, OperationPlanner.ForValues(Tokens.ConcatOp, VBNullType.TypeInfo, VBNullType.TypeInfo).EffectiveType);
+        Assert.IsTrue(OperationPlanner.ForValues(Tokens.ConcatOp, VBObjectType.TypeInfo, VBStringType.TypeInfo).IsTypeMismatch);
+    }
+
+    [TestMethod]
+    public void TwoByteArrays_AreConcatenated_AsTheStringsTheyAreTheDataOf()
+    {
+        Assert.AreEqual(VBStringType.TypeInfo, OperationPlanner.ForValues(Tokens.ConcatOp, VBResizableByteArrayType.TypeInfo, VBResizableByteArrayType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBStringType.TypeInfo,
+            OperationPlanner.ForDeclared(Tokens.ConcatOp, new VBFixedSizeArrayType(VBByteType.TypeInfo), new VBResizableArrayType(VBByteType.TypeInfo)).EffectiveType,
+            "a fixed-size Byte array is the data of a String as well");
+
+        var longs = new VBResizableArrayType(VBLongType.TypeInfo);
+        Assert.IsTrue(OperationPlanner.ForValues(Tokens.ConcatOp, longs, longs).IsTypeMismatch);
+    }
+
+    [TestMethod]
+    public void ALogicalOperation_IsIntegral_OrBoolean()
+    {
+        // a Boolean operation is a Boolean; a floating-point, fixed-point, string or date operand is a Long, unless the other is a LongLong.
+        Assert.AreEqual(VBBooleanType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalAndOp, VBBooleanType.TypeInfo, VBBooleanType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBIntegerType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalOrOp, VBBooleanType.TypeInfo, VBByteType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalXOrOp, VBDoubleType.TypeInfo, VBIntegerType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongLongType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalEqvOp, VBStringType.TypeInfo, VBLongLongType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBByteType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalImpOp, VBByteType.TypeInfo, VBNullType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBNullType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalAndOp, VBNullType.TypeInfo, VBNullType.TypeInfo).EffectiveType);
+        Assert.IsTrue(OperationPlanner.ForValues(Tokens.LogicalAndOp, VBErrorType.TypeInfo, VBLongType.TypeInfo).IsTypeMismatch);
+    }
+
+    [TestMethod]
+    public void Not_NegatesTheBitsOfAnIntegralValue_InItsOwnType()
+    {
+        // unlike the negation of a Byte, which is an Integer, the bits of a Byte are negated in a Byte; anything that is not integral is a Long.
+        Assert.AreEqual(VBByteType.TypeInfo, OperationPlanner.ForValue(Tokens.LogicalNotOp, VBByteType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongLongType.TypeInfo, OperationPlanner.ForValue(Tokens.LogicalNotOp, VBLongLongType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongType.TypeInfo, OperationPlanner.ForValue(Tokens.LogicalNotOp, VBCurrencyType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongType.TypeInfo, OperationPlanner.ForValue(Tokens.LogicalNotOp, VBDateType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBNullType.TypeInfo, OperationPlanner.ForValue(Tokens.LogicalNotOp, VBNullType.TypeInfo).EffectiveType);
+        Assert.IsTrue(OperationPlanner.ForValue(Tokens.LogicalNotOp, VBErrorType.TypeInfo).IsTypeMismatch);
+    }
+
+    [TestMethod]
+    public void UnaryPlus_HasTheTableOfTheNegation()
+    {
+        foreach (var operand in new VBType[] { VBByteType.TypeInfo, VBBooleanType.TypeInfo, VBStringType.TypeInfo, VBDateType.TypeInfo, VBNullType.TypeInfo, VBErrorType.TypeInfo })
+        {
+            Assert.AreEqual(
+                OperationPlanner.ForValue(Tokens.NegationOp, operand).EffectiveType,
+                OperationPlanner.ForValue(Tokens.AdditionOp, operand).EffectiveType, operand.Name);
+        }
     }
 
     [TestMethod]
