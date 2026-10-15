@@ -91,4 +91,14 @@ public sealed class UnaryArithmeticOperatorRuntimeTests : OperatorArithmeticRunt
         Assert.IsNull(result.ErrorInfo);
         Assert.IsInstanceOfType<VBNullValue>(result.Result);
     }
+
+    [TestMethod]
+    [TestCategory("RD-VBAL 5.6.9.3.1.1 Unary '+' Operator")]
+    public void Plus_VariantHoldingNull_IsNull()
+    {
+        // a Variant holding Null used to reach the Null effective type and fall out of it as an internal error.
+        var result = Evaluate(Plus(), new VBVariantValue(VBNullValue.Null));
+        Assert.IsNull(result.ErrorInfo);
+        Assert.IsInstanceOfType<VBNullValue>(result.Result);
+    }
 }

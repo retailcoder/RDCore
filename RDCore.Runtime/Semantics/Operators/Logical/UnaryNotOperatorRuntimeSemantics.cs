@@ -38,8 +38,8 @@ public record class UnaryNotOperatorRuntimeSemantics(
             VBNumericType numericEffectiveType when frame.EffectiveType is IIntegralNumericType && frame[InputIndex.UnaryOperand] is VBNumericTypedValue numericOperand 
                 => RuntimeSemanticsEvaluationResult.Success(EvaluateRuntimeSemantics(numericEffectiveType, numericOperand)),
 
-            VBNullType nullEffectiveType when frame[InputIndex.UnaryOperand] is VBNullValue nullOperand 
-                => RuntimeSemanticsEvaluationResult.Success(EvaluateRuntimeSemantics(nullEffectiveType, nullOperand)),
+            // a Null effective type is Null whatever holds it: a Variant holding Null is no different from Null (MS-VBAL 5.6.9.8.1).
+            VBNullType nullEffectiveType => RuntimeSemanticsEvaluationResult.Success(nullEffectiveType.DefaultValue),
 
             _ => RuntimeSemanticsEvaluationResult.InternalError(),
         };

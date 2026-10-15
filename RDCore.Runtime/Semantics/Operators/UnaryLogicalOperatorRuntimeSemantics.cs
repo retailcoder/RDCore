@@ -96,7 +96,4 @@ public abstract record class UnaryLogicalOperatorRuntimeSemantics(
     /// <returns><c>null</c> if no return value can be evaluated, which would throw a <em>type mismatch</em> error.</returns>
     protected virtual VBTypedValue EvaluateRuntimeSemantics(VBDateType effectiveType, VBNumericTypedValue operand) =>
         new VBDateValue(EvaluateBitwiseOp((int)operand.AsDouble));
-
-    protected virtual VBTypedValue EvaluateRuntimeSemantics(VBNullType effectiveType, VBNullValue operand) =>
-        effectiveType.DefaultValue;
 }

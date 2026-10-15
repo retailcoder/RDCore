@@ -48,6 +48,16 @@ public sealed class UnaryLogicalOperatorRuntimeTests : OperatorLogicalRuntimeSem
         Assert.IsInstanceOfType<VBNullValue>(result.Result);
     }
 
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.8.1 'Not' Operator")]
+    public void Not_VariantHoldingNull_IsNull()
+    {
+        // a Variant holding Null used to reach the Null effective type and fall out of it as an internal error.
+        var result = Evaluate(Not(), new VBVariantValue(VBNullValue.Null));
+        Assert.IsNull(result.ErrorInfo);
+        Assert.IsInstanceOfType<VBNullValue>(result.Result);
+    }
+
     public static IEnumerable<object[]> NonIntegralOperands()
     {
         // 2.5 rounds to 2 (banker's rounding), and Not 2 is -3.

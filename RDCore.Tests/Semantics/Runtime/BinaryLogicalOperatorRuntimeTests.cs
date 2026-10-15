@@ -226,6 +226,20 @@ public sealed class BinaryLogicalOperatorRuntimeTests : OperatorLogicalRuntimeSe
         // the bits of Not 7 in a Byte are 248, never the -8 of a wider integer.
         => AssertResult<VBByteValue>(Evaluate(Imp(), new VBByteValue(operand), VBNullValue.Null), expected);
 
+    [TestMethod]
+    [TestCategory("MS-VBAL 5.6.9.8 Logical Operators")]
+    public void EachOperator_OfAVariantHoldingNull_AndNull_IsNull()
+    {
+        // two Null operands are Null whatever holds them: a Variant holding Null used to fall out of the Null effective type as an internal error.
+        var held = new VBVariantValue(VBNullValue.Null);
+        foreach (var op in new BinaryLogicalOperatorRuntimeSemantics[] { And(), Or(), Xor(), Eqv(), Imp() })
+        {
+            AssertIsNull(Evaluate(op, held, VBNullValue.Null));
+            AssertIsNull(Evaluate(op, VBNullValue.Null, held));
+            AssertIsNull(Evaluate(op, held, held));
+        }
+    }
+
     private static void AssertIsNull(RuntimeSemanticsEvaluationResult result)
     {
         Assert.IsNull(result.ErrorInfo);

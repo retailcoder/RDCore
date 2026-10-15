@@ -136,7 +136,8 @@ public abstract record class BinaryLogicalOperatorRuntimeSemantics(
         {
             return EvaluateBitwise(frame.EffectiveType, lhs, rhs);
         }
-        else if (lhs is VBNullValue && rhs is VBNullValue)
+        // a Null effective type is two Null operands, whatever holds them: a Variant holding Null is no different from Null.
+        else if (frame.EffectiveType is VBNullType)
         {
             return EvaluateNullBinaryExpressionResult();
         }
@@ -149,7 +150,7 @@ public abstract record class BinaryLogicalOperatorRuntimeSemantics(
     /// </summary>
     /// <remarks>
     /// Operands are <strong>explicitly specified</strong> as being evaluated bitwise only given specific operand data types.
-    /// Base implementation has already handled the case where both operands are <see cref="IIntegralNumericType"/>, and the case where they're both <see cref="VBNullValue"/>.
+    /// Base implementation has already handled the case where both operands are <see cref="IIntegralNumericType"/>, and the case where they're both <c>Null</c>.
     /// </remarks>
     protected abstract RuntimeSemanticsEvaluationResult EvaluateSemanticallly(
         ISymbolResolver resolver, 

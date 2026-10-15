@@ -34,7 +34,7 @@ public record class BinaryImpLogicalOperatorRuntimeSemantics(
     /// </summary>
     /// <remarks>
     /// Operands are <strong>explicitly specified</strong> as being evaluated bitwise only given specific operand data types.
-    /// Base implementation has already handled the case where both operands are <see cref="IIntegralNumericType"/>, and the case where they're both <see cref="VBNullValue"/>.
+    /// Base implementation has already handled the case where both operands are <see cref="IIntegralNumericType"/>, and the case where they're both <c>Null</c>.
     /// </remarks>
     protected override RuntimeSemanticsEvaluationResult EvaluateSemanticallly(
         ISymbolResolver resolver, 
