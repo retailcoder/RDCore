@@ -1,3 +1,6 @@
+using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Shared;
@@ -71,7 +74,10 @@ internal static class GoldenMaster
         VBNullValue or VBEmptyValue => value.TypeInfo.Name,
         VBNothingValue => "Nothing",
         VBObjectValue => "Object",
+        VBFixedSizeArrayValue array => $"{array.ItemType.Name}(n)",
         VBArrayValue array => $"{array.ItemType.Name}()",
+        // the value of a user-defined type is its fields, which a snapshot does not need to know.
+        VBUserDefinedTypeValue => $"{value.TypeInfo.Name}{{}}",
         // a trailing byte is part of the data of a String, and of what a comparison compares.
         VBStringValue text => $"{value.TypeInfo.Name}({Escape(text.Value)}{(text.TrailingByte is { } trailing ? $"+0x{trailing:X2}" : string.Empty)})",
         _ => $"{value.TypeInfo.Name}({Format(value.RuntimeValue.BoxedValue)})",
@@ -98,6 +104,39 @@ internal static class GoldenMaster
             return $"throws {exception.GetType().Name}";
         }
     }
+
+    /// <summary>
+    /// What a let-coercion yields or raises - or throws, as <see cref="Outcome(Func{RuntimeSemanticsEvaluationResult})"/> has it.
+    /// </summary>
+    public static string Outcome(Func<LetCoercionResult> evaluate)
+    {
+        try
+        {
+            var result = evaluate();
+            return result.ErrorInfo is { } error ? $"error {error.ErrorId}"
+                : result.Result is { } value ? Describe(value)
+                : result.IsApplicable ? "nothing" : "not applicable";
+        }
+        catch (Exception exception)
+        {
+            return $"throws {exception.GetType().Name}";
+        }
+    }
+
+    /// <summary>
+    /// A type as a snapshot writes it: an array by its elements, a fixed-length string by its length, and what declares an Enum, a user-defined type or
+    /// a class by its kind.
+    /// </summary>
+    public static string Describe(VBType type) => type switch
+    {
+        VBFixedSizeArrayType array => $"{Describe(array.ItemType)}(n)",
+        VBArrayType array => $"{Describe(array.ItemType)}()",
+        VBFixedStringType fixedString => $"String * {fixedString.Length}",
+        VBEnumType => $"Enum {type.Name}",
+        VBUserDefinedType => $"Type {type.Name}",
+        VBClassType => $"Class {type.Name}",
+        _ => type.Name,
+    };
 
     /// <summary>
     /// What an analysis is told of an operation, in the order it is told: the operation, then the conversions of its operands.
