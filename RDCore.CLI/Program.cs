@@ -339,6 +339,11 @@ internal class RDCoreConsoleCommandHost : AppHost<RDCoreConsoleCommandApp>
             .AddSingleton<ICliCommand, DescribeExtensionCommand>()
             .AddSingleton<ICliCommand, NewWorkspaceCommand>()
             .AddSingleton<ICliCommand, ExportLibraryCommand>()
+            .AddSingleton<ICliCommand, BenchCommand>()
+            // rdc bench runs a workspace in-process, as the environment host runs one: it needs what the host's errors are described with.
+            .Configure<VerboseMessageOptions>(configuration.GetSection("Configuration:VerboseMessages"))
+            .AddVerboseMessages()
+            .AddSingleton<RDCore.CLI.App.Bench.BenchRunner>()
             .AddSingleton<ICliCommandProvider, NativeCliCommandProvider>()
             .AddSingleton<ICliCommandProvider, ExtensionCliCommandProvider>()
             .AddSingleton<ICliCommandDispatcher, CliCommandDispatcher>();

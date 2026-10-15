@@ -61,6 +61,42 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Times the interpreter on a workspace, or on the built-in corpus: parse, load, sweep, then each Bench* case..
+        /// </summary>
+        public static string Bench_Summary {
+            get {
+                return ResourceManager.GetString("Bench_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to --runs must be at least 1..
+        /// </summary>
+        public static string Bench_RunsMustBePositive {
+            get {
+                return ResourceManager.GetString("Bench_RunsMustBePositive", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to (built-in corpus).
+        /// </summary>
+        public static string Bench_BuiltInCorpus {
+            get {
+                return ResourceManager.GetString("Bench_BuiltInCorpus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to No cases: a case is a Public Sub Bench*() of a standard module..
+        /// </summary>
+        public static string Bench_NoCases {
+            get {
+                return ResourceManager.GetString("Bench_NoCases", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Available commands:.
         /// </summary>
         public static string Command_Available {

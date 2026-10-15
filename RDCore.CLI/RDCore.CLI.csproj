@@ -75,11 +75,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the corpus rdc bench runs when it is given no workspace. -->
+    <EmbeddedResource Include="Bench\Corpus\*.bas;Bench\Corpus\*.cls" LogicalName="Bench/Corpus/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\RDCore.SDK\RDCore.SDK.csproj" />
     <!-- environment-host mode composes the RD-VBA runtime session; RDCore.Runtime is GPLv3, as is this app. -->
     <ProjectReference Include="..\RDCore.Runtime\RDCore.Runtime.csproj" />
     <!-- the host composes the session with the outside world of the platform it runs on. -->
     <ProjectReference Include="..\RDCore.External.Windows\RDCore.External.Windows.csproj" />
+    <!-- rdc bench (and, later, rdc build) parse a workspace and build its symbols in-process, as the language server does. -->
+    <ProjectReference Include="..\RDCore.Parsing\RDCore.Parsing.csproj" />
+    <ProjectReference Include="..\RDCore.Symbols\RDCore.Symbols.csproj" />
   </ItemGroup>
 
 </Project>

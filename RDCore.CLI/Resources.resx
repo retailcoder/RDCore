@@ -487,4 +487,16 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Host_RequestCarriedNoStatement" xml:space="preserve">
     <value>the request carried no statement</value>
   </data>
+  <data name="Bench_Summary" xml:space="preserve">
+    <value>Times the interpreter on a workspace, or on the built-in corpus: parse, load, sweep, then each Bench* case.</value>
+  </data>
+  <data name="Bench_RunsMustBePositive" xml:space="preserve">
+    <value>--runs must be at least 1.</value>
+  </data>
+  <data name="Bench_BuiltInCorpus" xml:space="preserve">
+    <value>(built-in corpus)</value>
+  </data>
+  <data name="Bench_NoCases" xml:space="preserve">
+    <value>No cases: a case is a Public Sub Bench*() of a standard module.</value>
+  </data>
 </root>

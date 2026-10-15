@@ -485,4 +485,16 @@
   <data name="Host_RequestCarriedNoStatement" xml:space="preserve">
     <value>la requête ne portait aucune instruction</value>
   </data>
+  <data name="Bench_Summary" xml:space="preserve">
+    <value>Chronomètre l'interpréteur sur un workspace, ou sur le corpus intégré : parsing, chargement, analyse, puis chaque cas Bench*.</value>
+  </data>
+  <data name="Bench_RunsMustBePositive" xml:space="preserve">
+    <value>--runs doit valoir au moins 1.</value>
+  </data>
+  <data name="Bench_BuiltInCorpus" xml:space="preserve">
+    <value>(corpus intégré)</value>
+  </data>
+  <data name="Bench_NoCases" xml:space="preserve">
+    <value>Aucun cas : un cas est une Public Sub Bench*() d'un module standard.</value>
+  </data>
 </root>
