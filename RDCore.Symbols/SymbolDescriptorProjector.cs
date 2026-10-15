@@ -8,7 +8,7 @@ using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.StdLib;
 using System.Collections.Immutable;
 
-namespace RDCore.LanguageServer.Symbols;
+namespace RDCore.Symbols;
 
 /// <summary>
 /// Projects the flat <see cref="Symbol"/> stream from <see cref="SyntaxTreeSymbolProvider"/> onto the
@@ -22,7 +22,7 @@ namespace RDCore.LanguageServer.Symbols;
 /// carried (it would be redundant); the descriptor's <see cref="SymbolDescriptor.DeclaredTypeName"/>
 /// is <c>null</c>.
 /// </remarks>
-internal static class SymbolDescriptorProjector
+public static class SymbolDescriptorProjector
 {
     public static ImmutableArray<SymbolDescriptor> Project(IEnumerable<Symbol> symbols, Uri moduleUri)
     {

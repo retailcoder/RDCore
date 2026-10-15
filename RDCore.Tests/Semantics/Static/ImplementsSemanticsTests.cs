@@ -7,6 +7,7 @@ using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Semantics.Static;
 using System.Collections.Immutable;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.Semantics.Static;
 

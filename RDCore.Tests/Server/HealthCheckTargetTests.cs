@@ -1,5 +1,5 @@
 ﻿using RDCore.LanguageServer;
-using RDCore.Parsing;
+using RDCore.ParseServer;
 using RDCore.SDK.Client;
 using RDCore.SDK.Platform;
 using RDCore.SDK.Server;

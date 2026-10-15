@@ -43,7 +43,7 @@ public interface IModuleParser
 
 /// <param name="serverOptions">Supplies <see cref="SdkServerOptions.WireErrorDetail"/>; optional, the default suits tests.</param>
 /// <param name="logger">Records the exceptions the resilience guards swallow; optional, no-op by default.</param>
-internal partial class ModuleParser(
+public partial class ModuleParser(
     IOptions<SdkServerOptions>? serverOptions = null,
     ILogger<ModuleParser>? logger = null) : IModuleParser
 {

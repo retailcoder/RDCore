@@ -9,7 +9,7 @@ using RDCore.SDK.Runtime.StdLib;
 using RDCore.SDK.Workspace;
 using System.Collections.Immutable;
 
-namespace RDCore.LanguageServer.Symbols;
+namespace RDCore.Symbols;
 
 /// <summary>
 /// A composed workspace: the resolver that binds its names, and the <see cref="ScopeTree"/> that
@@ -17,7 +17,7 @@ namespace RDCore.LanguageServer.Symbols;
 /// </summary>
 /// <param name="Resolver">Binds a workspace name, falling back to the intrinsic type names.</param>
 /// <param name="ScopeTree">The scope tree over the composed workspace's symbols.</param>
-internal readonly record struct WorkspaceComposition(ISymbolResolver Resolver, ScopeTree ScopeTree);
+public readonly record struct WorkspaceComposition(ISymbolResolver Resolver, ScopeTree ScopeTree);
 
 /// <summary>
 /// Composes an <see cref="ISymbolResolver"/> over a whole parsed workspace, in two passes. The first
@@ -30,7 +30,7 @@ internal readonly record struct WorkspaceComposition(ISymbolResolver Resolver, S
 /// <see cref="ScopeTreeSymbolResolver"/> over the second pass's symbols, falling back to
 /// <paramref name="fallback"/> for the intrinsics.
 /// </summary>
-internal static class WorkspaceSymbolResolver
+public static class WorkspaceSymbolResolver
 {
     /// <summary>
     /// Modules are passed as tuples, not a dictionary: <c>Uri</c> equality ignores the fragment, but a

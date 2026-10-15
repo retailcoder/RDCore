@@ -9,7 +9,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Semantics;
 
-namespace RDCore.LanguageServer.Symbols;
+namespace RDCore.Symbols;
 
 /// <summary>
 /// Produces the member symbols a module declares, resolved from its parsed declaration AST. The tree
@@ -35,7 +35,7 @@ namespace RDCore.LanguageServer.Symbols;
 /// Where the variable such a reference declares lives: a local of the procedure, as <strong>MS-VBAL §5.6.10</strong>
 /// has it, or a variable of the module, as a BASIC does.
 /// </param>
-internal sealed class SyntaxTreeSymbolProvider(
+public sealed class SyntaxTreeSymbolProvider(
     Uri workspaceRoot, Uri moduleUri, ModuleType moduleType, ModuleParseResult parseResult, ISymbolResolver resolver,
     bool withImplicitDeclarations = true,
     ImplicitDeclarationScope implicitScope = ImplicitDeclarationScope.Procedure) : ISymbolProvider

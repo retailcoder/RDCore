@@ -15,6 +15,7 @@ using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Services.VerboseMessages;
 using RDCore.SDK.Workspace;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.Cli;
 

@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RDCore.Parsing;
-using RDCore.Parsing.Handlers;
+using RDCore.ParseServer.Handlers;
 using RDCore.SDK.ConsoleIO;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.Source;

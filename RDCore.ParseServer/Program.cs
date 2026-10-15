@@ -4,16 +4,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using RDCore.Parsing.Handlers;
+using RDCore.Parsing;
+using RDCore.ParseServer.Handlers;
 using RDCore.SDK.Client;
 using RDCore.SDK.Server;
 using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Server.Services;
 using RDCore.SDK.Server.Services.States;
 using System.Runtime.CompilerServices;
-
-// for warnings about antlr-generated parser rule context types not requiring CLSCompliantAttribute because not present on assembly.
-[assembly: CLSCompliant(false)]
 
 // expose internals to RDCore.Tests and CastleWindsor proxies:
 [assembly: InternalsVisibleTo("RDCore.Tests")]
@@ -24,7 +22,7 @@ using System.Runtime.CompilerServices;
 [assembly: ProvidesCorePlatformClientCapability<ParseTokens>]
 
 
-namespace RDCore.Parsing;
+namespace RDCore.ParseServer;
 
 public class Program
 {

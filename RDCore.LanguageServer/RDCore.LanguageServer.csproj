@@ -52,6 +52,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RDCore.SDK\RDCore.SDK.csproj" />
+    <!-- the symbols of the workspace, built from the syntax trees the parser hands over. -->
+    <ProjectReference Include="..\RDCore.Symbols\RDCore.Symbols.csproj" />
   </ItemGroup>
 
   <ItemGroup>

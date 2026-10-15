@@ -13,6 +13,7 @@ using RDCore.SDK.Services.VerboseMessages;
 using RDCore.SDK.Workspace;
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.Cli;
 

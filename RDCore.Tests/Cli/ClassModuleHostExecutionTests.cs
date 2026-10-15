@@ -13,6 +13,7 @@ using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Services.VerboseMessages;
 using RDCore.SDK.Workspace;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.Cli;
 

@@ -20,7 +20,7 @@ public interface ISyntaxTokenizer
     IReadOnlyList<SyntaxToken> Tokenize(string text);
 }
 
-internal sealed class SyntaxTokenizer : ISyntaxTokenizer
+public sealed class SyntaxTokenizer : ISyntaxTokenizer
 {
     // where a token is in what names a type: after As, As New or Implements, and in a name with dots.
     private enum TypeNameState

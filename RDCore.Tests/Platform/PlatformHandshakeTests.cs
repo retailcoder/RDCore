@@ -1,4 +1,4 @@
-﻿using RDCore.Parsing;
+﻿using RDCore.ParseServer;
 using RDCore.SDK.Client;
 using RDCore.SDK.Platform.Protocol;
 
@@ -10,7 +10,7 @@ public class PlatformHandshakeTests
     [TestMethod]
     public void Reflect_ReadsProvidesCorePlatformClientCapabilityAttributes()
     {
-        // RDCore.Parsing declares [assembly: ProvidesCorePlatformClientCapability<ParseFullDocument>]
+        // the parse server declares [assembly: ProvidesCorePlatformClientCapability<ParseFullDocument>]
         var provided = ProvidedCorePlatformCapabilities.Reflect(typeof(RDCoreParserApp).Assembly);
 
         CollectionAssert.Contains(provided.ToList(), nameof(ParseFullDocument));

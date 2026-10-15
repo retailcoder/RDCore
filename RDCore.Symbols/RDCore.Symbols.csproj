@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon>logo.ico</ApplicationIcon>
+    <Authors>9562-7303 Québec inc.</Authors>
+    <Copyright>Copyright © 2026 ${Authors}</Copyright>
+    <Product>RDCore</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="logo.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the symbols of a workspace, built from the syntax trees the parser makes: the declarations, the names they resolve to, and their descriptors. -->
+    <ProjectReference Include="..\RDCore.SDK\RDCore.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RDCore.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+</Project>

@@ -4,7 +4,9 @@ using OmniSharp.Extensions.JsonRpc.Server;
 using RDCore.SDK.Client;
 using RDCore.SDK.Platform.Protocol;
 
-namespace RDCore.Parsing.Handlers;
+using RDCore.Parsing;
+
+namespace RDCore.ParseServer.Handlers;
 
 [Method(RDCorePlatformProtocol.ParseTokens)]
 public class ParseTokensHandler(ISyntaxTokenizer tokenizer, ILogger<ParseTokensHandler> logger)

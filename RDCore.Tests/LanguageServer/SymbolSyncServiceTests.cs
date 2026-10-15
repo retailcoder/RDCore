@@ -14,6 +14,7 @@ using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Server.Configuration;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.LanguageServer;
 

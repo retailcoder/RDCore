@@ -12,6 +12,7 @@ using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Semantics.Static;
 using RDCore.SDK.Semantics.Static.Abstract;
 using RDCore.SDK.Workspace;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.LanguageServer;
 

@@ -16,7 +16,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using System.Collections.Immutable;
 
-namespace RDCore.LanguageServer.Symbols;
+namespace RDCore.Symbols;
 
 /// <summary>
 /// Turns a declaration AST node into the bound <see cref="Symbol"/> it declares. One trivial method
@@ -37,7 +37,7 @@ namespace RDCore.LanguageServer.Symbols;
 /// <paramref name="typeDefs"/> are the module's <c>Def&lt;Type&gt;</c> directives (<strong>MS-VBAL §5.2.2</strong>): the first letter of the name decides.
 /// </para>
 /// </remarks>
-internal sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind memberScope, ISymbolResolver resolver, VBType? implicitType = null, ImmutableArray<TypeDefDirectiveNode> typeDefs = default)
+public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind memberScope, ISymbolResolver resolver, VBType? implicitType = null, ImmutableArray<TypeDefDirectiveNode> typeDefs = default)
 {
     // MS-VBAL 3.3.2 type-declaration characters name a reserved type the resolver can bind.
     private static readonly ImmutableDictionary<string, string> _typeHintNames = new Dictionary<string, string>

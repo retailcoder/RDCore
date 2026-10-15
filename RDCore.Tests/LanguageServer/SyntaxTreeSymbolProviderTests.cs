@@ -11,6 +11,7 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.LanguageServer;
 

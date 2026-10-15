@@ -3,6 +3,7 @@ using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.LanguageServer;
 

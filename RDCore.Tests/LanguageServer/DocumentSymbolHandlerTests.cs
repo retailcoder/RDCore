@@ -9,6 +9,7 @@ using RDCore.Parsing;
 using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Server.Configuration;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.LanguageServer;
 

@@ -16,6 +16,7 @@ using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Server.Services;
 using RDCore.SDK.Workspace;
 using System.IO.Abstractions;
+using RDCore.Symbols;
 
 namespace RDCore.LanguageServer;
 

@@ -63,7 +63,7 @@ $Projects = @(
     },
     @{
         Name = "RDCore.Parsing"
-        Project = "RDCore.Parsing\RDCore.Parsing.csproj"
+        Project = "RDCore.ParseServer\RDCore.ParseServer.csproj"
     },
     @{
         Name = "Extensions\RDCore.Diagnostics"

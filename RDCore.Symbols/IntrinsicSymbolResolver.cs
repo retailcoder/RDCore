@@ -7,7 +7,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using System.Diagnostics.CodeAnalysis;
 
-namespace RDCore.LanguageServer.Symbols;
+namespace RDCore.Symbols;
 
 /// <summary>
 /// The language server's fallback <see cref="ISymbolResolver"/> until it can resolve project and
@@ -22,7 +22,7 @@ namespace RDCore.LanguageServer.Symbols;
 /// value, so it binds in the type binding context only.
 /// </remarks>
 /// <param name="is64Bit">Whether the environment is 64-bit: what <c>LongPtr</c> is an alias of.</param>
-internal sealed class IntrinsicSymbolResolver(bool is64Bit = true) : ISymbolResolver
+public sealed class IntrinsicSymbolResolver(bool is64Bit = true) : ISymbolResolver
 {
     /// <inheritdoc/>
     public SymbolResolutionResult ResolveValue(string name, ScopeKind scope, Uri handle) => SymbolResolutionResult.Unbound;

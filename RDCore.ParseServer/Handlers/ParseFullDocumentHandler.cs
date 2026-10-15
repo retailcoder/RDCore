@@ -8,7 +8,9 @@ using RDCore.SDK.Model.Source;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Server.Configuration;
 
-namespace RDCore.Parsing.Handlers;
+using RDCore.Parsing;
+
+namespace RDCore.ParseServer.Handlers;
 
 [Method(RDCorePlatformProtocol.ParseFullDocument)]
 public class ParseFullDocumentHandler(

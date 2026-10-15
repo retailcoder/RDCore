@@ -11,6 +11,7 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Workspace;
+using RDCore.Symbols;
 
 namespace RDCore.Tests.Cli;
 

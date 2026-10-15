@@ -12,6 +12,7 @@ using RDCore.SDK.Model.Source;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Workspace;
+using RDCore.Symbols;
 
 namespace RDCore.LanguageServer.Symbols;
 
