@@ -15,6 +15,8 @@ using RDCore.SDK.Semantics.Builders;
 using RDCore.SDK.Semantics.Facts;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Services.VerboseMessages;
+using RDCore.SDK.Semantics.Plans;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -76,13 +78,27 @@ public class LetCoercionRuntimeSemanticsProvider(
     private readonly Dictionary<Type, ILetCoercionRuntimeSemantics> _strategies =
         semantics.ToDictionary(strategy => strategy.LetCoercionSpecification, strategy => strategy);
 
+    // the strategy found for each kind of type, by walking its base-type chain once: a provider lets values be coerced to and from few kinds of type.
+    private readonly ConcurrentDictionary<Type, ILetCoercionRuntimeSemantics?> _resolved = new();
+
     /// <summary>
     /// Resolves the strategy for a destination <see cref="VBType"/> by walking its base-type chain
     /// (a strategy keyed on <c>VBNumericType</c> handles <c>VBIntegerType</c>, <c>VBLongType</c>, …).
     /// </summary>
     private bool TryGetStrategy(VBType destinationType, [MaybeNullWhen(false)] out ILetCoercionRuntimeSemantics strategy)
+        => TryGetStrategy(destinationType.GetType(), out strategy);
+
+    /// <summary>
+    /// The strategy for the rule of a <see cref="ConversionPlan"/>: the strategy of the source's type when the rule is the source's, and of the
+    /// destination's otherwise - found by walking the type's base-type chain, once for each kind of type.
+    /// </summary>
+    private ILetCoercionRuntimeSemantics? StrategyFor(ConversionPlan plan)
+        => _resolved.GetOrAdd((plan.IsBySource ? plan.Source : plan.Destination).GetType(),
+            static (type, provider) => provider.TryGetStrategy(type, out var strategy) ? strategy : null, this);
+
+    private bool TryGetStrategy(Type kind, [MaybeNullWhen(false)] out ILetCoercionRuntimeSemantics strategy)
     {
-        for (var type = destinationType.GetType(); type is not null; type = type.BaseType)
+        for (var type = kind; type is not null; type = type.BaseType)
         {
             if (_strategies.TryGetValue(type, out var found))
             {
@@ -295,22 +311,7 @@ public class LetCoercionRuntimeSemanticsProvider(
             frame = frame with { SourceValue = wrapped };
         }
 
-        // MS-VBAL §5.2.3.4: the members of an enumeration are Longs, and a value of its type is one - what is let-coerced to it is let-coerced to a Long.
-        if (frame.DestinationTypeDesc.Target is VBEnumType)
-        {
-            frame = frame with { DestinationTypeDesc = new VBTypeDescValue(VBLongType.TypeInfo) };
-        }
-
-        // MS-VBAL §2.2: LongPtr is a type alias, of LongLong in a 64-bit environment and of Long in a 32-bit one - and is let-coerced to as what it is an alias of.
-        if (frame.DestinationTypeDesc.Target is VBLongPtrType_x64 or VBLongPtrType_x86)
-        {
-            frame = frame with
-            {
-                DestinationTypeDesc = new VBTypeDescValue(frame.DestinationTypeDesc.Target is VBLongPtrType_x64 ? VBLongLongType.TypeInfo : VBLongType.TypeInfo),
-            };
-        }
-
-        // and a LongPtr source is the value of what it is an alias of.
+        // MS-VBAL §2.2: a LongPtr source is the value of what it is an alias of.
         if (frame.SourceValue is VBLongPtrValue pointer)
         {
             frame = frame with
@@ -319,25 +320,17 @@ public class LetCoercionRuntimeSemanticsProvider(
             };
         }
 
-        // MS-VBAL §5.5.1.2.13's "Any class -> Any type" and "Nothing -> Any type" rules don't key off
-        // the destination at all - like the Variant unwrap above, destination-based dispatch alone
-        // would only ever reach VBObjectLetCoercionRuntimeSemantics when the destination itself is an
-        // object type, never for the (far more common) object-to-Long/String/etc. case.
-        ILetCoercionRuntimeSemantics? strategy;
-        var strategyFound = frame.SourceValue switch
+        // the plan says what the value is let-coerced to - an Enum is a Long, a LongPtr what it is an alias of - and whose rule applies: an object, a Null,
+        // an Empty and an Error are let-coerced by rules of their own whatever the destination is (MS-VBAL §5.5.1.2.9-11 and 13), anything else by the
+        // destination's.
+        var plan = ConversionPlanner.ForValue(frame.SourceValue.TypeInfo, frame.DestinationTypeDesc.Target);
+        if (!plan.Destination.Equals(frame.DestinationTypeDesc.Target))
         {
-            VBObjectValue => TryGetStrategy(VBObjectType.TypeInfo, out strategy),
+            frame = frame with { DestinationTypeDesc = new VBTypeDescValue(plan.Destination) };
+        }
 
-            // MS-VBAL §5.5.1.2.9-11: so do a Null, an Empty and an Error source, to any destination but a Variant that holds them.
-            // Their rules leave a fixed-size array out as they do a Variant ("except a fixed-size array or Variant"), and no
-            // strategy is keyed on one, so it stays the type mismatch below rather than a strategy that is not applicable.
-            VBNullValue or VBEmptyValue or VBErrorValue when frame.DestinationTypeDesc.Target is not VBVariantType and not VBFixedSizeArrayType
-                => TryGetStrategy(frame.SourceValue.TypeInfo, out strategy),
-
-            _ => TryGetStrategy(frame.DestinationTypeDesc.Target, out strategy),
-        };
-
-        if (!strategyFound || strategy is null)
+        var strategy = StrategyFor(plan);
+        if (strategy is null)
         {
             // in-and-out: no need to push the coercion frame for this
             return LetCoercionResult.Error(OnLetCoercionTypeMismatch(expression, frame), [.. _stack.Frames]);
