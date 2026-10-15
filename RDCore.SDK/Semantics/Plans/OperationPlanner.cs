@@ -2,6 +2,7 @@ using RDCore.SDK.Model;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace RDCore.SDK.Semantics.Plans;
 
@@ -12,7 +13,9 @@ namespace RDCore.SDK.Semantics.Plans;
 /// <remarks>
 /// <para>
 /// A plan depends on nothing but the operator and the operand types, so each is made once and kept: the interpreter asks for the plan of every operation it
-/// evaluates, and an operation evaluated a million times is planned once.
+/// evaluates, and an operation evaluated a million times is planned once. The plans last asked for are also kept by the identity of the operator and the
+/// types, which is what an operation evaluated in a loop asks with every time: finding a plan by three references is several times cheaper than looking it
+/// up by value, which compares records.
 /// </para>
 /// <para>
 /// Every operator of <strong>MS-VBAL §5.6.9</strong> is planned here: the arithmetic operators and unary <c>+</c>, <c>&amp;</c>, the relational operators,
@@ -35,6 +38,14 @@ public static class OperationPlanner
     private static readonly ConcurrentDictionary<(string Operator, VBType Left, VBType Right), OperationPlan> _binary = new();
     private static readonly ConcurrentDictionary<(string Operator, VBType Operand), OperationPlan> _unary = new();
 
+    // the plans last made or found, in a slot for the identity of what they were asked for. An entry is immutable and replaces the one before it whole, so
+    // threads that race for a slot only cost each other a lookup.
+    private const int RecentSlots = 64;
+    private static readonly RecentPlan?[] _recentBinary = new RecentPlan?[RecentSlots];
+    private static readonly RecentPlan?[] _recentUnary = new RecentPlan?[RecentSlots];
+
+    private sealed record class RecentPlan(string Operator, VBType Left, VBType? Right, OperationPlan Plan);
+
     /// <summary>
     /// The plan of a binary operation on values of these types: final, whatever the types are.
     /// </summary>
@@ -43,7 +54,18 @@ public static class OperationPlanner
     /// <param name="right">The value type of the right operand.</param>
     /// <exception cref="NotSupportedException">The operator has no table of effective types: it is a conversion.</exception>
     public static OperationPlan ForValues(string @operator, VBType left, VBType right)
-        => _binary.GetOrAdd((@operator, left, right), key => new OperationPlan(key.Operator, [key.Left, key.Right], BinaryEffectiveType(key.Operator, key.Left, key.Right)));
+    {
+        var slot = (RuntimeHelpers.GetHashCode(@operator) ^ RuntimeHelpers.GetHashCode(left) * 31 ^ RuntimeHelpers.GetHashCode(right) * 17) & (RecentSlots - 1);
+        if (_recentBinary[slot] is { } recent
+            && ReferenceEquals(recent.Operator, @operator) && ReferenceEquals(recent.Left, left) && ReferenceEquals(recent.Right, right))
+        {
+            return recent.Plan;
+        }
+
+        var plan = _binary.GetOrAdd((@operator, left, right), key => new OperationPlan(key.Operator, [key.Left, key.Right], BinaryEffectiveType(key.Operator, key.Left, key.Right)));
+        _recentBinary[slot] = new RecentPlan(@operator, left, right, plan);
+        return plan;
+    }
 
     /// <summary>
     /// The plan of a unary operation on a value of this type: final, whatever the type is.
@@ -52,7 +74,17 @@ public static class OperationPlanner
     /// <param name="operand">The value type of the operand.</param>
     /// <exception cref="NotSupportedException">The operator has no table of effective types: it is a conversion.</exception>
     public static OperationPlan ForValue(string @operator, VBType operand)
-        => _unary.GetOrAdd((@operator, operand), key => new OperationPlan(key.Operator, [key.Operand], UnaryEffectiveType(key.Operator, key.Operand)));
+    {
+        var slot = (RuntimeHelpers.GetHashCode(@operator) ^ RuntimeHelpers.GetHashCode(operand) * 31) & (RecentSlots - 1);
+        if (_recentUnary[slot] is { } recent && ReferenceEquals(recent.Operator, @operator) && ReferenceEquals(recent.Left, operand))
+        {
+            return recent.Plan;
+        }
+
+        var plan = _unary.GetOrAdd((@operator, operand), key => new OperationPlan(key.Operator, [key.Operand], UnaryEffectiveType(key.Operator, key.Operand)));
+        _recentUnary[slot] = new RecentPlan(@operator, operand, null, plan);
+        return plan;
+    }
 
     /// <summary>
     /// The plan of a binary operation on operands of these declared types: <see cref="OperationPlan.IsDeferred"/> when either is declared <c>Variant</c> or

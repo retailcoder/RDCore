@@ -25,6 +25,18 @@ public sealed class OperationPlannerTests
     }
 
     [TestMethod]
+    public void APlan_FoundByTheIdentityOfItsTypes_IsThePlanFoundByTheirValue()
+    {
+        // two fixed-length strings of the same length are the same type, in two instances: the second is found by value, and then by identity.
+        var first = OperationPlanner.ForValues(Tokens.ConcatOp, new VBFixedStringType(5), VBStringType.TypeInfo);
+        var other = new VBFixedStringType(5);
+
+        Assert.AreSame(first, OperationPlanner.ForValues(Tokens.ConcatOp, other, VBStringType.TypeInfo));
+        Assert.AreSame(first, OperationPlanner.ForValues(Tokens.ConcatOp, other, VBStringType.TypeInfo));
+        Assert.AreSame(OperationPlanner.ForValue(Tokens.LogicalNotOp, other), OperationPlanner.ForValue(Tokens.LogicalNotOp, new VBFixedStringType(5)));
+    }
+
+    [TestMethod]
     public void ThePlan_OfValues_IsFinal_WhateverTheTypes()
     {
         var plan = OperationPlanner.ForValues(Tokens.AdditionOp, VBObjectType.TypeInfo, VBLongType.TypeInfo);
