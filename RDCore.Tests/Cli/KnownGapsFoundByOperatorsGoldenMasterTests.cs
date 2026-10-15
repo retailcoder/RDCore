@@ -5,6 +5,7 @@ namespace RDCore.Tests.Cli;
 /// <summary>
 /// What the golden master of the relational, logical and concatenation operators (<c>OtherOperatorsGoldenMasterTests</c>) found that the interpreter gets
 /// wrong, and is not an internal error: each is pinned here, ignored until it is fixed. The golden master records what the operators do today, these included.
+/// (A Variant holding an array let-coerced to a scalar, which it also found, is <c>ArrayLetCoercionTests</c> now.)
 /// </summary>
 [TestClass]
 public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
@@ -46,24 +47,4 @@ public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
             "S = 1",
             "L = 1",
             "Debug.Print S = L"));
-
-    // MS-VBAL 5.5.1.2.7: an array of anything but Bytes let-coerced to anything but a Variant or an array is a type mismatch. No strategy takes an array to a
-    // String or a number, which is an internal error - the Like of one included.
-    [TestMethod]
-    [Ignore("Known gap: a Variant holding an array let-coerced to a String or a number is an internal error.")]
-    public async Task AVariantHoldingAnArray_LetCoercedToAScalar_IsATypeMismatch()
-        => CollectionAssert.AreEqual(new[] { "13", "13", "13" }, await RunMainAsync(
-            "On Error Resume Next",
-            "Dim V As Variant",
-            "Dim S As String",
-            "Dim D As Double",
-            "V = Array(1, 2)",
-            "S = V",
-            "Debug.Print Err.Number",
-            "Err.Clear",
-            "D = V",
-            "Debug.Print Err.Number",
-            "Err.Clear",
-            "Debug.Print V Like \"x\"",
-            "Debug.Print Err.Number"));
 }

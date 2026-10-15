@@ -204,6 +204,11 @@ public class LetCoercionRuntimeSemanticsProvider(
         }
     }
 
+    // an array's own TypeInfo is the generic VBArrayType whatever its elements are (VBArrayValue tags every array with it): the type of a Byte() is told by
+    // its elements, which is all its plan needs to know of them.
+    private static VBType ValueTypeOf(VBTypedValue source)
+        => source is VBArrayValue { ItemType: VBByteType } ? VBResizableByteArrayType.TypeInfo : source.TypeInfo;
+
     // the value a Variant holds, however deeply it is wrapped: what the coercion itself is about (see Coerce).
     private static VBTypedValue Unwrapped(VBTypedValue value)
     {
@@ -323,13 +328,14 @@ public class LetCoercionRuntimeSemanticsProvider(
         // the plan says what the value is let-coerced to - an Enum is a Long, a LongPtr what it is an alias of - and whose rule applies: an object, a Null,
         // an Empty and an Error are let-coerced by rules of their own whatever the destination is (MS-VBAL §5.5.1.2.9-11 and 13), anything else by the
         // destination's.
-        var plan = ConversionPlanner.ForValue(frame.SourceValue.TypeInfo, frame.DestinationTypeDesc.Target);
+        var plan = ConversionPlanner.ForValue(ValueTypeOf(frame.SourceValue), frame.DestinationTypeDesc.Target);
         if (!plan.Destination.Equals(frame.DestinationTypeDesc.Target))
         {
             frame = frame with { DestinationTypeDesc = new VBTypeDescValue(plan.Destination) };
         }
 
-        var strategy = StrategyFor(plan);
+        // no rule applies to a plan that is a type mismatch, whatever strategy its destination has.
+        var strategy = plan.IsTypeMismatch ? null : StrategyFor(plan);
         if (strategy is null)
         {
             // in-and-out: no need to push the coercion frame for this

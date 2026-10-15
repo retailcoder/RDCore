@@ -74,6 +74,26 @@ public sealed class ConversionPlannerTests
     }
 
     [TestMethod]
+    public void AnArray_AndAUserDefinedType_AreATypeMismatch_ToWhatTheirRulesHaveNoRowFor()
+    {
+        var longs = new VBResizableArrayType(VBLongType.TypeInfo);
+        var point = new VBUserDefinedType(new VBUserDefinedTypeMemberSymbol(Root, Root, "Point", ScopeKind.Module, SourceRange.Empty, SourceRange.Empty, AccessModifier.Public), []);
+
+        // a Byte() is the data of a String, and nothing else's.
+        Assert.AreEqual(ConversionRule.String, ConversionPlanner.ForValue(VBResizableByteArrayType.TypeInfo, VBStringType.TypeInfo).Rule);
+        Assert.IsTrue(ConversionPlanner.ForValue(VBResizableByteArrayType.TypeInfo, VBLongType.TypeInfo).IsTypeMismatch);
+
+        // an array of anything else is not even that; an array of the same elements, or a Variant, is the rule's to say.
+        Assert.IsTrue(ConversionPlanner.ForValue(longs, VBStringType.TypeInfo).IsTypeMismatch);
+        Assert.IsTrue(ConversionPlanner.ForValue(longs, VBResizableByteArrayType.TypeInfo).IsTypeMismatch);
+        Assert.AreEqual(ConversionRule.Array, ConversionPlanner.ForValue(longs, longs).Rule);
+        Assert.AreEqual(ConversionRule.Variant, ConversionPlanner.ForValue(longs, VBVariantType.TypeInfo).Rule);
+
+        Assert.IsTrue(ConversionPlanner.ForValue(point, longs).IsTypeMismatch);
+        Assert.AreEqual(ConversionRule.UserDefinedType, ConversionPlanner.ForValue(point, point).Rule);
+    }
+
+    [TestMethod]
     public void AnEnum_IsLetCoercedToAsALong_AndALongPtr_AsWhatItIsAnAliasOf()
     {
         var plan = ConversionPlanner.ForValue(VBStringType.TypeInfo, Colour());

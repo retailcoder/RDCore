@@ -32,7 +32,10 @@ public static class ConversionPlanner
     /// <summary>
     /// The plan of the let-coercion of a value of this type: final, whatever the types are.
     /// </summary>
-    /// <param name="source">The value type of the source: the type of what a Variant holds.</param>
+    /// <param name="source">
+    /// The value type of the source: the type of what a Variant holds, and for an array, an array of its elements - a <c>Byte()</c> is let-coerced by rules
+    /// an array of anything else is not.
+    /// </param>
     /// <param name="destination">The declared type the value is let-coerced to.</param>
     public static ConversionPlan ForValue(VBType source, VBType destination)
     {
@@ -93,8 +96,21 @@ public static class ConversionPlanner
             _ => RuleOf(destination),
         };
 
-        return new ConversionPlan(source, destination, rule);
+        return new ConversionPlan(source, destination, TakesTheSource(source, rule) ? rule : ConversionRule.None);
     }
+
+    // MS-VBAL §5.5.1.2.6-8: an array and a user-defined type are let-coerced to few types, and to any other one they are a type mismatch. A Byte() is the
+    // data of a String, and is let-coerced to one; an array of anything else, and a user-defined type, are not even that. What each takes of the rest -
+    // an array of the same elements, the same user-defined type - is the rule's to say.
+    private static bool TakesTheSource(VBType source, ConversionRule rule) => source switch
+    {
+        VBArrayType { ItemType: VBByteType } => rule is not (ConversionRule.Numeric or ConversionRule.Boolean or ConversionRule.Date),
+        VBArrayType => rule is not (ConversionRule.Numeric or ConversionRule.Boolean or ConversionRule.Date
+            or ConversionRule.String or ConversionRule.FixedString or ConversionRule.ByteArray),
+        VBUserDefinedType => rule is not (ConversionRule.Numeric or ConversionRule.Boolean or ConversionRule.Date
+            or ConversionRule.String or ConversionRule.FixedString or ConversionRule.ByteArray or ConversionRule.Array),
+        _ => true,
+    };
 
     // MS-VBAL §5.5.1.2.9-11: Null, Empty and an Error have rules of their own to any destination "except a fixed-size array or Variant".
     private static bool HasRulesForNullEmptyAndError(VBType destination) => destination is not VBVariantType and not VBFixedSizeArrayType;
