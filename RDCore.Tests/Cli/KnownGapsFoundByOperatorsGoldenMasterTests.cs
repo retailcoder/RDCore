@@ -9,20 +9,20 @@ namespace RDCore.Tests.Cli;
 [TestClass]
 public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
 {
-    private static Task<string[]> Run(params string[] lines)
+    private static Task<string[]> RunMainAsync(params string[] lines)
         => RunAsync([], $"Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\n{string.Join("\r\n", lines)}\r\nEnd Sub\r\n");
 
     // MS-VBAL 5.6.9.8.1: the bits of a Boolean are negated in a Boolean, as the binary logical operators have it. Not evaluates it in an Integer.
     [TestMethod]
     [Ignore("Known gap: the Not of a Boolean is an Integer.")]
     public async Task TheNot_OfABoolean_IsABoolean()
-        => CollectionAssert.AreEqual(new[] { "Boolean" }, await Run("Debug.Print TypeName(Not True)"));
+        => CollectionAssert.AreEqual(new[] { "Boolean" }, await RunMainAsync("Debug.Print TypeName(Not True)"));
 
     // MS-VBAL 5.6.9.4: Null is concatenated as the zero-length string. A Null operand is, but a Variant holding Null is let-coerced to a String, which raises 94.
     [TestMethod]
     [Ignore("Known gap: a Variant holding Null concatenated to a number raises Invalid use of Null.")]
     public async Task AVariantHoldingNull_ConcatenatedToANumber_IsTheNumber()
-        => CollectionAssert.AreEqual(new[] { "7" }, await Run(
+        => CollectionAssert.AreEqual(new[] { "7" }, await RunMainAsync(
             "Dim V As Variant",
             "V = Null",
             "Debug.Print V & 7"));
@@ -31,7 +31,7 @@ public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
     [TestMethod]
     [Ignore("Known gap: a Variant holding Null And a number raises Invalid use of Null.")]
     public async Task AVariantHoldingNull_AndANumber_IsNull()
-        => CollectionAssert.AreEqual(new[] { "True" }, await Run(
+        => CollectionAssert.AreEqual(new[] { "True" }, await RunMainAsync(
             "Dim V As Variant",
             "V = Null",
             "Debug.Print IsNull(V And 7)"));
@@ -40,7 +40,7 @@ public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
     [TestMethod]
     [Ignore("Known gap: comparing a Single to a LongLong raises Type mismatch.")]
     public async Task ASingle_ComparedToALongLong_IsCompared()
-        => CollectionAssert.AreEqual(new[] { "True" }, await Run(
+        => CollectionAssert.AreEqual(new[] { "True" }, await RunMainAsync(
             "Dim S As Single",
             "Dim L As LongLong",
             "S = 1",
@@ -52,7 +52,7 @@ public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
     [TestMethod]
     [Ignore("Known gap: a Variant holding an array let-coerced to a String or a number is an internal error.")]
     public async Task AVariantHoldingAnArray_LetCoercedToAScalar_IsATypeMismatch()
-        => CollectionAssert.AreEqual(new[] { "13", "13", "13" }, await Run(
+        => CollectionAssert.AreEqual(new[] { "13", "13", "13" }, await RunMainAsync(
             "On Error Resume Next",
             "Dim V As Variant",
             "Dim S As String",
