@@ -1,3 +1,4 @@
+using RDCore.External;
 using RDCore.Runtime.Execution;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.Errors;
@@ -48,7 +49,12 @@ public sealed class StdLibDispatcher : IExternalCallProvider
     /// </para>
     /// </remarks>
     /// <param name="session">The session the implementations read their state from.</param>
-    public static StdLibDispatcher For(IRuntimeSession session)
+    /// <param name="outside">
+    /// What the members that reach outside the platform reach - the dialogs, the desktop, the settings (<see cref="StdInteraction"/>). None of it unless said
+    /// otherwise (<see cref="ExternalWorld.None"/>), which is what an analysis is composed with.
+    /// </param>
+    /// <param name="cancellation">The run's cancellation, which stops a member that waits - a dialog - from waiting.</param>
+    public static StdLibDispatcher For(IRuntimeSession session, ExternalWorld? outside = null, CancellationToken cancellation = default)
     {
         // a collection makes the enumerator its For Each is driven by, which is an object of a class of its own.
         var enumerators = new StdEnumVariant(session);
@@ -62,7 +68,7 @@ public sealed class StdLibDispatcher : IExternalCallProvider
             [typeof(IStdErrClass)] = new ErrObject(session),
             [typeof(IStdConversionModule)] = new StdConversion(session),
             [typeof(IStdHiddenModule)] = new StdHidden(session),
-            [typeof(IStdInteractionModule)] = new StdInteraction(),
+            [typeof(IStdInteractionModule)] = new StdInteraction(session, outside, cancellation),
             [typeof(IStdCollectionClass)] = new StdCollection(session, enumerators),
             [typeof(IStdEnumVariantClass)] = enumerators,
         });
@@ -292,6 +298,8 @@ public sealed class StdLibDispatcher : IExternalCallProvider
         VBRuntimeHResult error => new VBErrorValue(Convert.ToInt32(error.BoxedValue)),
         // an object is the identity of one: what the argument is the storage of, as with the rest.
         VBRuntimeValue<VBRuntimeObjectId> identity => new VBObjectValue(identity.StoredValue),
+        // vbNullString is a String bound to no characters at all, and boxes nothing: it is the default the interpreter fills an omitted Optional String with.
+        VBRuntimeValue<string> { StoredValue: null } => VBStringValue.VBNullString,
         _ => argument.BoxedValue switch
         {
             // a Variant stores the whole typed value it wraps, and an array and a UDT are each boxed around

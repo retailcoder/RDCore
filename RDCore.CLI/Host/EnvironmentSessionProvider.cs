@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using RDCore.CLI.Host.Symbols;
 using RDCore.Runtime.Execution;
 using RDCore.External;
+using RDCore.External.Settings;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Libraries;
@@ -53,6 +54,12 @@ public interface IEnvironmentSessionProvider
     Action<IReadOnlyList<string>, long>? OutputStreamed { get; set; }
 
     /// <summary>
+    /// Where the dialogs a program opens are asked to be answered: the language server, which asks its client. Whoever owns the connection to the language server
+    /// sets it; while it is <see langword="null"/>, a program's dialogs are those of the platform the host runs on.
+    /// </summary>
+    IHostInteractionChannel? Interaction { get; set; }
+
+    /// <summary>
     /// The composed runtime session.
     /// </summary>
     /// <exception cref="InvalidOperationException">
@@ -72,11 +79,13 @@ public interface IEnvironmentSessionProvider
     ProgramExecution Execution { get; }
 
     /// <summary>
-    /// What a program reaches outside the platform - the automation servers that the objects of a referenced library are held by, and the native libraries
-    /// <c>Declare</c> statements name: those of the machine this host runs on, unless it was given others.
+    /// What a program reaches outside the platform - the automation servers that the objects of a referenced library are held by, the native libraries
+    /// <c>Declare</c> statements name, the dialogs, the desktop and the settings: those of the machine this host runs on, unless it was given others.
     /// </summary>
     /// <remarks>
-    /// Of the host and not of a run, because the objects a program made outlive it in the session and have to be let go of by what made them.
+    /// Of the host and not of a run, because the objects a program made outlive it in the session and have to be let go of by what made them. Once a session is
+    /// composed, it is the session's: its settings are those of the workspace it was composed from, its dialogs are answered by the client when the client shows
+    /// dialogs, and their title is the name of its project.
     /// </remarks>
     ExternalWorld Outside { get; }
 
@@ -98,9 +107,13 @@ public sealed class EnvironmentSessionProvider(
     ExternalWorld? outside = null) : IEnvironmentSessionProvider
 {
     private IRuntimeSession? _session;
+    private ExternalWorld? _world;
 
     /// <inheritdoc/>
-    public ExternalWorld Outside => outside ?? MachineExternal.World;
+    public ExternalWorld Outside => _world ?? outside ?? MachineExternal.World;
+
+    /// <inheritdoc/>
+    public IHostInteractionChannel? Interaction { get; set; }
 
     /// <inheritdoc/>
     public bool IsComposed => _session is not null;
@@ -189,6 +202,7 @@ public sealed class EnvironmentSessionProvider(
 
         var libraries = new LibrarySymbolProvider(workspaceRoot, referenced, environment.Is64Bit);
 
+        _world = ComposeWorld(project, workspaceRoot);
         _session = RuntimeSessionComposer.Compose(environment, MapReferences(project.References), [configuration, stdLib, libraries, modules], Output);
         // an event that something outside the workspace raises while no program runs prints where this host says: said as it is printed, and kept.
         _session.Turn.EventScope = BeginEvent;
@@ -212,6 +226,20 @@ public sealed class EnvironmentSessionProvider(
         }
 
         return _session;
+    }
+
+    // the settings are the workspace's (RD-VBAL 2.1.1), and a dialog is the client's to answer when it shows dialogs, the platform's when it does not.
+    private ExternalWorld ComposeWorld(RDCoreProject project, Uri workspaceRoot)
+    {
+        var host = outside ?? MachineExternal.World;
+        var settings = new JsonWorkspaceSettings(fileSystem, workspaceRoot.IsFile ? workspaceRoot.LocalPath : workspaceRoot.OriginalString);
+        return host with
+        {
+            Interaction = new RelayedUserInteraction(this, host.Interaction),
+            DialogTitle = project.Name is { Length: > 0 } name ? name : host.DialogTitle,
+            WorkspaceSettings = settings,
+            ProgramSettings = MachinePlatform.ProgramSettings(environment, settings),
+        };
     }
 
     // the .rdproj declares references in precedence order (RD-VBAL §2.3.1.2); the list index is the rank.

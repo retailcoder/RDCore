@@ -144,6 +144,9 @@ internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) :
             .AddSingleton<ReplProgram>()
             .AddSingleton<ReplDocument>()
             .AddSingleton<IReplConsole, ReplConsole>()
+            // the dialogs a program opens are asked at the shell's console.
+            .AddSingleton<IConsoleKeys, SystemConsoleKeys>()
+            .AddSingleton(provider => new ReplUserInteraction(provider.GetRequiredService<IConsoleKeys>(), System.Console.Out))
             .AddSingleton<IReplPlatformClient>(provider => new ReplPlatformClient(provider.GetRequiredService<RDCoreConsoleClientApp>()))
             .AddSingleton<IReplCommand, HelpReplCommand>()
             .AddSingleton<IReplCommand, ShowSplashReplCommand>()
@@ -245,6 +248,8 @@ internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) :
 internal class RDCoreConsoleClientApp(
     IOptions<SdkAppOptions> options,
     IChildConnectionFactory connectionFactory,
+    ReplUserInteraction interaction,
+    IReplConsole console,
     ILogger<RDCoreConsoleClientApp> logger)
     : RDCoreClientApp(options, connectionFactory, logger)
 {
@@ -263,12 +268,16 @@ internal class RDCoreConsoleClientApp(
             ProgramDebugging = new ProgramDebugging(true),
             SessionAnalyze = new SessionAnalyze(true),
             SessionMemoryAccess = new SessionMemoryAccess(true),
+            // the shell answers the dialogs a program opens, at its console.
+            SessionInteraction = new SessionInteraction(true),
         },
     };
 
+    // the handlers of the dialogs are built by the language client's own container; what they answer with is the shell's, in the outer one.
     protected override void ConfigureServices(IServiceCollection services)
-    {
-    }
+        => services
+            .AddSingleton(interaction)
+            .AddSingleton(console);
 
     protected override ClientCapabilities ConfigureClientCapabilities(ClientCapabilities capabilities)
     {
@@ -277,9 +286,9 @@ internal class RDCoreConsoleClientApp(
     }
 
     protected override void ConfigureHandlers(IRDCoreLSPHandlerConfigurationBuilder builder)
-    {
-        // TODO
-    }
+        => builder
+            .WithHandler<ReplMessageBoxHandler>()
+            .WithHandler<ReplInputBoxHandler>();
 
     protected override async Task OnLanguageClientStartedAsync(ILanguageClient client, CancellationToken token)
     {
@@ -400,9 +409,15 @@ internal class RDCoreConsoleEnvironmentHost : RDCorePlatformServerHost<RDCoreCon
                 provider.GetRequiredService<IChildConnectionFactory>().Create,
                 ExternalHost.DefaultExecutable,
                 provider.GetRequiredService<ILogger<ExternalHost>>()))
+            // the dialogs and the desktop are the machine's, and are not reached through the external host: nothing about showing a message box can take a
+            // process down. Whether the client answers the dialogs instead is the session's to say (EnvironmentSessionProvider).
             .AddSingleton(provider => new ExternalWorld(
                 new RemoteAutomationServer(provider.GetRequiredService<ExternalHost>()),
-                new RemoteNativeLibraryHost(provider.GetRequiredService<ExternalHost>())))
+                new RemoteNativeLibraryHost(provider.GetRequiredService<ExternalHost>()))
+            {
+                Interaction = MachinePlatform.Interaction,
+                Desktop = MachinePlatform.Desktop,
+            })
             .AddSingleton<IEnvironmentSessionProvider, EnvironmentSessionProvider>();
     }
 
@@ -485,6 +500,8 @@ internal class RDCoreConsoleEnvironmentHostApp(
     protected override void OnLanguageServerStarted(ILanguageServer server)
     {
         sessionProvider.OutputStreamed = (lines, total) => _ = SendNotificationAsync(new HostOutputNotification { Lines = lines, Total = total }, CancellationToken.None);
+        // and the dialogs it opens are asked of the language server, which asks its client if the client shows dialogs.
+        sessionProvider.Interaction = new LanguageServerInteractionChannel(this);
         base.OnLanguageServerStarted(server);
     }
 

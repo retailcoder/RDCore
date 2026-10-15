@@ -362,6 +362,9 @@
   <data name="Repl_Theme_Summary" xml:space="preserve">
     <value>Modifie le thème (couleurs) de la console, ou affiche les thèmes disponibles: THEME LIST|&lt;nom&gt;</value>
   </data>
+  <data name="Repl_Theme_ChooseHint" xml:space="preserve">
+    <value>←/→ pour choisir, ENTRÉE pour appliquer, ÉCHAP pour garder le thème actuel</value>
+  </data>
   <data name="Repl_Theme_ErrThemeNotFound" xml:space="preserve">
     <value>THEME INTROUVABLE</value>
   </data>

@@ -46,6 +46,7 @@ internal sealed class CoreLanguageServerApp(
     ISymbolSyncService symbolSync,
     IDocumentDiagnosticsService diagnostics,
     IDiagnosticsPublisher publisher,
+    IClientInteractionRelay interaction,
     ILogger<CoreLanguageServerApp> logger)
     : RDCoreServerApp(options, serverStateProvider, healthCheckService, transportLayer, logger)
 {
@@ -228,6 +229,9 @@ internal sealed class CoreLanguageServerApp(
     protected override void OnLanguageServerStarted(ILanguageServer server)
     {
         LogIfEnabled(LogLevel.Information, "🚀 Language Server app started");
+
+        // the dialogs of the program that runs in the environment host are relayed to this client, if it answers them.
+        interaction.Attach(new LanguageServerInteractionClient(server));
 
         // Bring up the core child components once the client<->LS connection is live. Each runs as a
         // supervised background task (not awaited): a child that is slow or fails to attach must not

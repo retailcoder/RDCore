@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RDCore.LanguageServer.Debugging;
+using RDCore.LanguageServer.Runtime;
 using RDCore.SDK.Client;
 using RDCore.SDK.Client.Connection;
 using RDCore.SDK.Extensibility;
@@ -26,7 +27,7 @@ internal class RDCoreServerProxyFactory(IServiceProvider services) : IRDCoreServ
             services.GetRequiredService<ILogger<RDCoreClientApp>>(),
             extensionInfo);
 
-    // what the environment host says of its own accord - the lines a program prints - is heard by the language server, whoever configured the proxy.
+    // what the environment host says of its own accord - the lines a program prints, the dialogs it opens - is heard by the language server, whoever configured the proxy.
     private Action<IRDCoreLSPHandlerConfigurationBuilder> Handlers(CoreServerComponent component, Action<IRDCoreLSPHandlerConfigurationBuilder>? configure)
         => builder =>
         {
@@ -34,6 +35,8 @@ internal class RDCoreServerProxyFactory(IServiceProvider services) : IRDCoreServ
             if (component is CoreServerComponent.EnvironmentHost)
             {
                 builder.WithHandler<HostOutputHandler>();
+                builder.WithHandler<HostMessageBoxHandler>();
+                builder.WithHandler<HostInputBoxHandler>();
             }
         };
 
@@ -44,6 +47,7 @@ internal class RDCoreServerProxyFactory(IServiceProvider services) : IRDCoreServ
             if (component is CoreServerComponent.EnvironmentHost)
             {
                 collection.AddSingleton(_ => services.GetRequiredService<IHostOutputRelay>());
+                collection.AddSingleton(_ => services.GetRequiredService<IClientInteractionRelay>());
             }
         };
 }

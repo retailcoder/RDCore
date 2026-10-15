@@ -135,6 +135,13 @@ public class LanguageServerCapabilities
     /// memory, over <c>rdcore/session/memory/peek</c> and <c>.../poke</c>.
     /// </summary>
     public SessionMemoryAccess SessionMemoryAccess { get; set; } = new();
+
+    /// <summary>
+    /// If supported, the language server relays the dialogs a program opens - <c>MsgBox</c> and <c>InputBox</c> - to the client, over
+    /// <c>rdcore/session/interaction/*</c>, and the client answers them. A client that does not expect it is never asked, and the program's dialogs are
+    /// the platform's own.
+    /// </summary>
+    public SessionInteraction SessionInteraction { get; set; } = new();
 }
 
 public static class RDCorePlatformProtocol
@@ -177,6 +184,28 @@ public static class RDCorePlatformProtocol
     /// <see cref="HostExecuteParams.StreamOutput"/>.
     /// </summary>
     public const string HostOutput = "rdcore/host/output";
+
+    /// <summary>
+    /// Asks the language server to have the client answer a program's <c>MsgBox</c>: a request from the environment host, which waits for the answer as the
+    /// program waits for the dialog.
+    /// </summary>
+    public const string HostMessageBox = "rdcore/host/interaction/msgBox";
+
+    /// <summary>
+    /// Asks the language server to have the client answer a program's <c>InputBox</c>. See <see cref="HostMessageBox"/>.
+    /// </summary>
+    public const string HostInputBox = "rdcore/host/interaction/inputBox";
+
+    /// <summary>
+    /// Asks a client to answer a program's <c>MsgBox</c>: the language-server side of <see cref="HostMessageBox"/>, sent to a client that expects
+    /// <see cref="SessionInteraction"/>.
+    /// </summary>
+    public const string SessionMessageBox = "rdcore/session/interaction/msgBox";
+
+    /// <summary>
+    /// Asks a client to answer a program's <c>InputBox</c>. See <see cref="SessionMessageBox"/>.
+    /// </summary>
+    public const string SessionInputBox = "rdcore/session/interaction/inputBox";
 
     /// <summary>
     /// Asks the environment host to resume a program that waits at a stop, or to take one step of it.
@@ -306,6 +335,7 @@ public static class RDCorePlatformProtocol
 [JsonDerivedType(typeof(SessionAnalyze))]
 [JsonDerivedType(typeof(SemanticAnalysis))]
 [JsonDerivedType(typeof(SessionMemoryAccess))]
+[JsonDerivedType(typeof(SessionInteraction))]
 [JsonPolymorphic]
 public abstract record class CorePlatformClientCapability(bool IsSupported = true);
 
@@ -370,6 +400,16 @@ public record class SessionAnalyze(bool IsSupported = false) : CorePlatformClien
 /// memory — <c>PEEK</c> and <c>POKE</c>, unchecked.
 /// </summary>
 public record class SessionMemoryAccess(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+
+/// <summary>
+/// Advertises that the dialogs a program opens - <c>MsgBox</c>, <c>InputBox</c> - reach the client: the language server provides it by relaying them over
+/// <c>rdcore/session/interaction/*</c>, and a client that expects it answers them (the interactive shell asks at its console).
+/// </summary>
+/// <remarks>
+/// The environment host asks the language server whatever its client is (<c>rdcore/host/interaction/*</c>); a client that did not expect this capability is never
+/// asked, and the language server answers that nobody was, so that the host shows the dialog of the platform it runs on.
+/// </remarks>
+public record class SessionInteraction(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
 
 /// <summary>
 /// Advertises that the declaring component runs the semantic analysis pass over the code it holds and answers with its model - <c>rdcore/host/semantics</c>,

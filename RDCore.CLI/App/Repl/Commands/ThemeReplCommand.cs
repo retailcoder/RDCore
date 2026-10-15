@@ -1,9 +1,23 @@
+using RDCore.CLI.App.Console;
 using RDCore.CLI.Themes;
 
 namespace RDCore.CLI.App.Repl.Commands;
 
-internal record class ThemeReplCommand(IAppThemeService Themes) : IReplCommand
+/// <summary>
+/// <c>THEME &lt;name&gt;</c> sets the shell's theme; <c>THEME LIST</c> shows the themes there are, with the current one selected, and applies the one chosen.
+/// </summary>
+/// <remarks>
+/// The choice is a <see cref="ConsoleMenu"/>, the same that answers the buttons of a program's <c>MsgBox</c>: the arrow keys move, <kbd>Enter</kbd> applies the theme
+/// selected - its first letter applies it at once - and <kbd>Esc</kbd> keeps the current one. A shell whose input is a script has no keys to choose with, and is shown
+/// the list, the current theme marked.
+/// </remarks>
+/// <param name="Themes">The themes, and the current one.</param>
+/// <param name="Keys">Where the choice is read.</param>
+/// <param name="Output">Where the menu is drawn; the console unless said otherwise.</param>
+internal record class ThemeReplCommand(IAppThemeService Themes, IConsoleKeys Keys, TextWriter? Output = null) : IReplCommand
 {
+    private const string Indent = "  ";
+
     public string Name => ReplCommandNames.Theme;
 
     public IReadOnlyList<string> Aliases => [];
@@ -13,16 +27,20 @@ internal record class ThemeReplCommand(IAppThemeService Themes) : IReplCommand
     public async Task<ReplCommandResult> ExecuteAsync(ReplCommandContext context, string arguments, CancellationToken token)
     {
         var current = Themes.Theme.Name;
-        var themes = Themes.ThemeNames;
+        // in a stable order, so that the same keys choose the same theme every time.
+        IReadOnlyList<string> themes = [.. Themes.ThemeNames.Order(StringComparer.OrdinalIgnoreCase)];
 
         if ("LIST".Equals(arguments, StringComparison.OrdinalIgnoreCase))
         {
-            foreach (var theme in themes)
+            if (Keys.IsInteractive && themes.Count > 0)
             {
-                var marker = current.Equals(theme, StringComparison.OrdinalIgnoreCase) ? "   🎨\t" : "\t";
-                context.Console.WriteLine($"{marker} {theme}");
+                Choose(context, themes, current, token);
             }
-            context.Console.WriteLine();
+            else
+            {
+                List(context, themes, current);
+            }
+
             return ReplCommandResult.Continue;
         }
 
@@ -31,5 +49,33 @@ internal record class ThemeReplCommand(IAppThemeService Themes) : IReplCommand
 
         Themes.SetTheme(target);
         return ReplCommandResult.Continue;
+    }
+
+    private void Choose(ReplCommandContext context, IReadOnlyList<string> themes, string current, CancellationToken token)
+    {
+        var output = Output ?? System.Console.Out;
+        var selected = Math.Max(0, themes.ToList().FindIndex(theme => theme.Equals(current, StringComparison.OrdinalIgnoreCase)));
+        var menu = new ConsoleMenu(themes, selected);
+
+        context.Console.WriteLine(Indent + Resources.Repl_Theme_ChooseHint);
+        var chosen = menu.Run(Keys, output, Indent, token);
+        output.WriteLine();
+        context.Console.WriteLine();
+
+        if (chosen is { } index && !themes[index].Equals(current, StringComparison.OrdinalIgnoreCase))
+        {
+            Themes.SetTheme(themes[index]);
+        }
+    }
+
+    private static void List(ReplCommandContext context, IReadOnlyList<string> themes, string current)
+    {
+        foreach (var theme in themes)
+        {
+            var marker = current.Equals(theme, StringComparison.OrdinalIgnoreCase) ? "   🎨\t" : "\t";
+            context.Console.WriteLine($"{marker} {theme}");
+        }
+
+        context.Console.WriteLine();
     }
 }

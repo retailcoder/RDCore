@@ -78,4 +78,13 @@ public interface IRuntimeEnvironmentProfile
     /// switch for both would be of no use to anyone who needs one and not the other.
     /// </remarks>
     bool AllowAutomation { get; }
+
+    /// <summary>
+    /// 🎯 Whether the legacy settings members (<c>SaveSetting</c>, <c>GetSetting</c>, <c>GetAllSettings</c>, <c>DeleteSetting</c>) use the <em>Windows Registry</em>, as
+    /// MS-VBA does. <c>false</c> unless the workspace asks for it: they use the <em>workspace application settings</em>.
+    /// </summary>
+    /// <remarks>
+    /// 👉 Only Windows has a registry. Elsewhere the workspace application settings are used whatever this says (<strong>RD-VBAL §2.1.1</strong>).
+    /// </remarks>
+    bool LegacyRegistrySettings { get; }
 }

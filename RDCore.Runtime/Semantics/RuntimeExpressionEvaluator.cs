@@ -1589,6 +1589,20 @@ public sealed class RuntimeExpressionEvaluator(IOperatorRuntimeSemanticsProvider
                 return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.InternalError());
             }
 
+            // an object is Set-assigned to the Variant it is collected into, as it is to a Variant parameter of its own (MS-VBAL §5.3.1.11): the element holds the
+            // object, and nothing asks it for a default value it may not have - which is what CallByName(obj, "Prop", VbSet, other) passes.
+            if (SetCoercion is { } setCoercion && argumentResult.Value.Result is VBObjectValue)
+            {
+                var setResult = setCoercion.EvaluateSetCoercion(session, argumentNodes[i], argumentResult.Value.Result!, VBVariantType.TypeInfo);
+                if (!setResult.IsSuccess)
+                {
+                    return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.Error(setResult.ErrorInfo!));
+                }
+
+                array.TrySetElement(BindingKnowledge.NewCell(setResult.Result!), i);
+                continue;
+            }
+
             var coercionFrame = new LetCoercionStackFrame(argumentNodes[i].Identity, InputIndex.CoercionSourceValue,
                 argumentResult.Value.Result!, new VBTypeDescValue(VBVariantType.TypeInfo), ConversionSite.Argument);
             var coercionResult = LetCoercionProvider!.EvaluateLetCoercionSemantics(session.Symbols.Resolver, argumentNodes[i], coercionFrame);

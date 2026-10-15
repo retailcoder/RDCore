@@ -18,6 +18,7 @@ public enum VBMsgBoxStyle
     VBYesNo = 4,
     VBRetryCancel = 5,
     VBCritical = 16,
+    VBQuestion = 32,
     VBExclamation = 48,
     VBInformation = 64,
     VBDefaultButton2 = 256,

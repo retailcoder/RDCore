@@ -32,8 +32,9 @@ public interface IStdInteractionModule
     /// <strong>MS-VBAL 6.1.2.8.1.2 Choose</strong>
     /// </summary>
     /// <remarks>
-    /// Invokes a <em>method</em> or <em>property</em> by name against the specified <see cref="VBObjectValue"/>.<br/>
-    /// 👉 <strong>Indexing is one-based</strong> regardless of any <c>Option Base</c> directives.<br/>
+    /// Returns a value from a list of choices, selected by a one-based index.<br/>
+    /// 👉 <strong>Indexing is one-based</strong> regardless of any <c>Option Base</c> directives. An index that is not a whole number is rounded to the nearest one,
+    /// the way a <c>Single</c> is Let-coerced to a <c>Long</c> (banker's rounding).<br/>
     /// ⚠️ This function yields a <see cref="VBNullValue"/> if the supplied <c>index</c> is out of bounds.
     /// </remarks>
     /// <param name="index">An <see cref="VBIntegerValue"/> between 1 and the number of supplied choices.</param>
@@ -105,23 +106,27 @@ public interface IStdInteractionModule
     /// </summary>
     /// <remarks>
     /// Gets a two-dimensional <see cref="VBArrayValue"/> containing <see cref="VBStringValue"/> elements representing 
-    /// the configuration setting <em>keys</em> and <em>values</em> of the specified <em>settings store</em> section if it exists under the specified <em>application name</em>; returns <see cref="VBEmptyValue"/> otherwise.
+    /// the configuration setting <em>keys</em> and <em>values</em> of the specified <em>settings store</em> section if it exists under the specified <em>application name</em>; returns <see cref="VBEmptyValue"/> otherwise.<br/>
+    /// 👉 The settings store is the <em>workspace application settings</em> (<c>ProgramSettings:appName:section</c> in the workspace's <c>appsettings.json</c>), unless the
+    /// environment asks for the legacy <em>Windows Registry</em> store (<c>LegacyRegistrySettings</c>), which only Windows has.
     /// </remarks>
     /// <param name="appName">A <see cref="VBStringValue"/> expression containing the name of the application or project whose key settings are requested.</param>
     /// <param name="section">A <see cref="VBStringValue"/> expression containing the name of the configuration section whose key settings are requested.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBVariantValue> GetAllSettings(VBStringValue appName, VBStringValue section);
     /// <summary>
-    /// 🧩 <strong>RD-VBAL 6.1.2.8.1.7.1 GetJsonSettings</strong><br/>
+    /// 🧩 <strong>RD-VBAL 6.1.2.8.1.7.1 GetAllJsonSettings</strong><br/>
     /// </summary>
     /// <remarks>
     /// Gets a two-dimensional <see cref="VBArrayValue"/> containing <see cref="VBStringValue"/> elements representing 
-    /// the configuration setting <em>keys</em> and <em>values</em> of the specified <em>managed configuration</em> section if it exists; returns <see cref="VBEmptyValue"/> otherwise.
+    /// the configuration setting <em>keys</em> and <em>values</em> of the specified <em>managed configuration</em> section if it exists; returns <see cref="VBEmptyValue"/> otherwise.<br/>
+    /// 👉 Always the <em>workspace application settings</em>, whatever store <see cref="GetAllSettings"/> is configured to use. A child of the section that is a section of its
+    /// own (it has children, and no value) is not a key setting of it, and is left out.
     /// </remarks>
     /// <param name="key">A <see cref="VBStringValue"/> expression containing the <em>managed configuration path</em> (e.g. <c>"Configuration:ConnectionStrings"</c>) of the configuration section whose key settings are requested.</param>
     /// <param name="config">A <see cref="VBStringValue"/> expression containing the <strong>name of a .json configuration file</strong> associated with the <em>workspace application</em>.<br/><strong>Optional</strong>: The default value of this parameter depends on the current host configuration (normally <c>"appsettings.json"</c>).</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> GetJsonSettings(VBStringValue key, VBStringValue? config = default);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> GetAllJsonSettings(VBStringValue key, VBStringValue? config = default);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.8.1.8 GetAttr</strong>
@@ -151,7 +156,9 @@ public interface IStdInteractionModule
     /// <strong>MS-VBAL 6.1.2.8.1.10 GetSetting</strong>
     /// </summary>
     /// <remarks>
-    /// Gets a <see cref="VBStringValue"/> representing the <em>key setting value</em> from the specified application's entry in an <em>implementation-defined application registry</em> if it exists; gets the specified <c>defaultValue</c> otherwise.
+    /// Gets a <see cref="VBStringValue"/> representing the <em>key setting value</em> from the specified application's entry in an <em>implementation-defined application registry</em> if it exists; gets the specified <c>defaultValue</c> otherwise.<br/>
+    /// 👉 The registry is the <em>workspace application settings</em> (<c>ProgramSettings:appName:section:key</c> in the workspace's <c>appsettings.json</c>), unless the
+    /// environment asks for the legacy <em>Windows Registry</em> store (<c>LegacyRegistrySettings</c>), which only Windows has.
     /// </remarks>
     /// <param name="appName">A <see cref="VBStringValue"/> expression containing the name of the application or project whose key settings are requested.</param>
     /// <param name="section">A <see cref="VBStringValue"/> expression containing the name of the configuration section whose key settings are requested.</param>
@@ -175,11 +182,14 @@ public interface IStdInteractionModule
     /// <strong>MS-VBAL 6.1.2.8.1.11 IIf</strong>
     /// </summary>
     /// <remarks>
-    /// Returns one of two parts, <strong>depending on the <em>evaluation of an expression</em></strong>.<br/><br/>
+    /// Returns one of two parts, <strong>depending on the <em>evaluation of an expression</em></strong>.<br/>
+    /// 👉 Both parts are evaluated, whichever is returned: they are arguments. A <c>Null</c> expression is not <c>True</c>, and returns <paramref name="falsePart"/>.<br/><br/>
     /// 💡 The wording of how this function and its parameters are specified does not exclude 🧩<c>VBDeferredValue</c> <em>language core extension</em> values that could...<br/>
     /// <em>fix the confusion around this function</em> while opening the door to something like <em>first-class delegates</em> in (extended) RD-VBA.
     /// </remarks>
-    /// <param name="pathName">A <see cref="VBStringValue"/> expression containing a file name. May specify a <em>mapped drive</em> and/or a <em>directory/folder path</em>.</param>
+    /// <param name="expression">The expression to evaluate, Let-coerced to <c>Boolean</c>.</param>
+    /// <param name="truePart">The value returned when <paramref name="expression"/> is <c>True</c>.</param>
+    /// <param name="falsePart">The value returned when <paramref name="expression"/> is not <c>True</c>.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBVariantValue> IIf(VBVariantValue expression, VBVariantValue truePart, VBVariantValue falsePart);
     
@@ -187,7 +197,9 @@ public interface IStdInteractionModule
     /// <strong>MS-VBAL 6.1.2.8.1.12 InputBox</strong>
     /// </summary>
     /// <remarks>
-    /// Displays a <em>prompt</em> in a dialog box, waits for the user to input text or click a button, and returns a <see cref="VBStringValue"/> containing the user-provided input.
+    /// Displays a <em>prompt</em> in a dialog box, waits for the user to input text or click a button, and returns a <see cref="VBStringValue"/> containing the user-provided input.<br/>
+    /// 👉 A dialog that is cancelled - its <em>Cancel</em> button, or <kbd>Esc</kbd> - returns <c>vbNullString</c>, a string bound to a null pointer; a dialog confirmed with
+    /// nothing typed returns a zero-length string. The two compare equal, and <c>StrPtr</c> is how a caller tells them apart.
     /// </remarks>
     /// <param name="prompt">A <see cref="VBStringValue"/> expression containing the <em>message</em> to be displayed in the dialog box.</param>
     /// <param name="title">A <see cref="VBStringValue"/> expression containing the <em>title</em> of the dialog box.<br/><strong>Optional</strong>: uses the name of the <em>workspace project</em> if omitted.</param>
@@ -203,7 +215,10 @@ public interface IStdInteractionModule
     /// <strong>MS-VBAL 6.1.2.8.1.13 MsgBox</strong>
     /// </summary>
     /// <remarks>
-    /// Displays a message in a dialog box, waits for the user to click a button, and returns a <see cref="VBMsgBoxResult"/> value indicating which button the user clicked.
+    /// Displays a message in a dialog box, waits for the user to click a button, and returns a <see cref="VBMsgBoxResult"/> value indicating which button the user clicked.<br/>
+    /// 👉 <kbd>Esc</kbd> closes the dialog at window level, as its close button does: it answers <see cref="VBMsgBoxResult.VBCancel"/> when the dialog has a
+    /// <em>Cancel</em> button, <see cref="VBMsgBoxResult.VBOk"/> when <em>OK</em> is its only button, and does nothing for <see cref="VBMsgBoxStyle.VBYesNo"/> and
+    /// <see cref="VBMsgBoxStyle.VBAbortRetryIgnore"/>, which cannot be dismissed without choosing.
     /// </remarks>
     /// <param name="prompt">A <see cref="VBStringValue"/> expression containing the <em>message</em> to be displayed in the dialog box.</param>
     /// <param name="buttons">A <see cref="VBMsgBoxStyle"/> expression containing the <strong>sum of values</strong> specifying the number and type of buttons to display, the icon style to use, the identity of the default button, and the modality of the message box.<br/><strong>Optional</strong>: defaults to <see cref="VBMsgBoxStyle.VBDefaultButton1"/> (<see cref="VBIntegerValue"/> <c>0</c>).</param>
@@ -232,8 +247,9 @@ public interface IStdInteractionModule
     /// </summary>
     /// <remarks>
     /// <strong>Asynchronously</strong> runs an executable program and returns a <see cref="VBDoubleValue"/> representing the implementation-defined program's <em>task ID</em> (or <em>process ID</em>) if successful, otherwise returns the data value <c>0</c>.<br/>
+    /// 👉 Only Windows runs the program; elsewhere nothing is run, and the answer is <c>0</c>.
     /// </remarks>
-    /// <param name="path">A <see cref="VBStringValue"/> expression containing the <em>value</em> to be evaluated against the <em>range</em>.</param>
+    /// <param name="path">A <see cref="VBStringValue"/> expression containing the name of the program to run, and any arguments or command-line switches it takes.</param>
     /// <param name="windowStyle">A <see cref="VBIntegerValue"/> (<see cref="VBAppWinStyle"/>) expression containing a value that sets the <em>style</em> of the window in which the program is to be executed.<br/><strong>Optional</strong>: <see cref="VBAppWinStyle.VBMinimizedFocus"/> unless specified otherwise.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBDoubleValue> Shell(VBVariantValue path, VBAppWinStyle windowStyle = VBAppWinStyle.VBMinimizedFocus);
@@ -255,6 +271,18 @@ public interface IStdInteractionModule
     /// <param name="varExpr">A <see cref="VBArrayValue"/> containing <see cref="VBVariantValue"/> elements representing expressions to be evaluated.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBVariantValue> Switch(params VBVariantValue[] varExpr);
+
+    /// <summary>
+    /// <strong>MacScript</strong> Runs an AppleScript script and returns what it returns.
+    /// </summary>
+    /// <remarks>
+    /// A hidden member of MS-VBA's <c>Interaction</c> module, kept for the Macintosh versions of Office. It resolves, so that code written for both platforms
+    /// compiles, and raises a run-time error when it is called: RD-VBA has no AppleScript to run.
+    /// </remarks>
+    /// <param name="script">The AppleScript source, or the path of a compiled script.</param>
+    /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
+    [StdLibMember(IsHidden = true)]
+    RuntimeSemanticsEvaluationResult<VBVariantValue> MacScript(VBStringValue script);
     #endregion
 
     #region 6.1.2.8.2. Public Subroutines
@@ -264,7 +292,8 @@ public interface IStdInteractionModule
     /// </summary>
     /// <remarks>
     /// Changes the focus to the named application window, without affecting whether it is maximized or minimized.<br/>
-    /// 👉 The title is compared to the title of each running application; with no exact match, any application whose title <em>begins with</em> it is activated.
+    /// 👉 The title is compared to the title of each running application; with no exact match, any application whose title <em>begins with</em> it is activated.<br/>
+    /// 👉 Only Windows has application windows to activate; elsewhere this does nothing.
     /// </remarks>
     /// <param name="title">A <see cref="VBStringValue"/> expression containing the title in the title bar of the application window to activate, or the task ID that <see cref="Shell"/> returned.</param>
     /// <param name="wait">A <see cref="VBBooleanValue"/> expression specifying whether the calling application has the focus before activating another.<br/><strong>Optional</strong>: <c>False</c> unless specified otherwise, which activates the application immediately.</param>
@@ -290,7 +319,7 @@ public interface IStdInteractionModule
     /// 💥 A run-time error occurs if the section or key setting does not exist.
     /// </remarks>
     /// <param name="appName">A <see cref="VBStringValue"/> expression containing the name of the application or project to which the section or key setting applies.</param>
-    /// <param name="section">A <see cref="VBStringValue"/> expression containing the name of the section where the key setting is being deleted.<br/><strong>Optional</strong>: given only the application name, nothing is deleted from it; given the section as well, the section is deleted with all of its key settings.</param>
+    /// <param name="section">A <see cref="VBStringValue"/> expression containing the name of the section where the key setting is being deleted.<br/><strong>Optional</strong>: given only the application name, every section of the application is deleted; given the section as well, the section is deleted with all of its key settings.</param>
     /// <param name="key">A <see cref="VBStringValue"/> expression containing the name of the key setting being deleted.<br/><strong>Optional</strong>.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult DeleteSetting(VBStringValue appName, VBStringValue? section = default, VBStringValue? key = default);
@@ -308,12 +337,27 @@ public interface IStdInteractionModule
     /// <param name="setting">A <see cref="VBStringValue"/> expression containing the value the key is being set to.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult SaveSetting(VBStringValue appName, VBStringValue section, VBStringValue key, VBStringValue setting);
+    /// <summary>
+    /// 🧩 <strong>RD-VBAL 6.1.2.8.2.4.1 SaveJsonSetting</strong><br/>
+    /// </summary>
+    /// <remarks>
+    /// Saves a <em>managed configuration</em> setting in the <em>workspace application settings</em>, creating the sections of its path - and the file - as needed:
+    /// what <see cref="GetJsonSetting"/> reads back.<br/>
+    /// 💥 An error occurs if the setting can't be saved for any reason. The value is written as a JSON string, and a configuration file that is written to is written
+    /// as JSON without its comments.
+    /// </remarks>
+    /// <param name="key">A <see cref="VBStringValue"/> expression containing the <em>managed configuration path</em> of the setting (e.g. <c>"Configuration:ConnectionStrings:AppDb"</c>).</param>
+    /// <param name="setting">A <see cref="VBStringValue"/> expression containing the value the setting is being set to.</param>
+    /// <param name="config">A <see cref="VBStringValue"/> expression containing the <strong>name of a .json configuration file</strong> associated with the <em>workspace application</em>.<br/><strong>Optional</strong>: The default value of this parameter depends on the current host configuration (normally <c>"appsettings.json"</c>).</param>
+    /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
+    RuntimeSemanticsEvaluationResult SaveJsonSetting(VBStringValue key, VBStringValue setting, VBStringValue? config = default);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.8.2.5 SendKeys</strong>
     /// </summary>
     /// <remarks>
-    /// Sends one or more keystrokes to the active window as if typed at the keyboard.
+    /// Sends one or more keystrokes to the active window as if typed at the keyboard.<br/>
+    /// 👉 Only Windows has an active window to send them to; elsewhere this does nothing.
     /// </remarks>
     /// <param name="string">A <see cref="VBStringValue"/> expression specifying the keystrokes to send.</param>
     /// <param name="wait">A <see cref="VBBooleanValue"/> expression specifying the wait mode.<br/><strong>Optional</strong>: <c>False</c> unless specified otherwise, which returns control to the procedure immediately after the keys are sent. With <c>True</c>, the keystrokes <strong>must</strong> be processed before control is returned.</param>

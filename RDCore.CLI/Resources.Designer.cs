@@ -755,6 +755,15 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to ←/→ to choose, ENTER to apply, ESC to keep the current theme.
+        /// </summary>
+        public static string Repl_Theme_ChooseHint {
+            get {
+                return ResourceManager.GetString("Repl_Theme_ChooseHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to THEME NOT FOUND.
         /// </summary>
         public static string Repl_Theme_ErrThemeNotFound {

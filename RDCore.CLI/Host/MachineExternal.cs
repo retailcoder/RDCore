@@ -12,7 +12,7 @@ using System.IO.Abstractions;
 namespace RDCore.CLI.Host;
 
 /// <summary>
-/// The outside world of the machine this host runs on - its automation servers and its native libraries - for a host that was not composed with its own:
+/// The outside world of the machine this host runs on - its automation servers, its native libraries, its dialogs and its desktop - for a host that was not composed with its own:
 /// reached through an external host of this process.
 /// </summary>
 /// <remarks>
@@ -31,7 +31,11 @@ internal static class MachineExternal
                 NullLogger<ChildConnection>.Instance),
             ExternalHost.DefaultExecutable,
             NullLogger<ExternalHost>.Instance);
-        return new ExternalWorld(new RemoteAutomationServer(host), new RemoteNativeLibraryHost(host));
+        return new ExternalWorld(new RemoteAutomationServer(host), new RemoteNativeLibraryHost(host))
+        {
+            Interaction = MachinePlatform.Interaction,
+            Desktop = MachinePlatform.Desktop,
+        };
     }, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>

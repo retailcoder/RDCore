@@ -238,6 +238,16 @@ public record class SdkEnvironmentOptions
     /// Finer-grained answers - per library, per member, per caller - are an <c>IExternalCallInterceptor</c>'s job.
     /// </remarks>
     public bool AllowAutomation { get; set; } = true;
+
+    /// <summary>
+    /// 🎯 Whether <c>SaveSetting</c>, <c>GetSetting</c>, <c>GetAllSettings</c> and <c>DeleteSetting</c> use the <em>Windows Registry</em>
+    /// (<c>HKEY_CURRENT_USER\Software\VB and VBA Program Settings</c>), as MS-VBA does. <c>false</c> by default: they use the <em>workspace application
+    /// settings</em> (the workspace's <c>appsettings.json</c>), like <c>GetJsonSetting</c>.
+    /// </summary>
+    /// <remarks>
+    /// Only Windows has a registry: elsewhere this is ignored, and the workspace application settings are used either way.
+    /// </remarks>
+    public bool LegacyRegistrySettings { get; set; }
 }
 
 public record class SdkServerAppOptions
