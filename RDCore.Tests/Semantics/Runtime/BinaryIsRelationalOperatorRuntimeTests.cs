@@ -1,5 +1,6 @@
 using RDCore.Runtime.Semantics.Operators.Relational;
 using RDCore.SDK.Model.Errors;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Runtime;
 
@@ -50,6 +51,15 @@ public sealed class BinaryIsRelationalOperatorRuntimeTests : OperatorRelationalR
     [TestMethod]
     public void AVariantThatHoldsNoObject_IsObjectRequired()
         => AssertError(Evaluate(Is(), new VBVariantValue(new VBLongValue(5)), VBObjectValue.Nothing), VBRuntimeErrorId.ObjectRequired);
+
+    // an array has no reference to read: reading one used to throw out of the operator.
+    [TestMethod]
+    public void AnArray_IsObjectRequired()
+        => AssertError(Evaluate(Is(), new VBResizableArrayValue([(0, 1)], VBLongType.TypeInfo), VBObjectValue.Nothing), VBRuntimeErrorId.ObjectRequired);
+
+    [TestMethod]
+    public void AVariantThatHoldsAnArray_IsObjectRequired()
+        => AssertError(Evaluate(Is(), VBObjectValue.Nothing, new VBVariantValue(new VBResizableArrayValue([(0, 1)]))), VBRuntimeErrorId.ObjectRequired);
 
     [TestMethod]
     public void NonObjectLeftHandSide_IsObjectRequired()

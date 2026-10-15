@@ -68,13 +68,13 @@ public record class BinaryIsRelationalOperatorRuntimeSemantics(
         var lhs = Held(frame[InputIndex.BinaryLeftOperand]);
         var rhs = Held(frame[InputIndex.BinaryRightOperand]);
 
-        // an operand is comparable by reference identity when it is currently bound to one — true of
-        // VBObjectValue/VBNothingValue always, and of a VBVariantValue currently holding an object.
-        if (lhs.RuntimeValue is not VBRuntimeValue<VBRuntimeObjectId> lhsReference)
+        // an operand is comparable by reference identity when it is an object reference — VBObjectValue/VBNothingValue, which a
+        // Variant may hold. Nothing else is one, and the value of an array is its elements, with no reference to read.
+        if (lhs is not VBObjectValue || lhs.RuntimeValue is not VBRuntimeValue<VBRuntimeObjectId> lhsReference)
         {
             return OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
         }
-        if (rhs.RuntimeValue is not VBRuntimeValue<VBRuntimeObjectId> rhsReference)
+        if (rhs is not VBObjectValue || rhs.RuntimeValue is not VBRuntimeValue<VBRuntimeObjectId> rhsReference)
         {
             return OnObjectRequired(expression, Exceptions.VBIsOp_ObjectRequired);
         }
