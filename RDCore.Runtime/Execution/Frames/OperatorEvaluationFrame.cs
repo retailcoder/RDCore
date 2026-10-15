@@ -34,7 +34,7 @@ namespace RDCore.Runtime.Execution.Frames
         /// </summary>
         /// <param name="index">The <see cref="InputIndex"/> value describing the index of the operator to retrieve.</param>
         /// <returns>The <see cref="VBTypedValue"/> operand at the specified index.</returns>
-        public VBTypedValue this[InputIndex index] => Operands[Convert.ToInt32(index)];
+        public VBTypedValue this[InputIndex index] => Operands[(int)index];
 
         SyntaxNodeId IStackFrame.NodeId => NodeId;
         ImmutableArray<VBTypedValue> IStackFrame.Inputs => Operands;
