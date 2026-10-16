@@ -53,7 +53,7 @@ public static class OperationPlanner
             return plan;
         }
 
-        plan = _binary.GetOrAdd((@operator, left, right), key => new OperationPlan(key.Operator, [key.Left, key.Right], BinaryEffectiveType(key.Operator, key.Left, key.Right)));
+        plan = _binary.GetOrAdd((@operator, left, right), key => new OperationPlan(key.Operator, [key.Left, key.Right], BinaryEffectiveType(key.Operator, AliasedTypeOf(key.Left), AliasedTypeOf(key.Right))));
         _recentBinary.Add(@operator, left, right, plan);
         return plan;
     }
@@ -71,7 +71,7 @@ public static class OperationPlanner
             return plan;
         }
 
-        plan = _unary.GetOrAdd((@operator, operand), key => new OperationPlan(key.Operator, [key.Operand], UnaryEffectiveType(key.Operator, key.Operand)));
+        plan = _unary.GetOrAdd((@operator, operand), key => new OperationPlan(key.Operator, [key.Operand], UnaryEffectiveType(key.Operator, AliasedTypeOf(key.Operand))));
         _recentUnary.Add(@operator, operand, null, plan);
         return plan;
     }
@@ -103,6 +103,14 @@ public static class OperationPlanner
     private static bool IsDeferredType(VBType type) => type is VBVariantType or VBObjectType;
 
     private static VBType ValueTypeOf(VBType declared) => declared is VBFixedStringType ? VBStringType.TypeInfo : declared;
+
+    // MS-VBAL §2.2: LongPtr is an alias, of LongLong in a 64-bit environment and of Long in a 32-bit one, and is operated on as what it is an alias of.
+    private static VBType AliasedTypeOf(VBType type) => type switch
+    {
+        VBLongPtrType_x64 => VBLongLongType.TypeInfo,
+        VBLongPtrType_x86 => VBLongType.TypeInfo,
+        _ => type,
+    };
 
     private static VBType? BinaryEffectiveType(string @operator, VBType left, VBType right) => @operator switch
     {

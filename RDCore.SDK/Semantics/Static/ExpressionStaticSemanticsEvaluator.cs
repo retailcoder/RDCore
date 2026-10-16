@@ -390,8 +390,15 @@ public static class ExpressionStaticSemanticsEvaluator
             : StaticSemanticsEvaluationResult.Success(VBUnknownType.TypeInfo);
     }
 
-    // MS-VBAL §5.2.3.4: the members of an enumeration are Longs, and an operand declared as the enumeration is a Long to the operator.
-    internal static VBType AsOperand(VBType declared) => declared is VBEnumType ? VBLongType.TypeInfo : declared;
+    // MS-VBAL §5.2.3.4: the members of an enumeration are Longs, and an operand declared as the enumeration is a Long to the operator; MS-VBAL §2.2:
+    // LongPtr is an alias, of LongLong in a 64-bit environment and of Long in a 32-bit one, and an operand declared LongPtr is what it is an alias of.
+    internal static VBType AsOperand(VBType declared) => declared switch
+    {
+        VBEnumType => VBLongType.TypeInfo,
+        VBLongPtrType_x64 => VBLongLongType.TypeInfo,
+        VBLongPtrType_x86 => VBLongType.TypeInfo,
+        _ => declared,
+    };
 
     private static StaticSemanticsEvaluationResult EvaluateUnaryOperator(
         StaticEvaluationContext context, ExpressionNode expression, VBUnaryOperatorExpressionNode unaryOperator)

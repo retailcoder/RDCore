@@ -45,6 +45,18 @@ public sealed class MixedTypeOperationTests
             "Debug.Print TypeName(L \\ 2.5)",
             "Debug.Print TypeName(I Mod 2.5)"));
 
+    // MS-VBAL 2.2: LongPtr is an alias of LongLong in a 64-bit environment, and is operated on as one.
+    [TestMethod]
+    public async Task ALongPtr_IsOperatedOn_AsWhatItIsAnAliasOf()
+        => CollectionAssert.AreEqual(new[] { "6", "LongLong", "True", "-5", "-6" }, await RunMainAsync(
+            "Dim P As LongPtr",
+            "P = 5",
+            "Debug.Print P + 1",
+            "Debug.Print TypeName(P + 1)",
+            "Debug.Print P = 5",
+            "Debug.Print -P",
+            "Debug.Print Not P"));
+
     // MS-VBAL 5.6.9.5: a Single and a LongLong are compared as Doubles.
     [TestMethod]
     public async Task ASingle_ComparedToALongLong_IsCompared()
