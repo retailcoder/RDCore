@@ -41,6 +41,20 @@ public sealed record class BoundLiteral(LiteralExpressionNode Literal) : BoundNo
 public sealed record class BoundName(SimpleNameExpressionNode Name, Symbol Symbol) : BoundNode(Name);
 
 /// <summary>
+/// A simple name that is a variable: a parameter, a local or <c>Static</c> variable, or a field (<strong>MS-VBAL §5.6.10</strong>), whose value is read.
+/// </summary>
+/// <remarks>
+/// What reading a name is - a call, a constant, an enumeration member's value, or a variable's value - depends on the symbol alone, and is decided once,
+/// here. A variable of the procedure the name is written in has its <see cref="Slot"/> in the procedure's <see cref="FrameLayout"/>.
+/// </remarks>
+/// <param name="Name">The simple name expression.</param>
+/// <param name="Variable">The variable the name resolves to.</param>
+/// <param name="Slot">The slot of the variable, when it is a parameter or a variable of the procedure the name is written in, and is not <c>Static</c>.</param>
+/// <param name="IsAutoInstantiated">Whether the variable is declared <c>As New</c> (<strong>MS-VBAL §5.2.3.1.4</strong>): a reference to it creates the
+/// object it does not hold yet.</param>
+public sealed record class BoundVariable(SimpleNameExpressionNode Name, Symbol Variable, FrameSlot? Slot, bool IsAutoInstantiated) : BoundNode(Name);
+
+/// <summary>
 /// A binary operation (<strong>MS-VBAL §5.6.9</strong>), its operands, and its plan.
 /// </summary>
 /// <param name="Operation">The binary operator expression.</param>

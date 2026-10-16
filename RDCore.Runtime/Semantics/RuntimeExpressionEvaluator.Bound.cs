@@ -1,3 +1,4 @@
+using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.Literals;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Source;
@@ -49,12 +50,42 @@ public sealed partial class RuntimeExpressionEvaluator
         return node;
     }
 
+    // the layout of the activations of each definition of a procedure, made once for it: a procedure defined again is another symbol, with a layout of its own.
+    private readonly ConditionalWeakTable<Symbol, FrameLayout> _layouts = [];
+
     // the binding is the static evaluation of the expression, in the scope the evaluation resolves its names from. An expression with no such scope - one
-    // that is not written in code the session defines - is not bound.
-    private static BoundNode Bind(IRuntimeSession session, ScopeTree scopes, ExpressionNode expression, RuntimeEvaluationContext context)
-        => scopes.TryGetScope(context.Scope, out var scope)
-            ? ExpressionBinder.Bind(new StaticEvaluationContext(session.Symbols.Resolver, scope), expression).NodeOf(expression) ?? new BoundFallback(expression)
-            : new BoundFallback(expression);
+    // that is not written in code the session defines - is not bound. Its variables are bound to the slots of the procedure it is written in, when that is
+    // the procedure the current activation is of (a Uri's equality ignores its fragment, which is what tells two procedures of a module apart).
+    private BoundNode Bind(IRuntimeSession session, ScopeTree scopes, ExpressionNode expression, RuntimeEvaluationContext context)
+    {
+        if (!scopes.TryGetScope(context.Scope, out var scope))
+        {
+            return new BoundFallback(expression);
+        }
+
+        var frame = session.CallStack.Current is CallStackFrame { Procedure: { } procedure } && procedure.Uri.AbsoluteUri == context.Scope.AbsoluteUri
+            ? _layouts.GetValue(procedure, FrameLayout.Of)
+            : null;
+
+        return ExpressionBinder.Bind(new StaticEvaluationContext(session.Symbols.Resolver, scope), expression, frame).NodeOf(expression)
+            ?? new BoundFallback(expression);
+    }
+
+    // a variable of the current activation is read through its slot; any other - a Static variable, a field, a variable of an activation the slot is not
+    // of - is looked up, as a name that is not bound is.
+    private RuntimeSemanticsEvaluationResult ReadBoundVariable(IRuntimeSession session, BoundVariable variable)
+    {
+        var typed = (ITypedSymbol)variable.Variable;
+        if (variable.Slot is { } slot && session.CallStack.Current is CallStackFrame frame
+            && frame.TryReadSlot(slot, variable.Variable, out var handle, out var referenced))
+        {
+            return ReadVariable(session, typed, handle, referenced, variable.IsAutoInstantiated);
+        }
+
+        return ReadVariable(session, typed, session.Symbols.Resolver.GetValue(variable.Variable),
+            session.CallStack.Current is { } current && current.TryGetReferencedType(variable.Variable, out var type) ? type : null,
+            variable.IsAutoInstantiated);
+    }
 
     private RuntimeSemanticsEvaluationResult EvaluateBound(IRuntimeSession session, BoundNode node, RuntimeEvaluationContext context)
     {
@@ -75,6 +106,7 @@ public sealed partial class RuntimeExpressionEvaluator
     private RuntimeSemanticsEvaluationResult EvaluateBoundNode(IRuntimeSession session, BoundNode node, RuntimeEvaluationContext context) => node switch
     {
         BoundLiteral literal => LiteralExpressionRuntimeSemantics.Instance.Evaluate(session, new(), literal.Literal),
+        BoundVariable variable => ReadBoundVariable(session, variable),
         BoundName name => ReadSymbol(session, context, name.Symbol, nameOfEnclosingFunctionIsItsResult: true),
         BoundBinary binary => EvaluateBoundBinary(session, binary, context),
         BoundUnary unary => EvaluateBoundUnary(session, unary, context),
@@ -111,6 +143,7 @@ public sealed partial class RuntimeExpressionEvaluator
     private static bool HasNoEffect(BoundNode node) => node switch
     {
         BoundLiteral => true,
+        BoundVariable { IsAutoInstantiated: false, Variable: ITypedSymbol { ResolvedType: VBNumericType or VBStringType or VBBooleanType or VBDateType } } => true,
         BoundName { Symbol: ITypedSymbol { ResolvedType: VBNumericType or VBStringType or VBBooleanType or VBDateType } and not VBTypeMemberSymbol } => true,
         BoundName { Symbol: VBTypeMemberSymbol { Kind: SymbolKindExt.Field or SymbolKindExt.Variable or SymbolKindExt.Constant } member }
             => member is ITypedSymbol { ResolvedType: VBNumericType or VBStringType or VBBooleanType or VBDateType },

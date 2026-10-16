@@ -8,6 +8,7 @@ using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Binding;
 using RDCore.SDK.Semantics.Instructions;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
@@ -217,6 +218,61 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// <inheritdoc/>
     public bool TryGetAddress(Symbol symbol, out MemoryAddress address)
         => _byRefAliases.TryGetValue(symbol.SemanticId, out address) || _addresses.TryGetAddress(symbol, out address);
+
+    // the slots of the activation (IR lowering D2), filled as they are read: each holds the address of its variable - this activation's own, or the one a
+    // ByRef parameter is an alias of - and the type a Variant reference parameter reads its variable as. A variable's address does not change while the
+    // activation runs (Push and PushByRef declare each variable once); the binding at the address does (a POKE rebinds it), which is why it is read there
+    // every time rather than kept.
+    private readonly record struct Slot(bool IsFilled, MemoryAddress Address, VBType? ReferencedType);
+
+    private FrameLayout? _layout;
+    private Slot[] _slots = [];
+
+    /// <summary>
+    /// Reads the binding of a variable through its slot (<see cref="FrameSlot"/>), filling the slot the first time it is read.
+    /// </summary>
+    /// <param name="slot">The slot the variable was bound to.</param>
+    /// <param name="variable">The variable.</param>
+    /// <param name="handle">Its binding.</param>
+    /// <param name="referencedType">The declared type of the variable a Variant reference parameter is bound to, if the variable is such a parameter.</param>
+    /// <returns>
+    /// <see langword="false"/> when the slot is not this activation's to read - its layout is not the one of the definition of the procedure this is an
+    /// activation of, or the variable is not declared yet - and the variable is to be read the way it always is.
+    /// </returns>
+    /// <remarks>
+    /// An activation is of one definition of one procedure, which is what the layout of the first slot read in it is: a slot of any other layout is not
+    /// read here.
+    /// </remarks>
+    public bool TryReadSlot(FrameSlot slot, Symbol variable, [NotNullWhen(true)] out IBindingHandle? handle, out VBType? referencedType)
+    {
+        handle = null;
+        referencedType = null;
+
+        _layout ??= slot.Layout;
+        if (!ReferenceEquals(_layout, slot.Layout))
+        {
+            return false;
+        }
+
+        if (_slots.Length == 0)
+        {
+            _slots = new Slot[slot.Layout.Count];
+        }
+
+        ref var held = ref _slots[slot.Index];
+        if (!held.IsFilled)
+        {
+            if (!TryGetAddress(variable, out var address))
+            {
+                return false;
+            }
+
+            held = new Slot(true, address, _referencedTypes.TryGetValue(variable.SemanticId, out var referenced) ? referenced : null);
+        }
+
+        referencedType = held.ReferencedType;
+        return Storage.TryRead(held.Address, out handle);
+    }
 
     /// <inheritdoc/>
     public bool IsByRefParameter(Symbol symbol) => _byRefAliases.ContainsKey(symbol.SemanticId);

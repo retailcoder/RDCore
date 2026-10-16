@@ -66,7 +66,8 @@ public sealed class ExpressionBinderTests
         Assert.AreEqual(VBDoubleType.TypeInfo, bindings[d.Identity]!.DeclaredType);
     }
 
-    // the bound tree (IR lowering §3.1): each name bound to the symbol it resolves to, each operation to its plan and its operands' nodes.
+    // the bound tree (IR lowering §3.1): each name bound to the variable it resolves to, each operation to its plan and its operands' nodes. A field is no
+    // variable of an activation, and has no slot.
     [TestMethod]
     public void AnOperation_OfNames_IsBoundToATreeOfItsOperands()
     {
@@ -79,8 +80,30 @@ public sealed class ExpressionBinderTests
         var binary = Assert.IsInstanceOfType<BoundBinary>(node);
         Assert.AreSame(sum, binary.Operation);
         Assert.AreSame(OperationPlanner.ForValues(Tokens.AdditionOp, VBLongType.TypeInfo, VBDoubleType.TypeInfo), binary.Plan);
-        Assert.AreEqual("x", Assert.IsInstanceOfType<BoundName>(binary.Left).Symbol.Name);
-        Assert.AreEqual("d", Assert.IsInstanceOfType<BoundName>(binary.Right).Symbol.Name);
+        var left = Assert.IsInstanceOfType<BoundVariable>(binary.Left);
+        Assert.AreEqual("x", left.Variable.Name);
+        Assert.IsNull(left.Slot);
+        Assert.AreEqual("d", Assert.IsInstanceOfType<BoundVariable>(binary.Right).Variable.Name);
+    }
+
+    // IR lowering D2: an activation has a slot for each parameter and each variable of its procedure, in the order they are declared - but none for a Static
+    // variable, which outlives it.
+    [TestMethod]
+    public void TheLayoutOfAProcedure_HasASlotForEachParameterAndVariable_ButNotAStaticOne()
+    {
+        var procedure = new VBProcedureMemberSymbol(Root, Root, "DoSomething", ScopeKind.Module, SymbolKindExt.Procedure, VBVoidType.TypeInfo, R, R, AccessModifier.Public);
+        var parameter = new VBParameterSymbol(Root, procedure.Uri, "value", R, R, ParameterKind.ExplicitByVal, VBLongType.TypeInfo);
+        var local = new VBLocalVariableSymbol(Root, procedure.Uri, "total", ScopeKind.Local, R, R, ResolvedType: VBDoubleType.TypeInfo);
+        var remembered = new VBLocalVariableSymbol(Root, procedure.Uri, "calls", ScopeKind.Local, R, R, IsStatic: true, ResolvedType: VBLongType.TypeInfo);
+
+        var layout = FrameLayout.Of(procedure with { Parameters = [parameter], Locals = [local, remembered] });
+
+        Assert.AreEqual(2, layout.Count);
+        Assert.IsTrue(layout.TryGetSlot(parameter, out var first));
+        Assert.AreEqual(0, first.Index);
+        Assert.IsTrue(layout.TryGetSlot(local, out var second));
+        Assert.AreEqual(1, second.Index);
+        Assert.IsFalse(layout.TryGetSlot(remembered, out _));
     }
 
     [TestMethod]

@@ -3,7 +3,10 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Errors;
+using RDCore.SDK.Model.Source;
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -49,6 +52,12 @@ public sealed class ExpressionBindings
     private readonly Dictionary<SyntaxNodeId, BoundNode> _nodes = [];
 
     /// <summary>
+    /// The layout of the activations of the procedure the expressions are written in, which binds its parameters and variables to their slots;
+    /// <see langword="null"/> when the expressions are bound outside a procedure, and no variable is bound to a slot.
+    /// </summary>
+    public FrameLayout? Frame { get; init; }
+
+    /// <summary>
     /// What each expression bound to, by its <c>Identity</c>.
     /// </summary>
     public IReadOnlyDictionary<SyntaxNodeId, BoundExpression> Bound => _bound;
@@ -84,9 +93,13 @@ public sealed class ExpressionBindings
         {
             LiteralExpressionNode literal => new BoundLiteral(literal),
 
-            // the name is resolved as the evaluation resolves it, from the same scope: the binding is the resolution, made once.
+            // the name is resolved as the evaluation resolves it, from the same scope: the binding is the resolution, made once. A variable is read; what
+            // anything else a name resolves to evaluates to is the symbol's to say.
             SimpleNameExpressionNode name when context.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope.Uri).Symbol is { } symbol
-                => new BoundName(name, symbol),
+                => IsVariable(symbol)
+                    ? new BoundVariable(name, symbol, Frame is { } frame && frame.TryGetSlot(symbol, out var slot) ? slot : null,
+                        symbol.GetProperty(SymbolProperties.AutoInstantiated))
+                    : new BoundName(name, symbol),
 
             VBBinaryOperatorExpressionNode binary when plan is not null && OperandNode(binary.Left) is { } left && OperandNode(binary.Right) is { } right
                 => new BoundBinary(binary, plan, left, right),
@@ -96,6 +109,12 @@ public sealed class ExpressionBindings
 
             _ => new BoundFallback(expression),
         };
+
+    // a parameter, a variable or a field, which a name reads the value of: no procedure, which it calls, nor a constant or an enumeration member, which have
+    // a value and no storage.
+    private static bool IsVariable(Symbol symbol)
+        => symbol is ITypedSymbol && symbol.Kind is SymbolKindExt.Variable or SymbolKindExt.Field
+            && symbol is not (VBProcedureMemberSymbol or VBFunctionMemberSymbol or VBPropertyGetMemberSymbol or VBLocalConstantSymbol or VBConstantMemberSymbol);
 
     // the node of an operand that is bound to something other than a fallback.
     private BoundNode? OperandNode(ExpressionNode operand) => NodeOf(operand) is { } node and not BoundFallback ? node : null;
@@ -144,9 +163,11 @@ public static class ExpressionBinder
     /// <param name="context">The context the expression is evaluated in. What the evaluation would record of its facts is not recorded: binding is not
     /// analyzing.</param>
     /// <param name="expression">The expression.</param>
-    public static ExpressionBindings Bind(StaticEvaluationContext context, ExpressionNode expression)
+    /// <param name="frame">The layout of the activations of the procedure the expression is written in, which binds its variables to their slots;
+    /// <see langword="null"/> to bind none to a slot.</param>
+    public static ExpressionBindings Bind(StaticEvaluationContext context, ExpressionNode expression, FrameLayout? frame = null)
     {
-        var bindings = new ExpressionBindings();
+        var bindings = new ExpressionBindings { Frame = frame };
         ExpressionStaticSemanticsEvaluator.Evaluate(context with { Facts = null, Bindings = bindings }, expression);
         return bindings;
     }

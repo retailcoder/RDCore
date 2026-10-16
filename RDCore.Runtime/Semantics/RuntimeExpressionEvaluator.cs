@@ -292,22 +292,37 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        var handle = session.Symbols.Resolver.GetValue(symbol);
+        return ReadVariable(session, typed, session.Symbols.Resolver.GetValue(symbol),
+            session.CallStack.Current is { } frame && frame.TryGetReferencedType(symbol, out var referenced) ? referenced : null,
+            symbol.GetProperty(SymbolProperties.AutoInstantiated));
+    }
 
+    /// <summary>
+    /// The value of a variable, read through its binding: what a name that resolves to a variable evaluates to, whether it is resolved now or was bound
+    /// already (<see cref="SDK.Semantics.Binding.BoundVariable"/>).
+    /// </summary>
+    /// <param name="session">The session the variable is read in.</param>
+    /// <param name="variable">The variable.</param>
+    /// <param name="handle">Its binding, in the current activation.</param>
+    /// <param name="referenced">The declared type of the variable a Variant reference parameter is bound to, if the variable is such a parameter.</param>
+    /// <param name="isAutoInstantiated">Whether the variable is declared <c>As New</c>.</param>
+    private RuntimeSemanticsEvaluationResult ReadVariable(
+        IRuntimeSession session, ITypedSymbol variable, IBindingHandle handle, VBType? referenced, bool isAutoInstantiated)
+    {
         // MS-VBAL §5.3.1.11: a Variant reference parameter bound to a variable of another type "is treated as having a declared type of Variant": what it reads is a
         // Variant, holding the variable's value as the type the variable is declared to be.
-        if (session.CallStack.Current is { } frame && frame.TryGetReferencedType(symbol, out var referenced))
+        if (referenced is not null)
         {
             return Assumed(RuntimeSemanticsEvaluationResult.Success(new VBVariantValue(referenced.CreateValue(handle.ForReading()))));
         }
 
-        var value = typed.ResolvedType.CreateValue(handle.ForReading());
+        var value = variable.ResolvedType.CreateValue(handle.ForReading());
 
         // MS-VBAL §5.2.3.1.4 / §2.5.1: a variable declared As New - a class module's default instance among them - is
         // never Nothing when it is referred to: the reference creates the object it was waiting for, which is also
         // why `Is Nothing` of it can never be true.
-        return symbol.GetProperty(SymbolProperties.AutoInstantiated) && value is VBObjectValue { } held && held.IsNothing()
-            && typed.ResolvedType is VBClassType { Symbol: { } classModule }
+        return isAutoInstantiated && value is VBObjectValue { } held && held.IsNothing()
+            && variable.ResolvedType is VBClassType { Symbol: { } classModule }
                 ? Assumed(AutoInstantiate(session, handle, classModule))
                 : Assumed(RuntimeSemanticsEvaluationResult.Success(value));
     }
