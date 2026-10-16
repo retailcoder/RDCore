@@ -322,8 +322,8 @@ public sealed class OperatorAnalysisFlagsTests : LetCoercionRuntimeSemanticsTest
         var not = new UnaryNotOperatorRuntimeSemantics(Provider(), Formatter());
 
         Assert.AreEqual(LogicalOperatorSemanticFlags.IsBitwiseSemantics | LogicalOperatorSemanticFlags.LongEffectiveType, FlagsOf(not, new VBLongValue(1)));
-        // MS-VBAL 5.6.9.8: the unary effective type of a Boolean is Integer.
-        Assert.AreEqual(LogicalOperatorSemanticFlags.IntegerEffectiveType, FlagsOf(not, VBBooleanValue.True));
+        // MS-VBAL 5.6.9.8.1: a Boolean is negated in a Boolean, as the binary logical operators have it.
+        Assert.AreEqual(LogicalOperatorSemanticFlags.BooleanEffectiveType, FlagsOf(not, VBBooleanValue.True));
         Assert.AreEqual(LogicalOperatorSemanticFlags.HasNullOperand | LogicalOperatorSemanticFlags.NullEffectiveType, FlagsOf(not, VBNullValue.Null));
     }
 

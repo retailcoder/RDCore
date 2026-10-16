@@ -354,12 +354,13 @@ public static class OperationPlanner
         _ => null,
     };
 
-    // MS-VBAL 5.6.9.8.1: Not negates the bits of an integral value, in the type of the value; a floating- or fixed-point value, a string and a date are a Long,
-    // as the binary logical operators take them.
+    // MS-VBAL 5.6.9.8.1: Not negates the bits of an integral value, in the type of the value - the -1 or 0 of a Boolean in a Boolean, as the binary logical
+    // operators have it; a floating- or fixed-point value, a string and a date are a Long, as the binary logical operators take them.
     private static VBType? NotEffectiveType(VBType operand) => operand switch
     {
         VBByteType => VBByteType.TypeInfo,
-        VBBooleanType or VBIntegerType or VBEmptyType => VBIntegerType.TypeInfo,
+        VBBooleanType => VBBooleanType.TypeInfo,
+        VBIntegerType or VBEmptyType => VBIntegerType.TypeInfo,
         VBLongType => VBLongType.TypeInfo,
         VBLongLongType => VBLongLongType.TypeInfo,
         IFloatingPointNumericType or IFixedPointNumericType or VBStringType or VBDateType => VBLongType.TypeInfo,

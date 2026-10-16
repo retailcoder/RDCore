@@ -5,19 +5,13 @@ namespace RDCore.Tests.Cli;
 /// <summary>
 /// What the golden master of the relational, logical and concatenation operators (<c>OtherOperatorsGoldenMasterTests</c>) found that the interpreter gets
 /// wrong, and is not an internal error: each is pinned here, ignored until it is fixed. The golden master records what the operators do today, these included.
-/// (A Variant holding an array let-coerced to a scalar, which it also found, is <c>ArrayLetCoercionTests</c> now.)
+/// (What it found and is fixed is tested on its own: <c>ArrayLetCoercionTests</c> and <c>MixedTypeOperationTests</c>.)
 /// </summary>
 [TestClass]
 public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
 {
     private static Task<string[]> RunMainAsync(params string[] lines)
         => RunAsync([], $"Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\n{string.Join("\r\n", lines)}\r\nEnd Sub\r\n");
-
-    // MS-VBAL 5.6.9.8.1: the bits of a Boolean are negated in a Boolean, as the binary logical operators have it. Not evaluates it in an Integer.
-    [TestMethod]
-    [Ignore("Known gap: the Not of a Boolean is an Integer.")]
-    public async Task TheNot_OfABoolean_IsABoolean()
-        => CollectionAssert.AreEqual(new[] { "Boolean" }, await RunMainAsync("Debug.Print TypeName(Not True)"));
 
     // MS-VBAL 5.6.9.4: Null is concatenated as the zero-length string. A Null operand is, but a Variant holding Null is let-coerced to a String, which raises 94.
     [TestMethod]

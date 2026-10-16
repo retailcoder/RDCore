@@ -45,6 +45,14 @@ public sealed class MixedTypeOperationTests
             "Debug.Print TypeName(L \\ 2.5)",
             "Debug.Print TypeName(I Mod 2.5)"));
 
+    // MS-VBAL 5.6.9.8.1: Not negates a Boolean in a Boolean.
+    [TestMethod]
+    public async Task TheNot_OfABoolean_IsABoolean()
+        => CollectionAssert.AreEqual(new[] { "Boolean", "False", "True" }, await RunMainAsync(
+            "Debug.Print TypeName(Not True)",
+            "Debug.Print Not True",
+            "Debug.Print Not False"));
+
     // MS-VBAL 2.2: LongPtr is an alias of LongLong in a 64-bit environment, and is operated on as one.
     [TestMethod]
     public async Task ALongPtr_IsOperatedOn_AsWhatItIsAnAliasOf()
