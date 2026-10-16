@@ -31,17 +31,15 @@ public sealed class BinaryIntegerDivisionOperatorEffectiveTypeTests : OperatorAr
         yield return [VbByte, VbEmpty, VbInteger];
         yield return [VbEmpty, VbByte, VbInteger];
 
-        yield return [VbBoolean, VbSingle, VbInteger];
-        yield return [VbBoolean, VbDouble, VbInteger];
-        yield return [VbBoolean, VbString, VbInteger];
-        yield return [VbBoolean, VbCurrency, VbInteger];
-        yield return [VbBoolean, VbDate, VbInteger];
-        yield return [VbBoolean, VbDecimal, VbInteger];
-
-        // row 3 (Boolean/Integer, Single/Double/…) is asymmetric in MS-VBAL — there is no
-        // mirrored "RHS is Boolean/Integer" row, so Integer \ Single lands here (Integer), while
-        // Single \ Integer falls through to the general rule below (Long).
-        yield return [VbInteger, VbSingle, VbInteger];
+        // MS-VBAL has a row (Boolean/Integer, Single/Double/…) that makes these an Integer, with no mirrored "RHS is
+        // Boolean/Integer" row; MS-VBA makes them a Long - TypeName(7% \ 2.5) is "Long" - as it does Single \ Integer.
+        yield return [VbBoolean, VbSingle, VbLong];
+        yield return [VbBoolean, VbDouble, VbLong];
+        yield return [VbBoolean, VbString, VbLong];
+        yield return [VbBoolean, VbCurrency, VbLong];
+        yield return [VbBoolean, VbDate, VbLong];
+        yield return [VbBoolean, VbDecimal, VbLong];
+        yield return [VbInteger, VbSingle, VbLong];
 
         yield return [VbSingle, VbInteger, VbLong];
         yield return [VbString, VbLong, VbLong];

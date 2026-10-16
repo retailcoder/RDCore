@@ -206,7 +206,6 @@ public static class OperationPlanner
         VBByteType when right is VBEmptyType => VBIntegerType.TypeInfo,
         VBEmptyType when right is VBByteType => VBIntegerType.TypeInfo,
 
-        VBBooleanType or VBIntegerType when right is VBSingleType or VBDoubleType or VBStringType or VBCurrencyType or VBDateType or VBDecimalType => VBIntegerType.TypeInfo,
         // a Boolean is a numeric operand here, the way the table above treats it as an Integer.
         IFloatingPointNumericType or IFixedPointNumericType or VBStringType or VBDateType
             when right is VBNumericType and not VBLongLongType or VBBooleanType or VBStringType or VBDateType or VBEmptyType => VBLongType.TypeInfo,

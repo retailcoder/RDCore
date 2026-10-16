@@ -33,6 +33,18 @@ public sealed class MixedTypeOperationTests
             "Debug.Print TypeName(B - A)",
             "Debug.Print B - A"));
 
+    // MS-VBAL 5.6.9.3.6-7: an Integer divided by a floating-point value is a Long, and a LongLong is a LongLong; Mod is the same.
+    [TestMethod]
+    public async Task TheIntegerDivision_OfAnIntegerByAFloatingPointValue_IsALong()
+        => CollectionAssert.AreEqual(new[] { "Long", "LongLong", "Long" }, await RunMainAsync(
+            "Dim I As Integer",
+            "Dim L As LongLong",
+            "I = 7",
+            "L = 7",
+            "Debug.Print TypeName(I \\ 2.5)",
+            "Debug.Print TypeName(L \\ 2.5)",
+            "Debug.Print TypeName(I Mod 2.5)"));
+
     // MS-VBAL 5.6.9.5: a Single and a LongLong are compared as Doubles.
     [TestMethod]
     public async Task ASingle_ComparedToALongLong_IsCompared()
