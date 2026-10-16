@@ -1,7 +1,4 @@
-﻿using RDCore.SDK.Model.AST.Abstract;
-using RDCore.SDK.Model.Errors;
-using RDCore.SDK.Model.Types;
-using RDCore.SDK.Model.Types.Abstract;
+﻿using RDCore.SDK.Model;
 using RDCore.SDK.Semantics.Static.Abstract;
 
 namespace RDCore.SDK.Semantics.Static.Operators;
@@ -9,39 +6,7 @@ namespace RDCore.SDK.Semantics.Static.Operators;
 /// <summary>
 /// <strong>MS-VBAL 5.6.9.4</strong> Binary '&amp;' Operator (static semantics)
 /// </summary>
-public record class BinaryConcatOperatorStaticSemantics : StaticSemantics
+public sealed record class BinaryConcatOperatorStaticSemantics : PlannedOperatorStaticSemantics
 {
-    /// <summary>
-    /// Determines a static <see cref="VBType"/> from specified operands.
-    /// </summary>
-    /// <param name="context">The compile-time context this expression is evaluated against.</param>
-    /// <param name="expression">The <em>expression node</em> being evaluated.</param>
-    /// <param name="operandDeclaredTypes">The declared type of each operand involved in the evaluation.</param>
-    /// <returns>
-    /// A <see cref="StaticSemanticsEvaluationResult"/> encapsulating the resulting <see cref="VBType"/> if successful, or <see cref="VBCompileErrorInfo"/> error metadata otherwise.
-    /// </returns>
-    public override StaticSemanticsEvaluationResult DetermineDeclaredType(StaticEvaluationContext context, ExpressionNode expression, params VBType[] operandDeclaredTypes)
-    {
-        var lhs = operandDeclaredTypes[(int)InputIndex.BinaryLeftOperand];
-        var rhs = operandDeclaredTypes[(int)InputIndex.BinaryRightOperand];
-        
-        // 🎯 the specification's table leaves Boolean out of the types that concatenate to a String, which would make `"Done: " & IsEmpty(x)`
-        // a compile error; MS-VBA compiles it, and Let-coerces the Boolean to "True" or "False" like any other simple data value.
-        return lhs switch
-        {
-            VBNumericType or VBBooleanType or VBFixedStringType or VBStringType or VBDateType or VBNullType
-                when rhs is VBNumericType or VBBooleanType or VBFixedStringType or VBStringType or VBDateType
-                => StaticSemanticsEvaluationResult.Success(VBStringType.TypeInfo),
-            VBNumericType or VBBooleanType or VBFixedStringType or VBStringType or VBDateType
-                when rhs is VBNumericType or VBBooleanType or VBFixedStringType or VBStringType or VBDateType or VBNullType
-                => StaticSemanticsEvaluationResult.Success(VBStringType.TypeInfo),
-
-            VBType and not VBArrayType and not VBUserDefinedType when rhs is VBVariantType
-                => StaticSemanticsEvaluationResult.Success(VBVariantType.TypeInfo),
-            VBVariantType when rhs is VBType and not VBArrayType and not VBUserDefinedType
-                => StaticSemanticsEvaluationResult.Success(VBVariantType.TypeInfo),
-
-            _ => StaticSemanticsEvaluationResult.Error(GetStaticTypeMismatchErrorInfo(expression, operandDeclaredTypes))
-        };
-    }
+    protected override string Operator => Tokens.ConcatOp;
 }

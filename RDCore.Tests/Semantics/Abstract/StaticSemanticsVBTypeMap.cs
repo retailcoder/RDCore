@@ -38,6 +38,9 @@ public abstract class StaticSemanticsVBTypeMap
 
     /// <summary>
     /// Encodes <strong>MS-VBAL 5.6.9.3</strong> Unary Operators base static semantics.
+    /// <para>
+    /// 👉 A Decimal operand makes a Decimal of a Currency or a Date (MS-VBAL 5.6.9.3), as the plan of the operation has it; no declaration has the type.
+    /// </para>
     /// </summary>
     /// <remarks>
     /// Unary operators may override these mappings.
@@ -119,7 +122,7 @@ public abstract class StaticSemanticsVBTypeMap
         [(VBCurrencyType.TypeInfo, VBSingleType.TypeInfo)] = VBCurrencyType.TypeInfo,
         [(VBCurrencyType.TypeInfo, VBDoubleType.TypeInfo)] = VBCurrencyType.TypeInfo,
         [(VBCurrencyType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
-        [(VBCurrencyType.TypeInfo, VBDecimalType.TypeInfo)] = VBCurrencyType.TypeInfo,
+        [(VBCurrencyType.TypeInfo, VBDecimalType.TypeInfo)] = VBDecimalType.TypeInfo,
         [(VBCurrencyType.TypeInfo, VBStringType.TypeInfo)] = VBCurrencyType.TypeInfo,
         [(VBByteType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
         [(VBIntegerType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
@@ -127,7 +130,7 @@ public abstract class StaticSemanticsVBTypeMap
         [(VBLongLongType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
         [(VBSingleType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
         [(VBDoubleType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
-        [(VBDecimalType.TypeInfo, VBCurrencyType.TypeInfo)] = VBCurrencyType.TypeInfo,
+        [(VBDecimalType.TypeInfo, VBCurrencyType.TypeInfo)] = VBDecimalType.TypeInfo,
         [(VBDateType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBDateType.TypeInfo, VBByteType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBDateType.TypeInfo, VBIntegerType.TypeInfo)] = VBDateType.TypeInfo,
@@ -136,7 +139,7 @@ public abstract class StaticSemanticsVBTypeMap
         [(VBDateType.TypeInfo, VBSingleType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBDateType.TypeInfo, VBDoubleType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBDateType.TypeInfo, VBCurrencyType.TypeInfo)] = VBDateType.TypeInfo,
-        [(VBDateType.TypeInfo, VBDecimalType.TypeInfo)] = VBDateType.TypeInfo,
+        [(VBDateType.TypeInfo, VBDecimalType.TypeInfo)] = VBDecimalType.TypeInfo,
         [(VBDateType.TypeInfo, VBStringType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBByteType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBIntegerType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
@@ -145,7 +148,7 @@ public abstract class StaticSemanticsVBTypeMap
         [(VBSingleType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBDoubleType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBCurrencyType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
-        [(VBDecimalType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
+        [(VBDecimalType.TypeInfo, VBDateType.TypeInfo)] = VBDecimalType.TypeInfo,
         [(VBStringType.TypeInfo, VBDateType.TypeInfo)] = VBDateType.TypeInfo,
         [(VBVariantType.TypeInfo, VBVariantType.TypeInfo)] = VBVariantType.TypeInfo,
         [(VBVariantType.TypeInfo, VBByteType.TypeInfo)] = VBVariantType.TypeInfo,

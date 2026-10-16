@@ -16,7 +16,7 @@ public sealed class MixedTypeOperationTests
     [TestMethod]
     public async Task ABoolean_AndANumber_AreAddedComparedAndCombined()
         => CollectionAssert.AreEqual(new[] { "1.5", "False", "7" }, await RunMainAsync(
-            "Dim B As Variant",
+            "Dim B As Boolean",
             "B = True",
             "Debug.Print B + 2.5",
             "Debug.Print B = 2.5",

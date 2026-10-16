@@ -175,8 +175,51 @@ public sealed class ExpressionStaticSemanticsEvaluatorTests
     }
 
     [TestMethod]
-    public void UnmappedOperatorToken_DefersToUnknown()
-        // Mod has no static semantics rule yet - the evaluator must defer, not throw or misreport.
+    public void AnObjectOperand_IsLateBound_NotACompileError()
+        // the default member of the object is evaluated at run time, which says what the operand is: the object is not made into a Variant.
+    {
+        var module = Module("Caller");
+        var o = ModuleField(module.Uri, "o", VBObjectType.TypeInfo);
+        var x = ModuleField(module.Uri, "x", VBLongType.TypeInfo);
+        var context = ContextAt(module.Uri, module with { Members = [o, x] }, o, x);
+
+        Assert.AreEqual(VBObjectType.TypeInfo, ExpressionStaticSemanticsEvaluator.Evaluate(context, NameOf("o")).Result, "the operand is the Object it is declared");
+        var result = ExpressionStaticSemanticsEvaluator.Evaluate(context, BinaryOf(Tokens.AdditionOp, NameOf("o"), NameOf("x")));
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(VBUnknownType.TypeInfo, result.Result);
+    }
+
+    [TestMethod]
+    [DataRow(Tokens.AdditionOp, "Boolean", "Double", "Double")]
+    [DataRow(Tokens.LogicalAndOp, "Boolean", "Long", "Long")]
+    [DataRow(Tokens.MultiplicationOp, "Single", "Single", "Single")]
+    [DataRow(Tokens.PowerOp, "Boolean", "Integer", "Double")]
+    public void TheDeclaredType_OfAnOperation_IsThePlanOfItsOperation(string token, string left, string right, string expected)
+    {
+        VBType TypeNamed(string name) => name switch
+        {
+            "Boolean" => VBBooleanType.TypeInfo,
+            "Integer" => VBIntegerType.TypeInfo,
+            "Long" => VBLongType.TypeInfo,
+            "Single" => VBSingleType.TypeInfo,
+            _ => VBDoubleType.TypeInfo,
+        };
+
+        var module = Module("Caller");
+        var a = ModuleField(module.Uri, "a", TypeNamed(left));
+        var b = ModuleField(module.Uri, "b", TypeNamed(right));
+        var context = ContextAt(module.Uri, module with { Members = [a, b] }, a, b);
+
+        var result = ExpressionStaticSemanticsEvaluator.Evaluate(context, BinaryOf(token, NameOf("a"), NameOf("b")));
+
+        Assert.IsTrue(result.IsSuccess, $"{left} {token} {right}");
+        Assert.AreEqual(TypeNamed(expected), result.Result);
+    }
+
+    [TestMethod]
+    public void Modulo_HasTheRuleOfTheIntegerDivision()
+        // MS-VBAL 5.6.9.3.7: Mod shares the table of '\'.
     {
         var module = Module("Caller");
         var x = ModuleField(module.Uri, "x", VBLongType.TypeInfo);
@@ -185,7 +228,7 @@ public sealed class ExpressionStaticSemanticsEvaluatorTests
         var result = ExpressionStaticSemanticsEvaluator.Evaluate(context, BinaryOf(Tokens.ModuloOp, NameOf("x"), NameOf("x")));
 
         Assert.IsTrue(result.IsSuccess);
-        Assert.AreEqual(VBUnknownType.TypeInfo, result.Result);
+        Assert.AreEqual(VBLongType.TypeInfo, result.Result);
     }
 
     [TestMethod]

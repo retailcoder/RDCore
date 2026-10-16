@@ -420,9 +420,8 @@ public static class ExpressionStaticSemanticsEvaluator
             : StaticSemanticsEvaluationResult.Success(VBUnknownType.TypeInfo);
     }
 
-    // One rule instance per call; every operator rule is either a parameterless-constructible record
-    // or a shared Lazy singleton, so this never allocates anything meaningful. `Mod` (Tokens.ModuloOp)
-    // has no rule yet - falls through to null, deferred by the caller like any other unmapped case.
+    // One rule instance per call; every operator rule is a small record or a shared Lazy singleton, so this never allocates anything meaningful. An
+    // operator with no rule falls through to null, deferred by the caller like any other unmapped case.
     internal static IStaticSemantics? ResolveBinaryOperatorRule(string token) => token switch
     {
         Tokens.AdditionOp => new BinaryAdditionOperatorStaticSemantics(),
@@ -430,6 +429,7 @@ public static class ExpressionStaticSemanticsEvaluator
         Tokens.MultiplicationOp => new BinaryMultiplicationOperatorStaticSemantics(),
         Tokens.DivisionOp => new BinaryDivisionOperatorStaticSemantics(),
         Tokens.IntegerDivisionOp => new BinaryIntegerDivisionOperatorStaticSematics(),
+        Tokens.ModuloOp => new BinaryModuloOperatorStaticSemantics(),
         Tokens.PowerOp => new BinaryExponentOperatorStaticSemantics(),
         Tokens.ConcatOp => new BinaryConcatOperatorStaticSemantics(),
         Tokens.CompareIsOp => new BinaryIsRefEqOperatorStaticSemantics(),
@@ -437,7 +437,7 @@ public static class ExpressionStaticSemanticsEvaluator
             or Tokens.CompareGreaterThanOrEqualOp or Tokens.CompareLessThanOp
             or Tokens.CompareLessThanOrEqualOp or Tokens.CompareLikeOp => new BinaryRelationalOperatorStaticSemantics(),
         Tokens.LogicalAndOp or Tokens.LogicalOrOp or Tokens.LogicalXOrOp
-            or Tokens.LogicalEqvOp or Tokens.LogicalImpOp => new BinaryLogicalOperatorStaticSemantics(),
+            or Tokens.LogicalEqvOp or Tokens.LogicalImpOp => new BinaryLogicalOperatorStaticSemantics(token),
         _ => null,
     };
 

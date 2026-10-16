@@ -18,6 +18,18 @@ public sealed class ExponentOperatorStaticSemanticsTests : BinaryOperatorStaticS
 
     public static IEnumerable<object[]> GetBinaryOperatorTypeMap()
         => StaticSemanticsVBTypeMap.OverrideBinaryOperatorMap(
+            // '^' is a Double of a Boolean as of anything numeric.
+            (VBBooleanType.TypeInfo, VBByteType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBByteType.TypeInfo, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBBooleanType.TypeInfo, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBBooleanType.TypeInfo, VBIntegerType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBIntegerType.TypeInfo, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBBooleanType.TypeInfo, VBLongType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBLongType.TypeInfo, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBBooleanType.TypeInfo, VBLongLongType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBLongLongType.TypeInfo, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBBooleanType.TypeInfo, VBSingleType.TypeInfo, VBDoubleType.TypeInfo),
+            (VBSingleType.TypeInfo, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo),
             (VBByteType.TypeInfo, VBByteType.TypeInfo, VBDoubleType.TypeInfo),
             (VBByteType.TypeInfo, VBIntegerType.TypeInfo, VBDoubleType.TypeInfo),
             (VBIntegerType.TypeInfo, VBByteType.TypeInfo, VBDoubleType.TypeInfo),
