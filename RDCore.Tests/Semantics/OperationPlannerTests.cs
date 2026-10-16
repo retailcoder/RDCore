@@ -58,6 +58,14 @@ public sealed class OperationPlannerTests
     }
 
     [TestMethod]
+    public void ThePlan_OfALateBoundOperand_IsDeferred()
+    {
+        // an operand whose type is not known statically is known when the operation is evaluated.
+        Assert.IsTrue(OperationPlanner.ForDeclared(Tokens.AdditionOp, VBUnknownType.TypeInfo, VBLongType.TypeInfo).IsDeferred);
+        Assert.IsTrue(OperationPlanner.ForDeclared(Tokens.LogicalNotOp, VBUnknownType.TypeInfo).IsDeferred);
+    }
+
+    [TestMethod]
     public void ThePlan_OfOtherDeclaredTypes_IsThePlanOfTheirValues()
     {
         Assert.AreSame(

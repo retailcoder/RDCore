@@ -111,6 +111,8 @@ public sealed class ConversionPlannerTests
         Assert.IsTrue(plan.IsDeferred);
         Assert.IsFalse(plan.IsTypeMismatch, "a deferred plan is not a mismatch: the value decides");
         Assert.AreEqual(VBLongType.TypeInfo, plan.Destination);
+
+        Assert.IsTrue(ConversionPlanner.ForDeclared(VBUnknownType.TypeInfo, VBStringType.TypeInfo).IsDeferred, "a late-bound source is known at run time");
     }
 
     [TestMethod]

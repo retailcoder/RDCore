@@ -50,8 +50,8 @@ public static class ConversionPlanner
     }
 
     /// <summary>
-    /// The plan of the let-coercion of a source of this declared type: <see cref="ConversionPlan.IsDeferred"/> when it is declared <c>Variant</c>, whose
-    /// value type is not known until the conversion is evaluated, and the plan of its value otherwise.
+    /// The plan of the let-coercion of a source of this declared type: <see cref="ConversionPlan.IsDeferred"/> when it is declared <c>Variant</c> or is
+    /// late-bound (<see cref="VBUnknownType"/>), whose value type is not known until the conversion is evaluated, and the plan of its value otherwise.
     /// </summary>
     /// <param name="source">The declared type of the source.</param>
     /// <param name="destination">The declared type the value is let-coerced to.</param>
@@ -60,7 +60,7 @@ public static class ConversionPlanner
     /// value types the plan is made for.
     /// </remarks>
     public static ConversionPlan ForDeclared(VBType source, VBType destination)
-        => source is VBVariantType
+        => source is VBVariantType or VBUnknownType
             ? new ConversionPlan(source, DestinationOf(destination), ConversionRule.None, IsDeferred: true)
             : ForValue(ValueTypeOf(source), destination);
 

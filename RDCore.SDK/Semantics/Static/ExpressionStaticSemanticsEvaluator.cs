@@ -53,6 +53,9 @@ public static class ExpressionStaticSemanticsEvaluator
             facts.Record(ExpressionFactDescriber.Describe(context, facts, expression, result));
         }
 
+        // so are its bindings, so that the plan of an operation is made for the declared types of its operands.
+        context.Bindings?.Record(expression, result);
+
         return result;
     }
 

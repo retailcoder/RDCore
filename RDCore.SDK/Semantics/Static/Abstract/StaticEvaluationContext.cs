@@ -32,5 +32,10 @@ namespace RDCore.SDK.Semantics.Static.Abstract;
 /// Where the facts of the expressions evaluated are recorded (<see cref="ExpressionFact"/>), or <c>null</c> when the caller
 /// has no use for anything but the declared type.
 /// </param>
+/// <param name="Bindings">
+/// Where what each expression evaluated binds to is recorded - its declared type, and the plan of an operation (<see cref="Binding.ExpressionBinder"/>) -
+/// or <c>null</c> when the expressions are not being bound.
+/// </param>
 public readonly record struct StaticEvaluationContext(
-    ISymbolResolver Resolver, LexicalScope Scope, VBType? EnclosingWithTargetType = null, IExpressionFactSink? Facts = null);
+    ISymbolResolver Resolver, LexicalScope Scope, VBType? EnclosingWithTargetType = null, IExpressionFactSink? Facts = null,
+    Binding.ExpressionBindings? Bindings = null);

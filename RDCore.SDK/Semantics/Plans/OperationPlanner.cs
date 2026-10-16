@@ -78,7 +78,8 @@ public static class OperationPlanner
 
     /// <summary>
     /// The plan of a binary operation on operands of these declared types: <see cref="OperationPlan.IsDeferred"/> when either is declared <c>Variant</c> or
-    /// <c>Object</c>, whose value type is not known until the operation is evaluated, and the plan of the values otherwise.
+    /// <c>Object</c>, or is late-bound (<see cref="VBUnknownType"/>), whose value type is not known until the operation is evaluated, and the plan of the
+    /// values otherwise.
     /// </summary>
     /// <param name="operator">The operator: one of the <c>Tokens</c> binary operators.</param>
     /// <param name="left">The declared type of the left operand.</param>
@@ -100,7 +101,8 @@ public static class OperationPlanner
             ? new OperationPlan(@operator, [operand], null, IsDeferred: true)
             : ForValue(@operator, ValueTypeOf(operand));
 
-    private static bool IsDeferredType(VBType type) => type is VBVariantType or VBObjectType;
+    // a Variant and an object are what their value is; a type that is not known statically - late-bound - is known when the operation is evaluated.
+    private static bool IsDeferredType(VBType type) => type is VBVariantType or VBObjectType or VBUnknownType;
 
     private static VBType ValueTypeOf(VBType declared) => declared is VBFixedStringType ? VBStringType.TypeInfo : declared;
 
