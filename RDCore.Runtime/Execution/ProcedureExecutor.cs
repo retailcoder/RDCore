@@ -737,7 +737,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
         var state = new ForLoopState(counterSymbol, forStatement.ControlExpression, endResult.Result!, stepResult.Result!);
 
-        var assignResult = forLoop.AssignCounter(session, state, forStatement.StartExpression, startResult.Result!);
+        var assignResult = forLoop.AssignCounter(session, state, forStatement.StartExpression, startResult.Result!, context);
         if (!assignResult.IsSuccess)
         {
             return ToFailureOutcome(assignResult);
@@ -794,7 +794,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             return ToFailureOutcome(sumResult);
         }
 
-        var assignResult = forLoop.AssignCounter(session, state, state.ControlExpression, sumResult.Result!);
+        var assignResult = forLoop.AssignCounter(session, state, state.ControlExpression, sumResult.Result!, context);
         if (!assignResult.IsSuccess)
         {
             return ToFailureOutcome(assignResult);

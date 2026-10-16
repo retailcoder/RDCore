@@ -98,9 +98,12 @@ public sealed class LetAssignmentEvaluator(
                 ? AssignObjectMember(session, context, statement, target, source, value, isSet: false)
                 : target is IndexExpressionNode element
                     ? AssignArrayElement(session, context, element.Callee, element.Arguments, source, value, isSet: false)
-                    : TryResolveTarget(session, context, target, out var symbol)
-                        ? Assign(session, context, statement, symbol!, target, source, value)
-                        : RuntimeExecutionOutcome.InternalError;
+                    // a variable is assigned through the slot it is bound to, by the plan of its coercion, when it can be (IR lowering S0.8c).
+                    : expressions.TryAssignBound(session, target, value, context) is { } assigned
+                        ? assigned.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Next
+                        : TryResolveTarget(session, context, target, out var symbol)
+                            ? Assign(session, context, statement, symbol!, target, source, value)
+                            : RuntimeExecutionOutcome.InternalError;
 
     // `owner.Property(index) = value`: an index expression whose callee is a member access.
     private static bool IsMemberOfObject(ExpressionNode target) => target is IndexExpressionNode { Callee: MemberAccessExpressionNode };

@@ -1,6 +1,8 @@
 using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.Operators;
+using RDCore.Runtime.Semantics.Plans;
 using RDCore.SDK.Model;
+using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Symbols.Operators;
@@ -35,8 +37,20 @@ public sealed class ForLoopEvaluator(RuntimeExpressionEvaluator expressionEvalua
     /// coerced) resulting value — MS-VBAL comparisons and the next increment both operate on this, never
     /// on the raw <paramref name="value"/> that was assigned.
     /// </summary>
-    public RuntimeSemanticsEvaluationResult AssignCounter(IRuntimeSession session, ForLoopState state, ExpressionNode locationNode, VBTypedValue value)
+    /// <remarks>
+    /// The counter is assigned through the slot its name is bound to when it can be (IR lowering S0.8c); an assignment that cannot - or that fails, which
+    /// raises its error at <paramref name="locationNode"/> - is the let-assignment operation it always was.
+    /// </remarks>
+    public RuntimeSemanticsEvaluationResult AssignCounter(
+        IRuntimeSession session, ForLoopState state, ExpressionNode locationNode, VBTypedValue value, RuntimeEvaluationContext context)
     {
+        // a counter of a type no plan converts to - a Variant - is not looked for on every iteration only to be declined.
+        if (state.Counter is ITypedSymbol { ResolvedType: var counterType } && PlanExecutor.IsPlannedDestination(counterType)
+            && expressionEvaluator.TryAssignBound(session, state.ControlExpression, value, context) is { } assigned)
+        {
+            return assigned;
+        }
+
         // every Next assigns the counter at its own expression, with the assignment the loop made once; the start value is assigned at its own.
         var assignment = ReferenceEquals(locationNode, state.ControlExpression)
             ? state.CounterAssignment
