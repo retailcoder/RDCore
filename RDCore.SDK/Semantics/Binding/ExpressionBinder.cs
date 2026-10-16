@@ -107,6 +107,12 @@ public sealed class ExpressionBindings
             VBUnaryOperatorExpressionNode unary when OperandNode(unary.Operand) is { } operand
                 => new BoundUnary(unary, plan, operand),
 
+            // a call by the bare name of a procedure, resolved as the evaluation resolves it.
+            IndexExpressionNode { Callee: SimpleNameExpressionNode callee } index
+                when context.Resolver.ResolveValue(callee, ScopeKind.Local, context.Scope.Uri).Symbol is
+                    VBTypeMemberSymbol procedure and (VBProcedureMemberSymbol or VBFunctionMemberSymbol or VBPropertyGetMemberSymbol)
+                => new BoundCall(index, procedure),
+
             _ => new BoundFallback(expression),
         };
 

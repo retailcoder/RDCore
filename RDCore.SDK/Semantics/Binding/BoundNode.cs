@@ -74,6 +74,19 @@ public sealed record class BoundBinary(VBBinaryOperatorExpressionNode Operation,
 public sealed record class BoundUnary(VBUnaryOperatorExpressionNode Operation, OperationPlan? Plan, BoundNode Operand) : BoundNode(Operation);
 
 /// <summary>
+/// A call of a procedure the name before its argument list resolves to (<strong>MS-VBAL §5.6.13</strong>): a <c>Sub</c>, a <c>Function</c> or a
+/// <c>Property Get</c> of the workspace or of a library, by its bare name.
+/// </summary>
+/// <remarks>
+/// The binding is the resolution of the callee, made once. How the arguments are passed - aliased to a variable, let-coerced, collected into a
+/// <c>ParamArray</c>, omitted - is the call's to decide each time it is made, from the arguments as they are written; each argument is an expression of its
+/// own, bound in its turn. 🚧 Binding how each argument is passed is a later step.
+/// </remarks>
+/// <param name="Call">The index expression that is the call.</param>
+/// <param name="Procedure">The procedure called.</param>
+public sealed record class BoundCall(IndexExpressionNode Call, Symbol Procedure) : BoundNode(Call);
+
+/// <summary>
 /// An expression the binder does not bind yet (IR lowering D3): it is evaluated from the syntax tree, the way it always was.
 /// </summary>
 /// <remarks>

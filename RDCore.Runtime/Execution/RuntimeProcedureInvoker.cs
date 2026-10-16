@@ -1,6 +1,7 @@
 using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics;
 using RDCore.SDK;
+using System.Collections.Concurrent;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Errors;
@@ -97,14 +98,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        var staticSymbol = new StaticSymbol(procedure.Name, procedure.Kind, procedure.ResolvedType);
-
-        // MS-VBAL 5.2.1: a procedure's code runs under the Option directives of the module declaring it,
-        // whichever module called it. A StaticSymbol has no link back to its module, so the frame is what
-        // carries them - and it was never given any, so Option Compare Text and Option Base 1 both read
-        // back as their defaults everywhere the runtime consults them.
-        var frame = (CallStackFrame)Session.Symbols.CreateFrame(
-            new SyntaxNodeId(procedure.Uri.AbsolutePath, []), staticSymbol, DeclaringModuleDirectives(procedure));
+        var activation = _activations.GetOrAdd(procedure, ActivationOf);
+        var frame = (CallStackFrame)Session.Symbols.CreateFrame(activation.NodeId, activation.Symbol, activation.Directives);
 
         // the first parameter of a member of a class is its Me, and the object the member is a call on is what its
         // fields are the storage of.
@@ -254,6 +249,20 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             }
         }
     }
+
+    // what an activation of a procedure is made of that the procedure alone decides, made once for each procedure the invoker activates (IR lowering S0.9):
+    // the invoker lives as long as one execution, and a procedure that is defined again is another symbol. Its body is not among them: a module loaded again
+    // while a program is broken replaces it for the calls made after.
+    private sealed record class Activation(StaticSymbol Symbol, SyntaxNodeId NodeId, ModuleDirectives Directives);
+
+    private readonly ConcurrentDictionary<VBTypeMemberSymbol, Activation> _activations = new(ReferenceEqualityComparer.Instance);
+
+    // MS-VBAL 5.2.1: a procedure's code runs under the Option directives of the module declaring it, whichever module called it. A StaticSymbol has no link
+    // back to its module, so the frame is what carries them.
+    private Activation ActivationOf(VBTypeMemberSymbol procedure) => new(
+        new StaticSymbol(procedure.Name, procedure.Kind, procedure.ResolvedType),
+        new SyntaxNodeId(procedure.Uri.AbsolutePath, []),
+        DeclaringModuleDirectives(procedure));
 
     // the module a procedure is declared in is its symbol's parent, a standard module or a class module,
     // whose name binds only as a type. A procedure whose parent is not a module symbol — one the session

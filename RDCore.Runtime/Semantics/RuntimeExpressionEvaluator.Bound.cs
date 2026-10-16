@@ -94,6 +94,23 @@ public sealed partial class RuntimeExpressionEvaluator
                     session.CallStack.Current is { } current && current.TryGetReferencedType(variable.Variable, out var type) ? type : null);
 
     /// <summary>
+    /// Let-coerces a value by the plan of its coercion (<see cref="Plans.PlanExecutor.TryConvert"/>), when nothing observes the evaluation and the value and
+    /// the destination are ones the plan can be executed for: what an argument passed to a <c>ByVal</c> parameter, and the value assigned to a function's
+    /// result, are let-coerced by (IR lowering S0.9).
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <param name="destination">The declared type it is let-coerced to.</param>
+    /// <param name="converted">The let-coerced value.</param>
+    /// <returns><see langword="false"/> when the coercion is to be evaluated by its strategy: an analysis observes it, the plan does not take the value, or
+    /// the coercion fails - which the strategy raises.</returns>
+    internal bool TryConvertUnobserved(VBTypedValue value, VBType destination, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out VBTypedValue? converted)
+    {
+        converted = null;
+        return Observation is null && !AssumesVariables && Plans.PlanExecutor.IsPlannedDestination(destination)
+            && Plans.PlanExecutor.TryConvert(value, destination, out converted);
+    }
+
+    /// <summary>
     /// Let-assigns a value to the variable a name is bound to (IR lowering S0.8c): through its slot, by the plan of its let-coercion
     /// (<see cref="Plans.PlanExecutor.TryConvert"/>), if the target and the value are ones the plan can be executed for.
     /// </summary>
@@ -153,6 +170,7 @@ public sealed partial class RuntimeExpressionEvaluator
         BoundName name => ReadSymbol(session, context, name.Symbol, nameOfEnclosingFunctionIsItsResult: true),
         BoundBinary binary => EvaluateBoundBinary(session, binary, context),
         BoundUnary unary => EvaluateBoundUnary(session, unary, context),
+        BoundCall call => EvaluateBoundCall(session, call, context),
         _ => EvaluateSyntax(session, node.Expression, context),
     };
 
@@ -172,6 +190,13 @@ public sealed partial class RuntimeExpressionEvaluator
 
         return OperatorProvider.EvaluateBinaryOperator(session, binary.Operation, leftResult.Result!, rightResult.Result!);
     }
+
+    // what EvaluateIndex does with a callee that resolves to a procedure, its callee resolved once: a function that declares no parameter is not given what
+    // follows it in parentheses, which indexes what it returns - and that is evaluated from the syntax tree.
+    private RuntimeSemanticsEvaluationResult EvaluateBoundCall(IRuntimeSession session, BoundCall call, RuntimeEvaluationContext context)
+        => call.Procedure is VBTypeMemberSymbol procedure && !ReturnsToBeIndexed(procedure, null, call.Call.Arguments)
+            ? InvokeProcedure(session, context, procedure, call.Call.Arguments)
+            : EvaluateSyntax(session, call.Expression, context);
 
     private RuntimeSemanticsEvaluationResult EvaluateBoundUnary(IRuntimeSession session, BoundUnary unary, RuntimeEvaluationContext context)
     {

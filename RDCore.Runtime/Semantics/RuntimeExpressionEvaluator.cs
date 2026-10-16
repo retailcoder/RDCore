@@ -1677,6 +1677,13 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             // parameter whose argument wasn't recognized as an aliasable variable above falls through to
             // this exact same path (MS-VBAL §5.3.1.11's own "otherwise" case) - a fresh local, never a
             // reported error.
+            // by its plan when it can be (IR lowering S0.9): a number, a Boolean, a date or a String let-coerced to a parameter of a type a plan converts to.
+            if (TryConvertUnobserved(argumentResult.Value.Result!, parameter.ResolvedType, out var planned))
+            {
+                bound[i] = planned.RuntimeValue;
+                continue;
+            }
+
             var coercionFrame = new LetCoercionStackFrame(argumentNode.Identity, InputIndex.CoercionSourceValue,
                 argumentResult.Value.Result!, new VBTypeDescValue(parameter.ResolvedType), ConversionSite.Argument);
             var coercionResult = LetCoercionProvider.EvaluateLetCoercionSemantics(session.Symbols.Resolver, argumentNode, coercionFrame);

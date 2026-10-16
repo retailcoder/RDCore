@@ -607,7 +607,13 @@ public sealed class LetAssignmentEvaluator(
             // result variable isn't a real addressable Symbol, so this can't go through the same
             // "__let_op" operator every other target does (it needs a real IBindingHandle) - Let-coerce
             // directly instead, the same lower-level call ByVal/ByRef-fallback parameter passing already
-            // makes for the identical reason.
+            // makes for the identical reason - by its plan, when it can be (IR lowering S0.9).
+            if (expressions.TryConvertUnobserved(value, ((ITypedSymbol)symbol).ResolvedType, out var planned))
+            {
+                ((CallStackFrame)enclosing).ReturnValue = planned;
+                return RuntimeExecutionOutcome.Next;
+            }
+
             var returnCoercionFrame = new LetCoercionStackFrame(statement.Identity, InputIndex.CoercionSourceValue,
                 value, new VBTypeDescValue(((ITypedSymbol)symbol).ResolvedType), ConversionSite.Return);
             var returnCoercionResult = coercions.EvaluateLetCoercionSemantics(session.Symbols.Resolver, source, returnCoercionFrame);
