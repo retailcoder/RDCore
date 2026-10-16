@@ -20,8 +20,11 @@ namespace RDCore.SDK.Semantics.Plans;
 /// the rule of its destination. Whether that rule takes the value is the conversion's to say: the plan names the rule, and the rule decides.
 /// </para>
 /// <para>
-/// 🚧 The static semantics still have a table of their own (<strong>§5.5.1.1</strong>), keyed by declared types, which says which let-coercions are
-/// valid at all; binding from declared types (S0.5) is what reconciles the two.
+/// The static semantics have a table of their own (<strong>§5.5.1.1</strong>), keyed by declared types, which says which let-coercions are valid at all, and
+/// are not to consult this one: they are stricter where the specification makes them so - an implicit let-coercion from a LongLong to anything but a
+/// LongLong or a Variant is invalid, though the same value let-coerced at run time from a Variant is not. What they accept, this table does not reject for
+/// the same declared types - but where the specification itself makes a <c>Byte()</c> let-coerced to a number, a Boolean or a date statically valid
+/// (§5.5.1.1 lists no such row) and a type mismatch whenever it runs (§5.5.1.2.6).
 /// </para>
 /// </remarks>
 public static class ConversionPlanner

@@ -27,8 +27,10 @@ namespace RDCore.SDK.Semantics.Plans;
 /// (<strong>§5.6.9.8</strong>).
 /// </para>
 /// <para>
-/// 🚧 The static semantics still have a table of their own, keyed by declared types, that disagrees with this one here and there; binding from declared types
-/// (S0.5) is what makes it this one.
+/// The static semantics of the arithmetic, logical and concatenation operators consult this table. Those of the relational operators do not, and are not to:
+/// a comparison's <em>declared</em> type is Boolean, or Variant (<strong>§5.6.9.5</strong>), which says nothing of the effective type its operands are
+/// compared in. What the static semantics accept, this table does not reject for the same declared types - but where the specification itself makes a
+/// comparison of an <c>Error</c> and anything else statically valid and a type mismatch whenever it runs.
 /// </para>
 /// </remarks>
 public static class OperationPlanner
