@@ -36,15 +36,4 @@ public sealed class KnownGapsFoundByOperatorsGoldenMasterTests
             "Dim V As Variant",
             "V = Null",
             "Debug.Print IsNull(V And 7)"));
-
-    // MS-VBAL 5.6.9.5: a Single and a LongLong are compared as Doubles. The table of the relational operators has no row for them, and raises 13.
-    [TestMethod]
-    [Ignore("Known gap: comparing a Single to a LongLong raises Type mismatch.")]
-    public async Task ASingle_ComparedToALongLong_IsCompared()
-        => CollectionAssert.AreEqual(new[] { "True" }, await RunMainAsync(
-            "Dim S As Single",
-            "Dim L As LongLong",
-            "S = 1",
-            "L = 1",
-            "Debug.Print S = L"));
 }

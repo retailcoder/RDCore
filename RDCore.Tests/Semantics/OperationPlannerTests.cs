@@ -129,6 +129,13 @@ public sealed class OperationPlannerTests
     }
 
     [TestMethod]
+    public void ASingle_AndALongLong_AreComparedAsDoubles()
+    {
+        Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareEqualOp, VBSingleType.TypeInfo, VBLongLongType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareLessThanOp, VBLongLongType.TypeInfo, VBSingleType.TypeInfo).EffectiveType);
+    }
+
+    [TestMethod]
     public void EveryOperator_IsPlanned()
     {
         string[] binary =

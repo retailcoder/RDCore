@@ -277,8 +277,9 @@ public static class OperationPlanner
         VBSingleType when right is VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBDoubleType or VBStringType or VBEmptyType => VBSingleType.TypeInfo,
         VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBDoubleType or VBStringType or VBEmptyType when right is VBSingleType => VBSingleType.TypeInfo,
 
-        VBSingleType when right is VBLongType => VBDoubleType.TypeInfo,
-        VBLongType when right is VBSingleType => VBDoubleType.TypeInfo,
+        // a Single holds neither every Long nor every LongLong: the two are compared as Doubles.
+        VBSingleType when right is VBLongType or VBLongLongType => VBDoubleType.TypeInfo,
+        VBLongType or VBLongLongType when right is VBSingleType => VBDoubleType.TypeInfo,
         VBDoubleType when right is IIntegralNumericType or VBBooleanType or VBDoubleType or VBStringType or VBEmptyType => VBDoubleType.TypeInfo,
         IIntegralNumericType or VBBooleanType or VBDoubleType or VBStringType or VBEmptyType when right is VBDoubleType => VBDoubleType.TypeInfo,
 
