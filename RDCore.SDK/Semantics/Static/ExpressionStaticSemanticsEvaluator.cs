@@ -391,7 +391,7 @@ public static class ExpressionStaticSemanticsEvaluator
     }
 
     // MS-VBAL §5.2.3.4: the members of an enumeration are Longs, and an operand declared as the enumeration is a Long to the operator.
-    private static VBType AsOperand(VBType declared) => declared is VBEnumType ? VBLongType.TypeInfo : declared;
+    internal static VBType AsOperand(VBType declared) => declared is VBEnumType ? VBLongType.TypeInfo : declared;
 
     private static StaticSemanticsEvaluationResult EvaluateUnaryOperator(
         StaticEvaluationContext context, ExpressionNode expression, VBUnaryOperatorExpressionNode unaryOperator)
@@ -416,7 +416,7 @@ public static class ExpressionStaticSemanticsEvaluator
     // One rule instance per call; every operator rule is either a parameterless-constructible record
     // or a shared Lazy singleton, so this never allocates anything meaningful. `Mod` (Tokens.ModuloOp)
     // has no rule yet - falls through to null, deferred by the caller like any other unmapped case.
-    private static IStaticSemantics? ResolveBinaryOperatorRule(string token) => token switch
+    internal static IStaticSemantics? ResolveBinaryOperatorRule(string token) => token switch
     {
         Tokens.AdditionOp => new BinaryAdditionOperatorStaticSemantics(),
         Tokens.SubtractionOp => new BinarySubtractionOperatorStaticSemantics(),
@@ -434,7 +434,7 @@ public static class ExpressionStaticSemanticsEvaluator
         _ => null,
     };
 
-    private static IStaticSemantics? ResolveUnaryOperatorRule(string token) => token switch
+    internal static IStaticSemantics? ResolveUnaryOperatorRule(string token) => token switch
     {
         Tokens.NegationOp => new UnaryNegationOperatorStaticSemantics(),
         Tokens.LogicalNotOp => new UnaryLogicalOperatorStaticSemantics(),
