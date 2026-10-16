@@ -95,7 +95,8 @@ public sealed class BinaryArithmeticOperatorEffectiveTypeTests : OperatorArithme
         // directions, alongside every other numeric/string/empty combination:
         yield return [VbDate, VbInteger, VbDate];
         yield return [VbInteger, VbDate, VbDate];
-        yield return [VbDate, VbDate, VbDate];
+        // the subtraction of two dates has a row of its own (MS-VBAL 5.6.9.3.3): the days between them, a Double.
+        yield return [VbDate, VbDate, VbDouble];
         yield return [VbDate, VbString, VbDate];
         yield return [VbString, VbDate, VbDate];
         yield return [VbDate, VbEmpty, VbDate];

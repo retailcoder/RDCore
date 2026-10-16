@@ -113,6 +113,7 @@ public sealed class OperationPlannerTests
         Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.PowerOp, VBIntegerType.TypeInfo, VBIntegerType.TypeInfo).EffectiveType);
         Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.MultiplicationOp, VBDateType.TypeInfo, VBIntegerType.TypeInfo).EffectiveType);
         Assert.AreEqual(VBDateType.TypeInfo, OperationPlanner.ForValues(Tokens.SubtractionOp, VBDateType.TypeInfo, VBIntegerType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.SubtractionOp, VBDateType.TypeInfo, VBDateType.TypeInfo).EffectiveType, "the days between two dates");
     }
 
     [TestMethod]

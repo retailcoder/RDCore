@@ -107,7 +107,7 @@ public static class OperationPlanner
     private static VBType? BinaryEffectiveType(string @operator, VBType left, VBType right) => @operator switch
     {
         Tokens.AdditionOp => AdditionEffectiveType(left, right) ?? ArithmeticEffectiveType(left, right),
-        Tokens.SubtractionOp => ArithmeticEffectiveType(left, right),
+        Tokens.SubtractionOp => SubtractionEffectiveType(left, right) ?? ArithmeticEffectiveType(left, right),
         Tokens.MultiplicationOp => MultiplicationEffectiveType(left, right) ?? ArithmeticEffectiveType(left, right),
         Tokens.DivisionOp => DivisionEffectiveType(left, right) ?? ArithmeticEffectiveType(left, right),
         Tokens.IntegerDivisionOp or Tokens.ModuloOp => IntegerDivisionEffectiveType(left, right) ?? ArithmeticEffectiveType(left, right),
@@ -175,6 +175,10 @@ public static class OperationPlanner
     // MS-VBAL 5.6.9.3.2: two strings are concatenated.
     private static VBType? AdditionEffectiveType(VBType left, VBType right)
         => left is VBStringType && right is VBStringType ? VBStringType.TypeInfo : null;
+
+    // MS-VBAL 5.6.9.3.3: the difference of two dates is the number of days between them, a Double - not a date.
+    private static VBType? SubtractionEffectiveType(VBType left, VBType right)
+        => left is VBDateType && right is VBDateType ? VBDoubleType.TypeInfo : null;
 
     // MS-VBAL 5.6.9.3.4: a Currency multiplied by a floating-point number or a string, and a Date by anything numeric, are multiplied in Double.
     private static VBType? MultiplicationEffectiveType(VBType left, VBType right) => left switch

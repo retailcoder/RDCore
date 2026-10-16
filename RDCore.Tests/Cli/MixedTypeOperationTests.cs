@@ -22,6 +22,17 @@ public sealed class MixedTypeOperationTests
             "Debug.Print B = 2.5",
             "Debug.Print B And 7&"));
 
+    // MS-VBAL 5.6.9.3.3: the difference of two dates is the number of days between them.
+    [TestMethod]
+    public async Task TheDifference_OfTwoDates_IsADouble()
+        => CollectionAssert.AreEqual(new[] { "Double", "31" }, await RunMainAsync(
+            "Dim A As Date",
+            "Dim B As Date",
+            "A = #1/1/2000#",
+            "B = #2/1/2000#",
+            "Debug.Print TypeName(B - A)",
+            "Debug.Print B - A"));
+
     // MS-VBAL 5.6.9.5: a Single and a LongLong are compared as Doubles.
     [TestMethod]
     public async Task ASingle_ComparedToALongLong_IsCompared()
