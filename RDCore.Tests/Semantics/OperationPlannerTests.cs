@@ -116,6 +116,19 @@ public sealed class OperationPlannerTests
     }
 
     [TestMethod]
+    public void ABoolean_IsAnOperand_OfEveryRowAnIntegralValueIsAnOperandOf()
+    {
+        // MS-VBAL's tables list Boolean beside Byte and Integer: True + 2.5 is a Double, True = 2.5 compares Doubles, True And 7& is a Long.
+        Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.AdditionOp, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongLongType.TypeInfo, OperationPlanner.ForValues(Tokens.SubtractionOp, VBLongLongType.TypeInfo, VBBooleanType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBNullType.TypeInfo, OperationPlanner.ForValues(Tokens.MultiplicationOp, VBBooleanType.TypeInfo, VBNullType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBDoubleType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareEqualOp, VBBooleanType.TypeInfo, VBDoubleType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBDateType.TypeInfo, OperationPlanner.ForValues(Tokens.CompareLessThanOp, VBDateType.TypeInfo, VBBooleanType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalAndOp, VBBooleanType.TypeInfo, VBLongType.TypeInfo).EffectiveType);
+        Assert.AreEqual(VBLongType.TypeInfo, OperationPlanner.ForValues(Tokens.LogicalOrOp, VBStringType.TypeInfo, VBBooleanType.TypeInfo).EffectiveType);
+    }
+
+    [TestMethod]
     public void EveryOperator_IsPlanned()
     {
         string[] binary =

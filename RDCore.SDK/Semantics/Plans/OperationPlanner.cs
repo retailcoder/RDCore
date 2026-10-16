@@ -142,29 +142,29 @@ public static class OperationPlanner
         VBLongType when right is VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBEmptyType => VBLongType.TypeInfo,
         VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBEmptyType when right is VBLongType => VBLongType.TypeInfo,
 
-        VBLongLongType when right is IIntegralNumericType or VBEmptyType => VBLongLongType.TypeInfo,
-        IIntegralNumericType or VBEmptyType when right is VBLongLongType => VBLongLongType.TypeInfo,
+        VBLongLongType when right is IIntegralNumericType or VBBooleanType or VBEmptyType => VBLongLongType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or VBEmptyType when right is VBLongLongType => VBLongLongType.TypeInfo,
 
         VBSingleType when right is VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBEmptyType => VBSingleType.TypeInfo,
         VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBEmptyType when right is VBSingleType => VBSingleType.TypeInfo,
 
         VBSingleType when right is VBLongType or VBLongLongType => VBDoubleType.TypeInfo,
         VBLongType or VBLongLongType when right is VBSingleType => VBDoubleType.TypeInfo,
-        VBDoubleType or VBStringType when right is IIntegralNumericType or IFloatingPointNumericType or VBStringType or VBEmptyType => VBDoubleType.TypeInfo,
-        IIntegralNumericType or IFloatingPointNumericType or VBStringType or VBEmptyType when right is VBDoubleType or VBStringType => VBDoubleType.TypeInfo,
+        VBDoubleType or VBStringType when right is IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBStringType or VBEmptyType => VBDoubleType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBStringType or VBEmptyType when right is VBDoubleType or VBStringType => VBDoubleType.TypeInfo,
 
-        VBCurrencyType when right is IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType => VBCurrencyType.TypeInfo,
-        IIntegralNumericType or IFloatingPointNumericType or VBStringType or VBEmptyType when right is VBCurrencyType => VBCurrencyType.TypeInfo,
+        VBCurrencyType when right is IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType => VBCurrencyType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBStringType or VBEmptyType when right is VBCurrencyType => VBCurrencyType.TypeInfo,
 
         // a Date operation is evaluated in Double (OperationPlan.OperandDestination), and its result is a Date.
-        VBDateType when right is IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType => VBDateType.TypeInfo,
-        IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType when right is VBDateType => VBDateType.TypeInfo,
+        VBDateType when right is IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType => VBDateType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType when right is VBDateType => VBDateType.TypeInfo,
 
-        VBDecimalType when right is INumericType or VBStringType or VBDateType or VBEmptyType => VBDecimalType.TypeInfo,
-        INumericType or VBStringType or VBDateType or VBEmptyType when right is VBDecimalType => VBDecimalType.TypeInfo,
+        VBDecimalType when right is INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType => VBDecimalType.TypeInfo,
+        INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType when right is VBDecimalType => VBDecimalType.TypeInfo,
 
-        VBNullType when right is INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType => VBNullType.TypeInfo,
-        INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType when right is VBNullType => VBNullType.TypeInfo,
+        VBNullType when right is INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType or VBNullType => VBNullType.TypeInfo,
+        INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType or VBNullType when right is VBNullType => VBNullType.TypeInfo,
 
         // the operation of two Error values is planned in Error, which the evaluation of its operands refuses; one Error is a type mismatch.
         VBErrorType when right is VBErrorType => VBErrorType.TypeInfo,
@@ -181,8 +181,8 @@ public static class OperationPlanner
     {
         VBCurrencyType when right is VBSingleType or VBDoubleType or VBFixedStringType or VBStringType => VBDoubleType.TypeInfo,
         VBSingleType or VBDoubleType or VBFixedStringType or VBStringType when right is VBCurrencyType => VBDoubleType.TypeInfo,
-        VBDateType when right is VBNumericType or VBFixedStringType or VBStringType or VBDateType or VBEmptyType => VBDoubleType.TypeInfo,
-        VBNumericType or VBFixedStringType or VBStringType or VBDateType or VBEmptyType when right is VBDateType => VBDoubleType.TypeInfo,
+        VBDateType when right is VBNumericType or VBBooleanType or VBFixedStringType or VBStringType or VBDateType or VBEmptyType => VBDoubleType.TypeInfo,
+        VBNumericType or VBBooleanType or VBFixedStringType or VBStringType or VBDateType or VBEmptyType when right is VBDateType => VBDoubleType.TypeInfo,
         _ => null,
     };
 
@@ -191,8 +191,8 @@ public static class OperationPlanner
     {
         VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBLongLongType or VBEmptyType
             when right is VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBLongLongType or VBEmptyType => VBDoubleType.TypeInfo,
-        VBDoubleType or VBStringType or VBCurrencyType or VBDateType when right is INumericType or VBStringType or VBDateType or VBEmptyType => VBDoubleType.TypeInfo,
-        INumericType or VBStringType or VBDateType or VBEmptyType when right is VBDoubleType or VBStringType or VBCurrencyType or VBDateType => VBDoubleType.TypeInfo,
+        VBDoubleType or VBStringType or VBCurrencyType or VBDateType when right is INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType => VBDoubleType.TypeInfo,
+        INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType when right is VBDoubleType or VBStringType or VBCurrencyType or VBDateType => VBDoubleType.TypeInfo,
         _ => null,
     };
 
@@ -271,31 +271,31 @@ public static class OperationPlanner
         VBLongType when right is VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBStringType or VBEmptyType => VBLongType.TypeInfo,
         VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBStringType or VBEmptyType when right is VBLongType => VBLongType.TypeInfo,
 
-        VBLongLongType when right is IIntegralNumericType or VBStringType or VBEmptyType => VBLongLongType.TypeInfo,
-        IIntegralNumericType or VBStringType or VBEmptyType when right is VBLongLongType => VBLongLongType.TypeInfo,
+        VBLongLongType when right is IIntegralNumericType or VBBooleanType or VBStringType or VBEmptyType => VBLongLongType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or VBStringType or VBEmptyType when right is VBLongLongType => VBLongLongType.TypeInfo,
 
         VBSingleType when right is VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBDoubleType or VBStringType or VBEmptyType => VBSingleType.TypeInfo,
         VBByteType or VBBooleanType or VBIntegerType or VBSingleType or VBDoubleType or VBStringType or VBEmptyType when right is VBSingleType => VBSingleType.TypeInfo,
 
         VBSingleType when right is VBLongType => VBDoubleType.TypeInfo,
         VBLongType when right is VBSingleType => VBDoubleType.TypeInfo,
-        VBDoubleType when right is IIntegralNumericType or VBDoubleType or VBStringType or VBEmptyType => VBDoubleType.TypeInfo,
-        IIntegralNumericType or VBDoubleType or VBStringType or VBEmptyType when right is VBDoubleType => VBDoubleType.TypeInfo,
+        VBDoubleType when right is IIntegralNumericType or VBBooleanType or VBDoubleType or VBStringType or VBEmptyType => VBDoubleType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or VBDoubleType or VBStringType or VBEmptyType when right is VBDoubleType => VBDoubleType.TypeInfo,
 
         VBStringType when right is VBStringType or VBEmptyType => VBStringType.TypeInfo,
         VBStringType or VBEmptyType when right is VBStringType => VBStringType.TypeInfo,
 
-        VBCurrencyType when right is IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType => VBCurrencyType.TypeInfo,
-        IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType when right is VBCurrencyType => VBCurrencyType.TypeInfo,
+        VBCurrencyType when right is IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType => VBCurrencyType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBEmptyType when right is VBCurrencyType => VBCurrencyType.TypeInfo,
 
-        VBDateType when right is IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType => VBDateType.TypeInfo,
-        IIntegralNumericType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType when right is VBDateType => VBDateType.TypeInfo,
+        VBDateType when right is IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType => VBDateType.TypeInfo,
+        IIntegralNumericType or VBBooleanType or IFloatingPointNumericType or VBCurrencyType or VBStringType or VBDateType or VBEmptyType when right is VBDateType => VBDateType.TypeInfo,
 
-        VBDecimalType when right is INumericType or VBStringType or VBDateType or VBEmptyType => VBDecimalType.TypeInfo,
-        INumericType or VBStringType or VBDateType or VBEmptyType when right is VBDecimalType => VBDecimalType.TypeInfo,
+        VBDecimalType when right is INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType => VBDecimalType.TypeInfo,
+        INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType when right is VBDecimalType => VBDecimalType.TypeInfo,
 
-        VBNullType when right is INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType => VBNullType.TypeInfo,
-        INumericType or VBStringType or VBDateType or VBEmptyType or VBNullType when right is VBNullType => VBNullType.TypeInfo,
+        VBNullType when right is INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType or VBNullType => VBNullType.TypeInfo,
+        INumericType or VBBooleanType or VBStringType or VBDateType or VBEmptyType or VBNullType when right is VBNullType => VBNullType.TypeInfo,
 
         // MS-VBAL 5.6.9.5: two Error values compare by their numeric value.
         VBErrorType when right is VBErrorType => VBErrorType.TypeInfo,
@@ -324,13 +324,13 @@ public static class OperationPlanner
                 VBByteType or VBBooleanType or VBIntegerType or VBEmptyType or VBNullType)
             => VBIntegerType.TypeInfo,
 
-        (VBLongLongType, INumericType or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType)
+        (VBLongLongType, INumericType or VBBooleanType or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType)
             or (INumericType or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType, VBLongLongType)
             => VBLongLongType.TypeInfo,
 
         (IFloatingPointNumericType or IFixedPointNumericType or VBLongType or VBStringType or VBFixedStringType or VBDateType,
-            (INumericType and not VBLongLongType) or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType)
-            or ((INumericType and not VBLongLongType) or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType,
+            ((INumericType and not VBLongLongType) or VBBooleanType) or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType)
+            or (((INumericType and not VBLongLongType) or VBBooleanType) or VBStringType or VBFixedStringType or VBDateType or VBEmptyType or VBNullType,
                 IFloatingPointNumericType or IFixedPointNumericType or VBLongType or VBStringType or VBFixedStringType or VBDateType)
             => VBLongType.TypeInfo,
 
