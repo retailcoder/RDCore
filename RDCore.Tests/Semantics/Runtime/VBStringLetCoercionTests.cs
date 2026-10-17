@@ -90,11 +90,12 @@ public sealed class VBStringLetCoercionTests : LetCoercionRuntimeSemanticsTests
         // still normal notation for a Double must go scientific when the source is a Single.
         // The expectation was "1.234567E+7" until 2026-09-30: 12345678 is below 2^24 and so is exact
         // in a float, and the 8th digit is dropped by the 7-digit cap — which rounds, not truncates.
-        => AssertCoercedTo<VBStringValue>(Coerce(Sut(), new VBSingleValue(12345678f), VBStringType.TypeInfo), "1.234568E+7");
+        // The exponent has two digits at least, as MS-VBA writes it (Excel: CStr(CSng(12345678)) is "1.234568E+07").
+        => AssertCoercedTo<VBStringValue>(Coerce(Sut(), new VBSingleValue(12345678f), VBStringType.TypeInfo), "1.234568E+07");
 
     [TestMethod]
     public void NumericSource_NegativeSingleExceedingSevenDigits_UsesScientificNotationWithNegativeSign()
-        => AssertCoercedTo<VBStringValue>(Coerce(Sut(), new VBSingleValue(-12345678f), VBStringType.TypeInfo), "-1.234568E+7");
+        => AssertCoercedTo<VBStringValue>(Coerce(Sut(), new VBSingleValue(-12345678f), VBStringType.TypeInfo), "-1.234568E+07");
 
     [TestMethod]
     [DataRow(true, "True")]
@@ -148,7 +149,7 @@ public sealed class VBStringLetCoercionTests : LetCoercionRuntimeSemanticsTests
     public void NumericSource_InScientificNotation_UsesTheEnvironmentsDecimalSymbol()
         => AssertCoercedTo<VBStringValue>(
             Coerce(new VBStringLetCoercionRuntimeSemantics(Formatter(), CultureInfo.GetCultureInfo(1031)), new VBSingleValue(12345678f), VBStringType.TypeInfo),
-            "1,234568E+7");
+            "1,234568E+07");
 
     [TestMethod]
     public void DateSource_DoesNotDependOnTheCultureOfTheCallingThread()
