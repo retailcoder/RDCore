@@ -1620,8 +1620,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     /// handler starts with, and the one the raiser finds afterwards. An error a handler leaves unhandled stops the
     /// invocations and is the error of the <c>RaiseEvent</c>.
     /// <para>
-    /// 🚧 TODO a <c>ByRef</c> parameter whose argument is not a variable is a fresh local for each handler, so the
-    /// value one leaves in it is not the next one's argument.
+    /// A <c>ByRef</c> parameter whose argument is not a variable is given a location of its own for the handlers of the one event, so the value one
+    /// leaves in it is the next one's argument too.
     /// </para>
     /// </remarks>
     /// <param name="session">The session the event is raised in.</param>
