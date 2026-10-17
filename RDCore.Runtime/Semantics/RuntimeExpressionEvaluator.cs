@@ -526,6 +526,17 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         return named is VBEnumMemberSymbol { ResolvedType: VBEnumType enumeration } ? enumeration : null;
     }
 
+    /// <summary>
+    /// What a member access names when its owner is a project or a procedural module (<strong>MS-VBAL §5.6.12</strong>) - <c>Module1.Count</c>, a
+    /// variable of the module - rather than a member of a value: the symbol the name means unqualified there, for an assignment to write to as it
+    /// writes to that bare name.
+    /// </summary>
+    /// <returns>The member, or <see langword="null"/> when the owner is no namespace, or names no such member.</returns>
+    internal Symbol? ResolveNamespaceQualified(IRuntimeSession session, RuntimeEvaluationContext context, MemberAccessExpressionNode memberAccess)
+        => memberAccess.Owner is { } owner && TryClassifyNamespace(session, context, owner) is { } qualifier
+            ? ResolveNamespaceMember(session, context, qualifier, memberAccess)
+            : null;
+
     // the member of a namespace a qualified name refers to, or null when there is none to refer to - which static
     // semantics should have rejected, as it should an unresolved bare name.
     private static Symbol? ResolveNamespaceMember(

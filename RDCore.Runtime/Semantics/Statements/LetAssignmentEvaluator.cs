@@ -92,7 +92,10 @@ public sealed class LetAssignmentEvaluator(
         ExpressionNode target,
         ExpressionNode source,
         VBTypedValue value)
-        => target is MemberAccessExpressionNode memberAccess
+        // `Module1.Count = 5` is a variable of the module, assigned as its bare name is (MS-VBAL §5.6.12): not a member of a value.
+        => target is MemberAccessExpressionNode qualifiedAccess && expressions.ResolveNamespaceQualified(session, context, qualifiedAccess) is { } qualified
+            ? Assign(session, context, statement, qualified, target, source, value)
+            : target is MemberAccessExpressionNode memberAccess
             ? AssignField(session, context, statement, memberAccess, source, value)
             : IsMemberOfObject(target)
                 ? AssignObjectMember(session, context, statement, target, source, value, isSet: false)

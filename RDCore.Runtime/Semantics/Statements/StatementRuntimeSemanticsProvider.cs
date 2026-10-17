@@ -209,7 +209,12 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
     // which its Property Set is invoked for.
     private RuntimeExecutionOutcome ExecuteSetAssignment(IRuntimeSession session, RuntimeEvaluationContext context, AssignmentStatementNode assignment)
     {
-        if (assignment.Target is MemberAccessExpressionNode or IndexExpressionNode { Callee: MemberAccessExpressionNode })
+        // `Set Module1.Kept = x` is a variable of the module, written as its bare name is (MS-VBAL §5.6.12): not a member of an object.
+        var qualified = assignment.Target is MemberAccessExpressionNode qualifiedAccess
+            ? _expressionEvaluator.ResolveNamespaceQualified(session, context, qualifiedAccess)
+            : null;
+
+        if (qualified is null && assignment.Target is MemberAccessExpressionNode or IndexExpressionNode { Callee: MemberAccessExpressionNode })
         {
             var memberValue = _expressionEvaluator.Evaluate(session, assignment.Value, context);
             return memberValue.IsSuccess
@@ -225,13 +230,10 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
                 : elementValue.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(elementValue.ErrorInfo!);
         }
 
-        if (assignment.Target is not SimpleNameExpressionNode simpleName)
-        {
-            return RuntimeExecutionOutcome.InternalError;
-        }
-
-        var targetResult = session.Symbols.Resolver.ResolveValue(simpleName, ScopeKind.Local, context.Scope);
-        if (targetResult.Symbol is not ITypedSymbol target)
+        var targetSymbol = qualified ?? (assignment.Target is SimpleNameExpressionNode simpleName
+            ? session.Symbols.Resolver.ResolveValue(simpleName, ScopeKind.Local, context.Scope).Symbol
+            : null);
+        if (targetSymbol is not ITypedSymbol target)
         {
             return RuntimeExecutionOutcome.InternalError;
         }
