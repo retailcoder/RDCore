@@ -19,6 +19,12 @@ public record class LetCoercionStaticSemantics : StaticSemantics
         var destinationType = operandDeclaredTypes[(int)InputIndex.CoercionDestinationType];
         var sourceType = operandDeclaredTypes[(int)InputIndex.CoercionSourceValue];
 
+        // an object of a class that has no default member has no value to give a Variant either: the error says what MS-VBA does with it instead.
+        if (sourceType is VBClassType { DefaultMember: null } noDefault && destinationType is VBVariantType)
+        {
+            return StaticSemanticsEvaluationResult.Error(ObjectValueStaticSemantics.NoDefaultMember(expression, noDefault));
+        }
+
         // a destination of a value type expects a value of the source: an object stands for its default member's value, which it must have.
         if (ObjectValueStaticSemantics.IsValueType(destinationType))
         {
@@ -51,10 +57,8 @@ public record class LetCoercionStaticSemantics : StaticSemantics
         VBType when AnyTypeExceptNonByteResizableArrayOr(source, typeof(VBFixedSizeArrayType), typeof(VBVariantType)) && IsNonByteResizableArray(destination) => true,
         VBType and not VBUserDefinedType and not VBVariantType when destination is VBUserDefinedType => true,
         VBType and not VBVariantType when destination is VBObjectType or VBClassType => true,
-        // a class to a value type is its default member's value (ObjectValueStaticSemantics), and to a Variant the object itself: what is left is an
-        // array or a user-defined type, which a value is not either. MS-VBA compiles a class that has no default member, and raises error 438 when it runs.
-        VBClassType type when destination is not VBVariantType && type.DefaultMember is { } defaultMember
-            && IsLetCoercionInvalid(defaultMember.ResolvedType, destination) => true,
+        // a class to a value type is its default member's value, which ObjectValueStaticSemantics checks first, saying what MS-VBA does where it differs.
+        VBClassType type when type.DefaultMember is null || IsLetCoercionInvalid(type.DefaultMember.ResolvedType, destination) => true,
         VBFixedSizeArrayType or VBResizableArrayType and not VBResizableByteArrayType
             when destination is not VBVariantType && (destination is not VBArrayType
                 || destination is VBResizableArrayType dstArray && source is VBArrayType srcArray && !IsSameItemType(dstArray.ItemType, srcArray.ItemType)) => true,

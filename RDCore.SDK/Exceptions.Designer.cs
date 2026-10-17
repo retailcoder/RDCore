@@ -691,6 +691,15 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to {0} has no default member to give it a value, which makes it statically invalid to Let-coerce to one (MS-VBAL §5.5.1.1). MS-VBA compiles it, and raises run-time error 438 (Object doesn&apos;t support this property or method) when it runs..
+        /// </summary>
+        public static string VBCompileError_ClassHasNoDefaultMember_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_ClassHasNoDefaultMember_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Nothing is no object, and so has no value: a value is expected here..
         /// </summary>
         public static string VBCompileError_NothingIsNotAValue_Verbose {

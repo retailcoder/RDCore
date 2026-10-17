@@ -177,9 +177,8 @@ public sealed class LetCoercionStaticSemanticsTests : StaticSemanticsTests
     // rule above, which fires first and independently for that specific destination). ---
 
     [TestMethod]
-    // MS-VBAL 5.5.1.1 makes it invalid; MS-VBA compiles it, and raises error 438 when it runs (recorded in Excel), which RD-VBA does.
-    public void ClassWithNoDefaultMember_ToNumeric_IsValid()
-        => AssertValid(ClassWithDefaultMember(null), VBLongType.TypeInfo);
+    public void ClassWithNoDefaultMember_ToNumeric_IsInvalid()
+        => AssertInvalid(ClassWithDefaultMember(null), VBLongType.TypeInfo);
 
     [TestMethod]
     public void ClassWithValidDefaultMember_ToCompatibleNumeric_IsValid()

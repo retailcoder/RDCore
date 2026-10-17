@@ -16,15 +16,15 @@ using System.Collections.Immutable;
 namespace RDCore.SDK.Semantics.Static;
 
 /// <summary>
-/// What an object is where a value is expected, at compile time: the static half of <strong>MS-VBAL §5.5.1.2.13</strong>'s <em>simple data value</em>,
-/// as MS-VBA compiles it (<strong>MS-VBAL §5.5.1.1</strong>).
+/// What an object is where a value is expected, at compile time: the static half of <strong>MS-VBAL §5.5.1.2.13</strong>'s <em>simple data value</em>
+/// (<strong>MS-VBAL §5.5.1.1</strong>).
 /// </summary>
 /// <remarks>
 /// <para>
 /// A value is expected of the value of a <c>Let</c> assignment to a variable of a value type, of an operand of any operator but <c>Is</c>, of an argument of a
 /// parameter declared with a value type - <c>ByVal</c>, or <c>ByRef</c> and given an expression - and of an argument of the standard library's parameters that
-/// read a value (<see cref="SymbolProperties.ValueDestination"/>). There, an object stands for what its default member returns, and MS-VBA refuses at compile
-/// time what cannot have a value (recorded in Excel):
+/// read a value (<see cref="SymbolProperties.ValueDestination"/>). There, an object stands for what its default member returns, and what cannot have a value
+/// is a compile error, as MS-VBA has it (recorded in Excel):
 /// </para>
 /// <list type="bullet">
 /// <item>The <c>Nothing</c> literal: <see cref="VBCompileErrorId.InvalidUseOfObject"/>. An object variable that holds <c>Nothing</c> compiles, and raises error
@@ -35,8 +35,8 @@ namespace RDCore.SDK.Semantics.Static;
 /// it when they run (<see cref="ValueDestination.AnyValue"/>).</item>
 /// </list>
 /// <para>
-/// 👉 An object of a class that has no default member compiles: MS-VBA raises error 438 for it when it runs. MS-VBAL §5.5.1.1 makes it statically invalid,
-/// which MS-VBA does not.
+/// 👉 An object of a class that has no default member, where a value of a declared type is expected, is <see cref="VBCompileErrorId.TypeMismatch"/> too: MS-VBAL
+/// §5.5.1.1 makes it statically invalid. MS-VBA compiles it, and raises error 438 when it runs, which the error says (<see cref="NoDefaultMember"/>).
 /// </para>
 /// </remarks>
 public static class ObjectValueStaticSemantics
@@ -49,7 +49,8 @@ public static class ObjectValueStaticSemantics
     /// <param name="destination">What the place that expects a value expects of an object.</param>
     /// <returns>
     /// <paramref name="declaredType"/> for anything that is not an object of a class; the declared type of the class's default member for one that has a
-    /// default member; <see cref="VBObjectType"/> - late-bound - for one that has none, or whose default member returns an object; or the error.
+    /// default member; <see cref="VBObjectType"/> - late-bound - where a value of any type is expected, for one that has none or whose default member returns
+    /// an object; or the error.
     /// </returns>
     public static StaticSemanticsEvaluationResult ValueOf(ExpressionNode expression, VBType declaredType, ValueDestination destination)
     {
@@ -59,13 +60,20 @@ public static class ObjectValueStaticSemantics
                 Exceptions.VBCompileError_NothingIsNotAValue_Verbose));
         }
 
-        if (declaredType is not VBClassType classType || classType.DefaultMember is not VBReturningMemberSymbol defaultMember)
+        if (declaredType is not VBClassType classType)
         {
-            // what is not an object of a class is its own value; an object of a class that has no default member is late-bound, and is error 438 when it runs.
-            return StaticSemanticsEvaluationResult.Success(declaredType is VBClassType ? VBObjectType.TypeInfo : declaredType);
+            return StaticSemanticsEvaluationResult.Success(declaredType);
         }
 
-        if (OwnParameters(defaultMember.Parameters).Any(parameter => !parameter.IsOptional && parameter is not ParamArrayParameterSymbol))
+        if (classType.DefaultMember is not { } defaultMember)
+        {
+            // MS-VBAL 5.5.1.1: statically invalid. A function that takes a value of any type reads it when it runs, as MS-VBA has it.
+            return destination is ValueDestination.TypedValue
+                ? StaticSemanticsEvaluationResult.Error(NoDefaultMember(expression, classType))
+                : StaticSemanticsEvaluationResult.Success(VBObjectType.TypeInfo);
+        }
+
+        if (OwnParameters(ParametersOf(defaultMember)).Any(parameter => !parameter.IsOptional && parameter is not ParamArrayParameterSymbol))
         {
             return StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.ArgumentNotOptional, expression.Location,
                 string.Format(Exceptions.VBCompileError_DefaultMemberTakesArguments_Verbose, classType.Name, defaultMember.Name)));
@@ -81,6 +89,19 @@ public static class ObjectValueStaticSemantics
 
         return StaticSemanticsEvaluationResult.Success(defaultMember.ResolvedType);
     }
+
+    /// <summary>
+    /// The compile error of an object of a class that has no default member, Let-coerced to a value (<strong>MS-VBAL §5.5.1.1</strong>).
+    /// </summary>
+    /// <param name="expression">The expression that is the object.</param>
+    /// <param name="classType">The class of the object.</param>
+    /// <remarks>
+    /// 👉 MS-VBA compiles it, and raises error 438 (Object doesn't support this property or method) when it runs; RD-VBA validates at compile time what the
+    /// specification says is validated at compile time, and says so in the error.
+    /// </remarks>
+    public static VBCompileErrorInfo NoDefaultMember(ExpressionNode expression, VBClassType classType)
+        => VBCompileErrorInfo.For(VBCompileErrorId.TypeMismatch, expression.Location,
+            string.Format(Exceptions.VBCompileError_ClassHasNoDefaultMember_Verbose, classType.Name));
 
     /// <summary>
     /// What <paramref name="parameter"/> expects of an object given to it; <see langword="null"/> when it takes an object as it is.
@@ -186,13 +207,16 @@ public static class ObjectValueStaticSemantics
             _ => null,
         };
 
-        return symbol switch
-        {
-            VBReturningMemberSymbol returning => returning.Parameters,
-            VBProcedureMemberSymbol procedure => procedure.Parameters,
-            _ => null,
-        };
+        return symbol is VBReturningMemberSymbol or VBProcedureMemberSymbol ? ParametersOf((VBTypeMemberSymbol)symbol) : null;
     }
+
+    // the parameters of a procedure, whichever kind of member declares it.
+    private static ImmutableArray<VBParameterSymbol> ParametersOf(VBTypeMemberSymbol member) => member switch
+    {
+        VBReturningMemberSymbol returning => returning.Parameters,
+        VBProcedureMemberSymbol procedure => procedure.Parameters,
+        _ => [],
+    };
 
     // a member of a class has an implicit Me at parameter 0, which is the object the call is on and no argument of it.
     private static IEnumerable<VBParameterSymbol> OwnParameters(ImmutableArray<VBParameterSymbol> parameters)

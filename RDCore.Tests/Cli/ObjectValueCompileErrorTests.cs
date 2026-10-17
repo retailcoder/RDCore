@@ -9,7 +9,8 @@ namespace RDCore.Tests.Cli;
 /// </summary>
 /// <remarks>
 /// Each expected outcome is what MS-VBA reported compiling the same statement, alone in a module of the same project, in Excel (64-bit, en-US): its compile
-/// error, or none.
+/// error, or none - except for an object of a class that has no default member, which MS-VBAL §5.5.1.1 makes statically invalid and MS-VBA compiles, to
+/// raise error 438 when it runs. RD-VBA validates at compile time what the specification says is validated at compile time.
 /// </remarks>
 [TestClass]
 [TestCategory("MS-VBAL 5.5.1.1 Let-coercion")]
@@ -62,19 +63,20 @@ public sealed class ObjectValueCompileErrorTests
     [DataRow("l = New DfltVar", Compiles)]
     [DataRow("l = New DfltNum", Compiles)]
     // MS-VBAL 5.5.1.1 makes a class with no default member invalid; MS-VBA compiles it, and raises error 438 when it runs.
-    [DataRow("l = New NoDflt", Compiles)]
-    // a Variant takes the object.
+    [DataRow("l = New NoDflt", TypeMismatch)]
+    [DataRow("v = New NoDflt", TypeMismatch)]
+    // a Variant takes the object's value, whatever it is, when it runs.
     [DataRow("v = Nothing", Compiles)]
     [DataRow("v = New Collection", Compiles)]
     [DataRow("v = New DfltChain", Compiles)]
-    [DataRow("v = New NoDflt", Compiles)]
     public Task AnAssignment(string statement, string expected) => AssertCompiles(statement, expected);
 
     [TestMethod]
     [DataRow("ByLng Nothing", InvalidUseOfObject)]
     [DataRow("ByLng New Collection", ArgumentNotOptional)]
     [DataRow("ByLng New DfltChain", TypeMismatch)]
-    [DataRow("ByLng New NoDflt", Compiles)]
+    [DataRow("ByLng New NoDflt", TypeMismatch)]
+    [DataRow("ByVar New NoDflt", Compiles)]
     [DataRow("ByRefLng Nothing", InvalidUseOfObject)]
     [DataRow("ByRefLng New DfltArg", ArgumentNotOptional)]
     [DataRow("ByRefLng New DfltChain", TypeMismatch)]
@@ -97,11 +99,11 @@ public sealed class ObjectValueCompileErrorTests
     [DataRow("l = 1 + New DfltChain", TypeMismatch)]
     [DataRow("b = (New DfltChain = 1)", TypeMismatch)]
     [DataRow("s = \"x\" & New DfltChain", TypeMismatch)]
-    // an object whose default member gives a value is that value, and one with no default member is read when it runs.
+    // an object whose default member gives a value is that value; one with no default member has none (MS-VBA: error 438 when it runs).
     [DataRow("s = \"x\" & New DfltVar", Compiles)]
     [DataRow("l = 1 + New DfltVar", Compiles)]
-    [DataRow("s = \"x\" & New NoDflt", Compiles)]
-    [DataRow("l = 1 + New NoDflt", Compiles)]
+    [DataRow("s = \"x\" & New NoDflt", TypeMismatch)]
+    [DataRow("l = 1 + New NoDflt", TypeMismatch)]
     public Task AnOperand(string statement, string expected) => AssertCompiles(statement, expected);
 
     [TestMethod]
@@ -118,7 +120,7 @@ public sealed class ObjectValueCompileErrorTests
     [DataRow("v = Sqr(Nothing)", InvalidUseOfObject)]
     [DataRow("v = Val(New DfltChain)", TypeMismatch)]
     [DataRow("v = Chr(New DfltArg)", ArgumentNotOptional)]
-    [DataRow("v = CInt(New NoDflt)", Compiles)]
+    [DataRow("v = CInt(New NoDflt)", TypeMismatch)]
     [DataRow("v = CInt(New DfltVar)", Compiles)]
     // a value of any type: an object whose default member returns an object is read when it runs.
     [DataRow("v = Abs(Nothing)", InvalidUseOfObject)]
@@ -127,6 +129,7 @@ public sealed class ObjectValueCompileErrorTests
     [DataRow("v = Len(Nothing)", InvalidUseOfObject)]
     [DataRow("v = Abs(New DfltChain)", Compiles)]
     [DataRow("v = Int(New DfltChain)", Compiles)]
+    [DataRow("v = Abs(New NoDflt)", Compiles)]
     // a Variant the function takes as it is.
     [DataRow("v = CVar(Nothing)", Compiles)]
     [DataRow("v = CDec(New Collection)", Compiles)]
@@ -138,6 +141,21 @@ public sealed class ObjectValueCompileErrorTests
     [DataRow("v = TypeName(New Collection)", Compiles)]
     [DataRow("v = IIf(True, Nothing, 2)", Compiles)]
     public Task AnArgumentOfTheLibrary(string statement, string expected) => AssertCompiles(statement, expected);
+
+    [TestMethod]
+    [DataRow("l = New NoDflt")]
+    [DataRow("v = New NoDflt")]
+    [DataRow("ByLng New NoDflt")]
+    [DataRow("l = 1 + New NoDflt")]
+    public async Task AClassWithNoDefaultMember_IsACompileError_ThatSaysMSVBARaises438WhenItRuns(string statement)
+    {
+        var errors = await LoadErrorsAsync(Classes,
+            "Attribute VB_Name = \"Program\"\r\nPrivate Sub ByLng(ByVal x As Long)\r\nEnd Sub\r\nPublic Sub Main()\r\n"
+            + $"    Dim v As Variant, l As Long\r\n    {statement}\r\nEnd Sub\r\n");
+
+        Assert.HasCount(1, errors, string.Join(" | ", errors));
+        StringAssert.Contains(errors[0], string.Format(RDCore.SDK.Exceptions.VBCompileError_ClassHasNoDefaultMember_Verbose, "NoDflt"));
+    }
 
     [TestMethod]
     [Ignore("MS-VBA says 'Variable required - can't assign to this expression' for Len and LenB of an object whose default member returns an object; "

@@ -242,14 +242,15 @@ public sealed class StatementStaticSemanticsEvaluatorTests
 
     [TestMethod]
     public void LetAssignment_IncompatibleSource_IsATypeMismatchError()
-        // proves Let-coercion is really being checked (not just permissive by default): an array into a Long is invalid per MS-VBAL 5.5.1.1.
+        // proves Let-coercion is really being checked (not just permissive by default): an object of a class with no
+        // default member into a Long is invalid per MS-VBAL 5.5.1.1.
     {
         var module = Module("Caller");
-        var widgets = ModuleField(module.Uri, "widgets", new VBResizableArrayType(VBLongType.TypeInfo));
+        var widget = ModuleField(module.Uri, "widget", new VBClassType(ClassModule("Widget"), []));
         var n = ModuleField(module.Uri, "n", VBLongType.TypeInfo);
-        var context = ContextAt(module.Uri, module with { Members = [widgets, n] }, widgets, n);
+        var context = ContextAt(module.Uri, module with { Members = [widget, n] }, widget, n);
 
-        var block = Block(AssignOf(NameOf("n"), NameOf("widgets"), AssignmentKind.ImplicitLet));
+        var block = Block(AssignOf(NameOf("n"), NameOf("widget"), AssignmentKind.ImplicitLet));
         var errors = StatementStaticSemanticsEvaluator.Evaluate(context, block);
 
         Assert.AreEqual(1, errors.Length);
