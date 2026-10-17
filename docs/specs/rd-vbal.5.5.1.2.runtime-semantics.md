@@ -212,6 +212,31 @@ Every let-coercion to `String` writes in the session's culture: an assignment, `
 ([**RD-VBAL §6.1.2.3** Conversion Module](rd-vbal.6.1.2.3.conversion-module.md)). `Write #` writes fixed spellings
 instead ([**RD-VBAL §5.4.5.9** Write Statement](rd-vbal.5.4.5.9.write-statement.md)).
 
+### Reading a String as a number or a date
+
+A `String` let-coerced to a number, a `Boolean` or a `Date` is read by the **platform's** regional settings,
+[IRuntimeEnvironmentProfile](../api/RDCore.SDK.Runtime.Abstract.Execution.IRuntimeEnvironmentProfile.html)`.Regional`
+([RegionalSettings](../api/RDCore.SDK.Runtime.RegionalSettings.html)), bound from the `Environment.Regional` section of `appsettings.json`: en-US
+unless it says otherwise, whatever the machine's culture, so that a program reads `"1,000"` the same wherever it runs.
+
+|Setting|en-US (the default)|
+|---|---|
+|`DecimalSymbol`|`.`|
+|`DigitGroupingSymbol`|`,`|
+|`CurrencySymbol`|`$`|
+|`TwoDigitYearMax`|`2049`: `30` is 2030, `50` is 1950|
+
+What is read is what MS-VBA reads (recorded in Excel), which is more than §5.5.1.2.4's grammar says:
+
+- a number may have a sign before it or after it (`1-`), or parentheses around it (`(1)`), never two of them; the currency symbol before it or after it,
+  the sign on either side of it (`-$1`, `$-1`); the digit grouping symbol anywhere after its first digit, ignored (`1,000.5,0` is 1000.5); and an exponent,
+  `e` or `d`, after all of it;
+- a hexadecimal or octal literal is a number too (`&H10`, `&O7`), with no sign and no type character, and what it is depends on the type it is converted
+  to: to an `Integer`, up to 16 bits are the `Integer` they are (`&HFFFF` is -1); to a `Long`, up to 32 bits are the `Long` they are; to anything else, up to
+  32 bits are the `Long` they are (`&HFFFF` is 65535, `&HFFFFFFFF` is -1), and more are the number they are;
+- a date and a time are read by the grammar of a date literal, `date-or-time` (**MS-VBAL §3.3.3**), without its `#` delimiters: which number is the month
+  is decided by which can be, a comma is a date separator, a dot a time separator (`1.5` is 1:05), and a date that says no year is in the current one.
+
 > [!NOTE]
 > **Not implemented.** Let-coercion _from_ `String` reads a number or a date invariantly, whatever the culture. Under
 > a culture whose decimal symbol is a comma, `CStr(2.5)` is `"2,5"`, which does not read back as `2.5`.
