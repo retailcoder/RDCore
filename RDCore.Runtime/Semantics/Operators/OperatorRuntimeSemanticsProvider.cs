@@ -8,7 +8,10 @@ using RDCore.Runtime.Semantics.Plans;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.Runtime.Execution;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Context;
@@ -183,6 +186,32 @@ public sealed class OperatorRuntimeSemanticsProvider : IOperatorRuntimeSemantics
         public static readonly TContext Context = new();
     }
 
+    // replaces each operand that is an object, or a Variant that holds one, with its simple data value (ObjectDefaultMember.ValueOf); the error of the
+    // first that has none, raised at the operation unless its default member raised it somewhere of its own.
+    private static RuntimeSemanticsEvaluationResult? SimpleDataValues(IRuntimeSession session, ExpressionNode expression, VBTypedValue[] operands)
+    {
+        for (var index = 0; index < operands.Length; index++)
+        {
+            // an object an analysis assumes is not one to call: what it is said of is the operation's, on what the operand might be.
+            if (operands[index] is not (VBObjectValue or VBVariantValue { TypedValue: VBObjectValue or VBVariantValue }) || operands[index].IsIndeterminate)
+            {
+                continue;
+            }
+
+            var read = ObjectDefaultMember.ValueOf(session, operands[index]);
+            if (!read.IsSuccess)
+            {
+                return read.ErrorInfo is VBRuntimeErrorInfo { Location: var location } error && location == default
+                    ? RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For((VBRuntimeErrorId)error.ErrorId, expression.Location, error.Verbose))
+                    : read;
+            }
+
+            operands[index] = read.Result!;
+        }
+
+        return null;
+    }
+
     // the one place an operation is evaluated: what the evaluation says is the operation's, and is stated as it is, once the
     // operation is done, so that what is observed is what ran.
     private RuntimeSemanticsEvaluationResult Evaluate<TContext, TFlags>(
@@ -195,14 +224,19 @@ public sealed class OperatorRuntimeSemanticsProvider : IOperatorRuntimeSemantics
         where TContext : SemanticContext<TFlags>, new()
         where TFlags : struct, Enum
     {
+        // MS-VBAL 5.6.9.2: a simple data operator - every operator but Is, which compares references - "first evaluates its operands as simple data
+        // values": an object is what its default member returns (MS-VBAL 5.6.2.2), before the operation is planned on what its operands are. An operand
+        // that has no value is the operation's error, which is stated as the operation's like any other.
+        var unreadable = token != Tokens.CompareIsOp ? SimpleDataValues(session, expression, operands) : null;
+
         // an operation nothing observes is evaluated by its plan when it can be (IR lowering §3.2), and by the pipeline otherwise. An observed operation
         // always goes through the pipeline, which is what describes the conversions of its operands.
-        if (!IsObserved && PlanExecutor.TryEvaluate(semantics, session, Empty<TContext>.Context, token, expression, site, operands) is { } planned)
+        if (unreadable is null && !IsObserved && PlanExecutor.TryEvaluate(semantics, session, Empty<TContext>.Context, token, expression, site, operands) is { } planned)
         {
             return planned;
         }
 
-        var result = semantics.EvaluateAtSite(session, Empty<TContext>.Context, expression, site, operands);
+        var result = unreadable ?? semantics.EvaluateAtSite(session, Empty<TContext>.Context, expression, site, operands);
         if (_observation is { IsSuspended: false } observation)
         {
             // describing the operation evaluates it again, operands and all: those conversions are not the code's.

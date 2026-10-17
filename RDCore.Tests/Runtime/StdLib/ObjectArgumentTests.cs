@@ -105,9 +105,10 @@ public sealed class ObjectArgumentTests
 
     [TestMethod]
     // MS-VBA raises error 51, an internal error, for a default member that returns an object. RD-VBA raises no internal error for a specified input, and
-    // reads that object's simple data value in turn, as Let-coercing the object would (MS-VBAL 5.5.1.2.13): a Collection's default member takes a key.
+    // reads that object's simple data value in turn, as Let-coercing the object would (MS-VBAL 5.5.1.2.13). A Collection's default member takes a key,
+    // so the Collection has no value: error 13, as MS-VBAL 5.6.2.3 allows and MS-VBA raises for it held in a Variant.
     public Task ADefaultMemberThatReturnsAnObject_StandsForThatObjectsValue()
         => AssertRows(
             "Abs(New DfltChain) => Long 42",
-            "Abs(New DfltObj) => err 438");
+            "Abs(New DfltObj) => err 13");
 }

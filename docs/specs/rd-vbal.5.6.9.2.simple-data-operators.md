@@ -5,7 +5,14 @@
 
 ## Runtime Semantics
 
-The _evaluation pipeline_ of all operators follows a fixed sequence of three steps:
+A simple data operator - every operator but `Is` - "first evaluates its operands as simple data values": an operand that
+is an object, or a `Variant` that holds one, is what its default member returns (**MS-VBAL §5.6.2.2**), before anything
+else. `o + 1.5` of an object whose default member returns `42` is `43.5`, as in MS-VBA. An operand that has no value is
+the operation's error: `Nothing` is `91`, an object with no default member `438`, one whose default member takes an
+argument `450`, and an object a default member returned that has no value `13` (**MS-VBAL §5.6.2.3**). An operand an
+analysis assumes is not read.
+
+The _evaluation pipeline_ of all operators then follows a fixed sequence of three steps:
 
 1. **Effective type.** The _effective type_ of the operation is determined, based on the _declared type_ of its
    _operands_.

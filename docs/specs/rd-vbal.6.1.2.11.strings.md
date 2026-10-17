@@ -50,9 +50,11 @@ An object given for a `Variant` parameter is read as its Let-coercion reads it
 as its "simple data value", what its default member returns when it is called with no arguments, read again if that is
 an object. So `Left(o, 2)` of an object whose default member returns `"duck"` is `"du"`, and one that returns `Null` gives
 `Null`. `Nothing` is error `91`, as the call site makes it for a typed parameter: `Left(Nothing, 1)` is error `91`, as
-`StrReverse(Nothing)` is. An object whose class has no default member that can be called with no arguments (none, or one
-with a required parameter) is error `438`; what the default member raises is raised; and a chain of default members that
-never returns a value that is not an object is error `28`.
+`StrReverse(Nothing)` is. An object with no default member is error `438`, and one whose default member takes an argument
+(a `Collection`) is error `450`; an object that a default member returned and that has no value is error `13`
+(**MS-VBAL §5.6.2.3**); what the default member raises is raised; and a chain of default members that never returns a
+value that is not an object is error `28`. MS-VBA raises the same for most of its functions (recorded in Excel), but not
+all: its `Format` raises `438` for an object a default member returned.
 
 A `String * n` argument is its padded value, so `Trim`, `RTrim`, `Left`, `Right` and `Mid` see the padding.
 
@@ -139,7 +141,9 @@ error `5` though a zero-length expression gives a zero-length string.
 |`InStr` or `InStrB` is given no `String` to search, or no pattern|`449`|
 |A `Variant` argument has no form of the type the member needs: an `Error`, Missing, or an array other than a `Byte()` read as a `String`|`13`|
 |A `Variant` argument, or an element of a `SourceArray`, is `Nothing`, or an object whose default member returns `Nothing`|`91`|
-|A `Variant` argument is an object with no default member that can be called with no arguments|`438`|
+|A `Variant` argument is an object with no default member|`438`|
+|A `Variant` argument is an object whose default member takes an argument, such as a `Collection`|`450`|
+|A `Variant` argument is an object whose default member returns an object that has no value|`13`|
 |A `Variant` argument the member needs as a number is beyond a `Long`|`6`|
 |A date to format outside the range of dates|`6`|
 |A date to format before the first day of the Hijri calendar, when the session's calendar is Hijri|`5`|
@@ -493,6 +497,15 @@ not be able to determine the actual number of storage bytes required when used w
 user-defined data types". For such a record, `Len` counts the characters the member currently holds and `LenB` counts
 the pointer, so the two move independently of each other.
 
+🚧 MS-VBA measures a record differently (recorded in Excel, 64-bit): `Len` counts a variable-length `String`, an object
+or an array member as an 8-byte pointer and a `Variant` member as its 24 bytes - `Len` of `{ a As Long, s As String }` is
+`12` whatever `s` holds, and its `LenB` is `16` - where RD-VBA's `Len` is `4` plus `s`'s characters, and its `LenB` a
+32-bit layout's. A record with an object or an array member is not measured yet. Which of the two RD-VBA follows is not
+decided.
+
+An object is measured as its value, what its default member returns: `Len` of an object whose default member returns a
+`Long` is `4`, the size of a `Long`.
+
 #### Declared types at external dispatch
 
 👉 An external call carries _runtime_ values rather than _typed_ ones, so the declared type of the value a member was
@@ -588,7 +601,9 @@ a pair MS-VBAL makes "mutually exclusive": `vbUnicode` and `vbFromUnicode`, `vbW
 - `vbProperCase` lowercases the `String`, then uppercases its first character and each one after one of MS-VBAL's seven
   word separators (`Chr$(0)`, `Chr$(9)` to `Chr$(13)`, `Chr$(32)`), and no other: `"o'neil-smith"` is `"O'neil-smith"`,
   and a no-break or em space starts no word. In an East Asian locale the ideographic space starts one, "the actual value for
-  a space" varying "for DBCS".
+  a space" varying "for DBCS" - as in MS-VBA (recorded in Excel, `LocaleID` `&H411`, `&H804`, `&H404` and `&H412`).
+  🚧 MS-VBA also passes the `String` through the `LocaleID`'s ANSI code page: in en-US an ideographic space comes back a
+  space (U+0020), and starts a word; in an East Asian locale a no-break space comes back `?`. RD-VBA keeps every character.
 - `vbUnicode` reads the `String`'s bytes, a trailing one included, as text in "the default code page of the system", the
   environment's ANSI code page. `vbFromUnicode` writes the characters as that code page's bytes: `"abc"` becomes a
   `String` of three bytes. A `LocaleID` changes the casing only, never the code page.
@@ -612,7 +627,7 @@ error `5`, and so are `LOCALE_USER_DEFAULT` and `LOCALE_SYSTEM_DEFAULT` (`1024` 
 `vbWide`, `vbNarrow`, `vbKatakana` and `vbHiragana` "cause run-time errors when used in locales where they do not apply",
 in `LocaleID`'s locale or the environment's: `vbWide` and `vbNarrow` apply to "East Asia locales", read as the Chinese,
 Japanese and Korean ones, and `vbKatakana` and `vbHiragana` to "Japan only", read as the Japanese ones. Elsewhere they are
-error `5`.
+error `5`. MS-VBA does the same (recorded in Excel with `LocaleID` `&H411`, `&H804`, `&H404`, `&H412`, `1033` and `&H40C`).
 
 ### 6.1.2.11.1.38 String
 
@@ -635,7 +650,8 @@ which its declaration, `As Long`, makes error `94` at the call site.
 `FirstDayOfWeek`, as `Weekday` counts them, so `WeekdayName(Weekday(d))` is the name of `d`'s day; with `Abbreviate` it
 is the abbreviated name. `FirstDayOfWeek` left out is the declared `vbUseSystemDayOfWeek`, the first day of the week of
 the regional settings: `WeekdayName(1)` is `"lundi"` in fr-FR. The page's table calls `vbSunday` the default, which its
-declaration does not: the declaration is what is declared. A `Weekday` other than `1` to `7`, then a `FirstDayOfWeek` that
+declaration does not: the declaration is what is declared, and MS-VBA's type library declares the same default, `0`
+(`VBE7.DLL`: `Optional FirstDayOfWeek As VbDayOfWeek = 0`). A `Weekday` other than `1` to `7`, then a `FirstDayOfWeek` that
 is no value of its enumeration, are error `5`.
 
 ---
