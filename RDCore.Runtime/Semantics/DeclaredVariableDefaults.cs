@@ -103,8 +103,17 @@ public sealed class DeclaredVariableDefaults(IRuntimeSession session, ArrayBound
     // MS-VBAL §5.2.1.2: an omitted lower bound is the Option Base of the module the variable is declared in. A local's is on the
     // frame of the activation allocating it; a module's own variable is read off the module symbol, whose name is the first segment
     // of the variable's identity.
+    //
+    // A field of a user-defined type is the exception: MS-VBA gives its arrays a lower bound of 0 whatever the module's Option Base, where the
+    // section reads as covering every array dimension of the module. RD-VBA does what MS-VBA does (recorded in Excel, 2026-10-17: under
+    // `Option Base 1`, `Values(4) As Long` in a Type is 0 To 4 while a Dim beside it is 1 To 4).
     private int OptionBaseOf(Symbol variable)
     {
+        if (variable is VBUserDefinedTypeFieldSymbol)
+        {
+            return 0;
+        }
+
         if (variable.ScopeKind is ScopeKind.Local && session.CallStack.Current is { } frame)
         {
             return frame.Directives.Base;

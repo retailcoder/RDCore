@@ -85,20 +85,22 @@ public sealed class UserDefinedTypeVariableTests
             "Debug.Print LBound(b.Values) & \" \" & UBound(b.Values)",
             "Debug.Print b.Values(1) & \" \" & b.Values(2) & \" \" & b.Values(3)", "End Sub"));
 
-    // a bound is a constant expression, and an omitted lower bound is the module's Option Base (MS-VBAL §5.2.1.2).
+    // a bound is a constant expression. An omitted lower bound of a field is 0 whatever the module's Option Base, as MS-VBA has it (recorded in
+    // Excel) - where MS-VBAL §5.2.1.2 reads as covering every array dimension of the module, and the variable beside it does start at 1.
     [TestMethod]
-    public async Task AFixedSizeArrayField_BoundedByAConstant_StartsAtTheOptionBase()
-        => CollectionAssert.AreEqual(new[] { "1 4" }, await RunAsync(
+    public async Task AFixedSizeArrayField_BoundedByAConstant_StartsAtZero_WhateverTheOptionBase()
+        => CollectionAssert.AreEqual(new[] { "0 4", "1 4" }, await RunAsync(
             "Option Base 1", "Private Const Size As Long = 4",
             "Private Type TBox", "Values(Size) As Long", "End Type",
-            "Public Sub Main()", "Dim b As TBox", "Debug.Print LBound(b.Values) & \" \" & UBound(b.Values)", "End Sub"));
+            "Public Sub Main()", "Dim b As TBox", "Dim plain(Size) As Long",
+            "Debug.Print LBound(b.Values) & \" \" & UBound(b.Values)", "Debug.Print LBound(plain) & \" \" & UBound(plain)", "End Sub"));
 
     [TestMethod]
     public async Task AFixedSizeArrayField_OfAVariableOfTheModule_HasItsDimensions()
         => CollectionAssert.AreEqual(new[] { "2" }, await RunAsync(
             "Private Const Last As Long = 2",
             "Private Type TBox", "Values(Last) As String", "End Type",
-            "Public Box As TBox",
+            "Private Box As TBox",
             "Public Sub Main()", "Box.Values(2) = \"2\"", "Debug.Print Box.Values(UBound(Box.Values))", "End Sub"));
 
     [TestMethod]
