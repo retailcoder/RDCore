@@ -248,6 +248,43 @@ public record class SdkEnvironmentOptions
     /// Only Windows has a registry: elsewhere this is ignored, and the workspace application settings are used either way.
     /// </remarks>
     public bool LegacyRegistrySettings { get; set; }
+
+    /// <summary>
+    /// 🎯 The regional settings a <c>String</c> is read by as a number or a date (<see cref="Runtime.RegionalSettings"/>): en-US unless said otherwise,
+    /// whatever the machine's are.
+    /// </summary>
+    public SdkRegionalOptions Regional { get; set; } = new();
+}
+
+/// <summary>
+/// The regional settings of the platform, bound from <c>appsettings.json</c> (<see cref="SdkEnvironmentOptions.Regional"/>); en-US unless said otherwise.
+/// </summary>
+public record class SdkRegionalOptions
+{
+    /// <summary>
+    /// What separates the whole part of a number from its fraction: <c>.</c> by default.
+    /// </summary>
+    public string DecimalSymbol { get; set; } = Runtime.RegionalSettings.Default.DecimalSymbol;
+
+    /// <summary>
+    /// What groups the digits of a number: <c>,</c> by default.
+    /// </summary>
+    public string DigitGroupingSymbol { get; set; } = Runtime.RegionalSettings.Default.DigitGroupingSymbol;
+
+    /// <summary>
+    /// What a number may be written with, as an amount of money: <c>$</c> by default.
+    /// </summary>
+    public string CurrencySymbol { get; set; } = Runtime.RegionalSettings.Default.CurrencySymbol;
+
+    /// <summary>
+    /// The last year a year written with one or two digits can be: <c>2049</c> by default.
+    /// </summary>
+    public int TwoDigitYearMax { get; set; } = Runtime.RegionalSettings.Default.TwoDigitYearMax;
+
+    /// <summary>
+    /// The settings these options say.
+    /// </summary>
+    public Runtime.RegionalSettings ToSettings() => new(DecimalSymbol, DigitGroupingSymbol, CurrencySymbol, TwoDigitYearMax);
 }
 
 public record class SdkServerAppOptions

@@ -129,6 +129,15 @@ internal static class PlanExecutor
     private static bool TryConvertPlainValue(VBTypedValue value, VBType destination, [NotNullWhen(true)] out VBTypedValue? converted)
     {
         var plan = ConversionPlanner.ForValue(value.TypeInfo, destination);
+
+        // a String is read as a number, a Boolean or a date by the regional settings of the session (MS-VBAL 5.5.1.2.4), which a plan does not know:
+        // the coercion does.
+        if (value is VBStringValue && plan.Rule is ConversionRule.Numeric or ConversionRule.Boolean or ConversionRule.Date)
+        {
+            converted = null;
+            return false;
+        }
+
         var conversion = plan.Rule switch
         {
             ConversionRule.Numeric when plan.Destination is VBNumericType numeric => ValueConversions.ToNumeric(value, numeric),

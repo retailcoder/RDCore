@@ -177,11 +177,12 @@ public sealed class RuntimeExecutionPipeline
 
         var letCoercion = new LetCoercionRuntimeSemanticsProvider(
             [
-                new VBNumericLetCoercionTypeRuntimeSemantics(messages, handle),
-                new VBBooleanLetCoercionRuntimeSemantics(handle, messages),
+                // a String Let-coerced to a number, a Boolean or a date is read by the platform's regional settings (MS-VBAL 5.5.1.2.4).
+                new VBNumericLetCoercionTypeRuntimeSemantics(messages, handle, session.Environment.Regional),
+                new VBBooleanLetCoercionRuntimeSemantics(handle, messages, session.Environment.Regional),
                 // every number and date Let-coerced to String is written in the environment's regional settings.
                 new VBStringLetCoercionRuntimeSemantics(messages, session.Environment.Culture),
-                new VBDateLetCoercionRuntimeSemantics(handle, messages),
+                new VBDateLetCoercionRuntimeSemantics(handle, messages, session.Environment.Regional),
                 new VBFixedStringLetCoercionRuntimeSemantics(handle, messages),
                 new VBVariantTypeLetCoercionRuntimeSemantics(handle, messages),
                 new VBEmptyTypeLetCoercionRuntimeSemantics(messages),

@@ -30,16 +30,20 @@ namespace RDCore.Runtime.Semantics.LetCoercion;
 /// Byte's spec-mandated 255 special case) is dispatched by a <em>numeric</em> destination instead, and
 /// lives in <see cref="VBNumericLetCoercionTypeRuntimeSemantics"/> for that same reason.
 /// </remarks>
+/// <param name="Provider">The coercions this one is one of.</param>
+/// <param name="FormatterService">Writes the messages of the errors the coercion raises.</param>
+/// <param name="Regional">The regional settings a <c>String</c> is read by as a number (MS-VBAL 5.5.1.2.4); en-US when none are given.</param>
 public sealed record class VBBooleanLetCoercionRuntimeSemantics(
     ILetCoercionRuntimeSemanticsProvider Provider,
-    IVerboseMessageBuilder FormatterService)
+    IVerboseMessageBuilder FormatterService,
+    SDK.Runtime.RegionalSettings? Regional = null)
     : LetCoercionRuntimeSemantics<VBBooleanType>(FormatterService)
 {
     public sealed override LetCoercionResult EvaluateLetCoercion(ISymbolResolver resolver, ExpressionNode expression, LetCoercionStackFrame frame)
     {
         frame = WithoutVariant(frame);
         return frame.DestinationTypeDesc.Target is VBBooleanType
-            ? FromConversion(ValueConversions.ToBoolean(frame.SourceValue), expression, frame)
+            ? FromConversion(ValueConversions.ToBoolean(frame.SourceValue, Regional), expression, frame)
             : LetCoercionResult.NotApplicable(frame);
     }
 

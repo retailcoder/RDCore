@@ -161,12 +161,16 @@ public sealed class IsFunctionTests
     public async Task IsNumeric_OfAStringThatIsNotANumber_IsFalse(string text)
         => CollectionAssert.AreEqual(new[] { "False" }, await Run(string.Empty, $"Debug.Print IsNumeric(\"{text}\")"));
 
+    // MS-VBA reads a hexadecimal or octal literal in a string as the number it is, which MS-VBAL 5.5.1.2.4's grammar has no room for (recorded in Excel).
     [TestMethod]
-    [Ignore("The numeric Let-coercion grammar (ValueConversions.StringToNumeric) reads neither &H/&O literals, thousands separators, a currency " +
-        "symbol, parentheses nor a trailing sign, all of which MS-VBA's (the host's regional number format, MS-VBAL 5.5.1.2.4) does.")]
     [DataRow("&H10")]
     [DataRow("&HFFFF")]
     [DataRow("&O7")]
+    public async Task IsNumeric_OfAHexadecimalOrOctalLiteral_IsTrue(string text)
+        => CollectionAssert.AreEqual(new[] { "True" }, await Run(string.Empty, $"Debug.Print IsNumeric(\"{text}\")"));
+
+    // MS-VBAL 5.5.1.2.4: a number "according to the active host-defined regional settings" - the platform's, en-US unless it is told otherwise.
+    [TestMethod]
     [DataRow("1,000")]
     [DataRow("1,0,0")]
     [DataRow("1-")]

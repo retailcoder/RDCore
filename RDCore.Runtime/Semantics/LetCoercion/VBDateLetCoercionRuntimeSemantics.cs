@@ -27,9 +27,13 @@ namespace RDCore.Runtime.Semantics.LetCoercion;
 /// (Let-coercion to and from String), even though that rule is documented in the String section of
 /// the specification.
 /// </remarks>
+/// <param name="Provider">The coercions this one is one of.</param>
+/// <param name="FormatterService">Writes the messages of the errors the coercion raises.</param>
+/// <param name="Regional">The regional settings a <c>String</c> is read by (MS-VBAL 5.5.1.2.4); en-US when none are given.</param>
 public record class VBDateLetCoercionRuntimeSemantics(
     ILetCoercionRuntimeSemanticsProvider Provider,
-    IVerboseMessageBuilder FormatterService)
+    IVerboseMessageBuilder FormatterService,
+    SDK.Runtime.RegionalSettings? Regional = null)
     : LetCoercionRuntimeSemantics<VBDateType>(FormatterService)
 {
     public override LetCoercionResult EvaluateLetCoercion(
@@ -37,7 +41,7 @@ public record class VBDateLetCoercionRuntimeSemantics(
         ExpressionNode expression,
         LetCoercionStackFrame frame) =>
         frame.DestinationTypeDesc.Target is VBDateType
-            ? FromConversion(ValueConversions.ToDate(frame.SourceValue), expression, frame)
+            ? FromConversion(ValueConversions.ToDate(frame.SourceValue, Regional), expression, frame)
             : LetCoercionResult.NotApplicable(frame);
 
     protected override ILetCoercionSemanticContextBuilder AnalyzeLetCoercionOperation(

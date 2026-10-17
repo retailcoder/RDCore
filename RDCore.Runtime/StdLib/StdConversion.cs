@@ -56,7 +56,7 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
 
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult<VBBooleanValue> CBool(VBVariantValue expression)
-        => Convert<VBBooleanValue>(expression, ValueConversions.ToBoolean, nameof(Boolean), errorAsCode: true);
+        => Convert<VBBooleanValue>(expression, source => ValueConversions.ToBoolean(source, session.Environment.Regional), nameof(Boolean), errorAsCode: true);
 
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult<VBByteValue> CByte(VBVariantValue expression)
@@ -71,7 +71,7 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
         => Unwrapped(expression) is VBErrorValue
             // MS-VBAL 6.1.2.3.1.4: "If the value of Expression is an Error data value then raise error 13".
             ? Fail<VBDateValue>(VBRuntimeErrorId.TypeMismatch, "An error value cannot be converted to a Date.")
-            : Convert<VBDateValue>(expression, ValueConversions.ToDate, "Date", errorAsCode: false);
+            : Convert<VBDateValue>(expression, source => ValueConversions.ToDate(source, session.Environment.Regional), "Date", errorAsCode: false);
 
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> CVDate(VBVariantValue expression)
@@ -287,7 +287,7 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
             ? Succeed(new VBVariantValue(VBNullValue.Null))
             : InVariant(RadixText(number, radix));
 
-    private static RuntimeSemanticsEvaluationResult<VBStringValue> RadixText(VBVariantValue number, int radix)
+    private RuntimeSemanticsEvaluationResult<VBStringValue> RadixText(VBVariantValue number, int radix)
     {
         var source = Unwrapped(number);
         switch (source)
@@ -446,9 +446,9 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
         return value;
     }
 
-    private static RuntimeSemanticsEvaluationResult<TValue> ToNumeric<TValue>(VBVariantValue expression, VBNumericType destination, bool errorAsCode)
+    private RuntimeSemanticsEvaluationResult<TValue> ToNumeric<TValue>(VBVariantValue expression, VBNumericType destination, bool errorAsCode)
         where TValue : VBTypedValue
-        => Convert<TValue>(expression, source => ValueConversions.ToNumeric(source, destination), destination.Name, errorAsCode);
+        => Convert<TValue>(expression, source => ValueConversions.ToNumeric(source, destination, session.Environment.Regional), destination.Name, errorAsCode);
 
     // "If the value of Expression is an Error data value then return the [type] data value that is the result of
     // the Long error code of the Error data value being Let-coerced to [type]" - the error code stands in for the

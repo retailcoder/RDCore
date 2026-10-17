@@ -4,6 +4,7 @@ using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Runtime;
+using RDCore.SDK.Runtime;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -71,12 +72,6 @@ public readonly record struct ValueConversionResult(VBTypedValue? Value, VBRunti
 /// </remarks>
 public static partial class ValueConversions
 {
-    // MS-VBAL 5.5.1.2.4: numeric-coercion-string = [WS] [sign [WS]] regional-number-string
-    // [exponent-clause] [WS]; exponent-clause = ("e" / "d") [sign] integer-literal. Whitespace is
-    // also tolerated immediately around the sign and the exponent letter.
-    [GeneratedRegex(@"^\s*(?<mantissa>[+-]?\s*(?:[0-9]+\.?[0-9]*|\.[0-9]+))\s*(?:[eEdD]\s*(?<exponent>[+-]?\s*[0-9]+))?\s*$")]
-    private static partial Regex NumericCoercionStringPattern();
-
     /// <summary>
     /// Converts <paramref name="source"/> to the numeric type <paramref name="destination"/>
     /// (<strong>MS-VBAL §5.5.1.2.1</strong>), and from a <c>String</c>, <c>Boolean</c>, <c>Date</c> or
@@ -85,9 +80,10 @@ public static partial class ValueConversions
     /// </summary>
     /// <param name="source">The value, unwrapped from any <c>Variant</c> that held it.</param>
     /// <param name="destination">The numeric type to convert to.</param>
-    public static ValueConversionResult ToNumeric(VBTypedValue source, VBNumericType destination) => source.TypeInfo switch
+    /// <param name="regional">The regional settings a <c>String</c> is read by; en-US when none are given.</param>
+    public static ValueConversionResult ToNumeric(VBTypedValue source, VBNumericType destination, RegionalSettings? regional = null) => source.TypeInfo switch
     {
-        VBStringType => StringToNumeric(((VBStringValue)source).Value, destination),
+        VBStringType => StringToNumeric(((VBStringValue)source).Value, destination, regional),
 
         // if the source value is within the range of the destination type, the result is a copy of the value: a whole number is converted as the whole
         // number it is, which a LongLong past 2^53 is not as a Double.
@@ -196,51 +192,46 @@ public static partial class ValueConversions
         _ => null,
     };
 
-    private static ValueConversionResult StringToNumeric(string? text, VBNumericType destination)
+    // MS-VBAL 5.5.1.2.4, as MS-VBA reads it (NumberGrammar).
+    private static ValueConversionResult StringToNumeric(string? text, VBNumericType destination, RegionalSettings? regional = null)
     {
-        var match = NumericCoercionStringPattern().Match(text ?? string.Empty);
-        if (!match.Success)
+        if (!NumberGrammar.TryRead(text ?? string.Empty, regional ?? RegionalSettings.Default, out var reading))
         {
             return ValueConversionResult.Failure(VBRuntimeErrorId.TypeMismatch);
         }
 
-        if (!double.TryParse(
-            match.Groups["mantissa"].Value.Replace(" ", string.Empty),
-            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-            CultureInfo.InvariantCulture,
-            out var interpretedValue))
+        if (reading.Radix is { } bits)
+        {
+            return FromRadix(bits, destination);
+        }
+
+        if (!double.TryParse(reading.Digits, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var interpretedValue))
         {
             return ValueConversionResult.Failure(VBRuntimeErrorId.TypeMismatch);
         }
 
         // a number written without an exponent is the decimal number it is written as, when a Decimal holds it: "9223372036854775807" is the largest
         // LongLong, which no Double is.
-        if (!match.Groups["exponent"].Success && decimal.TryParse(
-            match.Groups["mantissa"].Value.Replace(" ", string.Empty),
-            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-            CultureInfo.InvariantCulture,
-            out var writtenValue))
+        if (reading.Exponent is null
+            && decimal.TryParse(reading.Digits, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var writtenValue))
         {
             return FromFixed(writtenValue, destination);
         }
 
-        var scaledValue = interpretedValue;
-        if (match.Groups["exponent"].Success)
-        {
-            if (!int.TryParse(
-                match.Groups["exponent"].Value.Replace(" ", string.Empty),
-                NumberStyles.AllowLeadingSign,
-                CultureInfo.InvariantCulture,
-                out var exponent))
-            {
-                return ValueConversionResult.Failure(VBRuntimeErrorId.TypeMismatch);
-            }
-
-            scaledValue *= Math.Pow(10, exponent);
-        }
-
+        var scaledValue = reading.Exponent is { } exponent ? interpretedValue * Math.Pow(10, exponent) : interpretedValue;
         return !double.IsNaN(scaledValue) && Ranged(scaledValue, destination)
             ? ValueConversionResult.Success(destination.CreateValue(scaledValue))
             : ValueConversionResult.Failure(VBRuntimeErrorId.Overflow);
     }
+
+    // the digits of an &H or &O literal, as MS-VBA converts them (recorded in Excel): to an Integer, up to 16 bits are the Integer they are (&HFFFF is -1)
+    // and more are the low 32 bits read as a Long, which may not fit; to a Long, up to 32 bits are the Long they are, and more overflow; to any other
+    // type, up to 32 bits are the Long they are (&HFFFF is 65535, &HFFFFFFFF is -1), and more are the number they are.
+    private static ValueConversionResult FromRadix(ulong bits, VBNumericType destination) => destination switch
+    {
+        VBIntegerType or VBByteType => FromWhole(bits <= ushort.MaxValue ? (short)(ushort)bits : (int)(uint)(bits & uint.MaxValue), destination),
+        VBLongType => bits <= uint.MaxValue ? FromWhole((int)(uint)bits, destination) : Overflow,
+        _ when bits <= uint.MaxValue => FromWhole((int)(uint)bits, destination),
+        _ => bits <= long.MaxValue ? FromWhole((long)bits, destination) : FromFixed(bits, destination),
+    };
 }

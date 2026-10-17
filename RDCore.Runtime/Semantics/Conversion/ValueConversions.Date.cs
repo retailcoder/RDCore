@@ -2,7 +2,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
-using System.Globalization;
+using RDCore.SDK.Runtime;
 
 namespace RDCore.Runtime.Semantics.Conversion;
 
@@ -14,7 +14,8 @@ public static partial class ValueConversions
     /// <c>Empty</c> (<strong>§5.5.1.2.11</strong>).
     /// </summary>
     /// <param name="source">The value, unwrapped from any <c>Variant</c> that held it.</param>
-    public static ValueConversionResult ToDate(VBTypedValue source) => source switch
+    /// <param name="regional">The regional settings a <c>String</c> is read by; en-US when none are given.</param>
+    public static ValueConversionResult ToDate(VBTypedValue source, RegionalSettings? regional = null) => source switch
     {
         // result is a copy of the source date.
         VBDateValue date => ValueConversionResult.Success(new VBDateValue(date.SerialValue)),
@@ -22,7 +23,7 @@ public static partial class ValueConversions
         // result is the source value converted to Double, then the Double interpreted as a standard serial value.
         VBNumericTypedValue or VBBooleanValue => DoubleToDate(ToNumeric(source, VBDoubleType.TypeInfo)),
 
-        VBStringValue text => StringToDate(text.Value),
+        VBStringValue text => StringToDate(text.Value, regional),
 
         // MS-VBAL 5.5.1.2.11: "The result is 12/30/1899 00:00:00."
         VBEmptyValue => ValueConversionResult.Success(new VBDateValue(VBDateType.Zero.SerialValue)),
@@ -54,24 +55,28 @@ public static partial class ValueConversions
     /// </remarks>
     /// <param name="text">The string.</param>
     /// <param name="date">The date it reads as, when it reads as one.</param>
+    /// <param name="regional">The regional settings - the window of two-digit years - it is read by; en-US when none are given.</param>
     /// <returns><see langword="false"/> when the string is not a date or a time.</returns>
-    public static bool TryInterpretDate(string? text, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out VBDateValue? date)
+    public static bool TryInterpretDate(string? text, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out VBDateValue? date, RegionalSettings? regional = null)
     {
-        date = text is not null && DateGrammar.TryRead(text, DateTime.Today.Year, out var value) ? new VBDateValue(value.ToOADate()) : null;
+        date = text is not null
+            && DateGrammar.TryRead(text, DateTime.Today.Year, out var value, (regional ?? RegionalSettings.Default).TwoDigitYearMax)
+                ? new VBDateValue(value.ToOADate())
+                : null;
         return date is not null;
     }
 
     // MS-VBAL 5.5.1.2.4: try date/time/time/date interpretation first; otherwise, if the string can be
     // interpreted as a number or currency value within Double's magnitude range, convert that Double
     // to Date. A Double-conversion overflow is reported as Type mismatch (13), not Overflow (6).
-    private static ValueConversionResult StringToDate(string? text)
+    private static ValueConversionResult StringToDate(string? text, RegionalSettings? regional)
     {
-        if (TryInterpretDate(text, out var date))
+        if (TryInterpretDate(text, out var date, regional))
         {
             return ValueConversionResult.Success(date);
         }
 
-        if (StringToNumeric(text, VBDoubleType.TypeInfo).Value is not VBDoubleValue number)
+        if (StringToNumeric(text, VBDoubleType.TypeInfo, regional).Value is not VBDoubleValue number)
         {
             // unparseable, or the string-to-Double step overflowed: reported as Type mismatch (13) either way.
             return ValueConversionResult.Failure(VBRuntimeErrorId.TypeMismatch);

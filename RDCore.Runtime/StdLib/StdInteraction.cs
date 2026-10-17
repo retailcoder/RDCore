@@ -103,9 +103,11 @@ public sealed class StdInteraction(
     // a String is written in the regional settings of the session's environment, as Let-coercion writes it.
     private RuntimeSemanticsEvaluationResult<VBTypedValue> ToText(VBTypedValue value) => Convert(value, source => ValueConversions.ToText(source, session.Environment.Culture), "String");
 
-    private static RuntimeSemanticsEvaluationResult<VBTypedValue> ToLong(VBTypedValue value) => Convert(value, source => ValueConversions.ToNumeric(source, VBLongType.TypeInfo), "Long");
+    private RuntimeSemanticsEvaluationResult<VBTypedValue> ToLong(VBTypedValue value)
+        => Convert(value, source => ValueConversions.ToNumeric(source, VBLongType.TypeInfo, session.Environment.Regional), "Long");
 
-    private static RuntimeSemanticsEvaluationResult<VBTypedValue> ToBoolean(VBTypedValue value) => Convert(value, ValueConversions.ToBoolean, "Boolean");
+    private RuntimeSemanticsEvaluationResult<VBTypedValue> ToBoolean(VBTypedValue value)
+        => Convert(value, source => ValueConversions.ToBoolean(source, session.Environment.Regional), "Boolean");
 
     private static bool IsTrue(VBTypedValue boolean) => boolean is VBBooleanValue { Value.StoredValue: not 0 };
 
@@ -284,10 +286,10 @@ public sealed class StdInteraction(
 
         Func<VBTypedValue, ValueConversionResult>? conversion = value is VBObjectValue ? null : declared switch
         {
-            VBNumericType numeric => source => ValueConversions.ToNumeric(source, numeric),
+            VBNumericType numeric => source => ValueConversions.ToNumeric(source, numeric, session.Environment.Regional),
             VBStringType => source => ValueConversions.ToText(source, session.Environment.Culture),
-            VBBooleanType => ValueConversions.ToBoolean,
-            VBDateType => ValueConversions.ToDate,
+            VBBooleanType => source => ValueConversions.ToBoolean(source, session.Environment.Regional),
+            VBDateType => source => ValueConversions.ToDate(source, session.Environment.Regional),
             _ => null,
         };
 
@@ -474,7 +476,7 @@ public sealed class StdInteraction(
         }
     }
 
-    private static RuntimeSemanticsEvaluationResult<VBTypedValue> WaitOf(VBVariantValue? wait)
+    private RuntimeSemanticsEvaluationResult<VBTypedValue> WaitOf(VBVariantValue? wait)
         => IsOmitted(wait) ? RuntimeSemanticsEvaluationResult<VBTypedValue>.Success(new VBBooleanValue(false)) : ToBoolean(wait!);
 
     #endregion

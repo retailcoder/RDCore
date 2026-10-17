@@ -89,7 +89,7 @@ public sealed class StdInformation(IRuntimeSession session) : IStdInformationMod
         => Test(arg, value => value switch
         {
             VBDateValue => true,
-            VBStringValue text => ValueConversions.TryInterpretDate(text.Value, out _),
+            VBStringValue text => ValueConversions.TryInterpretDate(text.Value, out _, session.Environment.Regional),
             _ => false,
         });
 
@@ -118,7 +118,7 @@ public sealed class StdInformation(IRuntimeSession session) : IStdInformationMod
             VBEmptyValue or VBBooleanValue => true,
             VBDateValue => false,
             VBNumericTypedValue => true,
-            VBStringValue text => ValueConversions.ToNumeric(text, VBDoubleType.TypeInfo).IsSuccess,
+            VBStringValue text => ValueConversions.ToNumeric(text, VBDoubleType.TypeInfo, session.Environment.Regional).IsSuccess,
             _ => false,
         });
 

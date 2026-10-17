@@ -3,6 +3,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Runtime;
 
 namespace RDCore.Runtime.Semantics.Conversion;
 
@@ -14,7 +15,8 @@ public static partial class ValueConversions
     /// <c>Empty</c> (<strong>§5.5.1.2.11</strong>).
     /// </summary>
     /// <param name="source">The value, unwrapped from any <c>Variant</c> that held it.</param>
-    public static ValueConversionResult ToBoolean(VBTypedValue source) => source switch
+    /// <param name="regional">The regional settings a <c>String</c> is read by as a number; en-US when none are given.</param>
+    public static ValueConversionResult ToBoolean(VBTypedValue source, RegionalSettings? regional = null) => source switch
     {
         VBBooleanValue boolean => ValueConversionResult.Success(new VBBooleanValue((bool)boolean.Value)),
 
@@ -24,7 +26,7 @@ public static partial class ValueConversions
         // MS-VBAL 5.5.1.2.3: a Date source converts via its standard Double (serial value) representation.
         VBDateValue date => ValueConversionResult.Success(new VBBooleanValue(date.SerialValue != 0)),
 
-        VBStringValue text => StringToBoolean(text.Value),
+        VBStringValue text => StringToBoolean(text.Value, regional),
 
         // MS-VBAL 5.5.1.2.11: "The result is False."
         VBEmptyValue => ValueConversionResult.Success(VBBooleanValue.False),
@@ -39,7 +41,7 @@ public static partial class ValueConversions
 
     // MS-VBAL 5.5.1.2.4: "True"/"False" are matched case-insensitive; "#TRUE#"/"#FALSE#" case-sensitive.
     // Otherwise, the result is the source string converted to Double, then converted to Boolean.
-    private static ValueConversionResult StringToBoolean(string? text)
+    private static ValueConversionResult StringToBoolean(string? text, RegionalSettings? regional)
     {
         if (string.Equals(text, Tokens.True, StringComparison.InvariantCultureIgnoreCase)
             || string.Equals(text, "#TRUE#", StringComparison.InvariantCulture))
@@ -53,7 +55,7 @@ public static partial class ValueConversions
             return ValueConversionResult.Success(VBBooleanValue.False);
         }
 
-        var number = StringToNumeric(text, VBDoubleType.TypeInfo);
+        var number = StringToNumeric(text, VBDoubleType.TypeInfo, regional);
         return number.Value is VBDoubleValue converted
             ? ValueConversionResult.Success(new VBBooleanValue(converted.Value != 0))
             : number;

@@ -67,10 +67,15 @@ public sealed class VBNumericLetCoercionTests : LetCoercionRuntimeSemanticsTests
     [TestMethod]
     [DataRow("")]
     [DataRow("abc")]
-    [DataRow("12,34")]
+    [DataRow(",12")]
     [DataRow("E5")]
     public void StringToNumeric_Unparseable_IsTypeMismatch(string source)
         => AssertError(Coerce(Sut(), new VBStringValue(source), VBDoubleType.TypeInfo), VBRuntimeErrorId.TypeMismatch);
+
+    // en-US regional settings: the digit grouping symbol is ignored after the first digit (MS-VBA, recorded in Excel).
+    [TestMethod]
+    public void StringToNumeric_WithTheDigitGroupingSymbol_IsTheNumberWithoutIt()
+        => AssertCoercedTo<VBDoubleValue>(Coerce(Sut(), new VBStringValue("12,34"), VBDoubleType.TypeInfo), 1234d);
 
     [TestMethod]
     public void EmptySource_IsZero()

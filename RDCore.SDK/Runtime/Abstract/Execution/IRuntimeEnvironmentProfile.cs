@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using RegionalSettings = RDCore.SDK.Runtime.RegionalSettings;
 
 namespace RDCore.SDK.Runtime.Abstract.Execution;
 
@@ -31,11 +32,16 @@ public interface IRuntimeEnvironmentProfile
     /// whatever the culture's own.
     /// </summary>
     /// <remarks>
-    /// 🚧 Let-coercion <em>from</em> <c>String</c> still reads a number or a date invariantly, so under a
-    /// culture whose decimal symbol is not <c>.</c> the text of a number does not read back as it. TODO
-    /// with the parsers.
+    /// 👉 Let-coercion <em>from</em> <c>String</c> reads a number or a date by <see cref="Regional"/>, which is the platform's and not the
+    /// culture's: en-US unless the platform is told otherwise.
     /// </remarks>
     CultureInfo Culture { get; }
+
+    /// <summary>
+    /// 🎯 The regional settings a <c>String</c> is read by when it is Let-coerced to a number or a date (<strong>MS-VBAL §5.5.1.2.4</strong>): its decimal,
+    /// digit grouping and currency symbols, and the window two-digit years are in. en-US unless the platform's configuration says otherwise.
+    /// </summary>
+    RegionalSettings Regional => RegionalSettings.Default;
 
     /// <summary>
     /// The ANSI code page: what a character is as a single byte or two outside a <c>String</c>'s own data —
