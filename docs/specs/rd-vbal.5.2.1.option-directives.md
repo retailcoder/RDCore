@@ -65,6 +65,11 @@ Resolving an omitted array lower bound against `Option Base` is the concern of t
 the array value, not of the declaration pass
 ([**RD-VBAL §2.4.1** Intrinsic Types](rd-vbal.2.4.1.intrinsic-types.md)).
 
+> [!IMPORTANT]
+> MS-VBAL says the directive sets the default lower bound "of all array dimensions" of the module, but MS-VBA does not apply it to an
+> array field of a user-defined type, which starts at `0` regardless; RD-VBA does what MS-VBA does. Under `Option Base 1`, a field
+> `Values(4) As Long` of a `Type` is `0 To 4`, and a `Dim Values(4) As Long` beside it is `1 To 4`.
+
 
 ## 5.2.1.3 Option Explicit Directive
 

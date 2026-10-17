@@ -175,7 +175,7 @@
     <value>Le mot-clé Call est obsolète; l'appel est le même sans lui.</value>
   </data>
   <data name="ImplicitNonDefaultArrayBase_Message" xml:space="preserve">
-    <value>Option Base 1 fait commencer à 1 plutôt qu'à 0 tout tableau déclaré sans borne inférieure, alors que les tableaux des autres modules et des bibliothèques gardent leurs propres bornes. Indiquez plutôt les bornes de chaque tableau.</value>
+    <value>Option Base 1 fait commencer à 1 plutôt qu'à 0 tout tableau déclaré sans borne inférieure - sauf un champ tableau d'un type défini par l'utilisateur, qui commence à 0 malgré tout -, alors que les tableaux des autres modules et des bibliothèques gardent leurs propres bornes. Indiquez plutôt les bornes de chaque tableau.</value>
   </data>
   <data name="ImplicitTypeDeclarationsEnabled_Message" xml:space="preserve">
     <value>{0} donne un type à tout nom qu'elle couvre et qui est déclaré sans type; le type d'une variable n'est donc plus écrit où elle est déclarée. Déclarez plutôt chacune avec une clause As.</value>

@@ -100,7 +100,7 @@ public sealed class UserDefinedTypeVariableTests
         => CollectionAssert.AreEqual(new[] { "2" }, await RunAsync(
             "Private Const Last As Long = 2",
             "Private Type TBox", "Values(Last) As String", "End Type",
-            "Private Box As TBox",
+            "Public Box As TBox",
             "Public Sub Main()", "Box.Values(2) = \"2\"", "Debug.Print Box.Values(UBound(Box.Values))", "End Sub"));
 
     [TestMethod]

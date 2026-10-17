@@ -175,7 +175,7 @@
     <value>The Call keyword is obsolete: the call is the same without it.</value>
   </data>
   <data name="ImplicitNonDefaultArrayBase_Message" xml:space="preserve">
-    <value>Option Base 1 makes every array declared without a lower bound start at 1 instead of 0, while the arrays of other modules and libraries keep their own bounds. State the bounds of each array instead.</value>
+    <value>Option Base 1 makes every array declared without a lower bound start at 1 instead of 0 - except an array field of a user-defined type, which starts at 0 regardless - while the arrays of other modules and libraries keep their own bounds. State the bounds of each array instead.</value>
   </data>
   <data name="ImplicitTypeDeclarationsEnabled_Message" xml:space="preserve">
     <value>{0} gives a type to every name it covers that is declared without one, so the type of a variable is no longer written where it is declared. Declare each with an As clause instead.</value>
