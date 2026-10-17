@@ -29,6 +29,17 @@ public sealed class DeclareTests
         Assert.AreEqual("rdc", process.ProcessName);
     }
 
+    // an element of an array is a variable (MS-VBAL §5.6.13.1), and MS-VBA passes its address: the function writes the element (recorded in Excel).
+    [TestMethod]
+    [Ignore("An element of an array passed by reference to a Declare is a copy: the native marshaller takes values and the addresses of variables, and an " +
+        "element has a cell and no address (RuntimeExpressionEvaluator.TryResolveByRefArgument skips elements for an external call).")]
+    public async Task AnElementOfAnArray_PassedByRef_IsWrittenByTheFunction()
+        => CollectionAssert.AreEqual(new[] { "True" }, await Run(
+            "Private Declare PtrSafe Function QueryPerformanceFrequency Lib \"kernel32\" (ByRef lpFrequency As Currency) As Long",
+            "Dim f(0) As Currency",
+            "QueryPerformanceFrequency f(0)",
+            "Debug.Print f(0) > 0"));
+
     [TestMethod]
     public async Task ASub_IsCalledWithANumberByValue()
         => CollectionAssert.AreEqual(new[] { "slept" }, await Run(

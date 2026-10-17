@@ -13,7 +13,7 @@ namespace RDCore.Tests.Cli;
 [TestCategory("MS-VBAL 5.4.3.3 ReDim Statement")]
 public sealed class ReDimArrayLockTests
 {
-    private const string Module = "Public arr() As Long\r\nPublic v As Variant";
+    private const string Module = "Public arr() As Long\r\nPublic v As Variant\r\nPublic calls As Long";
 
     private static Task<string[]> RunAsync(string procedures, params string[] body)
         => ArrayStatementTargetTests.RunProgramAsync(Module, procedures, body);
@@ -109,6 +109,16 @@ public sealed class ReDimArrayLockTests
     public async Task AnElementOfAnArrayAVariantHolds_PassedByRef_IsWhatTheCalleeAssigns()
         => CollectionAssert.AreEqual(new[] { "3" },
             await RunAsync("Public Sub Bump(ByRef x As Variant)\r\nx = x + 1\r\nEnd Sub", "v = Array(1, 2, 3)", "Bump v(1)", "Debug.Print v(1)"));
+
+    // an argument is evaluated once: its subscript too, when there is no such element, which is error 9 (recorded in Excel).
+    [TestMethod]
+    [Ignore("An element that cannot be bound by reference - outside the bounds - falls back to being evaluated as a value, which evaluates its subscripts " +
+        "again (RuntimeExpressionEvaluator.TryResolveElementByRefArgument).")]
+    public async Task AnElementOutsideTheBounds_PassedByRef_HasItsSubscriptEvaluatedOnce()
+        => CollectionAssert.AreEqual(new[] { "1 9" },
+            await RunAsync(
+                "Private Function NextIndex() As Long\r\ncalls = calls + 1\r\nNextIndex = 9\r\nEnd Function\r\nPublic Sub Hold(ByRef x As Long)\r\nEnd Sub",
+                "On Error Resume Next", "ReDim arr(1 To 3)", "calls = 0", "Hold arr(NextIndex())", "Debug.Print calls & \" \" & Err.Number"));
 
     [TestMethod]
     public async Task AnElementOfAFixedSizeArray_PassedByRef_IsWhatTheCalleeAssigns()
