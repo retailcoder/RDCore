@@ -274,7 +274,12 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
     public override void EnterUdtMember([NotNull] VBAParser.UdtMemberContext context)
         => OnEnterParent();
     public override void ExitUdtMember([NotNull] VBAParser.UdtMemberContext context)
-        => OnExitParent(builder => builder.BuildUserDefinedTypeMember(context));
+    {
+        // a field can be a fixed-size array (MS-VBAL §5.2.3.3), whose bounds are captured as a variable's are.
+        var arrayDim = context.untypedNameMemberDeclaration()?.optionalArrayClause()?.arrayDim();
+        var bounds = CaptureDimBounds(arrayDim);
+        OnExitParent(builder => builder.BuildUserDefinedTypeMember(context, arrayDim, bounds));
+    }
 
     public override void EnterEnumerationStmt([NotNull] VBAParser.EnumerationStmtContext context)
         => OnEnterParent();

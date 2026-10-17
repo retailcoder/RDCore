@@ -27,11 +27,29 @@ public record class VBUserDefinedTypeValue : VBTypedValue,
 {
     private readonly VBTypedValue[] _fields;
 
-    public VBUserDefinedTypeValue(IBindingHandle handle, VBUserDefinedType typeInfo) : base(typeInfo)
+    public VBUserDefinedTypeValue(IBindingHandle handle, VBUserDefinedType typeInfo)
+        : this(handle, typeInfo, field => field.ResolvedType?.DefaultValue ?? VBEmptyValue.Empty) { }
+
+    /// <summary>
+    /// A record of <paramref name="typeInfo"/> whose fields each start as <paramref name="fieldDefaults"/> says a variable declared as the field
+    /// is starts.
+    /// </summary>
+    /// <remarks>
+    /// A field is declared as a variable is (<strong>MS-VBAL §5.2.3.3</strong>), and a fixed-size array field is as big as its declaration's
+    /// bounds, constant expressions that the field's symbol carries and that only the runtime reduces: the type's own default gives such a field
+    /// no dimensions. This is the record a declared variable of the type starts as.
+    /// </remarks>
+    /// <param name="typeInfo">The type of the record.</param>
+    /// <param name="fieldDefaults">What each field, a typed symbol, starts as.</param>
+    public VBUserDefinedTypeValue(VBUserDefinedType typeInfo, IVariableDefaults fieldDefaults)
+        : this(new ValueBindingHandle(new VBRuntimeReference(MemoryAddress.Zero)), typeInfo, fieldDefaults.DefaultValueOf) { }
+
+    private VBUserDefinedTypeValue(IBindingHandle handle, VBUserDefinedType typeInfo, Func<VBUserDefinedTypeFieldSymbol, VBTypedValue> fieldDefault)
+        : base(typeInfo)
     {
         Handle = handle;
         Fields = [.. typeInfo.Fields()];
-        _fields = CreateFields(Fields);
+        _fields = [.. Fields.Select(field => Fresh(fieldDefault(field)))];
     }
 
     public VBUserDefinedTypeValue(MemoryAddress reference, VBUserDefinedType typeInfo)
@@ -99,7 +117,10 @@ public record class VBUserDefinedTypeValue : VBTypedValue,
     /// <summary>
     /// Where each of this value's fields sits in memory.
     /// </summary>
-    public VBUserDefinedTypeLayout Layout => VBUserDefinedTypeLayout.Of((VBUserDefinedType)TypeInfo);
+    /// <remarks>
+    /// Laid out from the record itself: a fixed-size array field is as wide as its elements, which its value knows and its type does not.
+    /// </remarks>
+    public VBUserDefinedTypeLayout Layout => VBUserDefinedTypeLayout.Of(this);
 
     /// <summary>
     /// The value of the field named <paramref name="name"/>, or <c>null</c> when there is no such field.
@@ -214,23 +235,15 @@ public record class VBUserDefinedTypeValue : VBTypedValue,
         return -1;
     }
 
-    // A fresh value per field so a write to one never aliases another. Every field starts at its declared
-    // type's own default, which is what a VBA UDT variable starts as: MS-VBAL gives a UDT no initializer, so
-    // each field is initialized as a variable of its type would be.
-    private static VBTypedValue[] CreateFields(ImmutableArray<VBUserDefinedTypeFieldSymbol> fields)
-        => [.. fields.Select(field => DefaultOf(field.ResolvedType))];
-
-    private static VBTypedValue DefaultOf(VBType? type)
-        => type is null ? VBEmptyValue.Empty
-            // a fresh binding rather than the shared DefaultValue instance: a type's default value is cached
-            // and reused by every caller, and both binding kinds mutate in place, so storing it directly would
-            // let a write to one field reach every other value that started from it - the same hazard
-            // SymbolAddressTable.FreshBinding exists for.
-            : type.DefaultValue switch
-            {
-                VBUserDefinedTypeValue nested => nested with { },
-                VBArrayValue array => array with { },
-                { Handle: ValueBindingHandle } scalar => scalar.WithRuntimeValue(scalar.RuntimeValue),
-                var other => other,
-            };
+    // A fresh value per field so a write to one never aliases another. MS-VBAL gives a UDT no initializer, so each field is initialized as a
+    // variable of its type would be: a fresh binding rather than the shared DefaultValue instance, for a type's default value is cached and
+    // reused by every caller, and both binding kinds mutate in place, so storing it directly would let a write to one field reach every other
+    // value that started from it - the same hazard SymbolAddressTable.FreshBinding exists for.
+    private static VBTypedValue Fresh(VBTypedValue value) => value switch
+    {
+        VBUserDefinedTypeValue nested => nested with { },
+        VBArrayValue array => array with { },
+        { Handle: ValueBindingHandle } scalar => scalar.WithRuntimeValue(scalar.RuntimeValue),
+        var other => other,
+    };
 }

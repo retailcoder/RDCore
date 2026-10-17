@@ -76,6 +76,69 @@ public sealed class UserDefinedTypeVariableTests
             Program(
                 "Public Sub Main()", "Dim h As New Holder", "Dim c As New Collection", "c.Add 1", "c.Add 2", "Set h.Items = c", "Debug.Print h.Items.Count", "End Sub")));
 
+    // MS-VBAL §5.2.3.3: a field is declared as a variable is, a fixed-size array included, with the dimensions its declaration gives it.
+    [TestMethod]
+    public async Task AFixedSizeArrayField_HasTheDimensionsItWasDeclaredWith()
+        => CollectionAssert.AreEqual(new[] { "1 3", "10 20 30" }, await RunAsync(
+            "Private Type TBox", "Count As Integer", "Values(1 To 3) As Long", "End Type",
+            "Public Sub Main()", "Dim b As TBox", "b.Values(1) = 10", "b.Values(2) = 20", "b.Values(3) = 30",
+            "Debug.Print LBound(b.Values) & \" \" & UBound(b.Values)",
+            "Debug.Print b.Values(1) & \" \" & b.Values(2) & \" \" & b.Values(3)", "End Sub"));
+
+    // a bound is a constant expression, and an omitted lower bound is the module's Option Base (MS-VBAL §5.2.1.2).
+    [TestMethod]
+    public async Task AFixedSizeArrayField_BoundedByAConstant_StartsAtTheOptionBase()
+        => CollectionAssert.AreEqual(new[] { "1 4" }, await RunAsync(
+            "Option Base 1", "Private Const Size As Long = 4",
+            "Private Type TBox", "Values(Size) As Long", "End Type",
+            "Public Sub Main()", "Dim b As TBox", "Debug.Print LBound(b.Values) & \" \" & UBound(b.Values)", "End Sub"));
+
+    [TestMethod]
+    public async Task AFixedSizeArrayField_OfAVariableOfTheModule_HasItsDimensions()
+        => CollectionAssert.AreEqual(new[] { "2" }, await RunAsync(
+            "Private Const Last As Long = 2",
+            "Private Type TBox", "Values(Last) As String", "End Type",
+            "Public Box As TBox",
+            "Public Sub Main()", "Box.Values(2) = \"2\"", "Debug.Print Box.Values(UBound(Box.Values))", "End Sub"));
+
+    [TestMethod]
+    public async Task AFixedSizeArrayField_OfANestedRecord_HasItsDimensions()
+        => CollectionAssert.AreEqual(new[] { "5" }, await RunAsync(
+            "Private Type TBox", "Values(0 To 1) As Long", "End Type",
+            "Private Type TCrate", "Box As TBox", "End Type",
+            "Public Sub Main()", "Dim c As TCrate", "c.Box.Values(1) = 5", "Debug.Print c.Box.Values(1)", "End Sub"));
+
+    [TestMethod]
+    public async Task AFixedSizeArrayField_OfAVariableOfAClass_HasItsDimensions()
+        => CollectionAssert.AreEqual(new[] { "3" }, await ModuleWorkspace.RunAsync(
+            [("Holder", ModuleWorkspace.ClassModule(
+                "Holder", "Private Type TState", "Values(1 To 3) As Long", "End Type", "Private this As TState",
+                "Public Function Last() As Long", "this.Values(3) = 3", "Last = this.Values(UBound(this.Values))", "End Function"))],
+            Program("Public Sub Main()", "Dim h As New Holder", "Debug.Print h.Last", "End Sub")));
+
+    // assigning a record copies its fields (MS-VBAL §5.4.3.1.2), an array field's elements included: the two do not share them.
+    [TestMethod]
+    public async Task AFixedSizeArrayField_IsCopiedByAnAssignmentOfTheRecord()
+        => CollectionAssert.AreEqual(new[] { "10 99" }, await RunAsync(
+            "Private Type TBox", "Values(1 To 2) As Long", "End Type",
+            "Public Sub Main()", "Dim p As TBox, q As TBox", "p.Values(1) = 10", "q = p", "p.Values(1) = 99",
+            "Debug.Print q.Values(1) & \" \" & p.Values(1)", "End Sub"));
+
+    // MS-VBAL §5.4.3.6: an LSet of a record copies its data, which an array field's elements are: the two do not share them either.
+    [TestMethod]
+    public async Task AFixedSizeArrayField_IsCopiedByAnLSetOfTheRecord()
+        => CollectionAssert.AreEqual(new[] { "10 99" }, await RunAsync(
+            "Private Type TBox", "Values(1 To 2) As Long", "End Type",
+            "Public Sub Main()", "Dim p As TBox, q As TBox", "p.Values(1) = 10", "LSet q = p", "p.Values(1) = 99",
+            "Debug.Print q.Values(1) & \" \" & p.Values(1)", "End Sub"));
+
+    // in memory a fixed-size array field is its elements inline: an Integer, then three Longs on their four-byte boundary.
+    [TestMethod]
+    public async Task AFixedSizeArrayField_IsItsElementsInline_InTheSizeOfTheRecord()
+        => CollectionAssert.AreEqual(new[] { "16" }, await RunAsync(
+            "Private Type TBox", "Count As Integer", "Values(1 To 3) As Long", "End Type",
+            "Public Sub Main()", "Dim b As TBox", "Debug.Print LenB(b)", "End Sub"));
+
     [TestMethod]
     public async Task AFieldThatIsNotOneOfTheType_IsStillAnError()
     {

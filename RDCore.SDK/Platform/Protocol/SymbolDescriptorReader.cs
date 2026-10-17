@@ -258,10 +258,10 @@ public static class SymbolDescriptorReader
     private static Symbol ReadUserDefinedTypeField(
         SymbolDescriptor field, Uri workspaceRoot, Uri userDefinedTypeUri, Func<string, VBType?> resolveType)
     {
-        var type = DeclaredType(field.DeclaredTypeName, array: null, resolveType, field.FixedLength);
+        var type = DeclaredType(field.DeclaredTypeName, field.Array, resolveType, field.FixedLength);
 
-        return new VBUserDefinedTypeFieldSymbol(
-            workspaceRoot, userDefinedTypeUri, field.Name, type, field.Range, field.SelectionRange, field.AccessModifier);
+        return WithArrayBounds(new VBUserDefinedTypeFieldSymbol(
+            workspaceRoot, userDefinedTypeUri, field.Name, type, field.Range, field.SelectionRange, field.AccessModifier), field.Array);
     }
 
     /// <summary>

@@ -220,9 +220,12 @@ public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind me
     public Symbol BuildUserDefinedTypeField(MemberDeclarationNode node, Uri userDefinedTypeUri)
     {
         var range = RangeOf(node);
-        var type = DeclaredType(AsTypeOf(node), typeHint: null, userDefinedTypeUri);
-        return AutoInstantiatedIfDeclaredAsNew(new VBUserDefinedTypeFieldSymbol(
-            workspaceRoot, userDefinedTypeUri, node.Name, type, range, range, node.AccessModifier), AsTypeOf(node));
+        var asType = AsTypeOf(node);
+        // MS-VBAL §5.2.3.3: a field is declared as a variable is, an array included - fixed-size or resizable.
+        var bounds = node.Children.OfType<ArrayBoundsNode>().FirstOrDefault();
+        var type = VariableType(ArrayElementType(node.Name, asType, typeHint: null, userDefinedTypeUri), asType, bounds);
+        return WithArrayBounds(AutoInstantiatedIfDeclaredAsNew(new VBUserDefinedTypeFieldSymbol(
+            workspaceRoot, userDefinedTypeUri, node.Name, type, range, range, node.AccessModifier), asType), bounds);
     }
 
     // includeMe is opt-in per caller: a procedure/function/property body has a Me in scope

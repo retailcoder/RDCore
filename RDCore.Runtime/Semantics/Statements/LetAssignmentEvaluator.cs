@@ -137,7 +137,14 @@ public sealed class LetAssignmentEvaluator(
             return evaluated.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(evaluated.ErrorInfo!);
         }
 
-        var held = evaluated.Result;
+        return AssignElementOf(session, context, evaluated.Result, arrayExpression, subscripts, source, value, isSet);
+    }
+
+    // the array is in hand - what the callee evaluated to, or the field of a record already evaluated - and is assigned an element in place.
+    private RuntimeExecutionOutcome AssignElementOf(
+        IRuntimeSession session, RuntimeEvaluationContext context, VBTypedValue? held, ExpressionNode arrayExpression,
+        System.Collections.Immutable.ImmutableArray<ExpressionNode> subscripts, ExpressionNode source, VBTypedValue value, bool isSet)
+    {
         while (held is VBVariantValue { TypedValue: { } wrapped })
         {
             held = wrapped;
@@ -288,6 +295,9 @@ public sealed class LetAssignmentEvaluator(
         {
             VBObjectValue objectOwner => AssignObjectMember(session, context, statement, memberAccess, indexArguments, objectOwner, source, value, isSet),
             VBUserDefinedTypeValue record when isSet && indexArguments.IsEmpty => SetField(session, memberAccess, record, source, value),
+            // `r.Values(1) = value`: an element of the array a field of the record holds, which is written where it is.
+            VBUserDefinedTypeValue record when !indexArguments.IsEmpty && record[memberAccess.Member.IdentifierName] is { } field
+                => AssignElementOf(session, context, field, memberAccess, indexArguments, source, value, isSet),
             _ => RuntimeExecutionOutcome.InternalError,
         };
     }

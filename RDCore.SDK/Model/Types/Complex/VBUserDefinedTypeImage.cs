@@ -111,8 +111,13 @@ public static class VBUserDefinedTypeImage
             // a program about: an analyzer flags it, FixedAssignmentSemanticFlags.)
             if (type is null || !HasImage(type))
             {
-                destination.TrySetFieldAt(index, ReferenceAt(source, sourceLayout, field.Offset, type)
-                    ?? type?.DefaultValue ?? VBEmptyValue.Empty);
+                // an array is data: the destination's elements are a copy of the source's, not the source's own cells.
+                destination.TrySetFieldAt(index, ReferenceAt(source, sourceLayout, field.Offset, type) switch
+                {
+                    VBArrayValue array => DataValues.Copy(array),
+                    { } held => held,
+                    null => type?.DefaultValue ?? VBEmptyValue.Empty,
+                });
                 continue;
             }
 

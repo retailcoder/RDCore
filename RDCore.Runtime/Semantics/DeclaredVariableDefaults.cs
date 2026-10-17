@@ -19,6 +19,10 @@ namespace RDCore.Runtime.Semantics;
 /// bound is the module's <c>Option Base</c>. A resizable array has none until a <c>ReDim</c> gives it some, but it is an array of
 /// the element type it was declared with all the same.
 /// <para>
+/// A field of a user-defined type is declared as a variable is (<strong>MS-VBAL §5.2.3.3</strong>), so a record starts with each of its
+/// fields as this gives it, a nested record's own included: a type's default value has no bounds to give a fixed-size array field.
+/// </para>
+/// <para>
 /// An optional parameter a call omits starts as its declared default, a constant expression (<strong>MS-VBAL §5.3.1.5</strong>) reduced
 /// by the same fold a <c>Const</c>'s is; one that declares none starts as Missing when it is a <c>Variant</c>.
 /// </para>
@@ -44,6 +48,12 @@ public sealed class DeclaredVariableDefaults(IRuntimeSession session, ArrayBound
         }
 
         var type = ((ITypedSymbol)variable).ResolvedType;
+        if (type is VBUserDefinedType record)
+        {
+            // each field starts as a variable declared as it is: a fixed-size array field with the dimensions its declaration gives it.
+            return new VBUserDefinedTypeValue(record, this);
+        }
+
         if (type is not VBArrayType array || array is VBResizableByteArrayType)
         {
             return type.DefaultValue;

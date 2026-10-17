@@ -90,14 +90,20 @@ internal class DeclarationNodeBuilder(Uri rootUri, SyntaxNodeId nodeId) : NodeBu
             modifier,
             NameRange: context.untypedIdentifier().SourceRange);
     }
-    public SyntaxNode BuildUserDefinedTypeMember(VBAParser.UdtMemberContext context)
+    public SyntaxNode BuildUserDefinedTypeMember(
+        VBAParser.UdtMemberContext context, VBAParser.ArrayDimContext? arrayDim, ImmutableArray<(ExpressionNode? Lower, ExpressionNode? Upper)> boundExpressions)
     {
         var name = context.Name();
+        var children = _children.ToList();
+        if (arrayDim is not null)
+        {
+            children.Add(BuildArrayBounds(arrayDim, children.Count, boundExpressions));
+        }
 
         return new MemberDeclarationNode(
             NodeId,
             context.GetSourceLocation(_rootUri),
-            [.. _children],
+            [.. children],
             name,
             MemberKind.UserDefinedTypeField,
             AccessModifier.Implicit,

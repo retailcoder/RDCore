@@ -1,6 +1,8 @@
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Types.Complex;
+using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Intrinsic;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace RDCore.SDK.Model.Types;
@@ -66,15 +68,33 @@ public sealed class VBUserDefinedTypeLayout
     /// <param name="type">The type to lay out.</param>
     /// <param name="pointerWidth">The host's pointer width in bytes; <see cref="DefaultPointerWidth"/>
     /// unless the caller knows better.</param>
+    /// <remarks>
+    /// A type does not know how many elements a fixed-size array field has: its bounds are reduced where a record of it is allocated, and a
+    /// field laid out from the type alone has none. <see cref="Of(VBUserDefinedTypeValue, int)"/> lays out a record that has them.
+    /// </remarks>
     public static VBUserDefinedTypeLayout Of(VBUserDefinedType type, int pointerWidth = DefaultPointerWidth)
+        => Of(type, record: null, pointerWidth, [type]);
+
+    /// <summary>
+    /// Lays <paramref name="record"/> out: as its type is, each fixed-size array field as wide as the elements the record's own has, and each
+    /// nested record as it is.
+    /// </summary>
+    /// <param name="record">The record to lay out.</param>
+    /// <param name="pointerWidth">The host's pointer width in bytes; <see cref="DefaultPointerWidth"/>
+    /// unless the caller knows better.</param>
+    public static VBUserDefinedTypeLayout Of(VBUserDefinedTypeValue record, int pointerWidth = DefaultPointerWidth)
+        => Of((VBUserDefinedType)record.TypeInfo, record, pointerWidth, [(VBUserDefinedType)record.TypeInfo]);
+
+    private static VBUserDefinedTypeLayout Of(VBUserDefinedType type, VBUserDefinedTypeValue? record, int pointerWidth, HashSet<VBUserDefinedType> nesting)
     {
         var fields = new List<VBUserDefinedTypeField>();
         var offset = 0;
         var alignment = 1;
 
+        var index = 0;
         foreach (var field in type.Fields())
         {
-            var (width, fieldAlignment) = MeasureOf(field.ResolvedType, pointerWidth, [type]);
+            var (width, fieldAlignment) = MeasureOf(field.ResolvedType, record?.StoredFieldAt(index++), pointerWidth, nesting);
 
             offset = AlignedTo(offset, fieldAlignment);
             fields.Add(new VBUserDefinedTypeField(field, offset, width));
@@ -116,7 +136,8 @@ public sealed class VBUserDefinedTypeLayout
     // rather than by asking its DefaultValue.Size: a default value answers for the value it is and not for
     // the slot a field of that type occupies - vbNullString is the default String and occupies no characters,
     // where a String field is a pointer whether it points at anything or not.
-    private static (int Width, int Alignment) MeasureOf(VBType? type, int pointerWidth, HashSet<VBUserDefinedType> nesting) => type switch
+    // A field's value, when there is one, measures what its type cannot: a fixed-size array's elements, and a nested record's own.
+    private static (int Width, int Alignment) MeasureOf(VBType? type, VBTypedValue? held, int pointerWidth, HashSet<VBUserDefinedType> nesting) => type switch
     {
         null => (0, 1),
 
@@ -136,11 +157,11 @@ public sealed class VBUserDefinedTypeLayout
         VBStringType or VBObjectType or VBClassType => (pointerWidth, pointerWidth),
 
         // a fixed-size array field is its elements inline, so its width is theirs and so is its alignment.
-        VBFixedSizeArrayType array => MeasureArray(array, pointerWidth, nesting),
+        VBFixedSizeArrayType array => MeasureArray(array, held as VBArrayValue, pointerWidth, nesting),
         // a resizable array field is a descriptor pointer, like a String.
         VBArrayType => (pointerWidth, pointerWidth),
 
-        VBUserDefinedType nested => MeasureNested(nested, pointerWidth, nesting),
+        VBUserDefinedType nested => MeasureNested(nested, held as VBUserDefinedTypeValue, pointerWidth, nesting),
 
         // an Enum member is a Long data value (MS-VBAL 2.1), and anything this does not know is given a
         // pointer's worth so that the fields after it still land somewhere plausible.
@@ -149,17 +170,17 @@ public sealed class VBUserDefinedTypeLayout
     };
 
     private static (int Width, int Alignment) MeasureArray(
-        VBFixedSizeArrayType array, int pointerWidth, HashSet<VBUserDefinedType> nesting)
+        VBFixedSizeArrayType array, VBArrayValue? held, int pointerWidth, HashSet<VBUserDefinedType> nesting)
     {
-        var (elementWidth, elementAlignment) = MeasureOf(array.ItemType, pointerWidth, nesting);
-        var elements = array.DefaultValue is Values.Intrinsic.VBArrayValue { Length: var length } ? length : 0;
-        return (elementWidth * elements, elementAlignment);
+        // the elements are measured by their type: an element that is a record is as wide as any other of its type.
+        var (elementWidth, elementAlignment) = MeasureOf(array.ItemType, held: null, pointerWidth, nesting);
+        return (elementWidth * (held?.Length ?? 0), elementAlignment);
     }
 
     // a nested UDT contributes its own padded size and its own alignment, so a field after it starts on a
     // boundary the nested type would itself have been placed on.
     private static (int Width, int Alignment) MeasureNested(
-        VBUserDefinedType nested, int pointerWidth, HashSet<VBUserDefinedType> nesting)
+        VBUserDefinedType nested, VBUserDefinedTypeValue? held, int pointerWidth, HashSet<VBUserDefinedType> nesting)
     {
         // VBA forbids a UDT that contains itself by value, but nothing in this model does, and a declaration
         // that does would otherwise recur until the stack ran out. A cycle contributes nothing rather than
@@ -169,7 +190,7 @@ public sealed class VBUserDefinedTypeLayout
             return (0, 1);
         }
 
-        var inner = Of(nested, pointerWidth);
+        var inner = Of(nested, held, pointerWidth, nesting);
         nesting.Remove(nested);
         return (inner.Size, inner.Alignment);
     }

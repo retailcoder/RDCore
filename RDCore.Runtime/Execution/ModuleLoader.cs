@@ -156,21 +156,38 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
         foreach (var member in members)
         {
             if (member.ScopeKind is not ScopeKind.Module
-                || member is not ITypedSymbol { ResolvedType: VBFixedSizeArrayType type }
-                || !member.TryGetProperty(SymbolProperties.ArrayBounds, out _)
+                || member is not ITypedSymbol { ResolvedType: var type }
                 || !session.Symbols.Resolver.TryGetAddress(member, out var address)
-                || !session.Symbols.Resolver.TryRead(address, out var handle)
-                || type.CreateValue(handle!) is not VBArrayValue { IsInitialized: false })
+                || !session.Symbols.Resolver.TryRead(address, out var handle))
             {
                 continue;
             }
 
-            if (defaults.DefaultValueOf(member) is VBArrayValue { IsInitialized: true } sized)
+            switch (type)
             {
-                handle!.SetValue(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(sized));
+                case VBFixedSizeArrayType when member.TryGetProperty(SymbolProperties.ArrayBounds, out _)
+                    && type.CreateValue(handle!) is VBArrayValue { IsInitialized: false }
+                    && defaults.DefaultValueOf(member) is VBArrayValue { IsInitialized: true } sized:
+                    handle!.SetValue(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(sized));
+                    break;
+
+                // a record is given again the fields it starts with, when one of them is a fixed-size array: nothing has run that assigned it.
+                case VBUserDefinedType record when HasFixedSizeArrayField(record, [])
+                    && defaults.DefaultValueOf(member) is VBUserDefinedTypeValue sized:
+                    handle!.SetValue(session.Symbols.Resolver, SymbolAddressTable.BoxedValue(sized));
+                    break;
             }
         }
     }
+
+    // directly, or in a record that is a field of it. A type that holds itself is not one MS-VBA compiles, and is looked into once.
+    private static bool HasFixedSizeArrayField(VBUserDefinedType record, HashSet<VBUserDefinedType> seen)
+        => seen.Add(record) && record.Fields().Any(field => field.ResolvedType switch
+        {
+            VBFixedSizeArrayType => true,
+            VBUserDefinedType nested => HasFixedSizeArrayField(nested, seen),
+            _ => false,
+        });
 
     // a name is not enough: the accessors of a property share one, and the declaration says which it is.
     private static VBTypeMemberSymbol? FindMember(IReadOnlyList<VBTypeMemberSymbol> members, MemberDeclarationNode declaration)
