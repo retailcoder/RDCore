@@ -103,10 +103,16 @@ public interface ICallStackFrame : IStackFrame
     bool TryGetReferencedType(Symbol symbol, [NotNullWhen(true)] out VBType? declaredType);
 
     /// <summary>
-    /// Whether a <c>ByRef</c> parameter of this activation is the variable at <paramref name="address"/> - whether this activation <em>locks</em> it
-    /// (<strong>MS-VBAL §5.4.3.3</strong>: a variable "currently locked by a ByRef formal parameter" cannot be re-dimensioned by another name).
+    /// Whether this activation <em>locks</em> <paramref name="array"/>: a <c>ByRef</c> parameter of it is an element of the array, or a <c>For Each</c>
+    /// of it that is running enumerates the array. A locked array is not re-dimensioned, erased or assigned: error 10.
     /// </summary>
-    bool LocksAddress(MemoryAddress address);
+    /// <remarks>
+    /// What MS-VBA locks, recorded in Excel. <strong>MS-VBAL §5.4.3.3</strong> says a variable "currently locked by a ByRef formal parameter" cannot be
+    /// re-dimensioned, which reads as the whole array passed by reference; MS-VBA does not lock that one - the parameter is another name for the variable,
+    /// and sees what a <c>ReDim</c> of either gives it. RD-VBA does what MS-VBA does.
+    /// </remarks>
+    /// <param name="array">The array, as the variable that holds it reads.</param>
+    bool LocksArray(Model.Values.Intrinsic.VBArrayValue array);
 
     /// <summary>
     /// Gets the <see cref="IBindingHandle"/> currently held in this frame for the specified

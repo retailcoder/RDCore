@@ -354,7 +354,47 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     public bool IsByRefParameter(Symbol symbol) => _byRefAliases is not null && _byRefAliases.ContainsKey(symbol.SemanticId);
 
     /// <inheritdoc/>
-    public bool LocksAddress(MemoryAddress address) => _byRefAliases is not null && _byRefAliases.ContainsValue(address);
+    public bool LocksArray(VBArrayValue array)
+    {
+        if (array.Length == 0)
+        {
+            return false;
+        }
+
+        // an element passed by reference: the parameter's address is bound to the element's own cell.
+        foreach (var address in _byRefAliases?.Values ?? Enumerable.Empty<MemoryAddress>())
+        {
+            if (Storage.TryRead(address, out var handle) && IsCellOf(array, handle))
+            {
+                return true;
+            }
+        }
+
+        // a For Each that is running holds what it enumerates (ProcedureExecutor.HoldForBlock): an array that shares its cells is the one.
+        foreach (var (_, (_, holder)) in _blockHolders ?? [])
+        {
+            if (holder.Value is VBRuntimeValue<VBRuntimeArrayValue> { StoredValue.Array: { Length: > 0 } enumerated }
+                && ReferenceEquals(enumerated.CellAt(0), array.CellAt(0)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsCellOf(VBArrayValue array, IBindingHandle handle)
+    {
+        for (var index = 0; index < array.Length; index++)
+        {
+            if (ReferenceEquals(array.CellAt(index), handle))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Frees every local this frame allocated. Called when the frame is popped off the

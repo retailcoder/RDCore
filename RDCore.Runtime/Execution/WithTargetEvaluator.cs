@@ -73,22 +73,8 @@ public sealed class WithTargetEvaluator(RuntimeExpressionEvaluator expressionEva
     /// call in it is made once.
     /// </para>
     /// </remarks>
-    public bool DenotesAVariable(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression) => expression switch
-    {
-        SimpleNameExpressionNode name => IsAVariable(session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol),
-        MemberAccessExpressionNode access when expressionEvaluator.ResolveNamespaceQualified(session, context, access) is { } qualified => IsAVariable(qualified),
-        MemberAccessExpressionNode { Owner: { } owner } access => RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, owner) switch
-        {
-            VBUserDefinedType => true,
-            VBClassType declared => declared.Members.FirstOrDefault(member
-                => member.Name.Equals(access.Member.IdentifierName, StringComparison.OrdinalIgnoreCase)) is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field },
-            _ => false,
-        },
-        IndexExpressionNode { Callee: var callee } => RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, callee) is VBArrayType,
-        _ => false,
-    };
-
-    private static bool IsAVariable(Symbol? symbol) => symbol is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field } or VBParameterSymbol;
+    public bool DenotesAVariable(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
+        => expressionEvaluator.DenotesAVariable(session, context, expression);
 
     // what the statement is, as its semantics analyze it. That it fails is only said of a target that is known, and of an error that is the code's.
     private void Observe(AnalysisObservation into, IRuntimeSession session, WithStatementNode node, VBTypedValue target, RuntimeSemanticsEvaluationResult result)

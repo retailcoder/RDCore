@@ -66,10 +66,11 @@ public sealed record class ArrayStatementRuntimeSemantics(
             return targetFailure;
         }
 
-        // "If the redimensioned variable is currently locked by a ByRef formal parameter runtime Error 10 is raised."
-        if (IsLockedByAParameter(session, context, target))
+        // "If the redimensioned variable is currently locked by a ByRef formal parameter runtime Error 10 is raised" - which MS-VBA reads as an
+        // element of it passed by reference, or a For Each over it (ICallStackFrame.LocksArray).
+        if (IsLocked(session, target))
         {
-            return Failed(redim, VBRuntimeErrorId.ThisArrayIsFixedOrTemporarilyLocked, $"{redim.Name} is locked by a ByRef parameter");
+            return Failed(redim, VBRuntimeErrorId.ThisArrayIsFixedOrTemporarilyLocked, $"{redim.Name} is locked");
         }
 
         if (!TryEvaluateBounds(session, context, redim, out var bounds, out var boundsKnown, out var failure))
@@ -136,20 +137,9 @@ public sealed record class ArrayStatementRuntimeSemantics(
     // a variable that an activation on the call stack has a ByRef parameter for is that parameter's for as long as the activation is: the array it holds is
     // what the callee may be reading, so another name for it cannot take its dimensions away. Re-dimensioning through the parameter itself is the
     // one way that is allowed - it is the very purpose of passing an array by reference.
-    private bool IsLockedByAParameter(IRuntimeSession session, RuntimeEvaluationContext context, Target target)
-    {
-        if (target.Symbol is { } symbol && session.CallStack.Current?.IsByRefParameter(symbol) == true)
-        {
-            return false;
-        }
-
-        MemoryAddress address = default;
-        var found = target.Symbol is { } named
-            ? session.Symbols.Resolver.TryGetAddress(named, out address)
-            : target.Expression is { } expression && Assignments.TryGetAddress(session, context, expression, out address);
-
-        return found && session.CallStack.Frames.Any(frame => frame.LocksAddress(address));
-    }
+    // what the target holds is an array some activation locks: one of its elements is passed by reference, or a For Each over it is running.
+    private static bool IsLocked(IRuntimeSession session, Target target)
+        => Unwrapped(target.Current) is VBArrayValue array && session.CallStack.Frames.Any(frame => frame.LocksArray(array));
 
     // an array with no dimensions yet is every uninitialized array's own default, which knows nothing of the element type its
     // variable was declared with: `Dim a() As Long` is an array of Long, and so is what a ReDim of it makes.
@@ -185,6 +175,12 @@ public sealed record class ArrayStatementRuntimeSemantics(
                 // "Runtime error 13 (Type mismatch) is raised if the declared type of an <erase-element> is
                 // Variant and its value type is not an array."
                 return Failed(statement, VBRuntimeErrorId.TypeMismatch, $"{name} is not an array");
+            }
+
+            // a locked array is not erased either (MS-VBA, recorded in Excel), whatever kind of array it is.
+            if (IsLocked(session, target))
+            {
+                return Failed(statement, VBRuntimeErrorId.ThisArrayIsFixedOrTemporarilyLocked, $"{name} is locked");
             }
 
             // a member of an object is read as a value of its own, as a property is: what is erased is that value, and the member is as it was
@@ -367,6 +363,18 @@ public sealed record class ArrayStatementRuntimeSemantics(
 
         // the elements the variable held are let go of, and the ones it holds now - kept by Preserve - are held by it (MS-VBAL §5.3.1.10).
         var resolver = session.Symbols.Resolver;
+
+        // a variable that has storage keeps it: the new array is written where the variable is, which is where a parameter that is another name for
+        // it reads it too - a whole array passed by reference is not locked (ICallStackFrame.LocksArray), and sees what a ReDim of the variable gives it.
+        if (resolver.TryGetAddress(target.Symbol!, out _) && resolver.GetValue(target.Symbol!) is { } existing
+            && existing.BindingCapabilities.HasFlag(BindingCapabilities.SetValue))
+        {
+            var held = ObjectReferences.HeldIn(session, existing);
+            existing.Store(resolver, SymbolAddressTable.BoxedValue(stored), !stored.IsIndeterminate);
+            ObjectReferences.Rebind(session, existing, held);
+            return RuntimeExecutionOutcome.Next;
+        }
+
         var before = resolver.TryGetAddress(target.Symbol!, out _) ? ObjectReferences.HeldIn(session, resolver.GetValue(target.Symbol!)) : ObjectReferences.Held.None;
         if (!resolver.TryAllocate(target.Symbol!, stored, out _))
         {

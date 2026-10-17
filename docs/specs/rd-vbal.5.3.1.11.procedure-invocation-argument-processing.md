@@ -170,7 +170,7 @@ raises error 13, Type mismatch.
 |Parameter|Argument|Binding|
 |---|---|---|
 |`ByVal`|Any|A fresh, Let-coerced [ValueBindingHandle](../api/RDCore.SDK.Model.Values.Bindings.ValueBindingHandle.html), which never aliases the caller's storage.|
-|`ByRef`|An addressable, writable variable whose declared type exactly matches the parameter's: a name (`x`), or a public variable of an object (`obj.Count`, `.Count`)|A reference binding.|
+|`ByRef`|An addressable, writable variable whose declared type exactly matches the parameter's: a name (`x`), that name through its module (`Module1.x`), a public variable of an object (`obj.Count`, `.Count`), or an element of an array a variable holds (`arr(1)`, `v(1)`)|A reference binding.|
 |`ByRef`, declared `Variant`|An addressable, writable variable, of either of those|A reference binding.|
 |`ByRef`, declared as a class or `Object`|A variable of a different declared type|A `ByVal`-style copy: the class/`Object` copy-back is not modeled.|
 |`ByRef`|Not recognized as aliasable: an expression, a literal, a variable of mismatched declared type, a read-only target|The same `ByVal`-style Let-coerced copy: **MS-VBAL §5.3.1.11**'s "otherwise" case. Never an error.|
@@ -193,6 +193,11 @@ A write to a `ByRef`-aliased parameter inside the callee is immediately visible 
 
 `CallStackFrame.ReleaseAll` never deallocates the address of a `ByRef` alias. The address belongs to its
 original allocator; the callee only borrows it.
+
+An element of an array has a cell and no address of its own: the call is given an address bound to the element's cell, which the call site gives back once
+the call is over - after every handler, for a `RaiseEvent`. What the callee assigns is what the element holds, and the array is locked for as long as the call
+runs ([**RD-VBAL §5.4.3.3** ReDim Statement](rd-vbal.5.4.3.3.redim-statement.md)). An element of what a function or a property returns is a value, and is copied;
+so is an element passed to a `Declare`d procedure, which the marshaller lays out.
 
 The `ByVal` and `ByRef`-fallback copy is made by a direct Let-coercion call, since there is no addressable
 symbol to Let-assign through. A Let-assignment to the function result variable makes the same lower-level call,

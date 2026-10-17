@@ -462,6 +462,33 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             error is null ? RuntimeSemanticsEvaluationResult.Success(VBVoidValue.Void) : RuntimeSemanticsEvaluationResult.Error(error));
     }
 
+    /// <summary>
+    /// Whether <paramref name="expression"/> is classified as a variable: a name of a variable, a field of the module or a parameter; that name qualified
+    /// by its module (<c>Module1.Kept</c>); a field of a record (<c>r.Item</c>); a public variable of an object whose class is declared (<c>obj.Child</c>);
+    /// an element of an array (<c>items(1)</c>).
+    /// </summary>
+    /// <remarks>
+    /// Anything else is taken to be a value - <c>New</c>, a call, a property, and a member of an object that is late bound, which MS-VBAL classifies as an
+    /// unbound member. Classified by the declared types the static semantics give the expression, not by evaluating it: a call in it is made once, by
+    /// whoever evaluates it.
+    /// </remarks>
+    internal bool DenotesAVariable(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression) => expression switch
+    {
+        SimpleNameExpressionNode name => IsAVariable(session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol),
+        MemberAccessExpressionNode access when ResolveNamespaceQualified(session, context, access) is { } qualified => IsAVariable(qualified),
+        MemberAccessExpressionNode { Owner: { } owner } access => DeclaredTypeOfOwner(session, context, owner) switch
+        {
+            VBUserDefinedType => true,
+            VBClassType declared => declared.Members.FirstOrDefault(member
+                => member.Name.Equals(access.Member.IdentifierName, StringComparison.OrdinalIgnoreCase)) is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field },
+            _ => false,
+        },
+        IndexExpressionNode { Callee: var callee } => DeclaredTypeOfOwner(session, context, callee) is VBArrayType,
+        _ => false,
+    };
+
+    private static bool IsAVariable(Symbol? symbol) => symbol is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field } or VBParameterSymbol;
+
     // the declared type of an expression, as the static semantics read it - without evaluating it, which a caller that only needs to classify an
     // expression must not do a second time (a call in it would be made twice).
     internal static VBType? DeclaredTypeOfOwner(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? ownerExpression)
@@ -1168,6 +1195,21 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         IRuntimeSession session, RuntimeEvaluationContext context, VBTypeMemberSymbol accessor, IRuntimeValue? receiver,
         ImmutableArray<ExpressionNode> indexArguments, VBTypedValue value, ExpressionNode source, bool isSet)
     {
+        var borrowed = new List<MemoryAddress>();
+        try
+        {
+            return InvokeAssignment(session, context, accessor, receiver, indexArguments, value, source, isSet, borrowed);
+        }
+        finally
+        {
+            GiveBack(session, borrowed);
+        }
+    }
+
+    private RuntimeSemanticsEvaluationResult InvokeAssignment(
+        IRuntimeSession session, RuntimeEvaluationContext context, VBTypeMemberSymbol accessor, IRuntimeValue? receiver,
+        ImmutableArray<ExpressionNode> indexArguments, VBTypedValue value, ExpressionNode source, bool isSet, List<MemoryAddress> borrowed)
+    {
         var parameters = RuntimeProcedureInvoker.GetParameters(accessor);
         parameters = receiver is not null && parameters is [{ Name: "Me" }, ..] ? parameters.RemoveAt(0) : parameters;
         if (ProcedureInvoker is null || LetCoercionProvider is null || parameters.IsEmpty)
@@ -1178,7 +1220,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
 
         // the value parameter is the last one, and the ones before it are what the property is indexed by.
         var valueParameter = parameters[^1];
-        if (BindArguments(session, context, parameters.RemoveAt(parameters.Length - 1), indexArguments, out var arguments, out _) is { } bindingError)
+        if (BindArguments(session, context, parameters.RemoveAt(parameters.Length - 1), indexArguments, out var arguments, out _, borrowed) is { } bindingError)
         {
             return bindingError;
         }
@@ -1518,21 +1560,29 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        if (BindArguments(session, context, parameters, argumentNodes, out var arguments, out var argumentsKnown,
-                external: procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol)
-            is { } bindingError)
+        var borrowed = new List<MemoryAddress>();
+        try
         {
-            return bindingError;
+            if (BindArguments(session, context, parameters, argumentNodes, out var arguments, out var argumentsKnown, borrowed,
+                    external: procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol)
+                is { } bindingError)
+            {
+                return bindingError;
+            }
+
+            IRuntimeValue[] callArguments = receiver is null ? arguments : [receiver, .. arguments];
+
+            // through a binding rather than straight to the invoker: whether this member's code is the workspace's
+            // is the factory's decision, and a call site has no business knowing.
+            var returned = Bindings is { } bindings
+                ? bindings.ForMember(procedure).Call(session.Symbols.Resolver, callArguments)
+                : ProcedureInvoker.Invoke(procedure, session.Symbols.Resolver, callArguments);
+            return argumentsKnown ? returned : NotKnown(returned);
         }
-
-        IRuntimeValue[] callArguments = receiver is null ? arguments : [receiver, .. arguments];
-
-        // through a binding rather than straight to the invoker: whether this member's code is the workspace's
-        // is the factory's decision, and a call site has no business knowing.
-        var returned = Bindings is { } bindings
-            ? bindings.ForMember(procedure).Call(session.Symbols.Resolver, callArguments)
-            : ProcedureInvoker.Invoke(procedure, session.Symbols.Resolver, callArguments);
-        return argumentsKnown ? returned : NotKnown(returned);
+        finally
+        {
+            GiveBack(session, borrowed);
+        }
     }
 
     /// <summary>
@@ -1583,15 +1633,17 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        if (BindArguments(session, context, raised.Parameters, argumentNodes, out var arguments, out _) is { } bindingError)
+        // the elements of arrays passed by reference are given back with the temporaries, once every handler has run.
+        var temporaries = new List<MemoryAddress>();
+        if (BindArguments(session, context, raised.Parameters, argumentNodes, out var arguments, out _, temporaries) is { } bindingError)
         {
+            GiveBack(session, temporaries);
             return bindingError;
         }
 
         // MS-VBAL §5.4.2.20: the next invocation's argument for a ByRef parameter is what the parameter last contained.
         // An argument that names a variable is that variable; any other has nowhere to be left a value in, so it is
         // given a location of its own for the handlers of this one event.
-        var temporaries = new List<MemoryAddress>();
         for (var i = 0; i < raised.Parameters.Length; i++)
         {
             var parameter = raised.Parameters[i];
@@ -1655,10 +1707,14 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     /// buffer of the variable it names, which the library may write to and which takes what it wrote, and an <c>As Any</c> parameter takes a variable of any
     /// type by reference.
     /// </param>
+    /// <param name="borrowed">
+    /// Where the addresses an element of an array passed by reference is given are added: the caller gives them back (<see cref="GiveBack"/>) once the call
+    /// made with the arguments is over, which is as long as the elements are passed as variables.
+    /// </param>
     /// <returns>The error that stopped the binding, or <see langword="null"/> when every argument was bound.</returns>
     private RuntimeSemanticsEvaluationResult? BindArguments(
         IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<VBParameterSymbol> parameters,
-        ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments, out bool isKnown, bool external = false)
+        ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments, out bool isKnown, List<MemoryAddress> borrowed, bool external = false)
     {
         arguments = [];
         isKnown = true;
@@ -1708,7 +1764,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             }
 
             var aliased =RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || external && parameter.ResolvedType is VBStringType;
-            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, out var reference, external))
+            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, external))
             {
                 bound[i] = reference;
                 continue;
@@ -1958,9 +2014,17 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     // type argument, a read-only target) falls through to the same Let-coerced copy every ByVal argument
     // already gets - MS-VBAL's own "otherwise" case, never an error.
     private bool TryResolveByRefArgument(
-        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode argument, VBParameterSymbol parameter, out VBRuntimeReference reference, bool external = false)
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode argument, VBParameterSymbol parameter, List<MemoryAddress> borrowed,
+        out VBRuntimeReference reference, bool external = false)
     {
         reference = VBRuntimeReference.NullRef;
+
+        // an element of an array is a variable (MS-VBAL §5.6.13.1), passed by reference as one: MS-VBA writes what the callee assigns to the element, and the
+        // array is locked for as long as the call runs (ICallStackFrame.LocksArray). A Declare's parameter is laid out by the marshaller, which takes a copy.
+        if (!external && argument is IndexExpressionNode element)
+        {
+            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference);
+        }
 
         // `As Any` is a parameter of a Declare that takes whatever it is given, a variable of any type by reference - and passes it as the type it is.
         if (external && parameter.ResolvedType is VBUnknownType && argument is SimpleNameExpressionNode anyName
@@ -1998,6 +2062,62 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
 
         reference = new VBRuntimeReference(address, ReferencedType(parameter, DeclaredTypeOf(session, argumentSymbol, typed.ResolvedType)));
         return true;
+    }
+
+    // the element's own cell, given an address of its own for as long as the call that is made with it runs - which the caller gives back (borrowed). An
+    // element whose cell cannot be written yet (the inert one an element of an object or a Variant array starts with) is given one that can, holding its
+    // default, as an assignment to it would. A callee that is not a variable - a function, a property - is not reached into: its element is a value.
+    private bool TryResolveElementByRefArgument(
+        IRuntimeSession session, RuntimeEvaluationContext context, IndexExpressionNode element, VBParameterSymbol parameter, List<MemoryAddress> borrowed,
+        out VBRuntimeReference reference)
+    {
+        reference = VBRuntimeReference.NullRef;
+        if (element.Arguments.IsDefaultOrEmpty || !DenotesAVariable(session, context, element.Callee))
+        {
+            return false;
+        }
+
+        var evaluated = Evaluate(session, element.Callee, context);
+        var held = evaluated.IsSuccess ? evaluated.Result : null;
+        while (held is VBVariantValue { TypedValue: var wrapped })
+        {
+            held = wrapped;
+        }
+
+        if (held is not VBArrayValue { IsIndeterminate: false } array
+            || (!IsOfDeclaredType(parameter, array.ItemType) && parameter.ResolvedType is not VBVariantType)
+            || EvaluateSubscripts(session, context, element.Arguments, out var indices, out var indicesKnown) is not null
+            || !indicesKnown
+            || array.GetElementHandle(indices) is not { } cell)
+        {
+            return false;
+        }
+
+        if (!cell.BindingCapabilities.HasFlag(BindingCapabilities.SetValue))
+        {
+            array.TrySetElement(BindingKnowledge.NewCell(array.ItemType.DefaultValue.RuntimeValue, isKnown: true), indices);
+            cell = array.GetElementHandle(indices)!;
+        }
+
+        if (!session.Storage.TryAllocate(array.ItemType.DefaultValue.Size, cell, out var address))
+        {
+            return false;
+        }
+
+        borrowed.Add(address);
+        reference = new VBRuntimeReference(address, ReferencedType(parameter, array.ItemType));
+        return true;
+    }
+
+    // what the elements passed by reference were given to be passed as: the call they were passed to is over.
+    private static void GiveBack(IRuntimeSession session, List<MemoryAddress> borrowed)
+    {
+        foreach (var address in borrowed)
+        {
+            session.Storage.TryDeallocate(address);
+        }
+
+        borrowed.Clear();
     }
 
     // whether a variable of this declared type is one a ByRef parameter can be bound to without a copy: one of the parameter's own declared type, an

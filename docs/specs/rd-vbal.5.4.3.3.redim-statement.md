@@ -83,14 +83,16 @@ else:
 An element the resized array has and the original did not is its element type's default value. An element at an
 index now outside the array's bounds is discarded.
 
-A `ReDim` of a variable that is currently locked by a `ByRef` formal parameter is runtime error 10, `This array is fixed or temporarily locked`
-(**MS-VBAL §5.4.3.3**). An array passed by reference is its parameter's for as long as an activation on the call stack has one: another name for it - the module variable the
-argument is, a public variable of an object - cannot take its dimensions away. A `ReDim` of the parameter itself is not locked, which is what passing an array by reference is for; so
-is one of a parameter that is passed on down a chain of `ByRef` calls. The lock is the activation's, so it is gone once the call returns
-([ICallStackFrame](../api/RDCore.SDK.Runtime.Abstract.Execution.ICallStackFrame.html)`.LocksAddress`).
+A `ReDim` of a variable that is currently locked is runtime error 10, `This array is fixed or temporarily locked` (**MS-VBAL §5.4.3.3**: "locked by a ByRef
+formal parameter"). An array is locked, as MS-VBA has it, while an activation on the call stack has an element of it as a `ByRef` parameter (`Hold arr(1)`), or
+while a `For Each` over it runs; the lock is gone once the call returns, or the loop is over
+([ICallStackFrame](../api/RDCore.SDK.Runtime.Abstract.Execution.ICallStackFrame.html)`.LocksArray`). A locked array is not erased either, nor assigned another
+array (`arr = other`): error 10 too.
 
-> [!NOTE]
-> **MS-VBAL §5.4.3.4** states no such rule for `Erase`, and `Erase` does not raise error 10.
+> [!IMPORTANT]
+> The whole array passed by reference does **not** lock it, which is what MS-VBA does (recorded in Excel) and not how §5.4.3.3 reads: the parameter is another
+> name for the variable, a `ReDim` of either is a `ReDim` of both, and each sees the dimensions the other gives it. RD-VBA does what MS-VBA does. The new array is
+> written where the variable is, which is what keeps the parameter's name for it.
 
 A target that is a member access (`obj.Buffer`, `.Buffer`) is an expression: the array is read from it, and the new array is written back through it, as an assignment to
 it is - the public variable of the object, or the field of the record. The element type of an array that has no dimensions yet is the one the member is declared with.
