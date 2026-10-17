@@ -40,11 +40,13 @@ public sealed class StringsDefaultMemberTests
             "Debug.Print IsNull(Left(o, 1))"));
 
     [TestMethod]
+    // MS-VBAL 5.6.2.2 and 5.6.2.3, and MS-VBA (recorded in Excel): no default member is 438, a default member that takes an argument is 450, and an
+    // object a default member returned that has no value - DfltObj's Collection - is 13.
     [DataRow("Dim o As New Class1", "438")]
-    [DataRow("Dim o As New DfltArgs", "438")]
+    [DataRow("Dim o As New DfltArgs", "450")]
     [DataRow("Dim o As New DfltRaise", "5")]
     [DataRow("Dim o As New DfltNothing", "91")]
-    [DataRow("Dim o As New DfltObj", "438")]
+    [DataRow("Dim o As New DfltObj", "13")]
     public async Task AnObjectWithNoValue_IsAnError(string setup, string error)
         => CollectionAssert.AreEqual(new[] { $"ERR {error}" }, await ErrorOf(setup, "Debug.Print Left(o, 1)"));
 }

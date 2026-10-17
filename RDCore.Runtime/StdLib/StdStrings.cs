@@ -164,9 +164,9 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     private const int MostDefaultMembers = 64;
 
     // a Variant argument's value, out of any Variant: an object is its "simple data value" (MS-VBAL 5.5.1.2.13), what its default
-    // member returns when it is called with no arguments, read again while that is an object. Nothing is error 91; an object whose
-    // class has no default member that can be called so is error 438; what the default member raises is its error; and a chain of
-    // default members that does not end in a value is out of stack space, as it is to Let-coercion.
+    // member returns when it is called with no arguments, read again while that is an object. Nothing is error 91; what has no value
+    // is the error ObjectDefaultMember.NoValue says (438, 450, or 13 for an object a default member returned); what the default member
+    // raises is its error; and a chain of default members that does not end in a value is out of stack space, as it is to Let-coercion.
     private bool TryReadValue(VBTypedValue argument, string member, string parameter, out VBTypedValue value, [NotNullWhen(false)] out IVBRaisableError? error)
     {
         value = Unwrapped(argument);
@@ -186,7 +186,8 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
 
             if (ObjectDefaultMember.Call(session, reference) is not { } called)
             {
-                error = Failure(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, member, $"{parameter} is an object with no default member to read its value from");
+                var noValue = ObjectDefaultMember.NoValue(session, reference, returnedByADefaultMember: depth > 0);
+                error = Failure((VBRuntimeErrorId)noValue.ErrorId, member, $"{parameter}: {noValue.Verbose}");
                 return false;
             }
 
@@ -310,9 +311,13 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
 
     // one measurement with one dial, because the specification defines LenB as Len "except for strings or
     // UDTs" - stating one function and its two exceptions rather than two functions.
-    private static RuntimeSemanticsEvaluationResult<VBVariantValue> Measure(VBVariantValue expression, bool inMemory)
+    private RuntimeSemanticsEvaluationResult<VBVariantValue> Measure(VBVariantValue expression, bool inMemory)
     {
-        var value = Unwrapped(expression);
+        // an object is measured as its value, what its default member returns - not as the reference it is.
+        if (!TryReadValue(expression, inMemory ? nameof(LenB) : nameof(Len), "Expression", out var value, out var error))
+        {
+            return RuntimeSemanticsEvaluationResult<VBVariantValue>.Error(error);
+        }
 
         // "If Expression contains the data value Null, Null is returned" - the one case that is not a number.
         if (value is VBNullValue)
