@@ -81,9 +81,9 @@ public sealed class MathFunctionTests
             "Abs(CSng(-3.402823E+38)) => Single 3.402823E+38");
 
     [TestMethod]
-    // MS-VBA answers the smallest Long with itself, a negative absolute value; RD-VBA overflows, as MS-VBA does for every other type (RD-VBAL 6.1.2.10).
-    public Task Abs_OfTheSmallestLong_Overflows()
-        => AssertRows("Abs(CLng(-2147483647) - 1) => err 6");
+    // MS-VBA answers the smallest Long with itself, a negative absolute value, where every other type overflows (RD-VBAL 6.1.2.10).
+    public Task Abs_OfTheSmallestLong_IsItself()
+        => AssertRows("Abs(CLng(-2147483647) - 1) => Long -2147483648");
 
     [TestMethod]
     public Task Sgn()
