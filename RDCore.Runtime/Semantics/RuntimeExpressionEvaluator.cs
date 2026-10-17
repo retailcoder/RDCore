@@ -1971,18 +1971,20 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return true;
         }
 
-        if (argument is MemberAccessExpressionNode memberAccess)
+        // `Module1.Items` is the variable its bare name is, named through its module (MS-VBAL §5.6.12): bound as the name is, not as a member of a value.
+        var qualified = argument is MemberAccessExpressionNode qualifiedAccess ? ResolveNamespaceQualified(session, context, qualifiedAccess) : null;
+        if (qualified is null && argument is MemberAccessExpressionNode memberAccess)
         {
             return TryResolveFieldByRefArgument(session, context, memberAccess, parameter, out reference);
         }
 
-        if (argument is not SimpleNameExpressionNode simpleName)
+        if (qualified is null && argument is not SimpleNameExpressionNode)
         {
             return false;
         }
 
-        var result = session.Symbols.Resolver.ResolveValue(simpleName, ScopeKind.Local, context.Scope);
-        if (result.Symbol is not { } argumentSymbol || argumentSymbol is not ITypedSymbol typed
+        var named = qualified ?? session.Symbols.Resolver.ResolveValue((SimpleNameExpressionNode)argument, ScopeKind.Local, context.Scope).Symbol;
+        if (named is not { } argumentSymbol || argumentSymbol is not ITypedSymbol typed
             || (!IsOfDeclaredType(parameter, typed.ResolvedType) && parameter.ResolvedType is not VBVariantType))
         {
             return false;

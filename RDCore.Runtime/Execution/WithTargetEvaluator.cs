@@ -13,6 +13,7 @@ using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Builders;
@@ -44,7 +45,12 @@ public sealed class WithTargetEvaluator(RuntimeExpressionEvaluator expressionEva
         }
 
         var target = targetResult.Result!;
-        var result = withStatement.Evaluate(session, new(), node, target);
+
+        // a record that is a variable is the block variable itself (MS-VBAL §5.4.2.21), and what the block assigns to its fields is the variable's: the
+        // Let-coercion the statement applies to a record is a copy (DataValues), which only a value - a function's result - is given.
+        var result = target is VBUserDefinedTypeValue && DenotesAVariable(session, context, node.WithExpression)
+            ? RuntimeSemanticsEvaluationResult.Success(target)
+            : withStatement.Evaluate(session, new(), node, target);
         if (observation is { IsSuspended: false })
         {
             Observe(observation, session, node, target, result);

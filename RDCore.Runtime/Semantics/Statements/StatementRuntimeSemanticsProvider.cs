@@ -214,7 +214,11 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
             ? _expressionEvaluator.ResolveNamespaceQualified(session, context, qualifiedAccess)
             : null;
 
-        if (qualified is null && assignment.Target is MemberAccessExpressionNode or IndexExpressionNode { Callee: MemberAccessExpressionNode })
+        // `Set Module1.Items(1) = x` is an element of the module's array, which the bare name's element is.
+        var isElementOfAQualifiedArray = assignment.Target is IndexExpressionNode { Callee: MemberAccessExpressionNode calleeAccess }
+            && _expressionEvaluator.ResolveNamespaceQualified(session, context, calleeAccess) is not null;
+
+        if (qualified is null && !isElementOfAQualifiedArray && assignment.Target is MemberAccessExpressionNode or IndexExpressionNode { Callee: MemberAccessExpressionNode })
         {
             var memberValue = _expressionEvaluator.Evaluate(session, assignment.Value, context);
             return memberValue.IsSuccess

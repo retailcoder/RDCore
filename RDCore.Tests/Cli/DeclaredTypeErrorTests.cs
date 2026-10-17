@@ -223,15 +223,17 @@ public sealed class DeclaredTypeErrorTests
         CollectionAssert.AreEqual(Array.Empty<string>(), errors);
     }
 
+    // a type of a class module is private to it (VBC09338), and the class names it from within; a type another module can name is a standard module's.
     private static readonly (string, string) Holder = ("Holder", ModuleWorkspace.ClassModule(
-        "Holder", "Public Type TPublic", "X As Long", "End Type", "Private Type TSecret", "X As Long", "End Type",
-        "Private Hidden As Holder.TSecret", "Public Open As Holder.TPublic"));
+        "Holder", "Private Type TSecret", "X As Long", "End Type", "Private Hidden As Holder.TSecret"));
+
+    private static readonly (string, string) Shared = ("Shared", ModuleWorkspace.StandardModule("Shared", "Public Type TPublic", "X As Long", "End Type"));
 
     [TestMethod]
     public async Task AModuleQualifiesTheTypesItDeclares_FromWithinAndFromWithout_WhenTheyArePublic()
     {
         var errors = await ModuleWorkspace.LoadErrorsAsync(
-            [Holder], Program("Private Type TLocal", "X As Long", "End Type", "Public A As Program.TLocal", "Public B As Holder.TPublic"));
+            [Holder], [Shared], Program("Private Type TLocal", "X As Long", "End Type", "Public A As Program.TLocal", "Public B As Shared.TPublic"));
 
         Assert.IsEmpty(errors, string.Join("; ", errors));
     }
@@ -242,8 +244,8 @@ public sealed class DeclaredTypeErrorTests
     [DataRow("Public S As Program.TPublic", "Program.TPublic")]
     public async Task ATypeThatTheQualifyingModuleDoesNotDeclareForTheModule_IsNotFound(string declaration, string name)
     {
-        // TSecret is Private to Holder; TMissing is nowhere; and TPublic is Holder's, which does not make it Program's.
-        var errors = await ModuleWorkspace.LoadErrorsAsync([Holder], Program(declaration));
+        // TSecret is Private to Holder; TMissing is nowhere; and TPublic is Shared's, which does not make it Program's.
+        var errors = await ModuleWorkspace.LoadErrorsAsync([Holder], [Shared], Program(declaration));
 
         Assert.HasCount(1, errors);
         StringAssert.Contains(errors[0], $"'{name}'");

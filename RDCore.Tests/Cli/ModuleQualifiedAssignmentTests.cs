@@ -15,7 +15,7 @@ public sealed class ModuleQualifiedAssignmentTests
         => RunAsync(
             [("Widget", ClassModule("Widget", "Public Name As String", "Public Sub Act()", classBody, "End Sub",
                 "Private Sub Class_Terminate()", "    Debug.Print \"terminated \" & Name", "End Sub"))],
-            $"Attribute VB_Name = \"Program\"\r\nPublic Kept As Object\r\nPublic Count As Long\r\nPublic Sub Main()\r\n{string.Join("\r\n", lines)}\r\nEnd Sub\r\n");
+            $"Attribute VB_Name = \"Program\"\r\nPublic Kept As Object\r\nPublic Count As Long\r\nPublic Items() As Long\r\nPublic Objects() As Object\r\nPublic Sub Main()\r\n{string.Join("\r\n", lines)}\r\nEnd Sub\r\n");
 
     [TestMethod]
     public async Task ALet_OfAVariableOfTheModule_ThroughTheModulesName_AssignsTheVariable()
@@ -24,6 +24,14 @@ public sealed class ModuleQualifiedAssignmentTests
     [TestMethod]
     public async Task ASet_OfAVariableOfTheModule_ThroughTheModulesName_AssignsTheVariable()
         => CollectionAssert.AreEqual(new[] { "Collection" }, await Run(string.Empty, "Set Program.Kept = New Collection", "Debug.Print TypeName(Kept)"));
+
+    [TestMethod]
+    public async Task ALet_OfAnElementOfAModulesArray_ThroughTheModulesName_AssignsTheElement()
+        => CollectionAssert.AreEqual(new[] { "7" }, await Run(string.Empty, "ReDim Program.Items(1 To 2)", "Program.Items(2) = 7", "Debug.Print Items(2)"));
+
+    [TestMethod]
+    public async Task ASet_OfAnElementOfAModulesArray_ThroughTheModulesName_AssignsTheElement()
+        => CollectionAssert.AreEqual(new[] { "Collection" }, await Run(string.Empty, "ReDim Objects(0)", "Set Program.Objects(0) = New Collection", "Debug.Print TypeName(Objects(0))"));
 
     // the Widget is destroyed when Main is over: its Terminate prints the last line, its Name being empty.
     [TestMethod]

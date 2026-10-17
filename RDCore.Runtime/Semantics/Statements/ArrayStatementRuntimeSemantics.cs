@@ -9,6 +9,7 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -186,6 +187,13 @@ public sealed record class ArrayStatementRuntimeSemantics(
                 return Failed(statement, VBRuntimeErrorId.TypeMismatch, $"{name} is not an array");
             }
 
+            // a member of an object is read as a value of its own, as a property is: what is erased is that value, and the member is as it was
+            // (MS-VBA, recorded in Excel - `Erase obj.Loose` leaves the array it holds). A class exposes no array of its own (VBC09337).
+            if (IsAMemberOfAnObject(session, context, target.Expression))
+            {
+                continue;
+            }
+
             // "If the declared type is fixed size array every dependent variable ... is reset to standard
             // initial value of the declared array element type" - the dimensions stay, since a fixed-size
             // array's bounds are part of its declaration and nothing at run time may change them.
@@ -203,6 +211,11 @@ public sealed record class ArrayStatementRuntimeSemantics(
         return RuntimeExecutionOutcome.Next;
     }
 
+    // classified by the type the owner is declared as, without evaluating it again.
+    private static bool IsAMemberOfAnObject(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? expression)
+        => expression is MemberAccessExpressionNode { Owner: { } owner }
+            && RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, owner) is VBClassType or VBObjectType;
+
     // the symbol a simple name resolves to, or the expression a member access or an element is - and what it holds, which is the array.
     private bool TryResolveTarget(
         IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? expression, string name,
@@ -211,7 +224,9 @@ public sealed record class ArrayStatementRuntimeSemantics(
         target = default;
         failure = RuntimeExecutionOutcome.Next;
 
-        if (expression is not null)
+        // `Mod2.Items` is the variable its bare name is, named through its module (MS-VBAL §5.6.12): a symbol, and not a member of a value.
+        var qualified = expression is MemberAccessExpressionNode access ? Expressions.ResolveNamespaceQualified(session, context, access) : null;
+        if (expression is not null && qualified is null)
         {
             var evaluated = Expressions.Evaluate(session, expression, context);
             if (!evaluated.IsSuccess)
@@ -225,7 +240,7 @@ public sealed record class ArrayStatementRuntimeSemantics(
             return true;
         }
 
-        if (session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol is not { } symbol)
+        if ((qualified ?? session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol) is not { } symbol)
         {
             failure = RuntimeExecutionOutcome.InternalError;
             return false;

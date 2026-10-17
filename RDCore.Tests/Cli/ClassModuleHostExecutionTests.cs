@@ -35,7 +35,10 @@ public sealed class ClassModuleHostExecutionTests
     private const string Disc = ClassHeader + "Attribute VB_Name = \"Disc\"\r\n"
         + "Implements IShape\r\n"
         + "Public Radius As Long\r\n"
-        + "Public Cells(1 To 3) As Long\r\n"
+        + "Private Cells(1 To 3) As Long\r\n"
+        + "Public Sub SetCell(ByVal index As Long, ByVal value As Long)\r\n    Cells(index) = value\r\nEnd Sub\r\n"
+        + "Public Function Cell(ByVal index As Long) As Long\r\n    Cell = Cells(index)\r\nEnd Function\r\n"
+        + "Public Function LastCell() As Long\r\n    LastCell = UBound(Cells)\r\nEnd Function\r\n"
         + "Private Function IShape_Area() As Double\r\n    IShape_Area = Radius * 2\r\nEnd Function\r\n";
 
     private static string Program(params string[] body)
@@ -136,11 +139,11 @@ public sealed class ClassModuleHostExecutionTests
             "Dim b As Disc",
             "Set a = New Disc",
             "Set b = New Disc",
-            "a.Cells(3) = 5",
-            "b.Cells(3) = 6",
-            "Debug.Print UBound(a.Cells)",
-            "Debug.Print a.Cells(3)",
-            "Debug.Print b.Cells(3)"));
+            "a.SetCell 3, 5",
+            "b.SetCell 3, 6",
+            "Debug.Print a.LastCell",
+            "Debug.Print a.Cell(3)",
+            "Debug.Print b.Cell(3)"));
 
         Assert.AreEqual(ExecutionOutcome.Completed, result.Outcome, result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "3", "5", "6" }, result.Output.Select(line => line.Trim()).ToArray());

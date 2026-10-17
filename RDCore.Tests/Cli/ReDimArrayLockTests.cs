@@ -4,8 +4,8 @@ namespace RDCore.Tests.Cli;
 /// <strong>MS-VBAL §5.4.3.3</strong> "If the redimensioned variable is currently locked by a ByRef formal parameter runtime Error 10 is raised."
 /// </summary>
 /// <remarks>
-/// An array passed by reference is the parameter's for as long as the call lasts, so another name for it - the module variable the argument is, a
-/// public variable of an object - cannot take its dimensions away. Re-dimensioning it through the parameter is what passing it by reference is for.
+/// An array passed by reference is the parameter's for as long as the call lasts, so another name for it - the module variable the argument is, the
+/// variable of another module named through it - cannot take its dimensions away. Re-dimensioning it through the parameter is what passing it by reference is for.
 /// </remarks>
 [TestClass]
 [TestCategory("MS-VBAL 5.4.3.3 ReDim Statement")]
@@ -24,11 +24,18 @@ public sealed class ReDimArrayLockTests
                 "ReDim arr(1 To 3)", "Hold arr"));
 
     [TestMethod]
-    public async Task ReDim_OfThePublicVariableOfAnObject_WhileACalleeHoldsItByRef_IsError10()
+    public async Task ReDim_OfAnotherModulesVariable_NamedThroughTheModule_WhileACalleeHoldsItByRef_IsError10()
         => CollectionAssert.AreEqual(new[] { "10" },
             await RunAsync(
-                "Public Sub Hold(ByRef p() As Long, ByVal o As Box)\r\nOn Error Resume Next\r\nReDim o.Items(1 To 5)\r\nDebug.Print Err.Number\r\nEnd Sub",
-                "ReDim b.Items(1 To 3)", "Hold b.Items, b"));
+                "Public Sub Hold(ByRef p() As Long)\r\nOn Error Resume Next\r\nReDim Mod2.Items(1 To 5)\r\nDebug.Print Err.Number\r\nEnd Sub",
+                "ReDim Mod2.Items(1 To 3)", "Hold Mod2.Items"));
+
+    [TestMethod]
+    public async Task AnotherModulesArray_NamedThroughTheModule_PassedByRef_IsTheParameter()
+        => CollectionAssert.AreEqual(new[] { "9" },
+            await RunAsync(
+                "Public Sub Grow(ByRef p() As Long)\r\nReDim p(1 To 9)\r\nEnd Sub",
+                "ReDim Mod2.Items(1 To 3)", "Grow Mod2.Items", "Debug.Print UBound(Mod2.Items)"));
 
     [TestMethod]
     public async Task ReDim_OfTheParameterItself_IsWhatPassingItByRefIsFor()

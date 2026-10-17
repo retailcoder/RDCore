@@ -25,11 +25,13 @@ public sealed class UserDefinedTypeVariableTests
             "Public Type TPoint", "X As Long", "Y As Long", "End Type",
             "Public Sub Main()", "Dim p As Program.TPoint", "p.X = 4", "p.Y = 5", "Debug.Print p.X + p.Y", "End Sub"));
 
+    // a type of a class module is private to it (VBC09338): a local of it is the class's own.
     [TestMethod]
     public async Task ALocal_OfAUserDefinedTypeOfAClassModule_HasItsFields()
         => CollectionAssert.AreEqual(new[] { "7" }, await ModuleWorkspace.RunAsync(
-            [("Shapes", ModuleWorkspace.ClassModule("Shapes", "Public Type TPoint", "X As Long", "End Type"))],
-            Program("Public Sub Main()", "Dim p As Shapes.TPoint", "p.X = 7", "Debug.Print p.X", "End Sub")));
+            [("Shapes", ModuleWorkspace.ClassModule("Shapes", "Private Type TPoint", "X As Long", "End Type",
+                "Public Function Seven() As Long", "Dim p As Shapes.TPoint", "p.X = 7", "Seven = p.X", "End Function"))],
+            Program("Public Sub Main()", "Dim s As New Shapes", "Debug.Print s.Seven", "End Sub")));
 
     [TestMethod]
     public async Task AVariableOfTheModule_OfAUserDefinedType_HasItsFields()
@@ -51,6 +53,15 @@ public sealed class UserDefinedTypeVariableTests
             "Private Type TPoint", "X As Long", "End Type",
             "Private Type TLine", "A As TPoint", "B As TPoint", "End Type",
             "Public Sub Main()", "Dim l As TLine", "l.B.X = 9", "Debug.Print l.B.X", "End Sub"));
+
+    // MS-VBAL §5.4.2.21: "If <expression> is classified as a variable, that variable is the With block variable": what the block assigns is the
+    // variable's, a field or a whole array field.
+    [TestMethod]
+    public async Task AWithBlockOnARecordVariable_AssignsTheVariablesFields()
+        => CollectionAssert.AreEqual(new[] { "5 2" }, await RunAsync(
+            "Private Type TPoint", "X As Long", "Items() As Long", "End Type",
+            "Public Sub Main()", "Dim p As TPoint", "With p", ".X = 5", "ReDim .Items(1 To 2)", "End With",
+            "Debug.Print p.X & \" \" & UBound(p.Items)", "End Sub"));
 
     [TestMethod]
     public async Task AParameter_OfAUserDefinedType_IsPassedWithItsFields()

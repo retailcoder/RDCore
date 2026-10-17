@@ -118,10 +118,12 @@ public sealed class ModuleQualifiedTypeTests
     [TestMethod]
     public async Task AClassModulesType_QualifiedByTheClass_IsTheType()
     {
-        var shapes = ("Shapes", ClassModule("Shapes", "Option Explicit", "Public Type TRec", "X As Long", "End Type", "Public Enum Colours", "cRed = 1", "End Enum"));
+        // a type of a class module is private to it (VBC09338), and is named through the class from within it; an Enum of it can be public, and named from without.
+        var shapes = ("Shapes", ClassModule("Shapes", "Option Explicit", "Private Type TRec", "X As Long", "End Type", "Public Enum Colours", "cRed = 1", "End Enum",
+            "Public Function Three() As Long", "Dim t As Shapes.TRec", "t.X = 3", "Three = t.X", "End Function"));
 
         CollectionAssert.AreEqual(new[] { "3", "2" }, await RunAsync([shapes], Program(
-            "", "Dim t As Shapes.TRec", "Dim e As Shapes.Colours", "t.X = 3", "e = 2", "Debug.Print t.X", "Debug.Print e")));
+            "", "Dim s As New Shapes", "Dim e As Shapes.Colours", "e = 2", "Debug.Print s.Three", "Debug.Print e")));
     }
 
     [TestMethod]

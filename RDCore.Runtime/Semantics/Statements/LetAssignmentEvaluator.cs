@@ -97,7 +97,7 @@ public sealed class LetAssignmentEvaluator(
             ? Assign(session, context, statement, qualified, target, source, value)
             : target is MemberAccessExpressionNode memberAccess
             ? AssignField(session, context, statement, memberAccess, source, value)
-            : IsMemberOfObject(target)
+            : IsMemberOfObject(target) && !IsElementOfAQualifiedArray(session, context, target)
                 ? AssignObjectMember(session, context, statement, target, source, value, isSet: false)
                 : target is IndexExpressionNode element
                     ? AssignArrayElement(session, context, element.Callee, element.Arguments, source, value, isSet: false)
@@ -110,6 +110,10 @@ public sealed class LetAssignmentEvaluator(
 
     // `owner.Property(index) = value`: an index expression whose callee is a member access.
     private static bool IsMemberOfObject(ExpressionNode target) => target is IndexExpressionNode { Callee: MemberAccessExpressionNode };
+
+    // `Module1.Items(1) = value` is an element of the module's array, which the bare name's element is (MS-VBAL §5.6.12): not a member of a value.
+    private bool IsElementOfAQualifiedArray(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode target)
+        => target is IndexExpressionNode { Callee: MemberAccessExpressionNode callee } && expressions.ResolveNamespaceQualified(session, context, callee) is not null;
 
     /// <summary>
     /// Assigns <paramref name="value"/> to an element of an array: <c>a(1, 2) = value</c>, or <c>owner.Items(1) = value</c> when the
