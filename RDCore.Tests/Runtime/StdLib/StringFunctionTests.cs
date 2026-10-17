@@ -106,9 +106,9 @@ public sealed class StringFunctionTests
         => Assert.AreEqual((int)VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, ErrorOf(Module().Repeat(L(3), V(VBObjectValue.Nothing))));
 
     [TestMethod]
-    public void Repeat_OfAnObject_IsError13()
-        // 🚧 an object that is not Nothing: its default member is not read.
-        => Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().Repeat(L(3), V(new VBObjectValue(new VBRuntimeObjectId())))));
+    public void Repeat_OfAnObjectWithNoDefaultMember_IsError438()
+        // an object is its default member's value, which an object of no class has none of (DefaultMemberTests).
+        => Assert.AreEqual((int)VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, ErrorOf(Module().Repeat(L(3), V(new VBObjectValue(new VBRuntimeObjectId())))));
 
     [TestMethod]
     public void Repeat_OfNull_IsNull_WhateverTheNumber()

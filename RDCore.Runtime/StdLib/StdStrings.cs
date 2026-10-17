@@ -1,3 +1,4 @@
+using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics.Conversion;
 using RDCore.Runtime.StdLib.Formatting;
 using RDCore.SDK.Model.Errors;
@@ -44,16 +45,10 @@ namespace RDCore.Runtime.StdLib;
 /// raises error 94.
 /// </para>
 /// <para>
-/// 👉 <c>Nothing</c> given for a <c>Variant</c> parameter is error 91, as its Let-coercion to a value is
-/// (<strong>MS-VBAL §5.5.1.2.13</strong>), and as the call site makes it for a typed parameter.
-/// </para>
-/// <para>
-/// 🚧 An object that is not <c>Nothing</c>, given for a <c>Variant</c> parameter, is a type mismatch: §5.5.1.2.13 would evaluate
-/// its default member, which nothing here can yet. TODO.
-/// </para>
-/// <para>
-/// 🚧 A member whose body returns <see cref="NotImplemented{TValue}"/> is declared and not written yet: the symbol resolves,
-/// the call is well-formed, and the platform has not got the code yet. Those are <c>MonthName</c> and <c>WeekdayName</c>.
+/// 👉 An object given for a <c>Variant</c> parameter is read as its Let-coercion reads it (<strong>MS-VBAL §5.5.1.2.13</strong>):
+/// as its "simple data value", what its default member returns when it is called with no arguments. <c>Nothing</c> is error 91,
+/// as the call site makes it for a typed parameter; an object with no default member that can be called so is error 438; what
+/// the default member raises is raised.
 /// </para>
 /// </remarks>
 /// <param name="session">The session whose environment (regional settings, ANSI code page) and comparison rules these members read.</param>
@@ -70,11 +65,8 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     private const int LowestWideCode = -32768;
 
     /// <summary>
-    /// The error every member that is declared but not written yet returns.
+    /// The error a member returns for what it has no code for yet: <c>Len</c> and <c>LenB</c> of a record with a field they cannot measure.
     /// </summary>
-    /// <remarks>
-    /// TODO the members not written yet: <c>MonthName</c> and <c>WeekdayName</c>.
-    /// </remarks>
     private static RuntimeSemanticsEvaluationResult<TValue> NotImplemented<TValue>(string member)
         where TValue : VBTypedValue
         => RuntimeSemanticsEvaluationResult<TValue>.Error(VBRuntimeErrorInfo.For(
@@ -113,15 +105,13 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         => argument ?? throw new ArgumentNullException(name, "an omitted optional is filled from its declaration before the call reaches its implementation");
 
     // a Variant argument's String, as a String parameter's Let-coercion would give it (MS-VBAL 5.5.1.2.4), in the regional
-    // settings of the session's environment; null for Null, which each member answers for itself. Nothing is error 91. A value
-    // with no String form (an Error, Missing, an array that is not a Byte array, a record) is a type mismatch, and so is an object
-    // that is not Nothing (see the remarks).
+    // settings of the session's environment; null for Null, which each member answers for itself. An object is its simple data
+    // value (TryReadValue). A value with no String form (an Error, Missing, an array that is not a Byte array, a record) is a type
+    // mismatch.
     private bool TryReadString(VBTypedValue argument, string member, string parameter, out VBStringValue? text, [NotNullWhen(false)] out IVBRaisableError? error)
     {
-        var value = Unwrapped(argument);
         text = null;
-        error = NothingFailure(value, member, parameter);
-        if (error is not null)
+        if (!TryReadValue(argument, member, parameter, out var value, out error))
         {
             return false;
         }
@@ -143,13 +133,12 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     }
 
     // a Variant argument's Long, as a Long parameter's Let-coercion would give it (MS-VBAL 5.5.1.2.1): Empty is 0, True -1, a
-    // number or a date rounds to even (6 outside a Long), a numeric String is read as one; Null is 94, Nothing 91, anything else 13.
-    private static bool TryReadLong(VBTypedValue argument, string member, string parameter, out int number, [NotNullWhen(false)] out IVBRaisableError? error)
+    // number or a date rounds to even (6 outside a Long), a numeric String is read as one, an object is its simple data value;
+    // Null is 94, anything else 13.
+    private bool TryReadLong(VBTypedValue argument, string member, string parameter, out int number, [NotNullWhen(false)] out IVBRaisableError? error)
     {
-        var value = Unwrapped(argument);
         number = default;
-        error = NothingFailure(value, member, parameter);
-        if (error is not null)
+        if (!TryReadValue(argument, member, parameter, out var value, out error))
         {
             return false;
         }
@@ -171,11 +160,48 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         return false;
     }
 
-    // Nothing, Let-coerced to a value of any type, is error 91 (MS-VBAL 5.5.1.2.13); null for anything else.
-    private static VBRuntimeErrorInfo? NothingFailure(VBTypedValue value, string member, string parameter)
-        => value is VBObjectValue held && held.IsNothing()
-            ? Failure(VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, member, $"{parameter} is Nothing")
-            : null;
+    // how many default members an argument is read through before it is taken for a chain that never ends in a value.
+    private const int MostDefaultMembers = 64;
+
+    // a Variant argument's value, out of any Variant: an object is its "simple data value" (MS-VBAL 5.5.1.2.13), what its default
+    // member returns when it is called with no arguments, read again while that is an object. Nothing is error 91; an object whose
+    // class has no default member that can be called so is error 438; what the default member raises is its error; and a chain of
+    // default members that does not end in a value is out of stack space, as it is to Let-coercion.
+    private bool TryReadValue(VBTypedValue argument, string member, string parameter, out VBTypedValue value, [NotNullWhen(false)] out IVBRaisableError? error)
+    {
+        value = Unwrapped(argument);
+        for (var depth = 0; value is VBObjectValue reference; depth++)
+        {
+            if (reference.IsNothing())
+            {
+                error = Failure(VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, member, $"{parameter} is Nothing");
+                return false;
+            }
+
+            if (depth == MostDefaultMembers)
+            {
+                error = Failure(VBRuntimeErrorId.OutOfStackSpace, member, $"{parameter}'s default members never return a value that is not an object");
+                return false;
+            }
+
+            if (ObjectDefaultMember.Call(session, reference) is not { } called)
+            {
+                error = Failure(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, member, $"{parameter} is an object with no default member to read its value from");
+                return false;
+            }
+
+            if (called.ErrorInfo is { } raised)
+            {
+                error = raised;
+                return false;
+            }
+
+            value = Unwrapped(called.Result!);
+        }
+
+        error = null;
+        return true;
+    }
 
     // an explicit Compare is vbBinaryCompare or vbTextCompare, and nothing else; an omitted one has already been filled in as one
     // of the two, Option Compare Database resolved, so this never sees a caller's omission.
@@ -623,9 +649,7 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// </remarks>
     public RuntimeSemanticsEvaluationResult<VBStringValue> FormatDateTime(VBVariantValue expression, VBDateTimeFormat namedFormat = VBDateTimeFormat.VBGeneralDate)
     {
-        var value = Unwrapped(expression);
-        var error = NothingFailure(value, nameof(FormatDateTime), "Expression");
-        if (error is not null)
+        if (!TryReadValue(expression, nameof(FormatDateTime), "Expression", out var value, out var error))
         {
             return Fail<VBStringValue>(error);
         }
@@ -758,8 +782,11 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     // read it. Nothing is 91, and anything else - an object, an Error, Missing, another array, a record - has no String form, 13.
     private bool TryReadFormattable(VBVariantValue expression, string member, out VBTypedValue value, [NotNullWhen(false)] out IVBRaisableError? error)
     {
-        value = Unwrapped(expression);
-        error = null;
+        if (!TryReadValue(expression, member, "Expression", out value, out error))
+        {
+            return false;
+        }
+
         if (value is VBNullValue or VBEmptyValue or VBBooleanValue or VBNumericTypedValue or VBDateValue or VBStringValue)
         {
             return true;
@@ -778,10 +805,8 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     // parameter's Let-coercion reads it, in the regional settings; Null is 94, Nothing 91, anything else 13.
     private bool TryReadNumber(VBVariantValue expression, string member, out NumberValue number, [NotNullWhen(false)] out IVBRaisableError? error)
     {
-        var value = Unwrapped(expression);
         number = default;
-        error = NothingFailure(value, member, "Expression");
-        if (error is not null)
+        if (!TryReadValue(expression, member, "Expression", out var value, out error))
         {
             return false;
         }
@@ -1246,7 +1271,25 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         return InVariant(rest[..Math.Min(count ?? rest.Length, rest.Length)].ToString());
     }
 
-    public RuntimeSemanticsEvaluationResult<VBStringValue> MonthName(VBLongValue month, VBBooleanValue? abbreviate = default) => NotImplemented<VBStringValue>(nameof(MonthName));
+    /// <inheritdoc/>
+    /// <remarks>
+    /// "A String indicating the specified month": its name in the regional settings of the session's environment, and in the
+    /// session's calendar, as <c>Format</c>'s <c>mmmm</c> and <c>mmm</c> write it, so under the Hijri calendar the 9th month is
+    /// Ramadan, whose name has no abbreviation. 👉 A Month other than 1 to 12 is error 5.
+    /// </remarks>
+    public RuntimeSemanticsEvaluationResult<VBStringValue> MonthName(VBLongValue month, VBBooleanValue? abbreviate = default)
+    {
+        var number = month.Value;
+        if (number is < 1 or > 12)
+        {
+            return Fail<VBStringValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(MonthName), $"Month is 1 to 12, not {number}");
+        }
+
+        var dates = CalendarFormats.Of(session.Environment.Culture, session.Clock.Calendar);
+        return Succeed(new VBStringValue((bool)Given(abbreviate).Value && dates.Calendar is not HijriCalendar
+            ? dates.GetAbbreviatedMonthName(number)
+            : dates.GetMonthName(number)));
+    }
 
     /// <inheritdoc/>
     /// <remarks>
@@ -1541,14 +1584,22 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// <para>
     /// 👉 <c>vbUnicode</c> converts first and <c>vbFromUnicode</c> last, so a case conversion sees the characters the bytes are and
     /// is what gets written; <c>vbProperCase</c> also lowercases the rest of each word, and starts none after punctuation, a
-    /// no-break space or an ideographic space. Both conversions of a pair (<c>vbWide</c> and <c>vbNarrow</c>, <c>vbKatakana</c>
+    /// no-break space, or an ideographic space outside an East Asian locale. Both conversions of a pair (<c>vbWide</c> and <c>vbNarrow</c>, <c>vbKatakana</c>
     /// and <c>vbHiragana</c>, <c>vbUnicode</c> and <c>vbFromUnicode</c>), a Conversion outside 0 to 255, and a LocaleID that names
     /// no locale are error 5.
     /// </para>
     /// <para>
-    /// 🚧 <c>vbWide</c>, <c>vbNarrow</c>, <c>vbKatakana</c> and <c>vbHiragana</c> are error 5 in every locale: they "cause
-    /// run-time errors when used in locales where they do not apply", and where they do apply, East Asian and Japanese
-    /// locales, they are not implemented. TODO.
+    /// <c>vbWide</c> and <c>vbNarrow</c> convert between narrow characters and their wide forms, and <c>vbKatakana</c> and
+    /// <c>vbHiragana</c> between the two Japanese syllabaries (<see cref="EastAsianText"/>). They "cause run-time errors when used in
+    /// locales where they do not apply": the first two apply to "East Asia locales", which are read as the Chinese, Japanese and
+    /// Korean ones, and the other two to "Japan only", which is read as the Japanese ones; elsewhere they are error 5. In those
+    /// locales "the actual value for a space varies [...] for DBCS": the ideographic space separates words for <c>vbProperCase</c>
+    /// as a space does.
+    /// </para>
+    /// <para>
+    /// 👉 The conversions are made in one order, whatever their sum: <c>vbUnicode</c>, the case, <c>vbWide</c>, <c>vbKatakana</c> or
+    /// <c>vbHiragana</c>, <c>vbNarrow</c>, then <c>vbFromUnicode</c>; so a halfwidth katakana widened is a katakana the syllabary
+    /// conversion sees, and a hiragana made a katakana can be narrowed.
     /// </para>
     /// </remarks>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> StrConv(VBVariantValue @string, VBStrConv conversion, VBLongValue? localeID = default)
@@ -1578,11 +1629,6 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             }
         }
 
-        if ((settings & (int)EastAsianConversions) != 0)
-        {
-            return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), "vbWide, vbNarrow, vbKatakana and vbHiragana are not implemented");
-        }
-
         // LocaleID has no default: left out, it is null, and 0 is the environment's locale too.
         var culture = session.Environment.Culture;
         if (localeID is { Value: not 0 and var lcid })
@@ -1595,6 +1641,18 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             {
                 return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), $"LocaleID {lcid} names no locale");
             }
+        }
+
+        var language = culture.TwoLetterISOLanguageName;
+        var isEastAsian = language is "ja" or "zh" or "ko";
+        if ((settings & (int)(VBStrConv.VBWide | VBStrConv.VBNarrow)) != 0 && !isEastAsian)
+        {
+            return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), $"vbWide and vbNarrow apply to East Asian locales, not {culture.Name}");
+        }
+
+        if ((settings & (int)(VBStrConv.VBKatakana | VBStrConv.VBHiragana)) != 0 && language != "ja")
+        {
+            return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), $"vbKatakana and vbHiragana apply to Japanese locales, not {culture.Name}");
         }
 
         if (settings == 0)
@@ -1610,9 +1668,15 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         {
             VBStrConv.VBUpperCase => casing.ToUpper(converted),
             VBStrConv.VBLowerCase => casing.ToLower(converted),
-            VBStrConv.VBProperCase => ProperCased(converted, casing),
+            VBStrConv.VBProperCase => ProperCased(converted, casing, isEastAsian),
             _ => converted,
         };
+
+        converted = (settings & (int)VBStrConv.VBWide) != 0 ? EastAsianText.Widen(converted) : converted;
+        converted = (settings & (int)VBStrConv.VBKatakana) != 0 ? EastAsianText.ToKatakana(converted)
+            : (settings & (int)VBStrConv.VBHiragana) != 0 ? EastAsianText.ToHiragana(converted)
+            : converted;
+        converted = (settings & (int)VBStrConv.VBNarrow) != 0 ? EastAsianText.Narrowed(converted) : converted;
 
         return (settings & (int)VBStrConv.VBFromUnicode) != 0
             ? InVariant(VBStringValue.FromBytes(ansi.GetBytes(converted)))
@@ -1627,20 +1691,21 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         (VBStrConv.VBUnicode | VBStrConv.VBFromUnicode, "vbUnicode and vbFromUnicode"),
     ];
 
-    private const VBStrConv EastAsianConversions = VBStrConv.VBWide | VBStrConv.VBNarrow | VBStrConv.VBKatakana | VBStrConv.VBHiragana;
-
     // "the valid word separators for proper casing: Null (Chr$(0)), horizontal tab (Chr$(9)), linefeed (Chr$(10)), vertical tab
     // (Chr$(11)), form feed (Chr$(12)), carriage return (Chr$(13)), space (SBCS) (Chr$(32))".
     private const string WordSeparators = "\0\t\n\v\f\r ";
 
+    // the space of a double-byte character set, which separates words in an East Asian locale.
+    private const char IdeographicSpace = '\u3000';
+
     // vbProperCase: each word's first character up and every other one down, a word beginning where the String does and after
     // a word separator, and nowhere else.
-    private static string ProperCased(string text, TextInfo casing)
+    private static string ProperCased(string text, TextInfo casing, bool isEastAsian)
     {
         var characters = casing.ToLower(text).ToCharArray();
         for (var index = 0; index < characters.Length; index++)
         {
-            if (index == 0 || WordSeparators.Contains(characters[index - 1]))
+            if (index == 0 || WordSeparators.Contains(characters[index - 1]) || isEastAsian && characters[index - 1] == IdeographicSpace)
             {
                 characters[index] = casing.ToUpper(characters[index]);
             }
@@ -1666,10 +1731,11 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     {
         const string member = "String";
 
-        // the coercion first: a String is read for its first character, and anything else but Null as a code.
-        var value = Unwrapped(character);
+        // the coercion first: a String is read for its first character, and anything else but Null as a code; an object is its
+        // simple data value, read so.
         var code = 0;
-        if (value is not (VBStringValue or VBNullValue) && !TryReadLong(value, member, "Character", out code, out var mismatch))
+        if (!TryReadValue(character, member, "Character", out var value, out var mismatch)
+            || value is not (VBStringValue or VBNullValue) && !TryReadLong(value, member, "Character", out code, out mismatch))
         {
             return Fail<VBVariantValue>(mismatch);
         }
@@ -1739,6 +1805,28 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult<VBStringValue> UCaseString(VBVariantValue @string) => Twin("UCase$", UCase(@string));
 
-    public RuntimeSemanticsEvaluationResult<VBStringValue> WeekdayName( VBLongValue weekday, VBBooleanValue? abbreviate = default, VBDayOfWeek firstDayOfWeek = VBDayOfWeek.VBUseSystemDayOfWeek) => NotImplemented<VBStringValue>(nameof(WeekdayName));
+    /// <inheritdoc/>
+    /// <remarks>
+    /// "A String indicating the specified day of the week", Weekday counted from FirstDayOfWeek as 1, as <c>Weekday</c> counts it: its
+    /// name in the regional settings of the session's environment, as <c>Format</c>'s <c>dddd</c> and <c>ddd</c> write it.
+    /// FirstDayOfWeek left out is the declared <c>vbUseSystemDayOfWeek</c>, the first day of the week of those regional settings.
+    /// 👉 A Weekday other than 1 to 7, and a FirstDayOfWeek that is no value of its enumeration, are error 5, in that order.
+    /// </remarks>
+    public RuntimeSemanticsEvaluationResult<VBStringValue> WeekdayName(VBLongValue weekday, VBBooleanValue? abbreviate = default, VBDayOfWeek firstDayOfWeek = VBDayOfWeek.VBUseSystemDayOfWeek)
+    {
+        var number = weekday.Value;
+        if (number is < 1 or > 7)
+        {
+            return Fail<VBStringValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(WeekdayName), $"Weekday is 1 to 7, not {number}");
+        }
+
+        if (!TryFormatSettings(nameof(WeekdayName), firstDayOfWeek, VBFirstWeekOfYear.VBFirstJan1, out var settings, out var error))
+        {
+            return Fail<VBStringValue>(error);
+        }
+
+        var day = (DayOfWeek)(((int)settings.FirstDayOfWeek + number - 1) % 7);
+        return Succeed(new VBStringValue((bool)Given(abbreviate).Value ? settings.Dates.GetAbbreviatedDayName(day) : settings.Dates.GetDayName(day)));
+    }
 
 }

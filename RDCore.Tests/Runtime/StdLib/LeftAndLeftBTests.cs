@@ -103,9 +103,9 @@ public sealed class LeftAndLeftBTests
     }
 
     [TestMethod]
-    public void Left_OfAnObject_IsError13()
-        // 🚧 an object that is not Nothing: its default member is not read.
-        => Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().Left(V(new VBObjectValue(new VBRuntimeObjectId())), L(1))));
+    public void Left_OfAnObjectWithNoDefaultMember_IsError438()
+        // an object is its default member's value, which an object of no class has none of (DefaultMemberTests).
+        => Assert.AreEqual((int)VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, ErrorOf(Module().Left(V(new VBObjectValue(new VBRuntimeObjectId())), L(1))));
 
     [TestMethod]
     public void Left_FromSource_TakesItsLengthLetCoerced()

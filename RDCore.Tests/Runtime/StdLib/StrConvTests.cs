@@ -7,7 +7,8 @@ namespace RDCore.Tests.Runtime.StdLib;
 
 /// <summary>
 /// <strong>MS-VBAL §6.1.2.11.1.37 StrConv</strong>: a String cased, or read from or written to the environment's ANSI code page,
-/// as a sum of <see cref="VBStrConv"/> values says; the East Asian width and kana conversions are not implemented.
+/// as a sum of <see cref="VBStrConv"/> values says, and between narrow and wide characters, hiragana and katakana, in the locales
+/// those conversions apply to.
 /// </summary>
 [TestClass]
 [TestCategory("MS-VBAL 6.1.2.11.1.37 StrConv")]
@@ -99,15 +100,62 @@ public sealed class StrConvTests
     [DataRow(8, 0)]
     [DataRow(16, 0)]
     [DataRow(32, 0)]
-    [DataRow(4, 1041)]
-    [DataRow(16, 1041)]
-    [DataRow(3 + 4, 1041)]
-    public void StrConv_TheEastAsianConversions_AreError5_InEveryLocale(int conversion, int lcid)
-    {
-        var result = Module().StrConv(V("abc"), Conversion(conversion), lcid == 0 ? null : L(lcid));
+    [DataRow(4, 1033)]
+    [DataRow(8, 1036)]
+    [DataRow(16, 2052)]
+    [DataRow(32, 1042)]
+    public void StrConv_TheEastAsianConversions_AreError5_WhereTheyDoNotApply(int conversion, int lcid)
+        => Assert.AreEqual(InvalidProcedureCall, ErrorOf(Module().StrConv(V("abc"), Conversion(conversion), lcid == 0 ? null : L(lcid))));
 
-        Assert.AreEqual(InvalidProcedureCall, ErrorOf(result));
-        StringAssert.Contains(result.ErrorInfo!.Verbose, "not implemented");
+    private const int Japanese = 1041;
+
+    [TestMethod]
+    [DataRow("abc 123!~", "ａｂｃ　１２３！～")]
+    [DataRow("ｶﾞｷﾞﾊﾟﾝ ｳﾞ", "ガギパン　ヴ")]
+    [DataRow("｢ｱｲｳ｣､｡･ｰ", "「アイウ」、。・ー")]
+    [DataRow("ﾞ", "゛")]
+    [DataRow("¥¢", "￥￠")]
+    [DataRow("ひらがな漢字", "ひらがな漢字")]
+    public void StrConv_Wide_WidensTheNarrowCharacters(string text, string expected)
+        => Assert.AreEqual(expected, TextOf(Module(Japanese).StrConv(V(text), VBStrConv.VBWide)));
+
+    [TestMethod]
+    [DataRow("ａｂｃ　１２３！～", "abc 123!~")]
+    [DataRow("ガギパン　ヴ", "ｶﾞｷﾞﾊﾟﾝ ｳﾞ")]
+    [DataRow("「アイウ」、。・ー", "｢ｱｲｳ｣､｡･ｰ")]
+    [DataRow("ひらがな漢字", "ひらがな漢字")]
+    public void StrConv_Narrow_NarrowsTheWideCharacters(string text, string expected)
+        => Assert.AreEqual(expected, TextOf(Module(Japanese).StrConv(V(text), VBStrConv.VBNarrow)));
+
+    [TestMethod]
+    public void StrConv_KatakanaAndHiragana_ConvertBetweenTheSyllabaries()
+    {
+        Assert.AreEqual("ヒラガナ ヴヽ", TextOf(Module(Japanese).StrConv(V("ひらがな ゔゝ"), VBStrConv.VBKatakana)));
+        Assert.AreEqual("かたかな ゔゞ ヷ", TextOf(Module(Japanese).StrConv(V("カタカナ ヴヾ ヷ"), VBStrConv.VBHiragana)));
+        Assert.AreEqual("ｶﾀｶﾅ", TextOf(Module(Japanese).StrConv(V("ｶﾀｶﾅ"), VBStrConv.VBHiragana)), "a halfwidth katakana has no hiragana");
+    }
+
+    [TestMethod]
+    public void StrConv_TheConversions_AreMadeInOneOrder()
+    {
+        Assert.AreEqual("かたかな", TextOf(Module(Japanese).StrConv(V("ｶﾀｶﾅ"), VBStrConv.VBWide | VBStrConv.VBHiragana)), "widened, then a hiragana");
+        Assert.AreEqual("ﾋﾗｶﾞﾅ", TextOf(Module(Japanese).StrConv(V("ひらがな"), VBStrConv.VBKatakana | VBStrConv.VBNarrow)), "a katakana, then narrowed");
+        Assert.AreEqual("ＡＢＣ", TextOf(Module(Japanese).StrConv(V("abc"), VBStrConv.VBUpperCase | VBStrConv.VBWide)));
+    }
+
+    [TestMethod]
+    public void StrConv_TheLocale_IsLocaleIDsOrTheEnvironments()
+    {
+        Assert.AreEqual("ａｂｃ", TextOf(Module().StrConv(V("abc"), VBStrConv.VBWide, L(2052))), "Chinese is an East Asian locale");
+        Assert.AreEqual("ㄱ", TextOf(Module().StrConv(V("\uFFA1"), VBStrConv.VBWide, L(1042))), "so is Korean, whose halfwidth Hangul widens");
+        Assert.AreEqual(InvalidProcedureCall, ErrorOf(Module(Japanese).StrConv(V("abc"), VBStrConv.VBWide, L(1033))));
+    }
+
+    [TestMethod]
+    public void StrConv_ProperCase_InAnEastAsianLocale_StartsAWordAfterAnIdeographicSpace()
+    {
+        Assert.AreEqual("Abc\u3000Def", TextOf(Module(Japanese).StrConv(V("abc\u3000def"), VBStrConv.VBProperCase)));
+        Assert.AreEqual("Abc\u3000def", TextOf(Module(1033).StrConv(V("abc\u3000def"), VBStrConv.VBProperCase)));
     }
 
     [TestMethod]
