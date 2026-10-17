@@ -1307,8 +1307,14 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         var typeText = type.GetText();
 
         // `type` is `(baseType | complexType) ( '(' ')' )?` — keep the trailing array-of `()`
-        // (`As Long()`) off the name; IsArrayDef carries it.
-        if (type.LPAREN() is not null && typeText.IndexOf('(') is var paren and >= 0)
+        // (`As Long()`) off the name; IsArrayDef carries it. A name that is no keyword - a class, Object,
+        // a qualified type - is a complexType, whose lExpression reads `Widget()` as an index expression
+        // with no argument before the trailing `()` can match: that empty index is the array-of `()` too.
+        var isArrayOfAComplexType = type.LPAREN() is null
+            && type.complexType() is VBAParser.CtLExprContext complex
+            && complex.lExpression() is VBAParser.IndexExprContext index
+            && string.IsNullOrWhiteSpace(index.argumentList()?.GetText());
+        if ((type.LPAREN() is not null || isArrayOfAComplexType) && typeText.LastIndexOf('(') is var paren and >= 0)
         {
             typeText = typeText[..paren].TrimEnd();
         }
@@ -1332,7 +1338,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
 
         OnExpression(new AsTypeExpressionNode(GetCurrentNodeId(), location, name, qualifier,
             AsAutoObject: context.NEW() is not null,
-            IsArrayDef: type.LPAREN() is not null,
+            IsArrayDef: type.LPAREN() is not null || isArrayOfAComplexType,
             FixedLength: length));
     }
 

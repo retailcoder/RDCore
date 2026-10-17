@@ -40,7 +40,7 @@ public record class LetCoercionStaticSemantics : StaticSemantics
         VBClassType type when type.DefaultMember is null || IsLetCoercionInvalid(type.DefaultMember.ResolvedType, destination) => true,
         VBFixedSizeArrayType or VBResizableArrayType and not VBResizableByteArrayType
             when destination is not VBVariantType && (destination is not VBArrayType
-                || destination is VBResizableArrayType dstArray && source is VBArrayType srcArray && dstArray.ItemType != srcArray.ItemType) => true,
+                || destination is VBResizableArrayType dstArray && source is VBArrayType srcArray && !IsSameItemType(dstArray.ItemType, srcArray.ItemType)) => true,
         VBUserDefinedType srcUdt when destination is not VBVariantType
             && (destination is not VBUserDefinedType || destination is VBUserDefinedType dstUdt && !srcUdt.Equals(dstUdt)) => true,
         VBUserDefinedType and not VBExternalUserDefinedType when destination is VBVariantType => true,
@@ -60,6 +60,14 @@ public record class LetCoercionStaticSemantics : StaticSemantics
 
         _ => false
     };
+
+    // the element types of two arrays are the same type when they are: a class is the same class when it is the same class module, whichever of
+    // the records that describe it each array was declared with - one built when the module's symbols were read, another when a declaration's
+    // type was resolved - and which differ in what they carry (its members) while naming the one class.
+    private static bool IsSameItemType(VBType left, VBType right)
+        => left is VBClassType leftClass && right is VBClassType rightClass
+            ? string.Equals(leftClass.Symbol.Uri.AbsoluteUri, rightClass.Symbol.Uri.AbsoluteUri, StringComparison.Ordinal)
+            : left == right;
 
     /// <summary>
     /// Helper function to twist the rules exactly in the same manner they're specified.
