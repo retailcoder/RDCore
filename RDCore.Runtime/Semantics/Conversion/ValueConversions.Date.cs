@@ -46,16 +46,18 @@ public static partial class ValueConversions
     /// </summary>
     /// <remarks>
     /// <c>IsDate</c> asks this alone: a string that is a date only by being a number is not one to it.
+    /// <para>
+    /// The string is read by the grammar of a date literal, <c>date-or-time</c> (<strong>MS-VBAL §3.3.3</strong>), without its <c>#</c> delimiters - which is
+    /// what MS-VBA does (recorded in Excel): a month and a day are told apart by which of them can be a month, a comma is a date separator, a dot is a
+    /// time separator (<c>1.5</c> is 1:05), and the month names are English. The year a date without one is in is the current year.
+    /// </para>
     /// </remarks>
     /// <param name="text">The string.</param>
     /// <param name="date">The date it reads as, when it reads as one.</param>
     /// <returns><see langword="false"/> when the string is not a date or a time.</returns>
     public static bool TryInterpretDate(string? text, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out VBDateValue? date)
     {
-        // 🚧 TODO MS-VBA reads a date string by the host's regional settings and its own grammar (day/month order swapped when the
-        // month would be out of range, a month name anywhere, two-part dates without a year, and more): .NET's invariant parse is an
-        // approximation of it, which disagrees on a few strings.
-        date = DateTime.TryParse(text, CultureInfo.InvariantCulture, out var dateValue) ? new VBDateValue(dateValue.ToOADate()) : null;
+        date = text is not null && DateGrammar.TryRead(text, DateTime.Today.Year, out var value) ? new VBDateValue(value.ToOADate()) : null;
         return date is not null;
     }
 
