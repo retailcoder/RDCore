@@ -125,9 +125,19 @@ public sealed class IsMissingTests
             "Private Sub Arr(Optional a As Variant)\r\n    Debug.Print IsMissing(a) & \" \" & TypeName(a)\r\nEnd Sub",
             "Arr Array()"));
 
+    // MS-VBA refuses a ParamArray as the argument of a ByRef parameter of a procedure of the code's own, as a compile error (recorded in Excel).
     [TestMethod]
-    [Ignore("A variable declared as a Variant array is passed to IsMissing by reference, and MS-VBA does not read an empty one as missing; " +
-        "the standard library's arguments arrive as values, so StdInformation.IsMissing cannot tell it from Array() itself.")]
+    [Ignore("VBC09305 Invalid ParamArray use is not issued: a ParamArray passed to a ByRef parameter of the workspace's code compiles, and is passed as a value.")]
+    public async Task AParamArray_PassedToAByRefParameter_IsInvalidParamArrayUse()
+    {
+        var errors = await RDCore.Tests.Cli.ModuleWorkspace.LoadErrorsAsync([],
+            "Attribute VB_Name = \"Program\"\r\nPrivate Sub Outer(ParamArray p() As Variant)\r\n    Inner p\r\nEnd Sub\r\nPrivate Sub Inner(ByRef a As Variant)\r\nEnd Sub\r\n");
+
+        StringAssert.Contains(Assert.ContainsSingle(errors), SDK.Exceptions.VBCompileError_InvalidParamArrayUse);
+    }
+
+    // a variable declared as a Variant array is passed to IsMissing by reference, as the array it is, and MS-VBA does not read an empty one as missing.
+    [TestMethod]
     public async Task AnEmptyArrayInAVariableDeclaredAsAVariantArray_IsNotMissing()
         => CollectionAssert.AreEqual(new[] { "False" }, await Run(string.Empty, "Dim e() As Variant", "e = Array()", "Debug.Print IsMissing(e)"));
 

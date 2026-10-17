@@ -210,12 +210,13 @@ public interface IStdInformationModule
     /// 🎯 <strong>A <c>Variant</c> array with no elements is missing too.</strong> The specification says <c>IsMissing</c> "always returns
     /// <c>False</c>" for a <c>ParamArray</c>; MS-VBA returns <c>True</c> for one that collected no arguments, and for any other
     /// zero-element <c>Variant</c> array it is given - <c>IsMissing(Array())</c> - and so does RD-VBA. A <c>ParamArray</c> that
-    /// collected any argument is not missing.
+    /// collected any argument is not missing. Nor is a variable declared as an array (<c>Dim e() As Variant</c>), which is passed by reference as the
+    /// array it is (<see cref="StdLibByRefAttribute"/>), and not as a <c>Variant</c> that holds one: <c>False</c> for an empty one, in MS-VBA.
     /// </para>
     /// </remarks>
     /// <param name="arg">The data value to be tested</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBBooleanValue> IsMissing(VBVariantValue arg);
+    RuntimeSemanticsEvaluationResult<VBBooleanValue> IsMissing([StdLibByRef] VBVariantValue arg);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.7.1.7 IsNull</strong>

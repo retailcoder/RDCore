@@ -368,8 +368,8 @@ public sealed class StdLibSymbolReader
         foreach (var parameter in parameters)
         {
             var name = StdLibNames.ParameterName(parameter.Name);
-            var byRef = parameter.ParameterType.IsByRef;
-            var declared = byRef ? parameter.ParameterType.GetElementType()! : parameter.ParameterType;
+            var declared = parameter.ParameterType.IsByRef ? parameter.ParameterType.GetElementType()! : parameter.ParameterType;
+            var byRef = parameter.ParameterType.IsByRef || parameter.GetCustomAttribute<StdLibByRefAttribute>() is not null;
             var array = parameter.GetCustomAttribute<StdLibArrayAttribute>();
             var paramArray = parameter.GetCustomAttribute<ParamArrayAttribute>() is not null;
 

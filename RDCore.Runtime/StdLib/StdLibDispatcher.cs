@@ -134,7 +134,7 @@ public sealed class StdLibDispatcher : IExternalCallProvider
             return NotImplemented(request, "nothing implements it yet");
         }
 
-        if (!TryMarshalArguments(method, request, out var arguments))
+        if (!TryMarshalArguments(method, request, resolver, out var arguments))
         {
             return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
                 VBRuntimeErrorId.InvalidProcedureCallOrArgument, request.CallSite,
@@ -165,9 +165,27 @@ public sealed class StdLibDispatcher : IExternalCallProvider
             VBRuntimeErrorId.ApplicationDefinedOrObjectDefinedError, request.CallSite,
             $"'{request.Member.Name}' could not be called: {because}."));
 
+    // a variable passed to a ByRef parameter (StdLibByRefAttribute) arrives as its address: what the member is given is the value the variable holds, read
+    // as the variable is declared - a Variant, or what a Variant parameter was given instead (VBRuntimeReference.DeclaredType), which it is told of.
+    private static bool TryDereference(
+        IRuntimeValue argument, ParameterInfo parameter, VBParameterSymbol? symbol, ISymbolResolver resolver, out object? marshalled)
+    {
+        marshalled = null;
+        if (argument is not VBRuntimeReference reference || symbol is null || !resolver.TryRead(reference.Value, out var handle))
+        {
+            return false;
+        }
+
+        var value = (reference.DeclaredType ?? symbol.ResolvedType).CreateValue(handle);
+        marshalled = parameter.ParameterType == typeof(VBVariantValue)
+            ? (value as VBVariantValue ?? new VBVariantValue(value)) with { ReferencedType = reference.DeclaredType }
+            : value;
+        return parameter.ParameterType.IsInstanceOfType(marshalled);
+    }
+
     // the reader built each parameter's declared type from the method's own, so this runs that backwards: a
     // VBTypedValue parameter takes the argument as it is, and a CLR enum parameter takes its numeric value.
-    private static bool TryMarshalArguments(MethodInfo method, ExternalCallRequest request, out object?[] arguments)
+    private static bool TryMarshalArguments(MethodInfo method, ExternalCallRequest request, ISymbolResolver resolver, out object?[] arguments)
     {
         var parameters = method.GetParameters();
         arguments = new object?[parameters.Length];
@@ -199,6 +217,16 @@ public sealed class StdLibDispatcher : IExternalCallProvider
             if (index >= supplied.Length || (parameter.IsOptional && TypedValue(supplied[index]) is VBMissingValue))
             {
                 if (!TryOmit(parameter, index < symbols.Length ? symbols[index] : null, out arguments[index]))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (supplied[index] is VBRuntimeReference)
+            {
+                if (!TryDereference(supplied[index], parameter, index < symbols.Length ? symbols[index] : null, resolver, out arguments[index]))
                 {
                     return false;
                 }

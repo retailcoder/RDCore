@@ -99,12 +99,13 @@ public sealed class StdInformation(IRuntimeSession session) : IStdInformationMod
     public RuntimeSemanticsEvaluationResult<VBBooleanValue> IsError(VBVariantValue arg)
         => Test(arg, value => value is VBErrorValue);
 
-    // a zero-element Variant array is how a ParamArray that collected nothing arrives, and MS-VBA says it is missing.
+    // a zero-element Variant array is how a ParamArray that collected nothing arrives, and MS-VBA says it is missing - but not one a variable declared as an
+    // array holds, which is passed by reference as the array it is (StdLibByRefAttribute).
     public RuntimeSemanticsEvaluationResult<VBBooleanValue> IsMissing(VBVariantValue arg)
         => Answer(Unwrapped(arg) switch
         {
             VBMissingValue => true,
-            VBArrayValue { Length: 0, IsInitialized: true, ItemType: VBVariantType } => true,
+            VBArrayValue { Length: 0, IsInitialized: true, ItemType: VBVariantType } => arg.ReferencedType is not VBArrayType,
             _ => false,
         });
 

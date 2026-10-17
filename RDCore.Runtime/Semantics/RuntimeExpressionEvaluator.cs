@@ -2055,7 +2055,9 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         }
 
         var named = qualified ?? session.Symbols.Resolver.ResolveValue((SimpleNameExpressionNode)argument, ScopeKind.Local, context.Scope).Symbol;
-        if (named is not { } argumentSymbol || argumentSymbol is not ITypedSymbol typed
+        // a ParamArray is never passed by reference: MS-VBA refuses it as an argument of a ByRef parameter ("Invalid ParamArray use"), and passes it to the
+        // library as a value - IsMissing of one that collected nothing is True (recorded in Excel).
+        if (named is not { } argumentSymbol || argumentSymbol is ParamArrayParameterSymbol || argumentSymbol is not ITypedSymbol typed
             || (!IsOfDeclaredType(parameter, typed.ResolvedType) && parameter.ResolvedType is not VBVariantType))
         {
             return false;

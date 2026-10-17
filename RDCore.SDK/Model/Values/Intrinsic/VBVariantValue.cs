@@ -22,6 +22,13 @@ public record class VBVariantValue : VBTypedValue, IVBTypedValue<VBVariantValue,
     public VBTypedValue TypedValue { get; init; }
 
     /// <summary>
+    /// The declared type of the variable this is the value of, when it was passed by reference to a <c>Variant</c> parameter of the standard library
+    /// and is declared as another type - an array, a number - which MS-VBA tells apart from a <c>Variant</c> that holds the same value
+    /// (<see cref="Runtime.Abstract.StdLib.StdLibByRefAttribute"/>); <see langword="null"/> otherwise.
+    /// </summary>
+    public Types.Abstract.VBType? ReferencedType { get; init; }
+
+    /// <summary>
     /// Creates a Variant wrapping <paramref name="typedValue"/>, self-consistently bound: its own
     /// <see cref="VBTypedValue.Handle"/> boxes <paramref name="typedValue"/> directly, so reading this
     /// value straight back through <see cref="VBTypedValue.RuntimeValue"/> never throws.
