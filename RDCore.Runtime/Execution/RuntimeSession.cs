@@ -44,6 +44,7 @@ internal sealed class RuntimeSession(
     public ISessionErrorState Errors { get; init; } = errors;
     public IFileChannels Files { get; init; } = files;
     public ISessionClock Clock { get; init; } = new SessionClock(TimeProvider.System);
+    public ISessionRandomNumberGenerator RandomNumbers { get; init; } = new SessionRandomNumberGenerator();
     public ICallStack CallStack { get; init; } = callStack;
     public ISessionHalt Halt { get; init; } = halt;
     public IReadOnlyList<ReferencePriorityInfo> References { get; init; } = references;
