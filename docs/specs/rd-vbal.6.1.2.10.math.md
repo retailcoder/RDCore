@@ -14,7 +14,10 @@ errors, and the whole of `Rnd` and `Randomize` are left to the implementation. R
 in Excel (64-bit, en-US), and the notes below say what that is.
 
 An argument declared `Double` is Let-coerced to `Double` by the call, before the function sees it: `Null` is error 94,
-a string that is not a number is error 13, and `Empty` is `0`.
+a string that is not a number is error 13, and `Empty` is `0`. An object, given to any parameter, is read as its
+simple data value - what its default member returns - as for the `Conversion` module
+([**RD-VBAL §6.1.2.3** An object argument](rd-vbal.6.1.2.3.conversion-module.md#an-object-argument)): `Abs` of an
+object whose default member returns `Null` is `Null`, and `Nothing` is error 91.
 
 ## 6.1.2.10.1 Public Functions
 

@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
@@ -84,6 +85,69 @@ internal static class ObjectDefaultMember
 
         arguments = filled;
         return null;
+    }
+
+    // how many objects deep a default member that returns an object is followed, before it is taken for one that never stops returning one.
+    private const int DeepestDefaultMember = 64;
+
+    /// <summary>
+    /// The value a standard-library function reads of its argument: the argument itself, unless it is an object, which stands for its
+    /// <em>simple data value</em> (<strong>MS-VBAL §5.5.1.2.13</strong>).
+    /// </summary>
+    /// <remarks>
+    /// A function that computes with the value of a <c>Variant</c> argument - <c>CInt</c>, <c>Abs</c>, <c>Round</c> - is given an object as it
+    /// is, a <c>Variant</c> holding objects as well as values; the Let-coercion its declared <c>Variant</c> parameter does not do is this one.
+    /// It is what MS-VBA does (recorded in Excel): <c>Nothing</c> is error 91, an object with no default member that can be called with no
+    /// arguments is error 438, and an error the default member raises is the function's. A default member that returns an object stands for
+    /// that object's simple data value in turn, as Let-coercing the object it returned would make it; MS-VBA raises error 51 instead, an
+    /// internal error, which RD-VBA never raises for a specified input.
+    /// </remarks>
+    /// <param name="session">The session the object lives in.</param>
+    /// <param name="argument">The argument, as the function was given it.</param>
+    /// <returns>The value, never an object or a <c>Variant</c>; or the error reading it raised.</returns>
+    public static RuntimeSemanticsEvaluationResult ValueOf(IRuntimeSession session, VBTypedValue argument)
+    {
+        var value = Unwrapped(argument);
+        for (var depth = 0; value is VBObjectValue reference; depth++)
+        {
+            if (reference.IsNothing())
+            {
+                return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, default,
+                    "Nothing has no value."));
+            }
+
+            if (depth == DeepestDefaultMember)
+            {
+                return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.OutOfStackSpace, default,
+                    $"A default member returned an object whose default member returned an object, {DeepestDefaultMember} times."));
+            }
+
+            if (Call(session, reference) is not { } called)
+            {
+                return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, default,
+                    "The object has no default member that can be called with no arguments."));
+            }
+
+            if (!called.IsSuccess)
+            {
+                return called;
+            }
+
+            value = Unwrapped(called.Result!);
+        }
+
+        return RuntimeSemanticsEvaluationResult.Success(value);
+    }
+
+    // a Variant holds whatever it was given, another Variant included, so this goes all the way down.
+    private static VBTypedValue Unwrapped(VBTypedValue value)
+    {
+        while (value is VBVariantValue { TypedValue: var wrapped })
+        {
+            value = wrapped;
+        }
+
+        return value;
     }
 
     /// <summary>

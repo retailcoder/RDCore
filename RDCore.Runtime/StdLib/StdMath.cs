@@ -1,5 +1,7 @@
+using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics.Conversion;
 using RDCore.SDK.Model.Errors;
+using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values;
@@ -28,8 +30,8 @@ namespace RDCore.Runtime.StdLib;
 /// a tangent close to a pole, its last digits differ - which are the digits the specification's "the sine of an angle" does not have.
 /// </para>
 /// <para>
-/// 🚧 An object argument raises Type mismatch rather than being read through its default member (<strong>MS-VBAL §5.5.1.2.13</strong>), as with the
-/// <c>Conversion</c> module (<see cref="StdConversion"/>). TODO.
+/// An object argument stands for its simple data value (<strong>MS-VBAL §5.5.1.2.13</strong>), read through its default member
+/// (<see cref="ObjectDefaultMember.ValueOf"/>): <c>Abs</c> of an object whose default member returns <c>Null</c> is <c>Null</c>, as in MS-VBA.
 /// </para>
 /// </remarks>
 /// <param name="session">The session whose random-number generator <see cref="Rnd"/> and <see cref="Randomize"/> use, and whose clock seeds it.</param>
@@ -57,7 +59,11 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> Abs(VBVariantValue Number)
     {
-        var source = Unwrapped(Number);
+        if (!TryRead(Number, out var source, out var unreadable))
+        {
+            return RuntimeSemanticsEvaluationResult<VBVariantValue>.Error(unreadable!);
+        }
+
         switch (source)
         {
             // "If Number is the data value Null, returns Null."
@@ -137,9 +143,16 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
     {
         // "Not supplied: The next random number in the sequence." - as for any number greater than zero.
         var number = 1f;
-        if (Number is not null && Unwrapped(Number) is not VBMissingValue)
+        if (Number is not null)
         {
-            var converted = ValueConversions.ToNumeric(Unwrapped(Number), VBSingleType.TypeInfo, session.Environment.Regional);
+            if (!TryRead(Number, out var value, out var unreadable))
+            {
+                return RuntimeSemanticsEvaluationResult<VBSingleValue>.Error(unreadable!);
+            }
+
+            var converted = value is VBMissingValue
+                ? ValueConversionResult.Success(new VBSingleValue(number))
+                : ValueConversions.ToNumeric(value, VBSingleType.TypeInfo, session.Environment.Regional);
             if (converted is not { IsSuccess: true, Value: VBSingleValue single })
             {
                 return Fail<VBSingleValue>(converted.Error ?? VBRuntimeErrorId.TypeMismatch, "Rnd takes a number that is a Single.");
@@ -175,7 +188,11 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
             return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, "A number cannot be rounded to fewer than no digits.");
         }
 
-        var source = Unwrapped(Number);
+        if (!TryRead(Number, out var source, out var unreadable))
+        {
+            return RuntimeSemanticsEvaluationResult<VBVariantValue>.Error(unreadable!);
+        }
+
         switch (source)
         {
             case VBNullValue:
@@ -264,7 +281,11 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> Sgn(VBVariantValue Number)
     {
-        var source = Unwrapped(Number);
+        if (!TryRead(Number, out var source, out var unreadable))
+        {
+            return RuntimeSemanticsEvaluationResult<VBVariantValue>.Error(unreadable!);
+        }
+
         int sign;
         switch (source)
         {
@@ -342,13 +363,19 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
     public RuntimeSemanticsEvaluationResult Randomize(VBVariantValue? Number = default)
     {
         double seed;
-        if (Number is null || Unwrapped(Number) is VBMissingValue)
+        VBTypedValue value = VBMissingValue.Missing;
+        if (Number is not null && !TryRead(Number, out value, out var unreadable))
+        {
+            return RuntimeSemanticsEvaluationResult.Error(unreadable!);
+        }
+
+        if (value is VBMissingValue)
         {
             // "If the argument is missing or Empty, the value returned by the system timer is used as the new seed value." MS-VBA uses the timer only when
             // the argument is missing: an Empty is Let-coerced like any other argument, to 0.
             seed = (float)session.Clock.Now.TimeOfDay.TotalSeconds;
         }
-        else if (!ToDouble(Unwrapped(Number), out seed, out var error))
+        else if (!ToDouble(value, out seed, out var error))
         {
             return RuntimeSemanticsEvaluationResult.Error(error.ErrorInfo!);
         }
@@ -381,16 +408,13 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
 
     private static decimal CurrencyValueOf(VBCurrencyValue currency) => Convert.ToDecimal(currency.RuntimeValue.BoxedValue);
 
-    // a Variant holds whatever it was given, another Variant included, so this goes all the way down.
-    private static VBTypedValue Unwrapped(VBVariantValue expression)
+    // the value of an argument, which an object stands for its simple data value as (MS-VBAL 5.5.1.2.13): what its default member returns.
+    private bool TryRead(VBVariantValue argument, out VBTypedValue value, out IVBRaisableError? error)
     {
-        VBTypedValue value = expression;
-        while (value is VBVariantValue { TypedValue: var wrapped })
-        {
-            value = wrapped;
-        }
-
-        return value;
+        var read = ObjectDefaultMember.ValueOf(session, argument);
+        value = read.Result ?? argument;
+        error = read.ErrorInfo;
+        return read.IsSuccess;
     }
 
     private static RuntimeSemanticsEvaluationResult<VBVariantValue> InVariant(ValueConversionResult converted, VBTypedValue source)
