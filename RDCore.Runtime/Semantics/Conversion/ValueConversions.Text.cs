@@ -75,7 +75,7 @@ public static partial class ValueConversions
     // session's ISessionClock.Calendar) to "subsequent calls to the functions defined in section 6.1.2.4" only, so a
     // let-coercion writes in the Gregorian calendar whatever it is: under th-TH a date is written with th-TH's patterns and
     // 2020 is 2020, not 2563. A culture that offers no Gregorian calendar at all keeps its own.
-    private static DateTimeFormatInfo DateFormatOf(CultureInfo culture)
+    internal static DateTimeFormatInfo DateFormatOf(CultureInfo culture)
     {
         if (culture.Calendar is GregorianCalendar
             || culture.OptionalCalendars.OfType<GregorianCalendar>().FirstOrDefault() is not { } gregorian)

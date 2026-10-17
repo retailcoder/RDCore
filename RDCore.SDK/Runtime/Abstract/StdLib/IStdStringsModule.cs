@@ -24,7 +24,9 @@ namespace RDCore.SDK.Runtime.Abstract.StdLib;
 /// <para>
 /// A typed optional whose specification declares a default C# cannot carry states it with
 /// <see cref="StdLibDefaultAttribute"/>: <c>InStrRev</c>'s <c>Start</c>, <c>Replace</c>'s <c>Start</c> and
-/// <c>Count</c>, <c>Split</c>'s <c>Limit</c>, <c>Filter</c>'s <c>Include</c>.
+/// <c>Count</c>, <c>Split</c>'s <c>Limit</c>, <c>Filter</c>'s <c>Include</c>, the <c>NumDigitsAfterDecimal</c> of
+/// <c>FormatCurrency</c>, <c>FormatNumber</c> and <c>FormatPercent</c>, and the <c>Abbreviate</c> of <c>MonthName</c> and
+/// <c>WeekdayName</c>.
 /// </para>
 /// </remarks>
 [StdLibModule]
@@ -134,7 +136,7 @@ public interface IStdStringsModule
     /// <param name="groupDigits">Whether digits are grouped with the environment's own group separator.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBStringValue> FormatCurrency(
-        VBVariantValue expression, VBLongValue? numDigitsAfterDecimal = default,
+        VBVariantValue expression, [StdLibDefault(-1)] VBLongValue? numDigitsAfterDecimal = default,
         VBTriState includeLeadingDigit = VBTriState.VBUseDefault,
         VBTriState useParensForNegativeNumbers = VBTriState.VBUseDefault,
         VBTriState groupDigits = VBTriState.VBUseDefault);
@@ -158,7 +160,7 @@ public interface IStdStringsModule
     /// <param name="groupDigits">Whether digits are grouped with the environment's own group separator.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBStringValue> FormatNumber(
-        VBVariantValue expression, VBLongValue? numDigitsAfterDecimal = default,
+        VBVariantValue expression, [StdLibDefault(-1)] VBLongValue? numDigitsAfterDecimal = default,
         VBTriState includeLeadingDigit = VBTriState.VBUseDefault,
         VBTriState useParensForNegativeNumbers = VBTriState.VBUseDefault,
         VBTriState groupDigits = VBTriState.VBUseDefault);
@@ -173,7 +175,7 @@ public interface IStdStringsModule
     /// <param name="groupDigits">Whether digits are grouped with the environment's own group separator.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBStringValue> FormatPercent(
-        VBVariantValue expression, VBLongValue? numDigitsAfterDecimal = default,
+        VBVariantValue expression, [StdLibDefault(-1)] VBLongValue? numDigitsAfterDecimal = default,
         VBTriState includeLeadingDigit = VBTriState.VBUseDefault,
         VBTriState useParensForNegativeNumbers = VBTriState.VBUseDefault,
         VBTriState groupDigits = VBTriState.VBUseDefault);
@@ -332,7 +334,7 @@ public interface IStdStringsModule
     /// <param name="month">The 1-based number of the month.</param>
     /// <param name="abbreviate"><c>True</c> for the abbreviated name.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBStringValue> MonthName(VBLongValue month, VBBooleanValue? abbreviate = default);
+    RuntimeSemanticsEvaluationResult<VBStringValue> MonthName(VBLongValue month, [StdLibDefault(false)] VBBooleanValue? abbreviate = default);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.29 Replace</strong> Gets a string with a number of occurrences of one substring replaced by another.
@@ -459,7 +461,7 @@ public interface IStdStringsModule
     /// <param name="firstDayOfWeek">The day the week starts on.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBStringValue> WeekdayName(
-        VBLongValue weekday, VBBooleanValue? abbreviate = default,
+        VBLongValue weekday, [StdLibDefault(false)] VBBooleanValue? abbreviate = default,
         VBDayOfWeek firstDayOfWeek = VBDayOfWeek.VBUseSystemDayOfWeek);
 
     #endregion
