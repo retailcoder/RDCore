@@ -462,7 +462,9 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             error is null ? RuntimeSemanticsEvaluationResult.Success(VBVoidValue.Void) : RuntimeSemanticsEvaluationResult.Error(error));
     }
 
-    private static VBType? DeclaredTypeOfOwner(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? ownerExpression)
+    // the declared type of an expression, as the static semantics read it - without evaluating it, which a caller that only needs to classify an
+    // expression must not do a second time (a call in it would be made twice).
+    internal static VBType? DeclaredTypeOfOwner(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? ownerExpression)
     {
         if (ownerExpression is null)
         {

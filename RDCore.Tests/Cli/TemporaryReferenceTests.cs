@@ -28,8 +28,10 @@ public sealed class TemporaryReferenceTests
         "    Debug.Print \"terminated \" & Name",
         "End Sub"));
 
+    private static readonly (string, string) Holder = ("Holder", ClassModule("Holder", "Public Item As Widget"));
+
     private static Task<string[]> RunWith(string declarations, params string[] lines)
-        => RunAsync([Widget], $"Attribute VB_Name = \"Program\"\r\nPublic Kept As Widget\r\nPublic Sub Forget()\r\n    Set Kept = Nothing\r\nEnd Sub\r\n{declarations}\r\nPublic Sub Main()\r\n{string.Join("\r\n", lines)}\r\nEnd Sub\r\n");
+        => RunAsync([Widget, Holder],$"Attribute VB_Name = \"Program\"\r\nPublic Kept As Widget\r\n{declarations}\r\nPublic Sub Forget()\r\n    Set Kept = Nothing\r\nEnd Sub\r\nPublic Sub Main()\r\n{string.Join("\r\n", lines)}\r\nEnd Sub\r\n");
 
     private const string Make = "Private Function Make(ByVal name As String) As Widget\r\n    Set Make = New Widget\r\n    Make.Name = name\r\nEnd Function";
 
@@ -125,6 +127,65 @@ public sealed class TemporaryReferenceTests
             "Set Kept = New Widget",
             "Kept.Name = \"k\"",
             "With Kept",
+            "    Set Kept = Nothing",
+            "    Debug.Print .Hello",
+            "    Debug.Print Err.Number",
+            "End With",
+            "Debug.Print \"after\""));
+
+    // a field of an object whose class is declared, an element of an array, a field of a record, a variable named through its module: each is a
+    // variable, and so the block variable itself.
+    [TestMethod]
+    public async Task AWithBlockOnAFieldOfAnObject_IsTheField_AndHoldsNothingOfItsOwn()
+        => CollectionAssert.AreEqual(new[] { "terminated f", "91", "after" }, await RunWith(string.Empty,
+            "On Error Resume Next",
+            "Dim h As Holder",
+            "Set h = New Holder",
+            "Set h.Item = New Widget",
+            "h.Item.Name = \"f\"",
+            "With h.Item",
+            "    Set h.Item = Nothing",
+            "    Debug.Print .Hello",
+            "    Debug.Print Err.Number",
+            "End With",
+            "Debug.Print \"after\""));
+
+    [TestMethod]
+    public async Task AWithBlockOnAnElementOfAnArray_IsTheElement_AndHoldsNothingOfItsOwn()
+        => CollectionAssert.AreEqual(new[] { "terminated e", "91", "after" }, await RunWith(string.Empty,
+            "On Error Resume Next",
+            "Dim a(0) As Widget",
+            "Set a(0) = New Widget",
+            "a(0).Name = \"e\"",
+            "With a(0)",
+            "    Set a(0) = Nothing",
+            "    Debug.Print .Hello",
+            "    Debug.Print Err.Number",
+            "End With",
+            "Debug.Print \"after\""));
+
+    [TestMethod]
+    public async Task AWithBlockOnAFieldOfARecord_IsTheField_AndHoldsNothingOfItsOwn()
+        => CollectionAssert.AreEqual(new[] { "terminated r", "91", "after" }, await RunWith(
+            "Private Type Pair\r\n    Item As Widget\r\nEnd Type",
+            "On Error Resume Next",
+            "Dim r As Pair",
+            "Set r.Item = New Widget",
+            "r.Item.Name = \"r\"",
+            "With r.Item",
+            "    Set r.Item = Nothing",
+            "    Debug.Print .Hello",
+            "    Debug.Print Err.Number",
+            "End With",
+            "Debug.Print \"after\""));
+
+    [TestMethod]
+    public async Task AWithBlockOnAVariableNamedThroughItsModule_IsTheVariable_AndHoldsNothingOfItsOwn()
+        => CollectionAssert.AreEqual(new[] { "terminated k", "91", "after" }, await RunWith(string.Empty,
+            "On Error Resume Next",
+            "Set Kept = New Widget",
+            "Kept.Name = \"k\"",
+            "With Program.Kept",
             "    Set Kept = Nothing",
             "    Debug.Print .Hello",
             "    Debug.Print Err.Number",

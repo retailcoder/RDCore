@@ -8,6 +8,9 @@ using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
+using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -55,17 +58,31 @@ public sealed class WithTargetEvaluator(RuntimeExpressionEvaluator expressionEva
     /// itself (<strong>MS-VBAL §5.4.2.21</strong>), rather than a value the block holds in an anonymous one.
     /// </summary>
     /// <remarks>
-    /// A name of a variable, a field of the module or a parameter is. Anything else - <c>New</c>, a call, a property, a member of an object - is taken
-    /// to be a value: the block holds it until it is over, which is what keeps it alive while it is in use.
+    /// A variable is a name of a variable, a field of the module or a parameter; that name qualified by its module (<c>Module1.Kept</c>); a field of a
+    /// record (<c>r.Item</c>); a public variable of an object whose class is declared (<c>obj.Child</c>); an element of an array (<c>items(1)</c>).
+    /// Anything else is taken to be a value - <c>New</c>, a call, a property, and a member of an object that is late bound, which MS-VBAL classifies
+    /// as an unbound member: the block holds it until it is over, which is what keeps it alive while it is in use.
     /// <para>
-    /// 🚧 TODO a public variable of an object (<c>With obj.Child</c>) and an element of an array (<c>With items(1)</c>) are variables too, which the
-    /// block is then to read through rather than hold; it holds them, which keeps their object alive until the block is over even when the variable
-    /// is assigned something else inside it.
+    /// 👉 Classified by the declared types the static semantics give the expression, not by evaluating it again: the target is evaluated once, and a
+    /// call in it is made once.
     /// </para>
     /// </remarks>
-    public bool DenotesAVariable(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
-        => expression is SimpleNameExpressionNode name
-            && session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field } or VBParameterSymbol;
+    public bool DenotesAVariable(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression) => expression switch
+    {
+        SimpleNameExpressionNode name => IsAVariable(session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol),
+        MemberAccessExpressionNode access when expressionEvaluator.ResolveNamespaceQualified(session, context, access) is { } qualified => IsAVariable(qualified),
+        MemberAccessExpressionNode { Owner: { } owner } access => RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, owner) switch
+        {
+            VBUserDefinedType => true,
+            VBClassType declared => declared.Members.FirstOrDefault(member
+                => member.Name.Equals(access.Member.IdentifierName, StringComparison.OrdinalIgnoreCase)) is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field },
+            _ => false,
+        },
+        IndexExpressionNode { Callee: var callee } => RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, callee) is VBArrayType,
+        _ => false,
+    };
+
+    private static bool IsAVariable(Symbol? symbol) => symbol is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field } or VBParameterSymbol;
 
     // what the statement is, as its semantics analyze it. That it fails is only said of a target that is known, and of an error that is the code's.
     private void Observe(AnalysisObservation into, IRuntimeSession session, WithStatementNode node, VBTypedValue target, RuntimeSemanticsEvaluationResult result)
