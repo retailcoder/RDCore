@@ -30,6 +30,7 @@ Semantic compilation errors are emitted by the resolver and the static semantic 
 
 |Code|Title|Condition|
 |---|---|---|
+|[`VBC09306`](../diagnostics/vbc09306.md)|Invalid ReDim|a `ReDim` re-dimensions a member of an object declared `As Object` (of a declared class, it is `VBC09316`)|
 |[`VBC09309`](../diagnostics/vbc09309.md)|Label not defined|a jump names a line label or line number the procedure does not define|
 |[`VBC09310`](../diagnostics/vbc09310.md)|Type mismatch|a value is of a type that cannot be let-coerced to the type it is used as|
 |[`VBC09312`](../diagnostics/vbc09312.md)|Exit Do not within Do...Loop|an `Exit Do` statement is not lexically inside a `Do` loop|

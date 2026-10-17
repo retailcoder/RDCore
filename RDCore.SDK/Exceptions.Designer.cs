@@ -628,6 +628,15 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is a member of an object, which a ReDim does not re-dimension: re-dimension the array in its class, or a variable of the code&apos;s own..
+        /// </summary>
+        public static string VBCompileError_ReDimOfAMemberOfAnObject_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_ReDimOfAMemberOfAnObject_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to &apos;{0}&apos; is public, and is declared with &apos;{1}&apos;, which is private to its module..
         /// </summary>
         public static string VBCompileError_PrivateTypeInPublicMember_Verbose {
@@ -822,6 +831,15 @@ namespace RDCore.SDK {
         public static string VBMemberAccess_ObjectVariableNotSet_Verbose {
             get {
                 return ResourceManager.GetString("VBMemberAccess_ObjectVariableNotSet_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The Variant this member is accessed on holds a {0}, which has no members: only an object, or a record, has..
+        /// </summary>
+        public static string VBMemberAccess_ObjectRequired_Verbose {
+            get {
+                return ResourceManager.GetString("VBMemberAccess_ObjectRequired_Verbose", resourceCulture);
             }
         }
 

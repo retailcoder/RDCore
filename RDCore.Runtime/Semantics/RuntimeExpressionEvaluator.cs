@@ -951,11 +951,18 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     // a member of an object variable that holds no object - never set, or set to Nothing - is error 91: there is no
     // object to find the member on. An As New variable is never in that state when it is referred to, which is what
     // made it the object the member is on.
+    // A member of what is neither an object nor a record - what a Variant holds when it holds a number, a String, Empty - is error 424: there is no object
+    // to find the member on (MS-VBA, recorded in Excel). What is not known is not judged.
     private static RuntimeSemanticsEvaluationResult? ObjectNotSet(MemberAccessExpressionNode memberAccess, VBTypedValue owner)
-        => UnwrappedOwner(owner) is VBObjectValue { } unset && unset.IsNothing()
-            ? RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
-                VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, memberAccess.Location, Exceptions.VBMemberAccess_ObjectVariableNotSet_Verbose))
-            : null;
+        => UnwrappedOwner(owner) switch
+        {
+            VBObjectValue unset when unset.IsNothing() => RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+                VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, memberAccess.Location, Exceptions.VBMemberAccess_ObjectVariableNotSet_Verbose)),
+            VBObjectValue or VBUserDefinedTypeValue => null,
+            { IsIndeterminate: false } notAnObject when owner is VBVariantValue { IsIndeterminate: false } => RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+                VBRuntimeErrorId.ObjectRequired, memberAccess.Location, string.Format(Exceptions.VBMemberAccess_ObjectRequired_Verbose, notAnObject.TypeInfo.Name))),
+            _ => null,
+        };
 
     // the value a member is accessed on: the expression written before the dot, or the enclosing With block's target.
     private RuntimeSemanticsEvaluationResult EvaluateOwner(IRuntimeSession session, RuntimeEvaluationContext context, MemberAccessExpressionNode memberAccess)

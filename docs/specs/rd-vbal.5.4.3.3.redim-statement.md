@@ -94,8 +94,18 @@ array (`arr = other`): error 10 too.
 > name for the variable, a `ReDim` of either is a `ReDim` of both, and each sees the dimensions the other gives it. RD-VBA does what MS-VBA does. The new array is
 > written where the variable is, which is what keeps the parameter's name for it.
 
-A target that is a member access (`obj.Buffer`, `.Buffer`) is an expression: the array is read from it, and the new array is written back through it, as an assignment to
-it is - the public variable of the object, or the field of the record. The element type of an array that has no dimensions yet is the one the member is declared with.
+A target that is a member access - the field of a record (`r.Buffer`, `.Buffer` in a `With r` block), a variable of a module named through it
+(`Module1.Buffer`) - is an expression: the array is read from it, and the new array is written back through it, as an assignment to it is. The element type
+of an array that has no dimensions yet is the one the member is declared with.
+
+A member of an object is not re-dimensioned, as MS-VBA has it (recorded in Excel), whatever the member is: of an object whose class is declared, it is the
+compile error [`VBC09316`](../diagnostics/vbc09316.md) _Method or data member not found_, and of an `Object` [`VBC09306`](../diagnostics/vbc09306.md) _Invalid
+ReDim_, in a `With` block too. A member of a `Variant` compiles; the member is read as a value when the statement runs, which is what is re-dimensioned, and the
+member is as it was afterwards - a `Variant` that holds no object is error 424.
+
+> [!NOTE]
+> 🧩 Nothing in the runtime prevents re-dimensioning an object's array through the object, by writing it back through the member. RD-VBA does what MS-VBA
+> does, so that a compile error is where it is expected; a language-level extension could allow it in the future.
 
 ## Implementation
 

@@ -15,7 +15,6 @@ public sealed class DiagnosticDocumentationTests
         VBCompileErrorId.UnspecifiedCompileError,
         VBCompileErrorId.ForbiddenWithOptionStrict,
         VBCompileErrorId.InvalidParamArrayUse,
-        VBCompileErrorId.InvalidReDim,
         VBCompileErrorId.ExpectedArray,
         VBCompileErrorId.ExpectedIdentifier,
     ];

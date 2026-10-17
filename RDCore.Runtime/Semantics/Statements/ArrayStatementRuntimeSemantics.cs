@@ -207,10 +207,12 @@ public sealed record class ArrayStatementRuntimeSemantics(
         return RuntimeExecutionOutcome.Next;
     }
 
-    // classified by the type the owner is declared as, without evaluating it again.
+    // classified by the type the owner is declared as, without evaluating it again. A Variant owner is one too: what it holds is an object by the time the
+    // member is read, which the read raises 424 for if it is not - a member of a declared class or of an Object is not re-dimensioned at all (a compile
+    // error, StatementStaticSemanticsEvaluator), but is erased as a value.
     private static bool IsAMemberOfAnObject(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode? expression)
         => expression is MemberAccessExpressionNode { Owner: { } owner }
-            && RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, owner) is VBClassType or VBObjectType;
+            && RuntimeExpressionEvaluator.DeclaredTypeOfOwner(session, context, owner) is VBClassType or VBObjectType or VBVariantType;
 
     // the symbol a simple name resolves to, or the expression a member access or an element is - and what it holds, which is the array.
     private bool TryResolveTarget(
@@ -355,7 +357,14 @@ public sealed record class ArrayStatementRuntimeSemantics(
         var variant = target.Declared is VBVariantType || target.Current is VBVariantValue;
         var stored = variant ? new VBVariantValue(array) : (VBTypedValue)array;
 
-        // a target that is an expression is written the way an assignment to it is: through the field of the object, or the element of the array.
+        // a member of an object is read as a value of its own, and what is made of it is not written back (MS-VBA, recorded in Excel: `ReDim v.Loose(3)`
+        // with an object in v leaves the member as it was).
+        if (IsAMemberOfAnObject(session, context, target.Expression))
+        {
+            return RuntimeExecutionOutcome.Next;
+        }
+
+        // a target that is an expression is written the way an assignment to it is: through the field of the record, or the element of the array.
         if (target.Expression is { } expression)
         {
             return Assignments.Assign(session, context, statement, expression, expression, stored);

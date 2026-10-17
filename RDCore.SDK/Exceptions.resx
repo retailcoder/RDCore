@@ -234,6 +234,9 @@
   <data name="VBMemberAccess_ObjectVariableNotSet_Verbose" xml:space="preserve">
     <value>The object this member is accessed on is Nothing: an object variable that was never set, or that was set to Nothing, has no object to hold the member.</value>
   </data>
+  <data name="VBMemberAccess_ObjectRequired_Verbose" xml:space="preserve">
+    <value>The Variant this member is accessed on holds a {0}, which has no members: only an object, or a record, has.</value>
+  </data>
   <data name="VBForEach_RequiresEnumerableCollection_Verbose" xml:space="preserve">
     <value>This For Each loop's collection expression must be an array, or an object exposing an enumeration member (VB_UserMemId = -4, commonly named _NewEnum).</value>
   </data>
@@ -422,6 +425,9 @@
   </data>
   <data name="VBCompileError_PublicUserDefinedTypeInObjectModule" xml:space="preserve">
     <value>Cannot define a Public user-defined type within an object module</value>
+  </data>
+  <data name="VBCompileError_ReDimOfAMemberOfAnObject_Verbose" xml:space="preserve">
+    <value>'{0}' is a member of an object, which a ReDim does not re-dimension: re-dimension the array in its class, or a variable of the code's own.</value>
   </data>
   <data name="VBCompileError_PrivateTypeInPublicMember_Verbose" xml:space="preserve">
     <value>'{0}' is public, and is declared with '{1}', which is private to its module.</value>

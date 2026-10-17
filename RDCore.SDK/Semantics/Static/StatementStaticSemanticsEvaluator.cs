@@ -362,7 +362,13 @@ public static class StatementStaticSemanticsEvaluator
                     break;
                 case RedimDeclarationNode redim:
                     // the target is the array, which is not one of the statement's operands: it is evaluated here.
-                    CollectError(ExpressionStaticSemanticsEvaluator.Evaluate(context, redim.Target), walk);
+                    var redimensioned = ExpressionStaticSemanticsEvaluator.Evaluate(context, redim.Target);
+                    CollectError(redimensioned, walk);
+                    if (redimensioned.IsSuccess && MemberOfAnObject(context, redim.Target) is { } refused)
+                    {
+                        walk.Errors.Add(refused);
+                    }
+
                     RequireVariable(context, redim.Target, "The target of a ReDim statement", "5.4.3.3", walk);
                     MarkWritten(context, redim.Target);
                     break;
@@ -716,6 +722,34 @@ public static class StatementStaticSemanticsEvaluator
     };
 
     // reports an operand that has to be a variable and certainly is not one (StatementOperandChecks.RequireVariable): whether it may be one.
+    // MS-VBA refuses to re-dimension a member of an object (recorded in Excel), whatever the member is - a public Variant of the class, a property: the
+    // object's member is reached through the object, and a class re-dimensions its own arrays. A member of an object of a declared class is "Method or data
+    // member not found", and of an Object "Invalid ReDim"; one of a Variant is not known to be an object's until it runs, and re-dimensions a value of it then.
+    // The member of a With block's object is the same member. MS-VBAL §5.4.3.3 only says the target is a variable.
+    // 🧩 A language-level extension could allow it - the runtime could write the array back through the member - but RD-VBA does what MS-VBA does.
+    private static VBCompileErrorInfo? MemberOfAnObject(StaticEvaluationContext context, ExpressionNode target)
+    {
+        if (target is not MemberAccessExpressionNode access)
+        {
+            return null;
+        }
+
+        var owner = access.Owner is { } ownerExpression
+            ? ExpressionStaticSemanticsEvaluator.Evaluate(context, ownerExpression) is { IsSuccess: true, Result: var evaluated } ? evaluated : null
+            : context.EnclosingWithTargetType;
+
+        var id = owner switch
+        {
+            VBClassType => VBCompileErrorId.MethodOrDataMemberNotFound,
+            VBObjectType => VBCompileErrorId.InvalidReDim,
+            _ => (VBCompileErrorId?)null,
+        };
+
+        return id is { } refused
+            ? VBCompileErrorInfo.For(refused, target.Location, string.Format(Exceptions.VBCompileError_ReDimOfAMemberOfAnObject_Verbose, target))
+            : null;
+    }
+
     private static bool RequireVariable(StaticEvaluationContext context, ExpressionNode operand, string role, string section, Walk walk)
         => RequireTarget(context, operand, role, section, isLet: false, walk);
 

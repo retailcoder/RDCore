@@ -228,6 +228,9 @@
   <data name="VBMemberAccess_ObjectVariableNotSet_Verbose" xml:space="preserve">
     <value>L'objet sur lequel ce membre est accédé est Nothing : une variable objet qui n'a jamais été définie, ou qui a été définie à Nothing, n'a aucun objet pour porter le membre.</value>
   </data>
+  <data name="VBMemberAccess_ObjectRequired_Verbose" xml:space="preserve">
+    <value>Le Variant sur lequel ce membre est accédé contient un {0}, qui n'a aucun membre : seul un objet, ou un enregistrement, en a.</value>
+  </data>
   <data name="VBForEach_RequiresEnumerableCollection_Verbose" xml:space="preserve">
     <value>L'expression de collection de cette boucle For Each doit être un tableau, ou un objet exposant un membre d'énumération (VB_UserMemId = -4, communément nommé _NewEnum).</value>
   </data>
@@ -422,6 +425,9 @@
   </data>
   <data name="VBCompileError_PublicUserDefinedTypeInObjectModule" xml:space="preserve">
     <value>Impossible de définir un type défini par l'utilisateur Public dans un module objet</value>
+  </data>
+  <data name="VBCompileError_ReDimOfAMemberOfAnObject_Verbose" xml:space="preserve">
+    <value>'{0}' est un membre d'un objet, qu'un ReDim ne redimensionne pas : redimensionnez le tableau dans sa classe, ou une variable du code lui-même.</value>
   </data>
   <data name="VBCompileError_PrivateTypeInPublicMember_Verbose" xml:space="preserve">
     <value>'{0}' est public et est déclaré avec '{1}', qui est privé à son module.</value>
