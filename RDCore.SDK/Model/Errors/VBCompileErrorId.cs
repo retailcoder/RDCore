@@ -337,6 +337,17 @@ public enum VBCompileErrorId
     /// <strong>MS-VBAL §5.2.3.3</strong> User Defined Type Declarations.
     /// </summary>
     PublicUserDefinedTypeInObjectModule = 9338,
+    /// <summary>
+    /// An object stands for the value of its default member where a value is expected - an operand, an argument of a parameter that takes a value, the
+    /// value of a <c>Let</c> assignment to a variable of a value type - and its default member takes an argument that nothing gives it: a <c>Collection</c>,
+    /// whose <c>Item</c> takes the key it reads.<br/>
+    /// <strong>MS-VBAL §5.5.1.1</strong> Let-coercion (static semantics), <strong>§5.5.1.2.13</strong>.
+    /// </summary>
+    /// <remarks>
+    /// 👉 The specification asks only for an "accessible default Property Get or function"; MS-VBA also asks that it can be called with no arguments
+    /// (recorded in Excel), as calling it at run time does (<strong>§5.5.1.2.13</strong>'s "simple data value").
+    /// </remarks>
+    ArgumentNotOptional = 9339,
 
 
     /***********************************************************************************************

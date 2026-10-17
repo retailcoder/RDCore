@@ -199,6 +199,13 @@ public static class ExpressionStaticSemanticsEvaluator
             MarkPassedAsArguments(context, indexExpression.Arguments);
         }
 
+        // an object given to a parameter that expects a value of it must have one (MS-VBAL §5.5.1.1).
+        if (calleeResult.Result is not VBArrayType && ObjectValueStaticSemantics.ParametersOfCallee(context, indexExpression.Callee) is { } parameters
+            && ObjectValueStaticSemantics.ArgumentsError(context, parameters, indexExpression.Arguments) is { } argumentError)
+        {
+            return StaticSemanticsEvaluationResult.Error(argumentError);
+        }
+
         // MS-VBAL §5.6.13: the arguments are those of a call when the callee is a procedure, and the result of the call has the type the procedure
         // returns - however that type is shaped: `Whole()` of a function that returns Long() is no element of an array. A procedure that declares no
         // parameters is not given the arguments written after it: it is called, and they index what it returns.
@@ -388,8 +395,28 @@ public static class ExpressionStaticSemanticsEvaluator
             return StaticSemanticsEvaluationResult.Success(VBUnknownType.TypeInfo);
         }
 
+        // an operand of any operator but Is is a value: an object stands for its default member's (MS-VBAL §5.5.1.1, as MS-VBA compiles it).
+        var left = leftResult.Result!;
+        var right = rightResult.Result!;
+        if (binaryOperator.Token != Tokens.CompareIsOp)
+        {
+            var leftValue = ObjectValueStaticSemantics.ValueOf(binaryOperator.Left, left, ValueDestination.TypedValue);
+            if (leftValue.IsError)
+            {
+                return leftValue;
+            }
+
+            var rightValue = ObjectValueStaticSemantics.ValueOf(binaryOperator.Right, right, ValueDestination.TypedValue);
+            if (rightValue.IsError)
+            {
+                return rightValue;
+            }
+
+            (left, right) = (leftValue.Result!, rightValue.Result!);
+        }
+
         return ResolveBinaryOperatorRule(binaryOperator.Token) is { } rule
-            ? rule.DetermineDeclaredType(context, expression, AsOperand(leftResult.Result!), AsOperand(rightResult.Result!))
+            ? rule.DetermineDeclaredType(context, expression, AsOperand(left), AsOperand(right))
             : StaticSemanticsEvaluationResult.Success(VBUnknownType.TypeInfo);
     }
 
@@ -418,8 +445,22 @@ public static class ExpressionStaticSemanticsEvaluator
             return StaticSemanticsEvaluationResult.Success(VBUnknownType.TypeInfo);
         }
 
+        // see EvaluateBinaryOperator: an operand is a value. The parentheses around an argument (`Foo (x)`) are no operator of the program's: what they
+        // coerce to is the parameter's to say.
+        var operand = operandResult.Result!;
+        if (unaryOperator.Token != OperatorSymbolNames.UnaryLetCoerceOp)
+        {
+            var value = ObjectValueStaticSemantics.ValueOf(unaryOperator.Operand, operand, ValueDestination.TypedValue);
+            if (value.IsError)
+            {
+                return value;
+            }
+
+            operand = value.Result!;
+        }
+
         return ResolveUnaryOperatorRule(unaryOperator.Token) is { } rule
-            ? rule.DetermineDeclaredType(context, expression, AsOperand(operandResult.Result!))
+            ? rule.DetermineDeclaredType(context, expression, AsOperand(operand))
             : StaticSemanticsEvaluationResult.Success(VBUnknownType.TypeInfo);
     }
 

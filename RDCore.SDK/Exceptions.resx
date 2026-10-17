@@ -438,6 +438,18 @@
   <data name="VBCompileError_PublicUserDefinedTypeInObjectModule_Verbose" xml:space="preserve">
     <value>User-defined type '{0}' is public, which a type of a class module cannot be; declare it Private.</value>
   </data>
+  <data name="VBCompileError_ArgumentNotOptional" xml:space="preserve">
+    <value>Argument not optional</value>
+  </data>
+  <data name="VBCompileError_DefaultMemberTakesArguments_Verbose" xml:space="preserve">
+    <value>A value of {0} is what its default member '{1}' returns, which takes an argument that a value read from the object does not give it.</value>
+  </data>
+  <data name="VBCompileError_DefaultMemberReturnsAnObject_Verbose" xml:space="preserve">
+    <value>A value of {0} is what its default member '{1}' returns, which is an object and not a value of a declared type.</value>
+  </data>
+  <data name="VBCompileError_NothingIsNotAValue_Verbose" xml:space="preserve">
+    <value>Nothing is no object, and so has no value: a value is expected here.</value>
+  </data>
   <data name="VBCompileError_UnspecifiedError" xml:space="preserve">
     <value>Unspecified error</value>
   </data>

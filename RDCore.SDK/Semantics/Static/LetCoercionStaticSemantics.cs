@@ -17,7 +17,21 @@ public record class LetCoercionStaticSemantics : StaticSemantics
     public override StaticSemanticsEvaluationResult DetermineDeclaredType(StaticEvaluationContext context, ExpressionNode expression, params VBType[] operandDeclaredTypes)
     {
         var destinationType = operandDeclaredTypes[(int)InputIndex.CoercionDestinationType];
-        return !IsLetCoercionInvalid(operandDeclaredTypes[(int)InputIndex.CoercionSourceValue], destinationType) 
+        var sourceType = operandDeclaredTypes[(int)InputIndex.CoercionSourceValue];
+
+        // a destination of a value type expects a value of the source: an object stands for its default member's value, which it must have.
+        if (ObjectValueStaticSemantics.IsValueType(destinationType))
+        {
+            var value = ObjectValueStaticSemantics.ValueOf(expression, sourceType, ValueDestination.TypedValue);
+            if (value.IsError)
+            {
+                return value;
+            }
+
+            sourceType = value.Result!;
+        }
+
+        return !IsLetCoercionInvalid(sourceType, destinationType)
             ? StaticSemanticsEvaluationResult.Success(destinationType)
             : StaticSemanticsEvaluationResult.Error(GetStaticCoercionTypeMismatchErrorInfo(expression, operandDeclaredTypes));
     }
@@ -37,7 +51,10 @@ public record class LetCoercionStaticSemantics : StaticSemantics
         VBType when AnyTypeExceptNonByteResizableArrayOr(source, typeof(VBFixedSizeArrayType), typeof(VBVariantType)) && IsNonByteResizableArray(destination) => true,
         VBType and not VBUserDefinedType and not VBVariantType when destination is VBUserDefinedType => true,
         VBType and not VBVariantType when destination is VBObjectType or VBClassType => true,
-        VBClassType type when type.DefaultMember is null || IsLetCoercionInvalid(type.DefaultMember.ResolvedType, destination) => true,
+        // a class to a value type is its default member's value (ObjectValueStaticSemantics), and to a Variant the object itself: what is left is an
+        // array or a user-defined type, which a value is not either. MS-VBA compiles a class that has no default member, and raises error 438 when it runs.
+        VBClassType type when destination is not VBVariantType && type.DefaultMember is { } defaultMember
+            && IsLetCoercionInvalid(defaultMember.ResolvedType, destination) => true,
         VBFixedSizeArrayType or VBResizableArrayType and not VBResizableByteArrayType
             when destination is not VBVariantType && (destination is not VBArrayType
                 || destination is VBResizableArrayType dstArray && source is VBArrayType srcArray && !IsSameItemType(dstArray.ItemType, srcArray.ItemType)) => true,
@@ -50,13 +67,8 @@ public record class LetCoercionStaticSemantics : StaticSemantics
         // NOTE: this line is specified outside the section 5.5.1.1 table
         VBLongLongType when destination is not VBLongLongType and not VBVariantType => true,
 
-        /*
-            * MS-VBAL 5.5.1.1 table specifies "source declared type OR LITERAL".
-            * NOT DOING THIS HERE: twisting StaticSemantics signature to work with VBTypedValue would make no sense.
-            * Alternatively we could treat literals as a first-class VBType or somehow semantically treat literals 
-            * as their declared type, having a shared base class for the two. It... twists the model in a weird way.
-        */
-        //VBType when source is VBNothingValue && destination is not VBObjectType and not VBVariantType => true,
+        // MS-VBAL 5.5.1.1's "source declared type OR LITERAL": the Nothing literal is told by its expression, not by a type, so DetermineDeclaredType asks
+        // ObjectValueStaticSemantics, which reports it as MS-VBA does (Invalid use of object) before these rules are consulted.
 
         _ => false
     };

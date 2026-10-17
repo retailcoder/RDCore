@@ -97,5 +97,6 @@ public record class VBCompileErrorInfo : VBErrorInfo
         [VBCompileErrorId.PrivateTypeInPublicMember] = Exceptions.VBCompileError_PrivateTypeInPublicMember,
         [VBCompileErrorId.NotAllowedAsPublicMemberOfObjectModule] = Exceptions.VBCompileError_NotAllowedAsPublicMemberOfObjectModule,
         [VBCompileErrorId.PublicUserDefinedTypeInObjectModule] = Exceptions.VBCompileError_PublicUserDefinedTypeInObjectModule,
+        [VBCompileErrorId.ArgumentNotOptional] = Exceptions.VBCompileError_ArgumentNotOptional,
     };
 }
