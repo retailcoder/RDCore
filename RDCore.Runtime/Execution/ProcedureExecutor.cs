@@ -936,7 +936,8 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 }
 
                 var firstElement = array.ElementAt(0)!;
-                var assignResult = forEach.AssignControl(session, control, forEachStatement.ControlExpression, array.ItemType is VBObjectType, firstElement);
+                var assignResult = forEach.AssignControl(session, control, forEachStatement.ControlExpression,
+                    ForEachEvaluator.IsSetAssigned(array.ItemType, firstElement), firstElement);
                 if (!assignResult.IsSuccess)
                 {
                     return ToFailureOutcome(assignResult);
@@ -1108,7 +1109,8 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         }
 
         var element = state.Array.ElementAt(nextIndex)!;
-        var assignResult = forEach.AssignControl(session, state.Control, state.ControlExpression, state.Array.ItemType is VBObjectType, element);
+        var assignResult = forEach.AssignControl(session, state.Control, state.ControlExpression,
+            ForEachEvaluator.IsSetAssigned(state.Array.ItemType, element), element);
         if (!assignResult.IsSuccess)
         {
             return ToFailureOutcome(assignResult);

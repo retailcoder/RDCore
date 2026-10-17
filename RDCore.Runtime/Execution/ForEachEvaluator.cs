@@ -5,6 +5,8 @@ using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -54,9 +56,35 @@ public sealed class ForEachEvaluator(RuntimeExpressionEvaluator expressionEvalua
             outcome is { Kind: RuntimeExecutionOutcomeKind.Error, ErrorInfo: { } error } ? error : null);
 
     /// <summary>
+    /// Whether an element of an array is Set-assigned to the control variable of a <c>For Each</c>, rather than Let-assigned.
+    /// </summary>
+    /// <remarks>
+    /// <strong>MS-VBAL §5.4.2.4</strong> Set-assigns when "the declared type of the array is Object", and Let-assigns otherwise - which would ask an
+    /// object an array of <c>Variant</c> holds for its default member, and raise 438 for one that has none. MS-VBA Set-assigns an element that is an
+    /// object whatever the array is declared as, and so does this: the specification's wording is an oversight (author's ruling, 2026-10-16). An
+    /// array of a class is an array of objects as much as one of <c>Object</c> is.
+    /// </remarks>
+    /// <param name="itemType">The declared type of the elements.</param>
+    /// <param name="element">The element about to be assigned.</param>
+    public static bool IsSetAssigned(VBType itemType, VBTypedValue element)
+    {
+        if (itemType is VBObjectType or VBClassType)
+        {
+            return true;
+        }
+
+        var held = element;
+        while (held is VBVariantValue { IsIndeterminate: false, TypedValue: var wrapped })
+        {
+            held = wrapped;
+        }
+
+        return held is VBObjectValue;
+    }
+
+    /// <summary>
     /// Assigns <paramref name="element"/> to <paramref name="control"/> — Set-assigns when
-    /// <paramref name="useSetAssignment"/> (the array's own item type is <see cref="VBObjectType"/>),
-    /// Let-assigns otherwise.
+    /// <paramref name="useSetAssignment"/> (<see cref="IsSetAssigned"/>), Let-assigns otherwise.
     /// </summary>
     public RuntimeSemanticsEvaluationResult AssignControl(IRuntimeSession session, ITypedSymbol control, ExpressionNode locationNode, bool useSetAssignment, VBTypedValue element)
     {
