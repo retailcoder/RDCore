@@ -185,6 +185,9 @@ conversions and coercions to `String` ([**RD-VBAL §2.5.2.1.1** Numeric Values](
 |[VBSingleValue](../api/RDCore.SDK.Model.Values.Intrinsic.VBSingleValue.html)|[VBSingleType](../api/RDCore.SDK.Model.Types.VBSingleType.html)|7|
 |[VBDoubleValue](../api/RDCore.SDK.Model.Values.Intrinsic.VBDoubleValue.html)|[VBDoubleType](../api/RDCore.SDK.Model.Types.VBDoubleType.html)|15|
 
+A floating-point zero keeps its sign, as in MS-VBA (recorded in Excel): a negative zero is written `-0`, as
+`Round(-0.5)` gives ([**RD-VBAL §6.1.2.10** Math](rd-vbal.6.1.2.10.math.md)).
+
 A `String` source is let-coerced to "a copy of the source string": its runtime value, every byte of its data, a
 trailing byte included ([**RD-VBAL §2.4.1.2** VBStringType](rd-vbal.2.4.1.intrinsic-types.md#2412-vbstringtype)). A
 copy of `vbNullString` is `vbNullString`. An assignment `u = s`, a `ByVal` argument, a parenthesized `(s)` and

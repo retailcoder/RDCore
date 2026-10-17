@@ -108,6 +108,15 @@ public sealed class ExplicitConversionFunctionTests
         => Assert.AreEqual("0.3", ValueOf(Conversion().CStr(Variant(new VBDoubleValue(0.1 + 0.2)))).Value);
 
     [TestMethod]
+    // a floating-point zero has a sign, and MS-VBA shows it (Excel: CStr(Round(-0.5)) is "-0").
+    public void CStr_OfANegativeZeroShowsItsSign()
+    {
+        Assert.AreEqual("-0", ValueOf(Conversion().CStr(Variant(new VBDoubleValue(-0d)))).Value);
+        Assert.AreEqual("-0", ValueOf(Conversion().CStr(Variant(new VBSingleValue(-0f)))).Value);
+        Assert.AreEqual("0", ValueOf(Conversion().CStr(Variant(new VBDoubleValue(0d)))).Value);
+    }
+
+    [TestMethod]
     public void CStr_OfABooleanIsItsToken()
         => Assert.AreEqual("True", ValueOf(Conversion().CStr(Variant(VBBooleanValue.True))).Value);
 

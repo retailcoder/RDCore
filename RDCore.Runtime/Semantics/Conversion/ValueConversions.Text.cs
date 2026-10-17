@@ -108,7 +108,8 @@ public static partial class ValueConversions
         var numericValue = value.AsDouble;
         if (numericValue == 0)
         {
-            return VBStringValue.Zero;
+            // a floating-point zero has a sign, and MS-VBA shows it: CStr(Round(-0.5)) is "-0".
+            return double.IsNegative(numericValue) ? "-" + VBStringValue.Zero : VBStringValue.Zero;
         }
 
         if (double.IsPositiveInfinity(numericValue))
