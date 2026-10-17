@@ -11,7 +11,7 @@ namespace RDCore.SDK.Runtime.Abstract.Execution;
 /// <c>Rnd</c> of a session is <c>0.7055475</c>, as it is in a new MS-VBA process.
 /// </para>
 /// <para>
-/// An <c>End</c> does not reset it: the generator belongs to the runtime the program runs in, as MS-VBA's belongs to its host process, not to the program.
+/// An <c>End</c> resets it with the rest of the session: the program that runs next generates the sequence a new session does.
 /// </para>
 /// </remarks>
 public interface ISessionRandomNumberGenerator
@@ -20,4 +20,9 @@ public interface ISessionRandomNumberGenerator
     /// The generator's state: a 24-bit value, from <c>0</c> to <c>16777215</c>, that the next number is generated from.
     /// </summary>
     int Seed { get; set; }
+
+    /// <summary>
+    /// The seed of a session that no program has run in: the one MS-VBA starts a new process with.
+    /// </summary>
+    void Reset();
 }

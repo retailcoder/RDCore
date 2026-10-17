@@ -1,3 +1,6 @@
+using RDCore.Runtime.Execution;
+using RDCore.Runtime.StdLib;
+using RDCore.SDK.Runtime.Abstract.Execution;
 using static RDCore.Tests.Cli.ModuleWorkspace;
 
 namespace RDCore.Tests.Runtime.StdLib;
@@ -273,6 +276,20 @@ public sealed class MathFunctionTests
             """.ReplaceLineEndings("\r\n"));
 
         CollectionAssert.AreEqual(expected, printed, string.Join(" | ", printed));
+    }
+
+    [TestMethod]
+    public void AnEnd_ResetsTheGenerator_SoThatTheNextProgramGeneratesTheSequenceOfANewSession()
+    {
+        var output = new RuntimeOutputBuffer();
+        var (session, outcome) = RuntimeSourceHarness.Run(null, [], output, standardLibrary: true, "Debug.Print Rnd(-1)", "Randomize 5", "Debug.Print Rnd");
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind, outcome.ErrorInfo?.Verbose);
+
+        SessionWipe.End(session);
+
+        var first = new StdMath(session).Rnd();
+        Assert.IsTrue(first.IsSuccess, first.ErrorInfo?.Verbose);
+        Assert.AreEqual(11837123d, (double)first.Result!.Value * 16777216d);
     }
 
     [TestMethod]

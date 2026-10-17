@@ -9,4 +9,6 @@ internal sealed class SessionRandomNumberGenerator : ISessionRandomNumberGenerat
     internal const int InitialSeed = 0x50000;
 
     public int Seed { get; set; } = InitialSeed;
+
+    public void Reset() => Seed = InitialSeed;
 }
