@@ -601,6 +601,60 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Private Enum and user defined types cannot be used as parameters or return types for public procedures, public data members, or fields of public user defined types.
+        /// </summary>
+        public static string VBCompileError_PrivateTypeInPublicMember {
+            get {
+                return ResourceManager.GetString("VBCompileError_PrivateTypeInPublicMember", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Constants, fixed-length strings, arrays, user-defined types and Declare statements not allowed as Public members of object modules.
+        /// </summary>
+        public static string VBCompileError_NotAllowedAsPublicMemberOfObjectModule {
+            get {
+                return ResourceManager.GetString("VBCompileError_NotAllowedAsPublicMemberOfObjectModule", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Cannot define a Public user-defined type within an object module.
+        /// </summary>
+        public static string VBCompileError_PublicUserDefinedTypeInObjectModule {
+            get {
+                return ResourceManager.GetString("VBCompileError_PublicUserDefinedTypeInObjectModule", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is public, and is declared with &apos;{1}&apos;, which is private to its module..
+        /// </summary>
+        public static string VBCompileError_PrivateTypeInPublicMember_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_PrivateTypeInPublicMember_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; cannot be a public member of a class module; declare it Private..
+        /// </summary>
+        public static string VBCompileError_NotAllowedAsPublicMemberOfObjectModule_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_NotAllowedAsPublicMemberOfObjectModule_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to User-defined type &apos;{0}&apos; is public, which a type of a class module cannot be; declare it Private..
+        /// </summary>
+        public static string VBCompileError_PublicUserDefinedTypeInObjectModule_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_PublicUserDefinedTypeInObjectModule_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Numeric literal overflow.
         /// </summary>
         public static string VBCompileError_NumericLiteralOverflow {

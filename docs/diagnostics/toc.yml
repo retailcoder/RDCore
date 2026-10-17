@@ -66,6 +66,12 @@
   href: vbc09334.md
 - name: VBC09335 — Type-declaration character does not match declared data type
   href: vbc09335.md
+- name: VBC09336 — Private Enum and user defined types cannot be used in public members
+  href: vbc09336.md
+- name: VBC09337 — Not allowed as a Public member of an object module
+  href: vbc09337.md
+- name: VBC09338 — Cannot define a Public user-defined type within an object module
+  href: vbc09338.md
 - name: VBR-0001 — Application-defined or object-defined error
   href: vbr-0001.md
 - name: VBR00003 — Return without GoSub

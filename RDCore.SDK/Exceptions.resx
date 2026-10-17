@@ -414,6 +414,24 @@
   <data name="VBCompileError_TypeDeclarationCharacterDoesNotMatch" xml:space="preserve">
     <value>Type-declaration character does not match declared data type</value>
   </data>
+  <data name="VBCompileError_PrivateTypeInPublicMember" xml:space="preserve">
+    <value>Private Enum and user defined types cannot be used as parameters or return types for public procedures, public data members, or fields of public user defined types</value>
+  </data>
+  <data name="VBCompileError_NotAllowedAsPublicMemberOfObjectModule" xml:space="preserve">
+    <value>Constants, fixed-length strings, arrays, user-defined types and Declare statements not allowed as Public members of object modules</value>
+  </data>
+  <data name="VBCompileError_PublicUserDefinedTypeInObjectModule" xml:space="preserve">
+    <value>Cannot define a Public user-defined type within an object module</value>
+  </data>
+  <data name="VBCompileError_PrivateTypeInPublicMember_Verbose" xml:space="preserve">
+    <value>'{0}' is public, and is declared with '{1}', which is private to its module.</value>
+  </data>
+  <data name="VBCompileError_NotAllowedAsPublicMemberOfObjectModule_Verbose" xml:space="preserve">
+    <value>'{0}' cannot be a public member of a class module; declare it Private.</value>
+  </data>
+  <data name="VBCompileError_PublicUserDefinedTypeInObjectModule_Verbose" xml:space="preserve">
+    <value>User-defined type '{0}' is public, which a type of a class module cannot be; declare it Private.</value>
+  </data>
   <data name="VBCompileError_UnspecifiedError" xml:space="preserve">
     <value>Unspecified error</value>
   </data>

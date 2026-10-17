@@ -68,6 +68,9 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[VBC09333](vbc09333.md)|Variable required — an expression that is not a variable is where a statement requires one|
 |[VBC09334](vbc09334.md)|Access not valid for the file mode — the Access clause of an Open is not one its For mode allows|
 |[VBC09335](vbc09335.md)|Type-declaration character does not match declared data type — a name is written with the character of a type other than the one it was declared as|
+|[VBC09336](vbc09336.md)|Private Enum and user defined types cannot be used in public members — a public member is declared with a private Enum, or in a class with a private type|
+|[VBC09337](vbc09337.md)|Not allowed as a Public member of an object module — a class exposes a constant, fixed-length string, array, user-defined type or Declare|
+|[VBC09338](vbc09338.md)|Cannot define a Public user-defined type within an object module — a class module declares a public Type|
 
 ### Runtime errors
 

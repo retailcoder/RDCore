@@ -94,5 +94,8 @@ public record class VBCompileErrorInfo : VBErrorInfo
         [VBCompileErrorId.VariableRequired] = Exceptions.VBCompileError_VariableRequired,
         [VBCompileErrorId.FileAccessNotValidForMode] = Exceptions.VBCompileError_FileAccessNotValidForMode,
         [VBCompileErrorId.TypeDeclarationCharacterDoesNotMatch] = Exceptions.VBCompileError_TypeDeclarationCharacterDoesNotMatch,
+        [VBCompileErrorId.PrivateTypeInPublicMember] = Exceptions.VBCompileError_PrivateTypeInPublicMember,
+        [VBCompileErrorId.NotAllowedAsPublicMemberOfObjectModule] = Exceptions.VBCompileError_NotAllowedAsPublicMemberOfObjectModule,
+        [VBCompileErrorId.PublicUserDefinedTypeInObjectModule] = Exceptions.VBCompileError_PublicUserDefinedTypeInObjectModule,
     };
 }

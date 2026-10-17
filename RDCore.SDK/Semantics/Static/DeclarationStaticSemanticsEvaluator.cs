@@ -26,6 +26,8 @@ namespace RDCore.SDK.Semantics.Static;
 /// type (<strong>MS-VBAL §5.6.16.7</strong>). Of a field of a user-defined type and of a local constant, only that much is checked: a procedural module is
 /// refused there, and a name that does not resolve is not. Whether a name resolves can only be told once everything the declaration can see is defined,
 /// which is why this rule is one a caller asks for (<see cref="DeclarationRules.DeclaredTypes"/>).</item>
+/// <item>What a module exposes (<see cref="PublicMemberSemantics"/>): a public member is not declared with a private type, and a class module exposes no
+/// constant, array, user-defined type or <c>Declare</c>. A rule of the declared types too, and asked for with them.</item>
 /// <item>A class module is also checked for what it declares about events (<see cref="ClassModuleEventSemantics"/>) and for what its
 /// <c>Implements</c> directives require (<see cref="ImplementsSemantics"/>).</item>
 /// </list>
@@ -48,6 +50,9 @@ public static class DeclarationStaticSemanticsEvaluator
         if (rules.HasFlag(DeclarationRules.DeclaredTypes))
         {
             CheckDeclaredTypes(module, members, resolver, errors);
+
+            // which types a public member may be declared with depends on the types its declarations name, resolved.
+            errors.AddRange(PublicMemberSemantics.Evaluate(module, members, resolver));
         }
 
         if (module is VBClassModuleSymbol classModule)

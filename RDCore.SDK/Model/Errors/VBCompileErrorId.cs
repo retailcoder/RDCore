@@ -316,6 +316,27 @@ public enum VBCompileErrorId
     /// <a href="https://learn.microsoft.com/office/vba/language/reference/user-interface-help/type-declaration-character-does-not-match-declared-data-type">learn.microsoft.com</a>
     /// </summary>
     TypeDeclarationCharacterDoesNotMatch = 9335,
+    /// <summary>
+    /// A public member names a private <c>Enum</c> in its signature - the type of a public variable, of a parameter or the result of a public
+    /// procedure, of a field of a public user-defined type - or, in a class module, a private user-defined type.<br/>
+    /// <strong>MS-VBAL §5.2.3.1</strong> Variable Declarations, <strong>§5.3.1</strong> Procedure Declarations.
+    /// </summary>
+    /// <remarks>
+    /// 👉 The message says "user defined types", but MS-VBA accepts a private user-defined type in the public members of a procedural module
+    /// (recorded in Excel): in a procedural module only a private <c>Enum</c> is refused.
+    /// </remarks>
+    PrivateTypeInPublicMember = 9336,
+    /// <summary>
+    /// A class module declares a constant, a fixed-length string, an array, a user-defined type or a <c>Declare</c> statement as a public
+    /// member: what an object module exposes is reached through an object, which has no room for them.<br/>
+    /// <strong>MS-VBAL §5.2.3.1</strong> Variable Declarations.
+    /// </summary>
+    NotAllowedAsPublicMemberOfObjectModule = 9337,
+    /// <summary>
+    /// A class module declares a <c>Public Type</c>: a user-defined type of an object module is private to it.<br/>
+    /// <strong>MS-VBAL §5.2.3.3</strong> User Defined Type Declarations.
+    /// </summary>
+    PublicUserDefinedTypeInObjectModule = 9338,
 
 
     /***********************************************************************************************

@@ -414,6 +414,24 @@
   <data name="VBCompileError_TypeDeclarationCharacterDoesNotMatch" xml:space="preserve">
     <value>Le caractère de déclaration de type ne correspond pas au type de données déclaré</value>
   </data>
+  <data name="VBCompileError_PrivateTypeInPublicMember" xml:space="preserve">
+    <value>Les Enum privés et les types définis par l'utilisateur ne peuvent pas être utilisés comme paramètres ou types de retour de procédures publiques, comme membres de données publics, ni comme champs de types définis par l'utilisateur publics</value>
+  </data>
+  <data name="VBCompileError_NotAllowedAsPublicMemberOfObjectModule" xml:space="preserve">
+    <value>Les constantes, les chaînes de longueur fixe, les tableaux, les types définis par l'utilisateur et les instructions Declare ne sont pas permis comme membres Public d'un module objet</value>
+  </data>
+  <data name="VBCompileError_PublicUserDefinedTypeInObjectModule" xml:space="preserve">
+    <value>Impossible de définir un type défini par l'utilisateur Public dans un module objet</value>
+  </data>
+  <data name="VBCompileError_PrivateTypeInPublicMember_Verbose" xml:space="preserve">
+    <value>'{0}' est public et est déclaré avec '{1}', qui est privé à son module.</value>
+  </data>
+  <data name="VBCompileError_NotAllowedAsPublicMemberOfObjectModule_Verbose" xml:space="preserve">
+    <value>'{0}' ne peut pas être un membre public d'un module de classe; déclarez-le Private.</value>
+  </data>
+  <data name="VBCompileError_PublicUserDefinedTypeInObjectModule_Verbose" xml:space="preserve">
+    <value>Le type défini par l'utilisateur '{0}' est public, ce que ne peut pas être un type d'un module de classe; déclarez-le Private.</value>
+  </data>
   <data name="VBCompileError_UnspecifiedError" xml:space="preserve">
     <value>Erreur non spécifiée</value>
   </data>
