@@ -185,7 +185,7 @@ public static partial class ValueConversions
     };
 
     // the decimal number a fixed-point value is; null for one that is not one of the fixed-point types.
-    private static decimal? FixedValueOf(VBTypedValue value) => value switch
+    internal static decimal? FixedValueOf(VBTypedValue value) => value switch
     {
         VBCurrencyValue currency => currency.Value.Value,
         VBDecimalValue decimalValue => decimalValue.Value,

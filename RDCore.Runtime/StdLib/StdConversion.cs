@@ -1,3 +1,4 @@
+using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics.Conversion;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Types;
@@ -19,8 +20,11 @@ namespace RDCore.Runtime.StdLib;
 /// machinery of an assignment, so they get it from <see cref="ValueConversions"/> — the conversions Let-coercion
 /// itself is built on.
 /// <para>
-/// 🚧 An object argument raises Type mismatch rather than being read through its default member
-/// (<strong>MS-VBAL §5.5.1.2.13</strong>): that is an invocation, which a conversion is not. TODO.
+/// An object argument stands for its simple data value (<strong>MS-VBAL §5.5.1.2.13</strong>), read through its default member
+/// (<see cref="ObjectDefaultMember.ValueOf"/>) where the function reads the value of its argument - every function but
+/// <see cref="CVar"/>, which returns its argument, object or not. A function that answers a <c>Null</c> argument with <c>Null</c> answers
+/// a <c>Null</c> read from an object the same way only if MS-VBA does: <see cref="Int"/> and <see cref="Fix"/> do, and <see cref="Hex"/>,
+/// <see cref="Oct"/> and <see cref="Str"/> raise error 94 instead, as Let-coercing it does (recorded in Excel).
 /// </para>
 /// <para>
 /// 👉 The specification's text for <see cref="Fix"/> says the result is "the smallest integer greater than or
@@ -37,8 +41,9 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
     // MS-VBAL 6.1.2.3.1.14: "If the resulting data value is not in the inclusive range 0 to 65535, Error 5 is raised."
     private const int LargestErrorCode = 65535;
 
-    // MS-VBAL 6.1.2.3.1.15: "Otherwise, the data value is "Application-defined or object-defined error.""
-    private const string UnknownErrorText = "Application-defined or object-defined error.";
+    // MS-VBAL 6.1.2.3.1.15: "Otherwise, the data value is "Application-defined or object-defined error."" - the period ends the specification's
+    // sentence: MS-VBA's text is error 1004's, which has none (recorded in Excel: Error(42)).
+    private static string UnknownErrorText => VBRuntimeErrorInfo.VBRuntimeErrors[VBRuntimeErrorId.ApplicationDefinedOrObjectDefinedError];
 
     private static RuntimeSemanticsEvaluationResult<TValue> Fail<TValue>(VBRuntimeErrorId id, string verbose)
         where TValue : VBTypedValue
@@ -222,7 +227,15 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
     // down to the next integer, and they agree for everything but a negative fraction.
     private RuntimeSemanticsEvaluationResult<VBVariantValue> Integral(VBVariantValue number, bool floor)
     {
-        var source = Unwrapped(number);
+        // an object is what its default member returns, a Null that is returned as Null included.
+        var read = ObjectDefaultMember.ValueOf(session, number);
+        if (!read.IsSuccess)
+        {
+            return RuntimeSemanticsEvaluationResult<VBVariantValue>.Error(read.ErrorInfo!);
+        }
+
+        var source = read.Result!;
+        number = new VBVariantValue(source);
         switch (source)
         {
             case VBNullValue:
@@ -453,11 +466,18 @@ public sealed partial class StdConversion(IRuntimeSession session) : IStdConvers
     // "If the value of Expression is an Error data value then return the [type] data value that is the result of
     // the Long error code of the Error data value being Let-coerced to [type]" - the error code stands in for the
     // Error, so `CInt(CVErr(13))` is 13, not a type mismatch.
-    private static RuntimeSemanticsEvaluationResult<TValue> Convert<TValue>(
+    // An object is converted as its simple data value (MS-VBAL 5.5.1.2.13), as Let-coercing it would be.
+    private RuntimeSemanticsEvaluationResult<TValue> Convert<TValue>(
         VBVariantValue expression, Func<VBTypedValue, ValueConversionResult> conversion, string destinationName, bool errorAsCode)
         where TValue : VBTypedValue
     {
-        var source = Unwrapped(expression);
+        var read = ObjectDefaultMember.ValueOf(session, expression);
+        if (!read.IsSuccess)
+        {
+            return RuntimeSemanticsEvaluationResult<TValue>.Error(read.ErrorInfo!);
+        }
+
+        var source = read.Result!;
         if (errorAsCode && source is VBErrorValue error)
         {
             source = new VBLongValue(error.Value);

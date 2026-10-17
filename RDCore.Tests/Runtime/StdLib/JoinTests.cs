@@ -72,8 +72,8 @@ public sealed class JoinTests
         Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().Join(VariantArray(new VBStringValue("a"), StringArray("b").TypedValue))));
         Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().Join(VariantArray(new VBStringValue("a"), new VBErrorValue(5)))));
         Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().Join(VariantArray(new VBStringValue("a"), VBMissingValue.Missing))));
-        // 🚧 an object that is not Nothing: its default member is not read.
-        Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().Join(VariantArray(new VBStringValue("a"), new VBObjectValue(new VBRuntimeObjectId())))));
+        // an object is its default member's value, which an object of no class has none of (DefaultMemberTests).
+        Assert.AreEqual((int)VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, ErrorOf(Module().Join(VariantArray(new VBStringValue("a"), new VBObjectValue(new VBRuntimeObjectId())))));
     }
 
     [TestMethod]

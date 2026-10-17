@@ -155,6 +155,11 @@ public record class VBObjectLetCoercionRuntimeSemantics(
             VBNothingValue when frame.SourceValue is VBTypedValue
                 => OnLetCoercionObjectVariableNotSet(expression, Exceptions.LetCoercionRuntimeErrorExceptionObjectVariableNotSet),
 
+            // an object variable that is Nothing holds a reference to no object rather than the Nothing literal's value, and is Nothing all the same:
+            // "Nothing -> Any type: Runtime error 91". There is no instance to look its class up by.
+            VBObjectValue reference when reference.IsNothing()
+                => OnLetCoercionObjectVariableNotSet(expression, Exceptions.LetCoercionRuntimeErrorExceptionObjectVariableNotSet),
+
             // a VBObjectValue's own TypeInfo is always the generic VBObjectType (never a VBClassType) -
             // GetObjectSimpleDataValue resolves the real class itself, via Session.
             VBObjectValue objectValue

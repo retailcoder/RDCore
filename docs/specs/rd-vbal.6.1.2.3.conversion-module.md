@@ -9,6 +9,27 @@ The `Conversion` module is represented in the SDK by the interface
 The `Conversion` module's declarations follow MS-VBAL's own _Function Declaration_ blocks (**MS-VBAL §6.1.2.3**),
 declaration by declaration, including their return types and their `Optional` parameters.
 
+### An object argument
+
+A function that reads the value of its argument reads an object's _simple data value_ (**MS-VBAL §5.5.1.2.13**):
+what its default member returns, called with no arguments. That is every function of the module but `CVar`, which
+returns its argument, object or not. As in MS-VBA (recorded in Excel), `Nothing` is error 91, an object with no default
+member that can be called with no arguments is error 438, and an error its default member raises is the function's.
+`Int` and `Fix` answer a `Null` read from an object with `Null`, as they answer `Null`; `Hex`, `Oct` and `Str` raise
+error 94 for it, as MS-VBA does, although they answer a `Null` argument with `Null`. The `Math` module reads its
+arguments the same way ([**RD-VBAL §6.1.2.10** Math](rd-vbal.6.1.2.10.math.md)).
+
+👉 A default member that returns an object stands for that object's simple data value in turn, as Let-coercing the
+object would make it. MS-VBA raises error 51 for it instead, an internal error, which RD-VBA does not raise for a
+specified input.
+
+MS-VBA refuses some of these at compile time: a `Nothing` literal ("Invalid use of object"), an object whose default
+member takes an argument, such as a `Collection` ("Argument not optional"), and, given to `CInt`, an object whose
+default member is declared `As Object` ("Type mismatch") - which `Abs` takes, and raises error 51 for at run time.
+
+`Error` of a number that is no run-time error is "Application-defined or object-defined error", without the period
+that ends the specification's sentence (MS-VBA, recorded in Excel).
+
 
 ## 6.1.2.3.1 Public Functions
 
