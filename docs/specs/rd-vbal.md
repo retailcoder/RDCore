@@ -178,7 +178,7 @@ The publisher of the **RDCore** platform project and of _this present documentat
 |2026-10-11|1.12|[§2.4.1.2](rd-vbal.2.4.1.intrinsic-types.md) `String` trailing byte; [§5.5.1.2](rd-vbal.5.5.1.2.runtime-semantics.md) let-coercion gaps; name resolution and type expressions; `Mid`, `Print`, `Write #`; [§6.1.2.2](rd-vbal.6.1.2.2.constants-module.md) Constants|
 |2026-10-16|1.13|[§6.1.2.11](rd-vbal.6.1.2.11.strings.md) Strings members and `$` functions; omitted `Optional` arguments and Missing|
 |2026-10-17|1.14|[§5.5.1.2](rd-vbal.5.5.1.2.runtime-semantics.md) regional settings for reading a `String`; [§2.6.2](rd-vbal.2.6.2.semantic-compilation-errors.md) `VBC09336`–`VBC09338`; `ReDim` locks|
-|2026-10-17|1.15|[§6.1.2.11](rd-vbal.6.1.2.11.strings.md) the `Format` family, `MonthName`, `WeekdayName`; `StrConv` East Asian conversions; objects' default members, and their errors (`438`, `450`, `13`) checked against MS-VBA; [§5.6.9.2](rd-vbal.5.6.9.2.simple-data-operators.md) an operand that is an object is its simple data value|
+|2026-10-17|1.15|[§6.1.2.11](rd-vbal.6.1.2.11.strings.md) the `Format` family, `MonthName`, `WeekdayName`; `StrConv` East Asian conversions; objects' default members; [§5.6.9.2](rd-vbal.5.6.9.2.simple-data-operators.md) object operands|
 
 ### Section map (1.9)
 
