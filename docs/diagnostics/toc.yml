@@ -74,6 +74,8 @@
   href: vbc09337.md
 - name: VBC09338 — Cannot define a Public user-defined type within an object module
   href: vbc09338.md
+- name: VBC09339 — Argument not optional
+  href: vbc09339.md
 - name: VBR-0001 — Application-defined or object-defined error
   href: vbr-0001.md
 - name: VBR00003 — Return without GoSub

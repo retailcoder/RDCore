@@ -2,6 +2,7 @@
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Static;
 
 namespace RDCore.SDK.Runtime.Abstract.StdLib;
 
@@ -24,7 +25,7 @@ public interface IStdMathModule
     /// </remarks>
     /// <param name="Number">Any <em>data value</em></param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> Abs(VBVariantValue Number);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> Abs([StdLibValue(ValueDestination.AnyValue)] VBVariantValue Number);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.10.2 Atn</strong>
@@ -110,7 +111,7 @@ public interface IStdMathModule
     /// </remarks>
     /// <param name="Number">Any <see cref="VBVariantValue"/> containing a valid numeric value (i.e. not <c>NaN</c>).</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> Sgn(VBVariantValue Number);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> Sgn([StdLibValue] VBVariantValue Number);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.10.9 Sin</strong>

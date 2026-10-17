@@ -391,6 +391,13 @@ public static class StatementStaticSemanticsEvaluator
                     ExpressionStaticSemanticsEvaluator.MarkPassedAsArguments(context, callStatement.Arguments);
                 }
 
+                // an object given to a parameter that expects a value of it must have one (MS-VBAL §5.5.1.1).
+                if (ObjectValueStaticSemantics.ParametersOfCallee(context, callStatement.Callee) is { } parameters
+                    && ObjectValueStaticSemantics.ArgumentsError(context, parameters, callStatement.Arguments) is { } argumentError)
+                {
+                    walk.Errors.Add(argumentError);
+                }
+
                 if (callStatement.IsExplicitCall && context.Facts is { } explicitFacts && explicitFacts.TryGet(callStatement.Callee.Identity, out var explicitCallee))
                 {
                     explicitFacts.Record(explicitCallee with { Flags = explicitCallee.Flags | ValueExpressionSemanticFlags.ExplicitCallKeyword });

@@ -97,10 +97,15 @@ internal static class ObjectDefaultMember
     /// <remarks>
     /// A function that computes with the value of a <c>Variant</c> argument - <c>CInt</c>, <c>Abs</c>, <c>Round</c> - is given an object as it
     /// is, a <c>Variant</c> holding objects as well as values; the Let-coercion its declared <c>Variant</c> parameter does not do is this one.
-    /// It is what MS-VBA does (recorded in Excel): <c>Nothing</c> is error 91, an object with no default member that can be called with no
-    /// arguments is error 438, and an error the default member raises is the function's. A default member that returns an object stands for
-    /// that object's simple data value in turn, as Let-coercing the object it returned would make it; MS-VBA raises error 51 instead, an
-    /// internal error, which RD-VBA never raises for a specified input.
+    /// It is what MS-VBA does (recorded in Excel): <c>Nothing</c> is error 91, and an error the default member raises is the function's. A default
+    /// member that returns an object stands for that object's simple data value in turn, as Let-coercing the object it returned would make it.
+    /// <para>
+    /// What has no value is the error <strong>MS-VBAL §5.6.2.2</strong> and <strong>§5.6.2.3</strong> say it is, and what MS-VBA raises for most of
+    /// its functions: an object with no default member is error 438; one whose default member takes an argument (a <c>Collection</c>'s <c>Item</c>)
+    /// is error 450, which the specification leaves unsaid; and an object that a default member returned, and that has no value, is error 13 - "the
+    /// implementation ... can raise error 9 (Subscript out of range) or 13 (Type mismatch)". 👉 MS-VBA's functions do not all agree: its
+    /// <c>Format</c> raises 438 for the last, and its <c>Abs</c> and <c>Int</c> raise 438 for a <c>Collection</c>.
+    /// </para>
     /// </remarks>
     /// <param name="session">The session the object lives in.</param>
     /// <param name="argument">The argument, as the function was given it.</param>
@@ -124,8 +129,7 @@ internal static class ObjectDefaultMember
 
             if (Call(session, reference) is not { } called)
             {
-                return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, default,
-                    "The object has no default member that can be called with no arguments."));
+                return RuntimeSemanticsEvaluationResult.Error(NoValue(session, reference, returnedByADefaultMember: depth > 0));
             }
 
             if (!called.IsSuccess)
@@ -137,6 +141,28 @@ internal static class ObjectDefaultMember
         }
 
         return RuntimeSemanticsEvaluationResult.Success(value);
+    }
+
+    /// <summary>
+    /// The error of an object that has no simple data value (<strong>MS-VBAL §5.6.2.2</strong>, <strong>§5.6.2.3</strong>): 13 for one a default member
+    /// returned; otherwise 450 when its default member takes an argument, and 438 when it has none.
+    /// </summary>
+    /// <param name="session">The session the object lives in.</param>
+    /// <param name="reference">The object, which is not <c>Nothing</c>.</param>
+    /// <param name="returnedByADefaultMember">Whether the object is what a default member returned, rather than the value that was read.</param>
+    public static VBRuntimeErrorInfo NoValue(IRuntimeSession session, VBObjectValue reference, bool returnedByADefaultMember)
+    {
+        if (returnedByADefaultMember)
+        {
+            return VBRuntimeErrorInfo.For(VBRuntimeErrorId.TypeMismatch, default,
+                "A default member returned an object that has no value of its own (MS-VBAL 5.6.2.3).");
+        }
+
+        return session.Symbols.TryGetInstance(reference.Value, out var instance) && VBClassType.FromClassModule(instance.ClassModule).DefaultMember is not null
+            ? VBRuntimeErrorInfo.For(VBRuntimeErrorId.WrongNumberOfArgumentsOrInvalidPropertyAssignment, default,
+                "The object's default member takes an argument, which reading its value does not give it.")
+            : VBRuntimeErrorInfo.For(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, default,
+                "The object has no default member to read its value from.");
     }
 
     // a Variant holds whatever it was given, another Variant included, so this goes all the way down.

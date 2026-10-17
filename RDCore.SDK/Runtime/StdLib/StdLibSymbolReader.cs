@@ -419,7 +419,25 @@ public sealed class StdLibSymbolReader
                 declaredType, parameter.IsOptional, DefaultValueOf(parameter, declaredType, name, method, memberUri));
 
             // the declared default stays: it is what a caller with no calling module gets.
-            builder.Add(optionCompare ? (VBParameterSymbol)symbol.With(SymbolProperties.DefaultsToOptionCompare, true) : symbol);
+            if (optionCompare)
+            {
+                symbol = (VBParameterSymbol)symbol.With(SymbolProperties.DefaultsToOptionCompare, true);
+            }
+
+            // a Variant parameter that reads the value of its argument, as MS-VBA compiles it, which its declared type does not say.
+            if (parameter.GetCustomAttribute<StdLibValueAttribute>() is { } value)
+            {
+                if (declared != typeof(VBVariantValue))
+                {
+                    throw new InvalidOperationException(
+                        $"'{name}' in '{method.DeclaringType?.Name}.{method.Name}' states that it reads a value, which only a Variant parameter needs " +
+                        "to say: one declared with a value type reads a value of that type.");
+                }
+
+                symbol = (VBParameterSymbol)symbol.With(SymbolProperties.ValueDestination, value.Destination);
+            }
+
+            builder.Add(symbol);
         }
 
         return builder.ToImmutable();

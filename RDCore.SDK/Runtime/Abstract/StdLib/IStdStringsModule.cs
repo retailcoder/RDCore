@@ -1,5 +1,6 @@
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Static;
 
 namespace RDCore.SDK.Runtime.Abstract.StdLib;
 
@@ -244,7 +245,7 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="LCase"/>
     [StdLibMember("LCase$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> LCaseString(VBVariantValue @string);
+    RuntimeSemanticsEvaluationResult<VBStringValue> LCaseString([StdLibValue] VBVariantValue @string);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.19 Left</strong> Gets a given number of characters from the start of a string.
@@ -259,21 +260,21 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="Left"/>
     [StdLibMember("Left$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> LeftString(VBVariantValue @string, VBLongValue length);
+    RuntimeSemanticsEvaluationResult<VBStringValue> LeftString([StdLibValue] VBVariantValue @string, VBLongValue length);
 
     /// <inheritdoc cref="LeftB"/>
     [StdLibMember("LeftB$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> LeftBString(VBVariantValue @string, VBLongValue length);
+    RuntimeSemanticsEvaluationResult<VBStringValue> LeftBString([StdLibValue] VBVariantValue @string, VBLongValue length);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.22 Len</strong> Gets the number of characters in a string, or the number of bytes a value of some other type occupies.
     /// </summary>
     /// <param name="expression">The string, or a variable of any type.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> Len(VBVariantValue expression);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> Len([StdLibValue(ValueDestination.AnyValue)] VBVariantValue expression);
 
     /// <inheritdoc cref="Len"/>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> LenB(VBVariantValue expression);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> LenB([StdLibValue(ValueDestination.AnyValue)] VBVariantValue expression);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.23 LTrim</strong> Gets a string with its <em>leading</em> spaces removed.
@@ -284,7 +285,7 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="LTrim"/>
     [StdLibMember("LTrim$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> LTrimString(VBVariantValue @string);
+    RuntimeSemanticsEvaluationResult<VBStringValue> LTrimString([StdLibValue] VBVariantValue @string);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.23 RTrim</strong> Gets a string with its <em>trailing</em> spaces removed.
@@ -295,7 +296,7 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="RTrim"/>
     [StdLibMember("RTrim$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> RTrimString(VBVariantValue @string);
+    RuntimeSemanticsEvaluationResult<VBStringValue> RTrimString([StdLibValue] VBVariantValue @string);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.23 Trim</strong> Gets a string with both its leading and its trailing spaces removed.
@@ -306,7 +307,7 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="Trim"/>
     [StdLibMember("Trim$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> TrimString(VBVariantValue @string);
+    RuntimeSemanticsEvaluationResult<VBStringValue> TrimString([StdLibValue] VBVariantValue @string);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.25 Mid</strong> Gets a given number of characters of a string, from a given position.
@@ -322,11 +323,11 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="Mid"/>
     [StdLibMember("Mid$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> MidString(VBVariantValue @string, VBLongValue start, VBVariantValue? length = default);
+    RuntimeSemanticsEvaluationResult<VBStringValue> MidString([StdLibValue] VBVariantValue @string, VBLongValue start, VBVariantValue? length = default);
 
     /// <inheritdoc cref="MidB"/>
     [StdLibMember("MidB$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> MidBString(VBVariantValue @string, VBLongValue start, VBVariantValue? length = default);
+    RuntimeSemanticsEvaluationResult<VBStringValue> MidBString([StdLibValue] VBVariantValue @string, VBLongValue start, VBVariantValue? length = default);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.28 MonthName</strong> Gets the name of a month, in the environment's own regional settings.
@@ -364,11 +365,11 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="Right"/>
     [StdLibMember("Right$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> RightString(VBVariantValue @string, VBLongValue length);
+    RuntimeSemanticsEvaluationResult<VBStringValue> RightString([StdLibValue] VBVariantValue @string, VBLongValue length);
 
     /// <inheritdoc cref="RightB"/>
     [StdLibMember("RightB$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> RightBString(VBVariantValue @string, VBLongValue length);
+    RuntimeSemanticsEvaluationResult<VBStringValue> RightBString([StdLibValue] VBVariantValue @string, VBLongValue length);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.33 Space</strong> Gets a string of a given number of spaces.
@@ -451,7 +452,7 @@ public interface IStdStringsModule
 
     /// <inheritdoc cref="UCase"/>
     [StdLibMember("UCase$")]
-    RuntimeSemanticsEvaluationResult<VBStringValue> UCaseString(VBVariantValue @string);
+    RuntimeSemanticsEvaluationResult<VBStringValue> UCaseString([StdLibValue] VBVariantValue @string);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.43 WeekdayName</strong> Gets the name of a day of the week, in the environment's own regional settings.

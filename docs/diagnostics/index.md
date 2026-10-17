@@ -72,6 +72,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[VBC09336](vbc09336.md)|Private Enum and user defined types cannot be used in public members — a public member is declared with a private Enum, or in a class with a private type|
 |[VBC09337](vbc09337.md)|Not allowed as a Public member of an object module — a class exposes a constant, fixed-length string, array, user-defined type or Declare|
 |[VBC09338](vbc09338.md)|Cannot define a Public user-defined type within an object module — a class module declares a public Type|
+|[VBC09339](vbc09339.md)|Argument not optional — an object whose default member takes an argument is where a value is expected|
 
 ### Runtime errors
 
