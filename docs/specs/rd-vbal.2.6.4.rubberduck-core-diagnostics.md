@@ -57,7 +57,7 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC01001`](../diagnostics/rdc01001.md)|Use meaningful identifier names|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.MeaningfulNames`|
 |[`RDC01002`](../diagnostics/rdc01002.md)|Hungarian notation|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.HungarianNotation`|
 |[`RDC11005`](../diagnostics/rdc11005.md)|Bitwise operator|Hint|`ProcedureSemanticModel.Runtime`: `LogicalOperatorSemanticFlags.IsBitwiseSemantics` of the `LogicalOperatorFact`s|
-|[`RDC11006`](../diagnostics/rdc11006.md)|Ambiguous concatenation|Warning|`ProcedureSemanticModel.Runtime`: `ArithmeticOperatorSemanticFlags.VBStringEffectiveType` of the `ArithmeticOperatorFact`s of `+`|
+|[`RDC11006`](../diagnostics/rdc11006.md)|Ambiguous concatenation|Information|`ProcedureSemanticModel.Runtime`: `ArithmeticOperatorSemanticFlags.VBStringEffectiveType` of the `ArithmeticOperatorFact`s of `+`|
 
 What the host's static pass found wrong with the code is not an opinion: it is reported as the `VBC` compile error it is, by the same
 extension, from the same model. Likewise, a run-time error that evaluating the code finds an instruction raises *whenever it runs* (`RuntimeFacts.Errors`) is reported

@@ -24,7 +24,7 @@ internal sealed class AmbiguousConcatenationAnalyzer : IModuleAnalyzer
             .Select(op => new AnalyzerFinding(
                 RDCoreDiagnosticId.AmbiguousConcatenation,
                 op.Location.Range,
-                DiagnosticSeverity.Warning,
+                DiagnosticSeverity.Information,
                 AnalyzerMessages.Format(
                     RDCoreDiagnosticsResources.AmbiguousConcatenation_Message,
                     op.Operator)));

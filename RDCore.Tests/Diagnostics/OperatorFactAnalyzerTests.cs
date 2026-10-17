@@ -27,7 +27,7 @@ public sealed class OperatorFactAnalyzerTests
         var finding = (await FindAsync(new AmbiguousConcatenationAnalyzer(), "ByVal s As String, ByVal t As String", "Dim r As String", "r = s + t")).Single();
 
         Assert.AreEqual(RDCoreDiagnosticId.AmbiguousConcatenation, finding.Id);
-        Assert.AreEqual(DiagnosticSeverity.Warning, finding.Severity);
+        Assert.AreEqual(DiagnosticSeverity.Information, finding.Severity);
         Assert.AreEqual(4, finding.Range.Start.Line);
     }
 
