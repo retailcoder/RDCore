@@ -225,6 +225,12 @@
   <data name="VBForLoopNotInitialized_Verbose" xml:space="preserve">
     <value>This For loop's Next statement ran without its own For header ever running in this call - a GoTo jumped directly into the loop body, so the start, end, and step values were never evaluated.</value>
   </data>
+  <data name="VBForLoopOperandIsNotANumber_Verbose" xml:space="preserve">
+    <value>The start, the end and the step of a For loop are numbers: this one cannot be read as a number (MS-VBAL 5.4.2.3).</value>
+  </data>
+  <data name="VBForLoopOperandNotOfLoopType_Verbose" xml:space="preserve">
+    <value>This For loop counts in {0}, and its start, end or step is not a value of that type.</value>
+  </data>
   <data name="VBForEach_ObjectVariableNotSet_Verbose" xml:space="preserve">
     <value>This For Each loop's collection expression is Nothing. Enumerating it requires invoking its _NewEnum member, which cannot be done on an object reference that isn't set.</value>
   </data>

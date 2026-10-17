@@ -106,7 +106,7 @@ public sealed class RuntimeProcedureInvokerTests
         var withStatement = new WithStatementRuntimeSemantics(new SetCoercionRuntimeSemantics(formatter), letCoercion);
         var withTargets = new WithTargetEvaluator(expressionEvaluator, withStatement);
         var cases = new CaseMatchEvaluator(expressionEvaluator, operators);
-        var forLoop = new ForLoopEvaluator(expressionEvaluator, operators);
+        var forLoop = new ForLoopEvaluator(expressionEvaluator, operators, letCoercion);
         var forEach = new ForEachEvaluator(expressionEvaluator, operators, new SetCoercionRuntimeSemantics(formatter));
         var jumpTable = new JumpTableEvaluator(expressionEvaluator, letCoercion);
         var errorHandling = new ErrorHandlingEvaluator(expressionEvaluator, letCoercion);

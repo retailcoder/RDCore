@@ -27,6 +27,12 @@ public readonly record struct ForLoopState(Symbol Counter, ExpressionNode Contro
     public VBSymbolDescValue CounterTarget { get; } = new(Counter);
 
     /// <summary>
+    /// Whether <see cref="Step"/> is negative: the loop counts down to <see cref="End"/>, and completes when the counter falls below it, rather than up
+    /// to it. Known once, as the step is.
+    /// </summary>
+    public bool CountsDown { get; init; }
+
+    /// <summary>
     /// The let-assignment of the counter on every <c>Next</c>, located at <see cref="ControlExpression"/>: made once for the loop rather than once for
     /// each iteration.
     /// </summary>

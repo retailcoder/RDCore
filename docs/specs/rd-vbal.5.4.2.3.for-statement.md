@@ -31,13 +31,16 @@ A `For` loop needs per-activation state. Its opener stores a
 
 1. Evaluate `start-value`, `end-value` and `step-increment` once each, in that order. A missing `step-clause`
    defaults to the integer value `1`; that default is never itself evaluated as a source expression.
-2. Let-assign the counter to `start-value`, through the same Let-assignment machinery a `Let` statement uses
+2. Let-coerce all three to the type the loop counts in (see below): an object to its default member's value, a
+   `String` to the number it reads as. A value that is no number raises what Let-coercing it raises: 13, or 94 for
+   `Null`.
+3. Let-assign the counter to `start-value`, through the same Let-assignment machinery a `Let` statement uses
    ([**RD-VBAL §5.4.3.8** Let Statement](rd-vbal.5.4.3.8.let-statement.md)).
-3. Store `end` and `step`, together with the counter symbol and the counter's own expression node, as a
+4. Store `end` and `step`, together with the counter symbol and the counter's own expression node, as a
    `ForLoopState`, for every later step to reuse.
-4. Check steps 1 and 2 of the **MS-VBAL §5.4.2.3** algorithm immediately: "if step is zero or positive and the
+5. Check steps 1 and 2 of the **MS-VBAL §5.4.2.3** algorithm immediately: "if step is zero or positive and the
    counter already exceeds end", and "if step is negative and the counter already falls short".
-5. When the counter is already out of range, branch to
+6. When the counter is already out of range, branch to
    [Instruction](../api/RDCore.SDK.Semantics.Instructions.Instruction.html)`.End`, right past the loop. Otherwise, fall
    through into the body.
 
@@ -53,6 +56,33 @@ A `For` loop needs per-activation state. Its opener stores a
 5. Re-test the counter in the same way as `ForOpener`: branch back to the body (`Instruction.Target`) while the counter
    is still in range, and fall through past the loop otherwise.
 
+### The type a loop counts in
+
+**MS-VBAL §5.4.2.3** checks that the start, the end and the step are "Let-coercible to Double", then proceeds "using
+the original, uncoerced values". Compared as they are, the counter of `For i = 1 To "40"` would never exceed `"40"`: a
+number is less than any `String` (**MS-VBAL §5.6.9.5**), and the loop would not end. The values are checked so that
+they can be counted with: RD-VBA counts with them as numbers, as MS-VBA does, which counts that loop 40 times (recorded
+in Excel, as is the rest of this section).
+
+A counter of a declared type counts in that type, and its start, end and step are Let-coerced to it:
+`For k = 1 To 2.6` counts to 3 with an `Integer` `k`, and `Step 0.5` is a step of 0.
+
+A `Variant` counter counts in the widest type of its start, end and step:
+
+|Rank|Type|Of|
+|---|---|---|
+|1|`Byte`|`Byte`; and of a loop whose start, end and step are all `Empty`|
+|2|`Integer`|`Integer`, `Boolean`|
+|3|`Long`|`Long`|
+|4|`LongLong`|`LongLong`|
+|5|`Double`|`Single`, `Double`, `String`|
+|6|`Currency`|`Currency`|
+|7|`Date` or `Decimal`|`Date`, `Decimal`: of a tie between the two, the end's type wins over the start's, and the step's over neither|
+
+`Empty` has no rank, and nor has the step `1` of a loop that writes none: `For i = CByte(1) To CByte(3)` counts in
+`Byte`. A loop that counts in `Date` reads a `String` as a date only, not as the number a Let-coercion to `Date` would
+also read it as: `"1/1/1900"` is a start, `"1"` is error 13.
+
 ### Range Test
 
 The range checks of `ForOpener` and `ForNext` use the relational operators `>` and `<`
@@ -61,8 +91,10 @@ The range checks of `ForOpener` and `ForNext` use the relational operators `>` a
 comparison. The counter's declared type (`Currency`, `Decimal`, `Date` as `Double`, …) has comparison semantics
 specified by MS-VBAL, which a CLR `>` or `<` comparison does not implement.
 
-Only the sign of `step` is read directly from its numeric value. The **MS-VBAL §5.4.2.3** algorithm treats the
-step's sign as a classification, not as a VBA-visible comparison expression.
+The counter, the end and the step are of the one type the loop counts in, so the comparison is between numbers of a
+type. Only the sign of `step` is read directly from its numeric value, once, when the loop starts
+(`ForLoopState.CountsDown`). The **MS-VBAL §5.4.2.3** algorithm treats the step's sign as a classification, not as a
+VBA-visible comparison expression.
 
 |Step|Out of range when|
 |---|---|
@@ -79,6 +111,9 @@ state for its `Matching` offset, its `ForOpener` never ran in this activation.
 |---|---|
 |`ForNext` finds no stored `ForLoopState` for its `Matching` offset (a `GoTo` landed directly on the closer).|92 — For loop not initialized|
 |The addition of `step` to the counter overflows.|6 — Overflow|
+|The start, the end or the step is no number: `"abc"`, an `Error`, an array, a `String` that is no date in a loop that counts in `Date`.|13 — Type mismatch|
+|The start, the end or the step is `Null`.|94 — Invalid use of Null|
+|The start, the end or the step is out of the range of the type the loop counts in (`For b = 1 To 300` with a `Byte` `b`).|6 — Overflow|
 
 Run-time error 92 is [VBRuntimeErrorId](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html)`.ForLoopNotInitialized`
 ([**RD-VBAL §2.6.3** Runtime Errors](rd-vbal.2.6.3.runtime-errors.md)).

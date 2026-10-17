@@ -808,6 +808,24 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to The start, the end and the step of a For loop are numbers: this one cannot be read as a number (MS-VBAL 5.4.2.3)..
+        /// </summary>
+        public static string VBForLoopOperandIsNotANumber_Verbose {
+            get {
+                return ResourceManager.GetString("VBForLoopOperandIsNotANumber_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to This For loop counts in {0}, and its start, end or step is not a value of that type..
+        /// </summary>
+        public static string VBForLoopOperandNotOfLoopType_Verbose {
+            get {
+                return ResourceManager.GetString("VBForLoopOperandNotOfLoopType_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to This For Each loop&apos;s collection expression is Nothing. Enumerating it requires invoking its _NewEnum member, which cannot be done on an object reference that isn&apos;t set..
         /// </summary>
         public static string VBForEach_ObjectVariableNotSet_Verbose {

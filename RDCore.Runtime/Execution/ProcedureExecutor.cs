@@ -776,18 +776,29 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         }
 
         // MS-VBAL §5.4.2.3: "if no step-clause is present, the step-increment value is the integer data
-        // value 1" - a static default, never itself evaluated as a source expression.
-        RuntimeSemanticsEvaluationResult stepResult = forStatement.StepExpression is { } stepExpression
-            ? forLoop.EvaluateOperand(session, stepExpression, context)
-            : RuntimeSemanticsEvaluationResult.Success(new VBLongValue(1));
-        if (!stepResult.IsSuccess)
+        // value 1" - a static default, never itself evaluated as a source expression (ForLoopEvaluator.Operands).
+        VBTypedValue? step = null;
+        if (forStatement.StepExpression is { } stepExpression)
         {
-            return ToFailureOutcome(stepResult);
+            var stepResult = forLoop.EvaluateOperand(session, stepExpression, context);
+            if (!stepResult.IsSuccess)
+            {
+                return ToFailureOutcome(stepResult);
+            }
+
+            step = stepResult.Result!;
         }
 
-        var state = new ForLoopState(counterSymbol, forStatement.ControlExpression, endResult.Result!, stepResult.Result!);
+        // the loop counts in one numeric type, which the start, the end and the step are Let-coerced to.
+        var counterType = counterSymbol is ITypedSymbol typed ? typed.ResolvedType : VBVariantType.TypeInfo;
+        if (forLoop.Operands(session, forStatement, counterType, startResult.Result!, endResult.Result!, step, out var counted) is { } operandError)
+        {
+            return ToFailureOutcome(RuntimeSemanticsEvaluationResult.Error(operandError));
+        }
 
-        var assignResult = forLoop.AssignCounter(session, state, forStatement.StartExpression, startResult.Result!, context);
+        var state = new ForLoopState(counterSymbol, forStatement.ControlExpression, counted.End, counted.Step) { CountsDown = ForLoopEvaluator.CountsDown(counted.Step) };
+
+        var assignResult = forLoop.AssignCounter(session, state, forStatement.StartExpression, counted.Start, context);
         if (!assignResult.IsSuccess)
         {
             return ToFailureOutcome(assignResult);
