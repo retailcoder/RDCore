@@ -16,13 +16,11 @@ Some MS-VBAL subsections declare more than one member:
 - the `$`-suffixed String-returning twins (`Chr$`, `ChrB$`, `ChrW$`) share a subsection with the member they vary;
 - the `LTrim` / `RTrim` / `Trim` group is one subsection, and so is its `$`-suffixed twin.
 
-Every member has a runtime implementation (`StdStrings`) but eight, which wait on the regional and calendar rules of
-`Format`.
+Every member has a runtime implementation (`StdStrings`) but two.
 
 > [!NOTE]
-> **Not implemented.** `Format`, `Format$`, `FormatCurrency`, `FormatDateTime`, `FormatNumber`, `FormatPercent`,
-> `MonthName` and `WeekdayName` have no runtime implementation. Calling one raises the run-time error
-> "Application-defined or object-defined error".
+> **Not implemented.** `MonthName` and `WeekdayName` have no runtime implementation. Calling one raises the run-time
+> error "Application-defined or object-defined error".
 
 
 ## Arguments
@@ -33,7 +31,8 @@ An argument has been through the call site before a member is given it
 - An argument to a typed parameter was Let-coerced to its type, so `Null` given for a `String` or a `Long` is error `94`
   before any member is reached: `Asc(Null)`, `InStrRev(Null, "a")`, `StrReverse(Null)`, `String(Null, "a")`.
 - A typed optional argument left out is its declared default: `InStrRev`'s `Start` and `Replace`'s `Count` are `-1`,
-  `Replace`'s `Start` is `1`, `Split`'s `Limit` is `-1` and `Filter`'s `Include` is `True`. C# cannot state those
+  `Replace`'s `Start` is `1`, `Split`'s `Limit` is `-1`, `Filter`'s `Include` is `True`, and the `NumDigitsAfterDecimal`
+  of `FormatCurrency`, `FormatNumber` and `FormatPercent` is `-1`. C# cannot state those
   defaults, so the declarations do, with
   [StdLibDefaultAttribute](../api/RDCore.SDK.Runtime.Abstract.StdLib.StdLibDefaultAttribute.html)
   ([**RD-VBAL §6.0.1** Symbol Injection](rd-vbal.6.0.standard-library.md#attributes)).
@@ -143,14 +142,17 @@ error `5` though a zero-length expression gives a zero-length string.
 |A `Variant` argument has no form of the type the member needs: an object that is not `Nothing`, an `Error`, Missing, or an array other than a `Byte()` read as a `String`|`13`|
 |A `Variant` argument, or an element of a `SourceArray`, is `Nothing`|`91`|
 |A `Variant` argument the member needs as a number is beyond a `Long`|`6`|
-|A `Variant` argument the member needs as a number, `Join`'s or `Split`'s `Delimiter`, or an element of a `SourceArray` is `Null`|`94`|
+|A date to format outside the range of dates|`6`|
+|A date to format before the first day of the Hijri calendar, when the session's calendar is Hijri|`5`|
+|A `Variant` argument the member needs as a number or a date, `Format`'s `Format`, `Join`'s or `Split`'s `Delimiter`, or an element of a `SourceArray` is `Null`|`94`|
 |A start below `1`, `InStrRev`'s `Start` of `0` or below `-1`, a negative `Length` or `Number`, `Replace`'s `Count` below `-1`, `Split`'s `Limit` below `-1`|`5`|
 |An explicit `Compare` other than `0` or `1`|`5`|
+|A `FirstDayOfWeek`, `FirstWeekOfYear`, `NamedFormat` or tristate that is no value of its enumeration; a `NumDigitsAfterDecimal` below `-1`|`5`|
 |`Asc`, `AscB` or `AscW` of a zero-length `String`; a code `Chr`, `ChrW` or `String` has no character for|`5`|
 |`ChrB` of a code outside `0` to `255`|`6`|
 |A `StrConv` conversion it does not make ([§6.1.2.11.1.37](#61211137-strconv))|`5`|
 |A `SourceArray` that is not a one-dimensional array|`13`|
-|A result longer than a `String` can hold, from `Space` or `String`|`14`|
+|A result longer than a `String` can hold, from `Space`, `String` or a `Format` function|`14`|
 |A `$` function whose `Variant` twin returns `Null`|`94`|
 
 
@@ -194,12 +196,12 @@ itself.
 |6.1.2.11.1.5|[ChrB / ChrB$](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/900323ac-8160-42cd-ae52-4073f2a95116)|`ChrB`, `ChrB$`|See [§6.1.2.11.1.4](#6121114-chr--chr).|
 |6.1.2.11.1.6|[ChrW / ChrW$](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/de4b7500-260f-41c5-b2fd-082eddd5f0b2)|`ChrW`, `ChrW$`|See [§6.1.2.11.1.4](#6121114-chr--chr).|
 |6.1.2.11.1.7|[Filter](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/22ca3cbf-f56b-4795-8f9c-f0a59414eaad)|`Filter`|See [§6.1.2.11.1.7](#6121117-filter).|
-|6.1.2.11.1.8|[Format](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/c2022d53-37dc-4597-8321-728e385afc92)|`Format`|Not implemented.|
-|6.1.2.11.1.9|[Format$](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/dc8463ed-bfe6-48d6-b804-3e993880ae45)|`Format$`|Not implemented.|
-|6.1.2.11.1.10|[FormatCurrency](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/2cf6e81f-a693-4884-a211-814c8c95e5a2)|`FormatCurrency`|Not implemented.|
-|6.1.2.11.1.11|[FormatDateTime](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/dc56ab7e-dc09-4b50-90ae-d994460c99a6)|`FormatDateTime`|Not implemented.|
-|6.1.2.11.1.12|[FormatNumber](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/357ce1a8-bacd-4a69-942e-921a6bc76c6d)|`FormatNumber`|Not implemented.|
-|6.1.2.11.1.13|[FormatPercent](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/60b37972-e710-4c3a-a985-c71794a60739)|`FormatPercent`|Not implemented.|
+|6.1.2.11.1.8|[Format](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/c2022d53-37dc-4597-8321-728e385afc92)|`Format`|See [§6.1.2.11.1.8](#6121118-format).|
+|6.1.2.11.1.9|[Format$](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/dc8463ed-bfe6-48d6-b804-3e993880ae45)|`Format$`|A [twin](#string-returning-twins).|
+|6.1.2.11.1.10|[FormatCurrency](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/2cf6e81f-a693-4884-a211-814c8c95e5a2)|`FormatCurrency`|See [§6.1.2.11.1.10](#61211110-formatcurrency--formatnumber--formatpercent).|
+|6.1.2.11.1.11|[FormatDateTime](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/dc56ab7e-dc09-4b50-90ae-d994460c99a6)|`FormatDateTime`|See [§6.1.2.11.1.11](#61211111-formatdatetime).|
+|6.1.2.11.1.12|[FormatNumber](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/357ce1a8-bacd-4a69-942e-921a6bc76c6d)|`FormatNumber`|See [§6.1.2.11.1.10](#61211110-formatcurrency--formatnumber--formatpercent).|
+|6.1.2.11.1.13|[FormatPercent](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/60b37972-e710-4c3a-a985-c71794a60739)|`FormatPercent`|See [§6.1.2.11.1.10](#61211110-formatcurrency--formatnumber--formatpercent).|
 |6.1.2.11.1.14|[InStr / InStrB](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/33e81067-4b43-4c45-a501-0acf1616f2f9)|`InStr`, `InStrB`|See [§6.1.2.11.1.14](#61211114-instr--instrb).|
 |6.1.2.11.1.15|[InStrRev](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/9d45a100-3a6d-4cb6-aa09-772ccffe9706)|`InStrRev`|See [§6.1.2.11.1.15](#61211115-instrrev).|
 |6.1.2.11.1.16|[Join](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/1c276c6f-c3b0-4de7-ade5-7803f99eea44)|`Join`|See [§6.1.2.11.1.16](#61211116-join).|
@@ -275,6 +277,106 @@ The result is a `String()` from `0`: `Filter` builds the array itself and never 
 `(0 To -1)` when nothing is kept.
 
 `SourceArray` is a `Variant`, as `Join`'s is ([§6.1.2.11.1.16](#61211116-join)).
+
+### 6.1.2.11.1.8 Format
+
+> [!NOTE]
+> This section describes the implementation of [**MS-VBAL §6.1.2.11.1.8** Format](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/c2022d53-37dc-4597-8321-728e385afc92).
+
+MS-VBAL gives `Format` its declaration and its calendar rules, and nothing of what a format expression is. RD-VBA reads
+format expressions as the Office VBA reference documents them, in the environment's regional settings
+([**RD-VBAL §2.3.1.2**](rd-vbal.2.3.1.2.session-services.md) `Environment.Culture`): its decimal and group separators and
+digit groups, its currency symbol and patterns, its date and time separators, patterns, and day and month names.
+
+Without a `Format`, or with a zero-length one, `Expression` is the `String` a Let-coercion writes, so `Format(1.5)` is
+`CStr(1.5)` and `Format(Null)` is `Null`. `Format` is read as a `String`, so a `Null` one is error `94`; it is cut to its
+first 257 characters, as MS-VBA documents. `Expression` is read as itself: `Null`, `Empty`, a `Boolean`, a number, a `Date`
+or a `String`, and a `Byte()` as its `String`; anything else is the error a `String` parameter would raise.
+
+A **named format** is read in any case. `General Number` is the number as a Let-coercion writes it; `Currency` is
+`FormatCurrency` with every argument left out; `Fixed`, `Standard`, `Percent` and `Scientific` are the user-defined
+`0.00`, `#,##0.00`, `0.00%` and `0.00E+00`; `Yes/No`, `True/False` and `On/Off` are the second word for zero and the
+first for any other number. `General Date`, `Long Date`, `Short Date` and `Long Time` are the user-defined `c`, `dddddd`,
+`ddddd` and `ttttt`; `Medium Date` is `dd-mmm-yy` (`15-Mar-24`, English being the language of the host); `Medium Time`
+is `hh:nn AMPM`, and `Short Time` `hh:nn`.
+
+Any other format is **user-defined**, of up to four sections separated by semicolons outside its literals (`"ABC"`, and
+the character after a `\`). What a section formats is read from the characters it uses outside its literals: `@`, `&`,
+`<`, `>` or `!` make it a string section; otherwise any date or time symbol (`c`, `d`, `w`, `m`, `q`, `y`, `h`, `n`, `s`,
+`ttttt`, `AM/PM`, `A/P`, `AMPM`) makes it a date section; otherwise a digit placeholder, a separator, `%` or an exponent
+makes it a number section. So a date or time letter is never a literal unless it is quoted or escaped:
+`"0 h"` is a date format, whose `h` is the hour.
+
+- A **number section** writes `Expression`'s magnitude rounded half away from zero on its decimal digits: a whole number,
+  a `Currency` and a `Decimal` exactly, a `Single` to 7 significant digits and a `Double` to 15, as a Let-coercion to
+  `String` has them ([**RD-VBAL §5.5.1.2.4**](rd-vbal.5.5.1.2.runtime-semantics.md)), so `Format(1.005, "0.00")` is
+  `1.01` and `Format(2.5, "0")` is `3`. Digits the placeholders have no room for are written at the first of them. A `,`
+  between placeholders of the whole part groups its digits by the culture's digit groups; one that ends the whole part
+  divides by 1000 (`##0,,` writes millions). A `.` is always written: `Format(5, "#.##")` is `5.`. `/` and `:` are the
+  culture's date and time separators.
+- A **date section** writes `Expression` Let-coerced to a `Date`, to the nearest second, in the session's calendar.
+  Every symbol is read in either case. `m` and `mm` are minutes when the date or time symbol before them is `h` or `hh`,
+  whatever separators are between, and months otherwise (`mm:ss` is the month). `w` and `ww` count by `FirstDayOfWeek`
+  and `FirstWeekOfYear`, `vbUseSystem` being the culture's. `AM/PM` and `A/P` are written in the case the format has them;
+  `AMPM` is the culture's designator. A run longer than a symbol's longest form is that form and the rest of the run.
+- A **string section** writes `Expression`'s `String`, right-aligned in its placeholders unless it has a `!`; characters
+  the placeholders have no room for are written all the same (`Format("ABCDE", "@@")` is `ABCDE`), and a section with no
+  placeholder writes its literals and then the whole `String`.
+
+When the first section is a string section, any value is written as its `String`, by the second section if that is
+zero-length or `Null` and the format has one. Otherwise a `String` that reads as a number is that number, one that reads
+as a date is that date, and any other is written as it is. The section is chosen by the sign before rounding: the second
+for a negative number and the third for zero when they are there and not empty, and otherwise the first, with a minus
+sign before everything it writes for a negative number, so `Format(-0.001, "0.00")` is `-0.00`. A date and a `Boolean`
+are the numbers they are. A `Null` is written by the fourth section, and is `Null` when there is none.
+
+`FirstDayOfWeek` and `FirstWeekOfYear` are values of their enumerations, else error `5`, checked after a `Null`
+`Expression` has made the result `Null`.
+
+Under the Hijri calendar ([**RD-VBAL §6.1.2.4**](rd-vbal.6.1.2.4.datetime-module.md)) the date symbols count in it,
+`mmm` is the full month name, and the names and the patterns of `c`, `ddddd`, `dddddd` and `ttttt` are the culture's own
+Hijri ones if it has them, and Arabic (Saudi Arabia)'s otherwise, with the culture's own date and time separators. Without a format, a date is still written as a
+Let-coercion writes it, in the Gregorian calendar.
+
+### 6.1.2.11.1.10 FormatCurrency / FormatNumber / FormatPercent
+
+> [!NOTE]
+> This section describes the implementation of [**MS-VBAL §6.1.2.11.1.10** FormatCurrency](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/2cf6e81f-a693-4884-a211-814c8c95e5a2),
+> [**§6.1.2.11.1.12** FormatNumber](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/357ce1a8-bacd-4a69-942e-921a6bc76c6d)
+> and [**§6.1.2.11.1.13** FormatPercent](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/60b37972-e710-4c3a-a985-c71794a60739).
+
+The three round half away from zero to `NumDigitsAfterDecimal` places, and write the culture's separators and digit
+groups. `FormatCurrency` writes the culture's currency symbol where its currency patterns put it; `FormatPercent` writes
+the number times 100 followed by `%`, the sign or the parentheses around both (`-50.00%`, `(50.00%)`). A number that
+rounds to zero has no sign.
+
+What the specification leaves to the implementation is decided so:
+
+|Left out, or `vbUseDefault`|RD-VBA|
+|---|---|
+|`NumDigitsAfterDecimal` (`-1`)|The culture's currency places for `FormatCurrency`; `2` for the other two, as `Fixed` and `Standard` have. .NET's places for numbers are not read: ICU and Windows disagree on them (3 and 2 for en-US).|
+|`IncludeLeadingDigit`|`True`|
+|`UseParensForNegativeNumbers`|Where the culture's negative pattern has parentheses|
+|`GroupDigits`|Where the culture has digit groups|
+
+`vbTrue` with a currency pattern that has no parentheses puts the amount and its symbol in parentheses, the symbol where
+the positive pattern has it; `vbFalse` with one that has them puts a minus sign before the amount and its symbol.
+
+`Expression` is read as a `Double`, except that a number is read as the value it is, so a `Currency`, a `Decimal` or a
+`LongLong` keeps every digit; `Empty` is `0` and a `Date` its serial number. `Null` is error `94`, and a `String` that is
+no number error `13`. A `NumDigitsAfterDecimal` below `-1`, and a tristate other than `vbTrue` (`-1`), `vbFalse` (`0`) or
+`vbUseDefault` (`-2`), are error `5`: the pages' tables give `1` and `2`, read as errata of **MS-VBAL §6.1.1.15**'s `-1`
+and `-2`.
+
+### 6.1.2.11.1.11 FormatDateTime
+
+> [!NOTE]
+> This section describes the implementation of [**MS-VBAL §6.1.2.11.1.11** FormatDateTime](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/dc56ab7e-dc09-4b50-90ae-d994460c99a6).
+
+`FormatDateTime` is `Format`'s named date formats: `vbGeneralDate` is `General Date`, `vbLongDate` `Long Date`,
+`vbShortDate` `Short Date`, `vbLongTime` `Long Time`, and `vbShortTime` `Short Time` ("the 24-hour format (hh:mm)"), in
+the session's calendar. `Expression` is Let-coerced to a `Date`: `Null` is error `94`, a value that is no date error
+`13`, and one outside the range of dates error `6`. A `NamedFormat` other than `0` to `4` is error `5`.
 
 ### 6.1.2.11.1.14 InStr / InStrB
 
