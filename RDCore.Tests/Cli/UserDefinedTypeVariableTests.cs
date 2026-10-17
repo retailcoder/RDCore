@@ -140,6 +140,47 @@ public sealed class UserDefinedTypeVariableTests
             "Public Sub Main()", "Dim b As TBox", "Debug.Print LenB(b)", "End Sub"));
 
     [TestMethod]
+    public async Task AFixedSizeArrayField_OfAFunctionsResult_HasItsDimensions()
+        => CollectionAssert.AreEqual(new[] { "2" }, await RunAsync(
+            "Private Type TBox", "Values(1 To 2) As Long", "End Type",
+            "Private Function Make() As TBox", "Make.Values(2) = 2", "End Function",
+            "Public Sub Main()", "Dim b As TBox", "b = Make()", "Debug.Print b.Values(2)", "End Sub"));
+
+    [TestMethod]
+    public async Task AFixedSizeArrayField_OfAnElementOfAnArrayOfRecords_HasItsDimensions()
+        => CollectionAssert.AreEqual(new[] { "5 0" }, await RunAsync(
+            "Private Type TBox", "Values(1 To 2) As Long", "End Type",
+            "Public Sub Main()", "Dim a(1) As TBox", "a(0).Values(1) = 5",
+            "Debug.Print a(0).Values(1) & \" \" & a(1).Values(1)", "End Sub"));
+
+    // each element of an array of records is a record of its own (MS-VBAL §5.2.3.1.3), which keeps what its fields are assigned.
+    [TestMethod]
+    public async Task AnElementOfAnArrayOfRecords_KeepsWhatItsFieldsAreAssigned()
+        => CollectionAssert.AreEqual(new[] { "5 7" }, await RunAsync(
+            "Private Type TPoint", "X As Long", "End Type",
+            "Public Sub Main()", "Dim a(1) As TPoint", "a(0).X = 5", "a(1).X = 7", "Debug.Print a(0).X & \" \" & a(1).X", "End Sub"));
+
+    [TestMethod]
+    public async Task AnElementOfAnArrayOfRecords_IsCopiedByAnAssignment()
+        => CollectionAssert.AreEqual(new[] { "5 9" }, await RunAsync(
+            "Private Type TPoint", "X As Long", "End Type",
+            "Public Sub Main()", "Dim a(0) As TPoint, p As TPoint", "a(0).X = 5", "p = a(0)", "a(0).X = 9", "Debug.Print p.X & \" \" & a(0).X", "End Sub"));
+
+    [TestMethod]
+    public async Task AnArrayOfRecords_Redimensioned_HasRecordsWithTheirDimensions()
+        => CollectionAssert.AreEqual(new[] { "3" }, await RunAsync(
+            "Private Type TBox", "Values(1 To 3) As Long", "End Type",
+            "Public Sub Main()", "Dim a() As TBox", "ReDim a(1)", "a(1).Values(3) = 3", "Debug.Print a(1).Values(3)", "End Sub"));
+
+    // "each of the extra elements is set to its default data value" (MS-VBAL §5.4.3.3), and the ones kept are what they were.
+    [TestMethod]
+    public async Task AnArrayOfRecords_RedimensionedPreserved_KeepsItsElements_AndTheNewOnesAreRecords()
+        => CollectionAssert.AreEqual(new[] { "4 6" }, await RunAsync(
+            "Private Type TPoint", "X As Long", "End Type",
+            "Public Sub Main()", "Dim a() As TPoint", "ReDim a(0)", "a(0).X = 4", "ReDim Preserve a(1)", "a(1).X = 6",
+            "Debug.Print a(0).X & \" \" & a(1).X", "End Sub"));
+
+    [TestMethod]
     public async Task AFieldThatIsNotOneOfTheType_IsStillAnError()
     {
         var errors = await ModuleWorkspace.LoadErrorsAsync([], Program(

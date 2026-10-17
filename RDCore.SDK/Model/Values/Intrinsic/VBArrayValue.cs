@@ -28,12 +28,14 @@ public abstract record class VBArrayValue : VBTypedValue
     /// </summary>
     /// <param name="dimensions">The lower and upper bound of each dimension, outermost first.</param>
     /// <param name="itemType">The element type. Use <see cref="VBVariantType"/> when unspecified.</param>
-    protected VBArrayValue((int lBound, int uBound)[] dimensions, VBType itemType)
+    /// <param name="elementDefault">What each element starts as, when it is more than the element type's own default value can say
+    /// (<see cref="IVariableDefaults.ElementDefaultOf"/>); <see langword="null"/> for that default.</param>
+    protected VBArrayValue((int lBound, int uBound)[] dimensions, VBType itemType, Func<VBTypedValue>? elementDefault = null)
         : base(VBArrayType.TypeInfo)
     {
         ItemType = itemType;
         Dimensions = [.. dimensions.Select(d => new VBArrayDimension(d.lBound, d.uBound))];
-        _cells = CreateCells(Dimensions, itemType);
+        _cells = CreateCells(Dimensions, itemType, elementDefault);
     }
 
     /// <summary>
@@ -253,7 +255,7 @@ public abstract record class VBArrayValue : VBTypedValue
         return index;
     }
 
-    private static IBindingHandle[] CreateCells(ImmutableArray<VBArrayDimension> dimensions, VBType itemType)
+    private static IBindingHandle[] CreateCells(ImmutableArray<VBArrayDimension> dimensions, VBType itemType, Func<VBTypedValue>? elementDefault)
     {
         if (dimensions.Length == 0)
         {
@@ -274,17 +276,23 @@ public abstract record class VBArrayValue : VBTypedValue
         var cells = new IBindingHandle[total];
         for (var i = 0; i < total; i++)
         {
-            cells[i] = CreateDefaultCell(itemType);
+            cells[i] = CreateDefaultCell(itemType, elementDefault);
         }
 
         return cells;
     }
 
-    // A fresh binding per cell so an element write never aliases another cell. Complex element types
-    // (Variant, UDT, Object) whose default value has no readable binding get an inert cell until the
-    // complex-value semantics land.
-    private static IBindingHandle CreateDefaultCell(VBType itemType)
+    // A fresh binding per cell so an element write never aliases another cell. An element that is a record is a record of its own,
+    // boxed as a variable stores one: its fields are written where they are, which an element built again at each read would lose. Other
+    // complex element types (Variant, Object) whose default value has no readable binding get an inert cell, which a write replaces.
+    private static IBindingHandle CreateDefaultCell(VBType itemType, Func<VBTypedValue>? elementDefault)
     {
+        if (itemType is VBUserDefinedType record)
+        {
+            var element = elementDefault?.Invoke() as VBUserDefinedTypeValue ?? new VBUserDefinedTypeValue(record);
+            return BindingKnowledge.NewCell(new VBRuntimeValue<VBRuntimeUserDefinedTypeValue>(new VBRuntimeUserDefinedTypeValue(element)), isKnown: true);
+        }
+
         var defaultValue = itemType.DefaultValue;
         return defaultValue.Handle.BindingCapabilities.HasFlag(BindingCapabilities.GetValue)
             ? new ValueBindingHandle(defaultValue.RuntimeValue)

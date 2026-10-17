@@ -1,5 +1,8 @@
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Intrinsic;
 
 namespace RDCore.SDK.Runtime.Abstract.Execution;
 
@@ -25,4 +28,13 @@ public interface IVariableDefaults
     /// </summary>
     /// <param name="variable">The variable, which is typed.</param>
     VBTypedValue DefaultValueOf(Symbol variable);
+
+    /// <summary>
+    /// What each element of an array of <paramref name="itemType"/> starts as, when it is more than the type's own default value: a record,
+    /// whose fields start as declared variables of them do - a fixed-size array field with its dimensions (<strong>MS-VBAL §5.2.3.3</strong>).
+    /// </summary>
+    /// <param name="itemType">The element type of the array.</param>
+    /// <returns>Makes one element; <see langword="null"/> when the type's own default value is what an element starts as.</returns>
+    Func<VBTypedValue>? ElementDefaultOf(VBType itemType)
+        => itemType is VBUserDefinedType record ? () => new VBUserDefinedTypeValue(record, this) : null;
 }

@@ -91,15 +91,19 @@ public sealed record class ArrayStatementRuntimeSemantics(
             // is what the rule is about, so it is the unwrapped value that decides: a Variant holding a
             // number is the error, and one holding nothing yet is not.
             return held is null or VBEmptyValue
-                ? Store(session, context, redim, target, Redimensioned(new VBResizableArrayValue(bounds, stated ?? ItemTypeOf(target.Current))))
+                ? Store(session, context, redim, target, Redimensioned(Resized(session, bounds, stated ?? ItemTypeOf(target.Current))))
                 : Failed(redim, VBRuntimeErrorId.TypeMismatch, $"{redim.Name} is not an array");
         }
 
         return redim.IsPreserve
             ? Preserved(session, context, redim, target, array, bounds, boundsKnown)
             : Store(session, context, redim, target, Redimensioned(
-                new VBResizableArrayValue(bounds, stated ?? (array.IsInitialized ? array.ItemType : DeclaredItemType(target, array.ItemType)))));
+                Resized(session, bounds, stated ?? (array.IsInitialized ? array.ItemType : DeclaredItemType(target, array.ItemType)))));
     }
+
+    // an array of the new bounds, each element its default data value: a record's as a declared variable of it starts (IVariableDefaults).
+    private static VBResizableArrayValue Resized(IRuntimeSession session, (int LBound, int UBound)[] bounds, VBType itemType)
+        => new(bounds, itemType, session.Symbols.Defaults?.ElementDefaultOf(itemType));
 
     // MS-VBAL 5.4.3.3: a <redim-untyped-dcl> "has the same static semantics as if the text of its elements were parsed as an <untyped-variable-dcl>",
     // and a <redim-typed-variable-dcl> as a <typed-variable-dcl>: the As clause, or the type character, is the type of the elements. A variable declared
@@ -285,7 +289,7 @@ public sealed record class ArrayStatementRuntimeSemantics(
             }
         }
 
-        var resized = new VBResizableArrayValue(bounds, array.ItemType);
+        var resized = Resized(session, bounds, array.ItemType);
 
         // "If a <redim-statement> containing the keyword Preserve results in more elements in a dimension,
         // each of the extra elements is set to its default data value" - which they already are; and an element

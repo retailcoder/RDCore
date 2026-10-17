@@ -1,5 +1,6 @@
 ﻿using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 
 namespace RDCore.SDK.Model.Values.Intrinsic;
@@ -14,8 +15,9 @@ public sealed record class VBFixedSizeArrayValue : VBArrayValue
     /// </summary>
     /// <param name="dimensions">The lower and upper bound of each dimension.</param>
     /// <param name="itemType">The element type; <see cref="VBVariantType"/> when unspecified.</param>
-    public VBFixedSizeArrayValue((int lBound, int uBound)[] dimensions, VBType? itemType = null)
-        : base(dimensions, itemType ?? VBVariantType.TypeInfo) { }
+    /// <param name="elementDefault">What each element starts as, when it is more than the element type's own default value can say.</param>
+    public VBFixedSizeArrayValue((int lBound, int uBound)[] dimensions, VBType? itemType = null, Func<VBTypedValue>? elementDefault = null)
+        : base(dimensions, itemType ?? VBVariantType.TypeInfo, elementDefault) { }
 
     /// <summary>Creates a fixed-size array bound to <paramref name="handle"/> (currently inert).</summary>
     public VBFixedSizeArrayValue(IBindingHandle handle, (int lBound, int uBound)[] dimensions, VBType? itemType = null)

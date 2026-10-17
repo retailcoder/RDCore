@@ -121,7 +121,10 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             // variable" - seeded to the declared return type's own default, exactly like a fresh Dim,
             // before the body ever runs (a Function that never assigns its own name still returns
             // something well-defined, not an uninitialized slot).
-            frame.ReturnValue = returning.ResolvedType.DefaultValue;
+            // A record is seeded field by field, as a declared variable of it is: a fixed-size array field has its dimensions.
+            frame.ReturnValue = returning.ResolvedType is VBUserDefinedType record && Session.Symbols.Defaults is { } defaults
+                ? new VBUserDefinedTypeValue(record, defaults)
+                : returning.ResolvedType.DefaultValue;
         }
 
         List<VBParameterSymbol>? copied = null;

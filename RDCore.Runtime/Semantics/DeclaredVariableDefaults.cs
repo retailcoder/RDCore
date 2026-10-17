@@ -67,7 +67,7 @@ public sealed class DeclaredVariableDefaults(IRuntimeSession session, ArrayBound
         return variable.TryGetProperty(SymbolProperties.ArrayBounds, out var declared)
             && !declared.IsDefaultOrEmpty
             && TryReduce(variable, declared) is { } dimensions
-                ? new VBFixedSizeArrayValue(dimensions, array.ItemType)
+                ? new VBFixedSizeArrayValue(dimensions, array.ItemType, ((IVariableDefaults)this).ElementDefaultOf(array.ItemType))
                 : new VBFixedSizeArrayValue([], array.ItemType);
     }
 
