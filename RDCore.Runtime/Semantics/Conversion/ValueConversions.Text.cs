@@ -108,7 +108,8 @@ public static partial class ValueConversions
         var numericValue = value.AsDouble;
         if (numericValue == 0)
         {
-            return VBStringValue.Zero;
+            // a floating-point zero has a sign, and MS-VBA shows it: CStr(Round(-0.5)) is "-0".
+            return double.IsNegative(numericValue) ? "-" + VBStringValue.Zero : VBStringValue.Zero;
         }
 
         if (double.IsPositiveInfinity(numericValue))
@@ -220,6 +221,13 @@ public static partial class ValueConversions
         {
             integerPart = "0";
             fractionalPart = new string('0', -exponent - 1) + digits;
+
+            // a number with no integer part is written in scientific notation once its leading zeros and its digits are more than the type's digits:
+            // 0.0123456! but 1.234567E-02 for 0.01234567!, and 0.001234567890123 but 1.2345678901234E-03 (MS-VBA, recorded in Excel).
+            if (fractionalPart.Length > significantIntegerDigits)
+            {
+                return ToScientificNotation(value, significantIntegerDigits, decimalSeparator);
+            }
         }
 
         return fractionalPart.Length > 0
@@ -253,10 +261,12 @@ public static partial class ValueConversions
 
         var fractionalDigits = scientific[2..eIndex].TrimEnd('0');
 
-        // MS-VBAL 5.5.1.2.4: the exponent is always signed ("+" or "-"), unlike a bare C# int.ToString().
+        // MS-VBAL 5.5.1.2.4: the exponent is always signed ("+" or "-"), unlike a bare C# int.ToString(), and MS-VBA writes it with two digits at
+        // least: 1.234568E+07, 8.832568E-02, 1E+100 (recorded in Excel).
         var exponentSign = exponent < 0 ? "-" : "+";
+        var exponentDigits = Math.Abs(exponent).ToString("00", CultureInfo.InvariantCulture);
         return fractionalDigits.Length > 0
-            ? $"{sign}{s}{decimalSeparator}{fractionalDigits}E{exponentSign}{Math.Abs(exponent)}"
-            : $"{sign}{s}E{exponentSign}{Math.Abs(exponent)}";
+            ? $"{sign}{s}{decimalSeparator}{fractionalDigits}E{exponentSign}{exponentDigits}"
+            : $"{sign}{s}E{exponentSign}{exponentDigits}";
     }
 }

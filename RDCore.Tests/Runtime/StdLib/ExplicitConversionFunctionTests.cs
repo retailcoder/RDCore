@@ -108,6 +108,43 @@ public sealed class ExplicitConversionFunctionTests
         => Assert.AreEqual("0.3", ValueOf(Conversion().CStr(Variant(new VBDoubleValue(0.1 + 0.2)))).Value);
 
     [TestMethod]
+    // a number with no integer part is written in scientific notation once its leading zeros and its digits are more than the type's digits
+    // (Excel, en-US).
+    [DataRow(0.0123456f, "0.0123456")]
+    [DataRow(0.01234567f, "1.234567E-02")]
+    [DataRow(0.08832568f, "8.832568E-02")]
+    [DataRow(-0.08832568f, "-8.832568E-02")]
+    [DataRow(0.00012345f, "1.2345E-04")]
+    [DataRow(0.000012f, "0.000012")]
+    [DataRow(1E-07f, "0.0000001")]
+    [DataRow(1.5E-10f, "1.5E-10")]
+    [DataRow(0.12345678f, "0.1234568")]
+    // the exponent has two digits at least.
+    [DataRow(12345678f, "1.234568E+07")]
+    [DataRow(1E+30f, "1E+30")]
+    public void CStr_OfASingleBelowOne(float value, string expected)
+        => Assert.AreEqual(expected, ValueOf(Conversion().CStr(Variant(new VBSingleValue(value)))).Value);
+
+    [TestMethod]
+    [DataRow(0.088325681234567, "0.088325681234567")]
+    [DataRow(0.001234567890123, "0.001234567890123")]
+    [DataRow(0.0012345678901234, "1.2345678901234E-03")]
+    [DataRow(0.000123456789, "0.000123456789")]
+    [DataRow(1.5E-10, "0.00000000015")]
+    [DataRow(0.1234567890123456, "0.123456789012346")]
+    public void CStr_OfADoubleBelowOne(double value, string expected)
+        => Assert.AreEqual(expected, ValueOf(Conversion().CStr(Variant(new VBDoubleValue(value)))).Value);
+
+    [TestMethod]
+    // a floating-point zero has a sign, and MS-VBA shows it (Excel: CStr(Round(-0.5)) is "-0").
+    public void CStr_OfANegativeZeroShowsItsSign()
+    {
+        Assert.AreEqual("-0", ValueOf(Conversion().CStr(Variant(new VBDoubleValue(-0d)))).Value);
+        Assert.AreEqual("-0", ValueOf(Conversion().CStr(Variant(new VBSingleValue(-0f)))).Value);
+        Assert.AreEqual("0", ValueOf(Conversion().CStr(Variant(new VBDoubleValue(0d)))).Value);
+    }
+
+    [TestMethod]
     public void CStr_OfABooleanIsItsToken()
         => Assert.AreEqual("True", ValueOf(Conversion().CStr(Variant(VBBooleanValue.True))).Value);
 
@@ -176,9 +213,10 @@ public sealed class ExplicitConversionFunctionTests
         => Assert.AreEqual(string.Empty, ValueOf(Conversion().ErrorStr(Variant(new VBLongValue(0)))).Value);
 
     [TestMethod]
+    // the specification's sentence ends with a period; MS-VBA's text has none (Excel: Error(42)).
     public void Error_OfAnUnknownCodeIsTheApplicationDefinedText()
         => Assert.AreEqual(
-            "Application-defined or object-defined error.",
+            "Application-defined or object-defined error",
             ValueOf(Conversion().ErrorStr(Variant(new VBLongValue(31999)))).Value);
 
     [TestMethod]

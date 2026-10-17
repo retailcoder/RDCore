@@ -128,7 +128,7 @@ public interface IStdMathModule
     /// <remarks>
     /// Gets the <em>square root</em> of a numeric value.
     /// </remarks>
-    /// <param name="Number">Any <see cref="VBDoubleValue"/> containing a valid numeric value (i.e. not <c>NaN</c>) <em>greater than</em> <c>0</c>.</param>
+    /// <param name="Number">Any <see cref="VBDoubleValue"/> containing a valid numeric value (i.e. not <c>NaN</c>) <em>greater than or equal to</em> <c>0</c>.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult<VBDoubleValue> Sqr(VBDoubleValue Number);
 
@@ -150,9 +150,10 @@ public interface IStdMathModule
     /// <strong>MS-VBAL 6.1.2.10.2.1 Randomize</strong>
     /// </summary>
     /// <remarks>
-    /// Initializes the <em>pseudo-random</em> number generator configured in the current <em>host environment</em>.
+    /// Initializes the session's <em>pseudo-random</em> number generator (<see cref="Execution.ISessionRandomNumberGenerator"/>).
     /// </remarks>
-    /// <param name="Number">A <see cref="VBNumericTypedValue"/> representing a <em>seed value</em>.<br/><strong>Optional</strong>: <see cref="VBMissingValue"/> or <see cref="VBEmptyValue"/> yields a new <em>seed value</em> from the <em>host-provided</em> pseudo-random number generator.</param>
+    /// <param name="Number">A <see cref="VBNumericTypedValue"/> representing a <em>seed value</em>, Let-coerced to <c>Double</c>.<br/><strong>Optional</strong>: <see cref="VBMissingValue"/> seeds the generator from the session's clock (<c>Timer</c>).<br/>
+    /// 👉 The specification seeds from the timer for <see cref="VBEmptyValue"/> too; MS-VBA Let-coerces an <c>Empty</c> like any other argument, to <c>0</c>, and so does RD-VBA.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     RuntimeSemanticsEvaluationResult Randomize(VBVariantValue? Number = default);
 

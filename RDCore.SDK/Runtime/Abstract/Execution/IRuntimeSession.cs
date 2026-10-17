@@ -77,6 +77,11 @@ public interface IRuntimeSession
     ISessionClock Clock { get; }
 
     /// <summary>
+    /// The state of the standard library's random-number generator (<strong>MS-VBAL §6.1.2.10</strong>), which outlives the call that seeds it.
+    /// </summary>
+    ISessionRandomNumberGenerator RandomNumbers { get; }
+
+    /// <summary>
     /// The session's call stack — pushing and popping an <see cref="ICallStackFrame"/> per procedure
     /// activation is what makes a procedure's locals and parameters visible through
     /// <see cref="ISessionSymbols"/>'s <see cref="ISessionSymbols.Resolver"/> (<strong>RD-VBAL
