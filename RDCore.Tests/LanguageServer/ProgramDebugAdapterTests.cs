@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.IO.Pipelines;
 using MediatR;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -8,11 +6,12 @@ using OmniSharp.Extensions.DebugAdapter.Protocol.Events;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Server;
-using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.JsonRpc.Server;
 using RDCore.LanguageServer.Debugging;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using System.Collections.Concurrent;
+using System.IO.Pipelines;
 
 namespace RDCore.Tests.LanguageServer;
 
@@ -54,7 +53,7 @@ public sealed class ProgramDebugAdapterTests
                 return true;
             });
             Workspace.TryGetModule(Arg.Is<string>(path => path != Path), out Arg.Any<string>()).Returns(false);
-            Debugging.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+            Debugging.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
                 .Returns(call => Task.FromResult(new HostDebugBreakpointsResult
                 {
                     Breakpoints = [.. call.Arg<IReadOnlyList<int>>().Select(line => new HostBreakpoint(line, true))],
@@ -220,7 +219,7 @@ public sealed class ProgramDebugAdapterTests
             Breakpoints = new Container<SourceBreakpoint>(new SourceBreakpoint { Line = 12 }, new SourceBreakpoint { Line = 20 }),
         });
 
-        await session.Debugging.Received(1).SetBreakpointsAsync("Prog", Arg.Is<IReadOnlyList<int>>(lines => lines.SequenceEqual(new[] { 11, 19 })), Arg.Any<CancellationToken>());
+        await session.Debugging.Received(1).SetBreakpointsAsync("Prog", Arg.Is<IReadOnlyList<BreakpointDto>>(bp => bp.SequenceEqual(new[] { new BreakpointDto { Line = 11 }, new BreakpointDto { Line = 19 } })), Arg.Any<CancellationToken>());
         CollectionAssert.AreEqual(new[] { 12, 20 }, response.Breakpoints.Select(breakpoint => breakpoint.Line!.Value).ToArray());
         Assert.IsTrue(response.Breakpoints.All(breakpoint => breakpoint.Verified));
     }
@@ -238,7 +237,7 @@ public sealed class ProgramDebugAdapterTests
             Breakpoints = new Container<SourceBreakpoint>(new SourceBreakpoint { Line = 11 }),
         });
 
-        await session.Debugging.Received(1).SetBreakpointsAsync("Prog", Arg.Is<IReadOnlyList<int>>(lines => lines.SequenceEqual(new[] { 11 })), Arg.Any<CancellationToken>());
+        await session.Debugging.Received(1).SetBreakpointsAsync("Prog", Arg.Is<IReadOnlyList<BreakpointDto>>(bp => bp.SequenceEqual(new[] { new BreakpointDto { Line = 11 } })), Arg.Any<CancellationToken>());
         Assert.AreEqual(11, response.Breakpoints.Single().Line);
     }
 
@@ -246,7 +245,7 @@ public sealed class ProgramDebugAdapterTests
     public async Task ABreakpoint_OnALineThatNoStatementBeginsOn_IsNotVerified()
     {
         await using var session = new Session();
-        session.Debugging.SetBreakpointsAsync("Prog", Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+        session.Debugging.SetBreakpointsAsync("Prog", Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult { Breakpoints = [new HostBreakpoint(3, false)] }));
         await session.StartAsync();
         await session.LaunchAsync();

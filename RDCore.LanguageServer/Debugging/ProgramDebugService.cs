@@ -41,9 +41,9 @@ internal interface IProgramDebugService
 
     /// <summary>Sets the lines of a module the program waits at.</summary>
     /// <param name="moduleName">The programmatic name of the module.</param>
-    /// <param name="lines">The zero-based lines, replacing the ones set before.</param>
+    /// <param name="breakpoints">The breakpoints replacing the ones set before.</param>
     /// <param name="token">A token that cancels the request.</param>
-    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<int> lines, CancellationToken token);
+    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token);
 
     /// <summary>The activations of the program that waits, innermost first.</summary>
     /// <param name="token">A token that cancels the request.</param>
@@ -135,16 +135,21 @@ internal sealed class ProgramDebugService(
         return await environment.SendRequestAsync<HostDebugTerminateParams, HostDebugAck>(new HostDebugTerminateParams { Wipe = wipe }, token);
     }
 
-    public async Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<int> lines, CancellationToken token)
+    public async Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token)
     {
         if (orchestration.RuntimeEnvironment is not { } environment)
         {
-            return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, false))] };
+            return new HostDebugBreakpointsResult
+            {
+                Breakpoints = [.. breakpoints
+                    .Where(breakpoint => breakpoint.IsEnabled) // disabled breakpoints don't get to the host
+                    .Select(breakpoint => new HostBreakpoint(breakpoint.Line, false))]
+            };
         }
 
         await environment.WaitForReadyAsync(token);
         return await environment.SendRequestAsync<HostDebugBreakpointsParams, HostDebugBreakpointsResult>(
-            new HostDebugBreakpointsParams { ModuleName = moduleName, Lines = lines }, token);
+            new HostDebugBreakpointsParams { ModuleName = moduleName, Breakpoints = breakpoints }, token);
     }
 
     public async Task<HostDebugStackResult> StackAsync(CancellationToken token)

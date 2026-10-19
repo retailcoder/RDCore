@@ -473,7 +473,7 @@ public sealed class ProgramExecutionTests
     // ---- breakpoints ----
 
     private static Task<HostDebugBreakpointsResult> SetBreakpoints(EnvironmentSessionProvider provider, params int[] lines)
-        => new HostDebugBreakpointsHandler(provider).Handle(new HostDebugBreakpointsParams { ModuleName = "Program", Lines = lines }, CancellationToken.None).WaitAsync(Patience);
+        => new HostDebugBreakpointsHandler(provider).Handle(new HostDebugBreakpointsParams { ModuleName = "Program", Breakpoints = [.. lines.Select(line => new BreakpointDto { Line = line })] }, CancellationToken.None).WaitAsync(Patience);
 
     private static readonly string Counting = Program(
         "Public Total As Long",
@@ -562,7 +562,7 @@ public sealed class ProgramExecutionTests
         => await DebugAsync(Counting, async (provider, _, _) =>
         {
             var set = await new HostDebugBreakpointsHandler(provider)
-                .Handle(new HostDebugBreakpointsParams { ModuleName = "Nothing", Lines = [5] }, CancellationToken.None).WaitAsync(Patience);
+                .Handle(new HostDebugBreakpointsParams { ModuleName = "Nothing", Breakpoints = [new BreakpointDto { Line = 5 }] }, CancellationToken.None).WaitAsync(Patience);
 
             Assert.IsFalse(set.Judged, "there is no code to judge a line by");
             Assert.IsFalse(set.Breakpoints.Single().Verified);

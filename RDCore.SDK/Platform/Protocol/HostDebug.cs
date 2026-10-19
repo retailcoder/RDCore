@@ -133,7 +133,7 @@ public record class HostDebugBreakpointsParams : IRequest, IRequest<HostDebugBre
     public string ModuleName { get; init; } = string.Empty;
 
     /// <summary>The zero-based lines of the source. None removes the module's breakpoints.</summary>
-    public IReadOnlyList<int> Lines { get; init; } = [];
+    public IReadOnlyList<BreakpointDto> Breakpoints { get; init; } = [];
 }
 
 /// <summary>
@@ -157,7 +157,8 @@ public record class HostDebugBreakpointsResult
 /// </summary>
 /// <param name="Line">The zero-based line it was asked for.</param>
 /// <param name="Verified">Whether a statement of the module's loaded code begins on the line, which is what a program can wait before.</param>
-public record class HostBreakpoint(int Line, bool Verified);
+/// <param name="ConditionExpression">Breaks when condition is <c>true</c>.</param>
+public record class HostBreakpoint(int Line, bool Verified, string? ConditionExpression = null);
 
 /// <summary>
 /// Request for <c>rdcore/host/debug/stack</c>: the activations of the program that waits, innermost first.

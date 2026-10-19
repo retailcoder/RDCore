@@ -60,8 +60,16 @@ public record class SessionDebugBreakpointsParams : IRequest, IRequest<HostDebug
     /// <inheritdoc cref="HostDebugBreakpointsParams.ModuleName"/>
     public string ModuleName { get; init; } = string.Empty;
 
-    /// <inheritdoc cref="HostDebugBreakpointsParams.Lines"/>
-    public IReadOnlyList<int> Lines { get; init; } = [];
+    /// <inheritdoc cref="HostDebugBreakpointsParams.Breakpoints"/>
+    public IReadOnlyList<BreakpointDto> Breakpoints { get; init; } = [];
+}
+
+
+public record class BreakpointDto
+{
+    public int Line { get; init; }
+    public bool IsEnabled { get; init; } = true;
+    public string? Condition { get; init; } = null;
 }
 
 /// <summary>

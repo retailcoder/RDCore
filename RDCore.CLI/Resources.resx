@@ -499,4 +499,10 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Bench_NoCases" xml:space="preserve">
     <value>No cases: a case is a Public Sub Bench*() of a standard module.</value>
   </data>
+  <data name="Repl_Breakpoint_Enabled" xml:space="preserve">
+    <value>BREAKPOINT ENABLED AT {0}</value>
+  </data>
+  <data name="Repl_Breakpoint_Disabled" xml:space="preserve">
+    <value>BREAKPOINT DISABLED AT {0}</value>
+  </data>
 </root>

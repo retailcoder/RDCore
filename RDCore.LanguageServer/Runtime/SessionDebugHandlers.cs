@@ -69,7 +69,7 @@ internal sealed class SessionDebugBreakpointsHandler(IProgramDebugService debugg
     protected override Task<HostDebugBreakpointsResult> HandleAsync(SessionDebugBreakpointsParams request, CancellationToken token)
     {
         SessionDebugRelay.RequireCapability(clientCapabilities);
-        return debugging.SetBreakpointsAsync(request.ModuleName, request.Lines, token);
+        return debugging.SetBreakpointsAsync(request.ModuleName, request.Breakpoints, token);
     }
 }
 

@@ -4,7 +4,6 @@ using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Server;
 using OmniSharp.Extensions.JsonRpc;
-using OmniSharp.Extensions.JsonRpc.Server;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using DapThread = OmniSharp.Extensions.DebugAdapter.Protocol.Models.Thread;
@@ -236,17 +235,17 @@ internal sealed class ProgramDebugAdapter(
 
     public async Task<SetBreakpointsResponse> Handle(SetBreakpointsArguments request, CancellationToken cancellationToken)
     {
-        var requested = request.Breakpoints?.Select(breakpoint => ToLine(breakpoint.Line)).ToArray() ?? [];
+        var requested = request.Breakpoints?.Select(breakpoint => new BreakpointDto { Line = ToLine(breakpoint.Line), Condition = breakpoint.Condition }).ToArray() ?? [];
         await _opened.Task.WaitAsync(cancellationToken);
 
         if (request.Source?.Path is not { } path || !workspace.TryGetModule(path, out var module))
         {
             return new SetBreakpointsResponse
             {
-                Breakpoints = new Container<Breakpoint>(requested.Select(line => new Breakpoint
+                Breakpoints = new Container<Breakpoint>(requested.Select(dto => new Breakpoint
                 {
                     Verified = false,
-                    Line = ToClientLine(line),
+                    Line = ToClientLine(dto.Line),
                     Message = DebuggerMessages.FileNotInWorkspace,
                 })),
             };

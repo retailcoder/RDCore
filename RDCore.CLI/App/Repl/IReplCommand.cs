@@ -195,9 +195,9 @@ public interface IReplPlatformClient
     /// Asks the language server to set the lines of a module that a program under a debugger waits at.
     /// </summary>
     /// <param name="moduleName">The module's programmatic name.</param>
-    /// <param name="lines">The zero-based lines of the module's source.</param>
+    /// <param name="breakpoints">The breakpoints to set.</param>
     /// <param name="token">A token that cancels the request.</param>
-    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<int> lines, CancellationToken token);
+    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token);
 
     /// <summary>
     /// Asks the language server for the activations of the program that waits, innermost first.

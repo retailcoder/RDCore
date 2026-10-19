@@ -36,10 +36,27 @@ internal sealed class BreakReplCommand : IReplCommand
             return ReplCommandResult.Continue;
         }
 
-        if (!int.TryParse(text, out var number))
+        var args = text.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (args.Length == 2 && args[0].Equals("TOGGLE", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(args[1], out var line))
+        {
+            var enabled = debugger.ToggleEnabled(line);
+            await TellAsync(context, token);
+            context.Console.WriteLine(string.Format(enabled ? Resources.Repl_Breakpoint_Disabled : Resources.Repl_Breakpoint_Enabled, line));
+            return ReplCommandResult.Continue;
+        }
+
+        if (!int.TryParse(args[0], out var number))
         {
             context.Console.WriteMessage(MessageKind.Error, Resources.Repl_SyntaxError, arguments);
             return ReplCommandResult.Continue;
+        }
+
+        string? condition = null;
+        if (args.Length > 1)
+        {
+            // a condition expression may be provided after the line number
+            condition = string.Join(' ', args.Skip(1));
         }
 
         // a breakpoint is on a line of the program, and a line that is not there is not one: it is as undefined as it is for a GOTO.
@@ -49,7 +66,7 @@ internal sealed class BreakReplCommand : IReplCommand
             return ReplCommandResult.Continue;
         }
 
-        var set = debugger.Toggle(number);
+        var set = debugger.ToggleBreakpoint(number, condition);
         await TellAsync(context, token);
         context.Console.WriteLine(string.Format(set ? Resources.Repl_Breakpoint_Set : Resources.Repl_Breakpoint_Cleared, number));
         return ReplCommandResult.Continue;

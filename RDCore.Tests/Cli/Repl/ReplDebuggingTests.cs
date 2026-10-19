@@ -29,7 +29,7 @@ public sealed class ReplDebuggingTests
         _platform.Provides<SessionExecute>().Returns(true);
         _platform.Provides<SessionDiscard>().Returns(true);
         _platform.Provides<ProgramDebugging>().Returns(true);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult()));
         _context = new ReplCommandContext(_program, _console, _platform, new ReplDocument(_program, _platform), []);
 
@@ -57,9 +57,9 @@ public sealed class ReplDebuggingTests
     [TestMethod]
     public async Task ABreakpoint_OnALineTheLoadedProgramHasNoStatementOn_IsDropped_OnceTheProgramHasRun()
     {
-        _ = _context.Debugger.Toggle(10);
-        _ = _context.Debugger.Toggle(20);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+        _ = _context.Debugger.ToggleBreakpoint(10);
+        _ = _context.Debugger.ToggleBreakpoint(20);
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult
             {
                 Breakpoints = [new HostBreakpoint(1, true), new HostBreakpoint(2, false)],
@@ -75,9 +75,9 @@ public sealed class ReplDebuggingTests
     [TestMethod]
     public async Task ABreakpoint_IsKept_WhileThePlatformHasNotJudgedIt()
     {
-        _ = _context.Debugger.Toggle(10);
-        _ = _context.Debugger.Toggle(20);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+        _ = _context.Debugger.ToggleBreakpoint(10);
+        _ = _context.Debugger.ToggleBreakpoint(20);
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult
             {
                 Breakpoints = [new HostBreakpoint(1, false), new HostBreakpoint(2, false)],
@@ -93,8 +93,8 @@ public sealed class ReplDebuggingTests
     [TestMethod]
     public async Task ABreakpoint_IsNotDropped_BeforeTheProgramHasRun()
     {
-        _ = _context.Debugger.Toggle(10);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+        _ = _context.Debugger.ToggleBreakpoint(10);
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult { Breakpoints = [new HostBreakpoint(1, false)], Judged = true }));
 
         await CommandAsync(new BreakReplCommand(), "20");
@@ -130,13 +130,13 @@ public sealed class ReplDebuggingTests
     [TestMethod]
     public async Task ARun_TellsThePlatformWhereTheBreakpointsAre_AsLinesOfTheModule()
     {
-        _context.Debugger.Toggle(30);
+        _context.Debugger.ToggleBreakpoint(30);
         ExecuteReturns(new ExecuteSessionResult { Outcome = ExecutionOutcome.Completed });
 
         await RunAsync();
 
         // before the program runs, and again once it has, to hear which of them the loaded program can have.
-        await _platform.Received(2).SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<int>>(lines => lines.SequenceEqual(new[] { 3 })), Arg.Any<CancellationToken>());
+        await _platform.Received(2).SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<BreakpointDto>>(lines => lines.SequenceEqual(new[] { new BreakpointDto { Line = 3 } })), Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -620,19 +620,32 @@ public sealed class ReplDebuggingTests
         throw new AssertFailedException($"line {number} was not listed");
     }
 
+    private IAppThemeService GetMockThemeService()
+    {
+        var themeService = Substitute.For<IAppThemeService>();
+        var theme = new AppTheme(new ThemeDocument
+        {
+            Debug = new()
+            {
+                BreakpointGlyph = "red",
+            }
+        });
+        themeService.Theme.Returns(theme);
+        return themeService;
+    }
+
     [TestMethod]
     public async Task AListing_HasAMarginOfOneCharacter_AndAMarkInItForABreakpoint()
     {
         await CommandAsync(new BreakReplCommand(), "20");
-
-        await CommandAsync(new ListReplCommand());
+        await CommandAsync(new ListReplCommand(GetMockThemeService()));
 
         var plain = Listed(10);
         Assert.AreEqual(" ", plain.Margin.Text);
         Assert.AreEqual(ReplLineStyle.Plain, plain.Style);
 
         var marked = Listed(20);
-        Assert.AreEqual("●", marked.Margin.Text);
+        Assert.AreEqual("🔴", marked.Margin.Text);
         Assert.AreEqual(ReplTextStyle.BreakpointGlyph, marked.Margin.Style);
         Assert.AreEqual(ReplLineStyle.Breakpoint, marked.Style);
     }
@@ -643,7 +656,7 @@ public sealed class ReplDebuggingTests
         ExecuteReturns(SuspendedAt(2));
         await RunAsync();
 
-        await CommandAsync(new ListReplCommand());
+        await CommandAsync(new ListReplCommand(GetMockThemeService()));
 
         Assert.AreEqual(ReplLineStyle.CurrentStatement, Listed(20).Style);
         Assert.AreEqual(ReplLineStyle.Plain, Listed(10).Style);
@@ -656,7 +669,7 @@ public sealed class ReplDebuggingTests
         await RunAsync();
         await CommandAsync(new BreakReplCommand(), "20");
 
-        await CommandAsync(new ListReplCommand());
+        await CommandAsync(new ListReplCommand(GetMockThemeService()));
 
         var line = Listed(20);
         Assert.AreEqual("●", line.Margin.Text);
@@ -671,7 +684,7 @@ public sealed class ReplDebuggingTests
         ResumeReturns(new ExecuteSessionResult { Outcome = ExecutionOutcome.Completed });
         await CommandAsync(new ContReplCommand());
 
-        await CommandAsync(new ListReplCommand());
+        await CommandAsync(new ListReplCommand(GetMockThemeService()));
 
         Assert.AreEqual(ReplLineStyle.Plain, Listed(20).Style);
     }

@@ -1,4 +1,5 @@
 using RDCore.SDK.Client;
+using RDCore.SDK.Platform.Protocol;
 
 namespace RDCore.CLI.App.Repl;
 
@@ -17,6 +18,14 @@ public enum ReplDebugState
     Suspended,
 }
 
+public record struct Breakpoint(int LineNumber, bool Enabled = true, string? ConditionExpression = default) : IComparable<Breakpoint>, IEquatable<Breakpoint>
+{
+    public readonly int CompareTo(Breakpoint other) => LineNumber.CompareTo(other.LineNumber);
+    public readonly override int GetHashCode() => LineNumber;
+    public readonly bool Equals(Breakpoint other) => LineNumber == other.LineNumber;
+    public static implicit operator int(Breakpoint breakpoint) => breakpoint.LineNumber;
+}
+
 /// <summary>
 /// What the shell knows of the program it runs under a debugger: its state, the line it waits before, and the lines that have breakpoints.
 /// </summary>
@@ -26,7 +35,7 @@ public enum ReplDebugState
 /// </remarks>
 public sealed class ReplDebugger
 {
-    private readonly SortedSet<int> _breakpoints = [];
+    private readonly SortedSet<Breakpoint> _breakpoints = [];
 
     /// <summary>Whether a program runs or waits.</summary>
     public ReplDebugState State { get; private set; }
@@ -35,14 +44,32 @@ public sealed class ReplDebugger
     public int? StoppedAt { get; private set; }
 
     /// <summary>The line numbers that have a breakpoint, in order.</summary>
-    public IReadOnlyCollection<int> Breakpoints => _breakpoints;
+    public IReadOnlyCollection<Breakpoint> Breakpoints => _breakpoints;
 
     /// <summary>
-    /// Sets the breakpoint of a line, or clears it if it has one.
+    /// Sets the conditional breakpoint of a line, or clears it if it has one.
     /// </summary>
     /// <param name="number">The line number.</param>
+    /// <param name="condition">The condition expression of the breakpoint.</param>
     /// <returns>Whether the line has a breakpoint now.</returns>
-    public bool Toggle(int number) => !_breakpoints.Remove(number) && _breakpoints.Add(number);
+    public bool ToggleBreakpoint(int number, string? condition = default) =>
+        !_breakpoints.Remove(new(number)) && _breakpoints.Add(new(number, Enabled: true, condition));
+
+    /// <summary>
+    /// Disables the breakpoint of a line, or enables it if it is disabled.
+    /// </summary>
+    /// <param name="number">The line number.</param>
+    /// <returns>Whether the line has an enabled breakpoint now.</returns>
+    public bool ToggleEnabled(int number)
+    {
+        if (_breakpoints.TryGetValue(new(number), out var breakpoint))
+        {
+            _ = _breakpoints.Remove(breakpoint);
+            _ = _breakpoints.Add(breakpoint with { Enabled = !breakpoint.Enabled });
+            return breakpoint.Enabled;
+        }
+        return false;
+    }
 
     /// <summary>
     /// Clears every breakpoint.
@@ -81,22 +108,28 @@ public sealed class ReplDebugger
     /// </param>
     public async Task PushBreakpointsAsync(ReplCommandContext context, CancellationToken token, bool judge = false)
     {
-        _ = _breakpoints.RemoveWhere(number => context.Program.IndexOf(number) < 0);
+        _ = _breakpoints.RemoveWhere(breakpoint => context.Program.IndexOf(breakpoint.LineNumber) < 0);
         if (!context.Platform.Provides<ProgramDebugging>())
         {
             return;
         }
 
-        var numbers = _breakpoints.ToArray();
-        var lines = numbers.Select(number => context.Program.SourceLineOf(number)).ToArray();
-        var result = await context.Platform.SetBreakpointsAsync(ReplProgram.ModuleName, lines, token);
-        if (judge && result.Judged && result.Breakpoints.Count == numbers.Length)
+        var breakpoints = _breakpoints.ToArray();
+        var wireBreakpoints = breakpoints.Select(breakpoint => new BreakpointDto
         {
-            for (var i = 0; i < numbers.Length; i++)
+            Line = context.Program.SourceLineOf(breakpoint.LineNumber),
+            IsEnabled = breakpoint.Enabled,
+            Condition = breakpoint.ConditionExpression
+        }).ToArray();
+
+        var result = await context.Platform.SetBreakpointsAsync(ReplProgram.ModuleName, wireBreakpoints, token);
+        if (judge && result.Judged && result.Breakpoints.Count == breakpoints.Length)
+        {
+            for (var i = 0; i < breakpoints.Length; i++)
             {
                 if (!result.Breakpoints[i].Verified)
                 {
-                    _ = _breakpoints.Remove(numbers[i]);
+                    _ = _breakpoints.Remove(breakpoints[i]);
                 }
             }
         }
