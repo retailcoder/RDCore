@@ -2,8 +2,10 @@ using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Errors;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
@@ -31,8 +33,9 @@ namespace RDCore.SDK.Semantics.Static;
 /// 91 when it runs.</item>
 /// <item>An object of a class whose default member takes an argument, as a <c>Collection</c>'s <c>Item</c> does: <see cref="VBCompileErrorId.ArgumentNotOptional"/>.</item>
 /// <item>An object of a class whose default member returns an object, where a value of a declared type is expected:
-/// <see cref="VBCompileErrorId.TypeMismatch"/> (<see cref="ValueDestination.TypedValue"/>). <c>Abs</c>, <c>Int</c>, <c>Fix</c> and <c>Len</c> take one, and read
-/// it when they run (<see cref="ValueDestination.AnyValue"/>).</item>
+/// <see cref="VBCompileErrorId.TypeMismatch"/> (<see cref="ValueDestination.TypedValue"/>). <c>Abs</c>, <c>Int</c> and <c>Fix</c> take one, and read it
+/// when they run (<see cref="ValueDestination.AnyValue"/>); <c>Len</c> and <c>LenB</c> take a <c>String</c> or a variable, which it is not
+/// (<see cref="ValueDestination.StringOrVariable"/>).</item>
 /// </list>
 /// <para>
 /// 👉 An object of a class that has no default member, where a value of a declared type is expected, is <see cref="VBCompileErrorId.TypeMismatch"/> too: MS-VBAL
@@ -179,7 +182,22 @@ public static class ObjectValueStaticSemantics
             // it binds to: this only asks its type again, and records nothing over it.
             var passed = value is ByValArgumentExpressionNode byVal ? byVal.Operand : value;
             var argumentType = ExpressionStaticSemanticsEvaluator.Evaluate(Unrecorded(context), passed);
-            if (argumentType is { IsSuccess: true, Result: { } type } && ValueOf(passed, type, destination) is { IsError: true } refused)
+            if (argumentType is not { IsSuccess: true, Result: { } type })
+            {
+                continue;
+            }
+
+            if (destination is ValueDestination.StringOrVariable)
+            {
+                if (StringOrVariableError(context, passed, type) is { } notAStringOrAVariable)
+                {
+                    return notAStringOrAVariable;
+                }
+
+                continue;
+            }
+
+            if (ValueOf(passed, type, destination) is { IsError: true } refused)
             {
                 return refused.ErrorInfo as VBCompileErrorInfo;
             }
@@ -187,6 +205,56 @@ public static class ObjectValueStaticSemantics
 
         return null;
     }
+
+    // Len and LenB: "any valid string expression, or any valid variable name" (MS-VBAL §6.1.2.11.1.22). A value that is a String or a Variant is a string
+    // expression, and so is one MS-VBA reads as one when it runs (an object, a record); a value of any other declared type must be a variable, whose size is
+    // measured. An object stands for its default member's value, which is no variable: MS-VBA refuses it unless that value is a String or a Variant.
+    private static VBCompileErrorInfo? StringOrVariableError(StaticEvaluationContext context, ExpressionNode expression, VBType type)
+    {
+        if (ValueOf(expression, type, ValueDestination.AnyValue) is { IsError: true } refused)
+        {
+            return refused.ErrorInfo as VBCompileErrorInfo;
+        }
+
+        if (type is VBClassType { DefaultMember: { } defaultMember } classType)
+        {
+            return IsReadAsAString(defaultMember.ResolvedType) && defaultMember.ResolvedType is not (VBClassType or VBObjectType)
+                ? null
+                : VBCompileErrorInfo.For(VBCompileErrorId.VariableRequired, expression.Location,
+                    string.Format(Exceptions.VBCompileError_LenOfADefaultMemberValue_Verbose, classType.Name, defaultMember.Name, defaultMember.ResolvedType.Name));
+        }
+
+        return type is VBClassType || IsReadAsAString(type) || DenotesAVariable(context, expression)
+            ? null
+            : VBCompileErrorInfo.For(VBCompileErrorId.VariableRequired, expression.Location,
+                string.Format(Exceptions.VBCompileError_LenOfAValue_Verbose, type.Name));
+    }
+
+    // what Len reads as a string expression when it runs, as MS-VBA has it (recorded in Excel): a String, a Variant, a late-bound object, a record.
+    private static bool IsReadAsAString(VBType type)
+        => type is VBStringType or VBFixedStringType or VBVariantType or VBObjectType or VBUserDefinedType or VBUnknownType or VBNullType or VBEmptyType;
+
+    // MS-VBAL §5.6: an expression classified as a variable - a variable or a parameter by its name, qualified by its module or not, a field of a record or a
+    // public variable of a class, an element of an array. A constant, a call, a property, a literal and an operator's result are values. MS-VBA takes a
+    // variable in parentheses as the variable, for Len (recorded in Excel).
+    private static bool DenotesAVariable(StaticEvaluationContext context, ExpressionNode expression) => expression switch
+    {
+        VBUnaryOperatorExpressionNode { Token: OperatorSymbolNames.UnaryLetCoerceOp } parenthesized => DenotesAVariable(context, parenthesized.Operand),
+        SimpleNameExpressionNode name => IsAVariable(context.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope.Uri).Symbol),
+        MemberAccessExpressionNode { Owner: { } owner } access when context.Resolver.NamespaceOf(owner, context.Scope.Uri) is { } qualifier
+            => IsAVariable(context.Resolver.ResolveMember(qualifier, access.Member, context.Scope.Uri).Symbol),
+        MemberAccessExpressionNode { Owner: { } owner } access => ExpressionStaticSemanticsEvaluator.Evaluate(Unrecorded(context), owner) switch
+        {
+            { IsSuccess: true, Result: VBUserDefinedType } => true,
+            { IsSuccess: true, Result: VBClassType declared } => declared.Members.FirstOrDefault(member
+                => member.Name.Equals(access.Member.IdentifierName, StringComparison.OrdinalIgnoreCase)) is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field },
+            _ => false,
+        },
+        IndexExpressionNode { Callee: var callee } => ExpressionStaticSemanticsEvaluator.Evaluate(Unrecorded(context), callee) is { IsSuccess: true, Result: VBArrayType },
+        _ => false,
+    };
+
+    private static bool IsAVariable(Symbol? symbol) => symbol is { Kind: SymbolKindExt.Variable or SymbolKindExt.Field } or VBParameterSymbol;
 
     /// <summary>
     /// The parameters of the procedure a call written on <paramref name="callee"/> calls - by its bare name, qualified by the project or module that declares

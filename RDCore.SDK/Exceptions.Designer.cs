@@ -700,6 +700,24 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Len and LenB take a String expression or the name of a variable (MS-VBAL §6.1.2.11.1.22): this is a value of type {0}, which is neither. Assign it to a variable of that type to measure the variable, or convert it to a String to count its characters..
+        /// </summary>
+        public static string VBCompileError_LenOfAValue_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_LenOfAValue_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Len and LenB take a String expression or the name of a variable (MS-VBAL §6.1.2.11.1.22): an object of {0} stands for what its default member {1} returns, a value of type {2}, which is neither..
+        /// </summary>
+        public static string VBCompileError_LenOfADefaultMemberValue_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_LenOfADefaultMemberValue_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Nothing is no object, and so has no value: a value is expected here..
         /// </summary>
         public static string VBCompileError_NothingIsNotAValue_Verbose {

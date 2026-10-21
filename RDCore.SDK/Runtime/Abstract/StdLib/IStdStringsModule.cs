@@ -271,10 +271,10 @@ public interface IStdStringsModule
     /// </summary>
     /// <param name="expression">The string, or a variable of any type.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> Len([StdLibValue(ValueDestination.AnyValue)] VBVariantValue expression);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> Len([StdLibValue(ValueDestination.StringOrVariable)] VBVariantValue expression);
 
     /// <inheritdoc cref="Len"/>
-    RuntimeSemanticsEvaluationResult<VBVariantValue> LenB([StdLibValue(ValueDestination.AnyValue)] VBVariantValue expression);
+    RuntimeSemanticsEvaluationResult<VBVariantValue> LenB([StdLibValue(ValueDestination.StringOrVariable)] VBVariantValue expression);
 
     /// <summary>
     /// <strong>MS-VBAL 6.1.2.11.1.23 LTrim</strong> Gets a string with its <em>leading</em> spaces removed.
