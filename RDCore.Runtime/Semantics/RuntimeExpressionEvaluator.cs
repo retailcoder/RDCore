@@ -1771,13 +1771,15 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             }
 
             var aliased =RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || external && parameter.ResolvedType is VBStringType;
-            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, external))
+            RuntimeSemanticsEvaluationResult? evaluatedInstead = null;
+            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, out evaluatedInstead, external))
             {
                 bound[i] = reference;
                 continue;
             }
 
-            var argumentResult = EvaluateIndexArgument(session, argumentNode, context);
+            // an argument is evaluated once: what binding it by reference already evaluated is what is passed, and not evaluated again.
+            var argumentResult = evaluatedInstead ?? EvaluateIndexArgument(session, argumentNode, context);
             if (argumentResult is { } evaluated && !evaluated.IsSuccess)
             {
                 return evaluated;
@@ -2022,15 +2024,16 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     // already gets - MS-VBAL's own "otherwise" case, never an error.
     private bool TryResolveByRefArgument(
         IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode argument, VBParameterSymbol parameter, List<MemoryAddress> borrowed,
-        out VBRuntimeReference reference, bool external = false)
+        out VBRuntimeReference reference, out RuntimeSemanticsEvaluationResult? evaluated, bool external = false)
     {
         reference = VBRuntimeReference.NullRef;
+        evaluated = null;
 
         // an element of an array is a variable (MS-VBAL §5.6.13.1), passed by reference as one: MS-VBA writes what the callee assigns to the element, and the
         // array is locked for as long as the call runs (ICallStackFrame.LocksArray). A Declare's parameter is laid out by the marshaller, which takes a copy.
         if (!external && argument is IndexExpressionNode element)
         {
-            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference);
+            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference, out evaluated);
         }
 
         // `As Any` is a parameter of a Declare that takes whatever it is given, a variable of any type by reference - and passes it as the type it is.
@@ -2076,29 +2079,49 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     // the element's own cell, given an address of its own for as long as the call that is made with it runs - which the caller gives back (borrowed). An
     // element whose cell cannot be written yet (the inert one an element of an object or a Variant array starts with) is given one that can, holding its
     // default, as an assignment to it would. A callee that is not a variable - a function, a property - is not reached into: its element is a value.
+    // Once the subscripts are evaluated, an element that is not bound is passed as what they select - an error, or a value - and they are not evaluated again
+    // (MS-VBA evaluates them once: a subscript outside the bounds is error 9, raised by the call's argument).
     private bool TryResolveElementByRefArgument(
         IRuntimeSession session, RuntimeEvaluationContext context, IndexExpressionNode element, VBParameterSymbol parameter, List<MemoryAddress> borrowed,
-        out VBRuntimeReference reference)
+        out VBRuntimeReference reference, out RuntimeSemanticsEvaluationResult? evaluated)
     {
         reference = VBRuntimeReference.NullRef;
+        evaluated = null;
         if (element.Arguments.IsDefaultOrEmpty || !DenotesAVariable(session, context, element.Callee))
         {
             return false;
         }
 
-        var evaluated = Evaluate(session, element.Callee, context);
-        var held = evaluated.IsSuccess ? evaluated.Result : null;
+        var callee = Evaluate(session, element.Callee, context);
+        var held = callee.IsSuccess ? callee.Result : null;
         while (held is VBVariantValue { TypedValue: var wrapped })
         {
             held = wrapped;
         }
 
         if (held is not VBArrayValue { IsIndeterminate: false } array
-            || (!IsOfDeclaredType(parameter, array.ItemType) && parameter.ResolvedType is not VBVariantType)
-            || EvaluateSubscripts(session, context, element.Arguments, out var indices, out var indicesKnown) is not null
-            || !indicesKnown
-            || array.GetElementHandle(indices) is not { } cell)
+            || (!IsOfDeclaredType(parameter, array.ItemType) && parameter.ResolvedType is not VBVariantType))
         {
+            return false;
+        }
+
+        if (EvaluateSubscripts(session, context, element.Arguments, out var indices, out var indicesKnown) is { } failed)
+        {
+            evaluated = failed;
+            return false;
+        }
+
+        // a subscript that is not known selects an element that could be any of them: what is passed is not known either.
+        if (!indicesKnown)
+        {
+            evaluated = RuntimeSemanticsEvaluationResult.Success(array.ItemType.CreateIndeterminateValue());
+            return false;
+        }
+
+        if (array.GetElementHandle(indices) is not { } cell)
+        {
+            evaluated = RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, element.Location,
+                string.Join(", ", indices)));
             return false;
         }
 
@@ -2110,6 +2133,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
 
         if (!session.Storage.TryAllocate(array.ItemType.DefaultValue.Size, cell, out var address))
         {
+            evaluated = array[indices] is { } value ? RuntimeSemanticsEvaluationResult.Success(value) : null;
             return false;
         }
 
