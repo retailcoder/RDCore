@@ -60,8 +60,31 @@ public record class SessionDebugBreakpointsParams : IRequest, IRequest<HostDebug
     /// <inheritdoc cref="HostDebugBreakpointsParams.ModuleName"/>
     public string ModuleName { get; init; } = string.Empty;
 
-    /// <inheritdoc cref="HostDebugBreakpointsParams.Lines"/>
-    public IReadOnlyList<int> Lines { get; init; } = [];
+    /// <summary>The breakpoints, one per line of the source. None removes the module's breakpoints.</summary>
+    public IReadOnlyList<SessionBreakpointLine> Breakpoints { get; init; } = [];
+}
+
+/// <summary>
+/// A breakpoint as a client asks for it: a line, whether it is on, and the condition it waits on, as the person typed it.
+/// </summary>
+/// <remarks>
+/// The language server parses the condition and sends the host the expression (<see cref="HostBreakpointLine.ConditionJson"/>). A condition that is not an expression
+/// is refused there, and the result says why (<see cref="HostBreakpoint.ConditionError"/>); it is not evaluated until the program reaches the line, since what its
+/// names are is the activation's that reaches it.
+/// </remarks>
+public record class SessionBreakpointLine
+{
+    /// <summary>The zero-based line of the source.</summary>
+    public int Line { get; init; }
+
+    /// <inheritdoc cref="HostBreakpointLine.IsEnabled"/>
+    public bool IsEnabled { get; init; } = true;
+
+    /// <summary>
+    /// The source of the expression the program waits on when it reaches the line, a <c>Boolean</c> condition as an <c>If</c> has (see <see cref="RDCore.SDK.Runtime.Abstract.Execution.RuntimeBreakpoint.Condition"/>);
+    /// <see langword="null"/> or blank for a breakpoint that is always waited at.
+    /// </summary>
+    public string? Condition { get; init; }
 }
 
 /// <summary>
@@ -99,4 +122,23 @@ public record class SessionDebugEvaluateParams : IRequest, IRequest<HostDebugEva
 
     /// <summary>The expression, as it would be written in the procedure of the activation.</summary>
     public string Expression { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Request for <c>rdcore/session/debug/execute</c>: runs a statement, written as text, in an activation of the program that waits - the answer to a line typed in the
+/// immediate window of a procedure that is stopped. The language server parses it and has the host run it. The language-server side of
+/// <see cref="HostDebugExecuteParams"/>.
+/// </summary>
+/// <remarks>
+/// The statement's names are the activation's: a local of the procedure is the local the program goes on with, and a name the procedure does not see is not defined
+/// - it declares nothing, since a statement typed at a stop is not part of the program's code. <c>?</c> is the immediate window's <c>Debug.Print</c>.
+/// </remarks>
+[Method(RDCorePlatformProtocol.SessionDebugExecute, Direction.ClientToServer)]
+public record class SessionDebugExecuteParams : IRequest, IRequest<HostDebugEvaluateResult>
+{
+    /// <inheritdoc cref="SessionDebugEvaluateParams.FrameId"/>
+    public int FrameId { get; init; }
+
+    /// <summary>The statement, as it would be written in the procedure of the activation; one line.</summary>
+    public string Statement { get; init; } = string.Empty;
 }

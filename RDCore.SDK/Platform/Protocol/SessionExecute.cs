@@ -227,6 +227,14 @@ public record class ExecuteSessionResult
     public long ErrorLineNumber { get; init; }
 
     /// <summary>
+    /// Why the condition of the breakpoint the program waits at could not be evaluated, when <see cref="Outcome"/> is <see cref="ExecutionOutcome.Suspended"/> and that
+    /// is why it waits: a breakpoint whose condition raises an error is waited at (see <see cref="RDCore.SDK.Runtime.Abstract.Execution.RuntimeBreakpoint.Condition"/>),
+    /// and this is what the person is told of it. Empty otherwise. The program does not wait on the error: it is the condition's and not the program's, and
+    /// <see cref="ErrorNumber"/> stays <c>0</c>.
+    /// </summary>
+    public string ConditionError { get; init; } = string.Empty;
+
+    /// <summary>
     /// 🎯 The call stack the error was raised on, innermost activation first - what <c>Err.StackTrace</c>
     /// reports. Empty for any other outcome.
     /// </summary>
@@ -249,4 +257,12 @@ public record class ExecuteSessionResult
 /// where in itself it is suspended.
 /// </param>
 /// <param name="Character">Zero-based character within <paramref name="Line"/>, or <c>-1</c>.</param>
-public record class ExecuteStackFrame(string Procedure, int Line = -1, int Character = -1);
+/// <param name="ReturnLines">
+/// The zero-based lines of the <c>GoSub</c> statements the activation had not <c>Return</c>ed from when the error was raised, innermost first - how it got to where it
+/// was, as <see cref="HostStackFrame.ReturnLines"/> says it of a program that waits. Empty for an activation in no <c>GoSub</c>.
+/// </param>
+public record class ExecuteStackFrame(string Procedure, int Line = -1, int Character = -1, IReadOnlyList<int>? ReturnLines = null)
+{
+    /// <summary>The lines of the <c>GoSub</c> statements the activation would have returned to; none for one that was in none.</summary>
+    public IReadOnlyList<int> ReturnLines { get; init; } = ReturnLines ?? [];
+}

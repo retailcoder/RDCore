@@ -487,12 +487,16 @@ public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind me
 
                 declared.Add(reference.IdentifierName);
 
+                // a name is the same name however it is spelled (MS-VBAL 3.3.5): the variable an earlier pass declared is declared again under the
+                // spelling it has, so that its identity - and its value, which a session keeps across a redefinition - is the one it had.
+                var name = resolved.Symbol?.Name;
+
                 // where the variable lives is the environment's to say (ImplicitDeclarationScope). Declared at module
                 // level it is one variable however many procedures refer to the name - each of them declares it, and
                 // the provider fuses the declarations that share an identity.
                 results.Add(implicitScope == ImplicitDeclarationScope.Module
-                    ? BuildImplicitModuleVariable(reference)
-                    : BuildImplicitLocal(reference, procedureUri));
+                    ? BuildImplicitModuleVariable(reference, name)
+                    : BuildImplicitLocal(reference, procedureUri, name));
             }
         }
 
@@ -522,6 +526,18 @@ public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind me
         => resolved.Symbol is VBModuleFieldVariableMemberSymbol variable
             && variable.GetProperty(SymbolProperties.ImplicitlyDeclared)
             && variable.ParentUri.AbsoluteUri == moduleUri.AbsoluteUri;
+
+    /// <summary>
+    /// The simple name expressions of <paramref name="statement"/>, and of the statements in its body, that sit in the <em>default</em> binding context
+    /// (<strong>MS-VBAL §5.6.10</strong>) — the references an implicit declaration can come from, found as a procedure's are.
+    /// </summary>
+    /// <remarks>
+    /// What a statement run where a program waits declares, when it names what the procedure does not: the same names a procedure's own
+    /// body would have declared, so that the immediate window and the code agree on what is a variable.
+    /// </remarks>
+    /// <param name="statement">The statement.</param>
+    public static IEnumerable<SimpleNameExpressionNode> ImplicitDeclarationCandidates(SyntaxNode statement)
+        => DescendantsAndSelf(statement).SelectMany(ValueContextSimpleNames);
 
     /// <summary>
     /// The simple name expressions of <paramref name="node"/> that sit in the <em>default</em> binding
@@ -779,12 +795,17 @@ public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind me
     /// </remarks>
     /// <param name="node">The simple name expression that declared it.</param>
     /// <param name="procedureUri">The procedure the variable is local to.</param>
-    public Symbol BuildImplicitLocal(SimpleNameExpressionNode node, Uri procedureUri)
+    /// <param name="name">
+    /// The name it is declared under: the spelling of the variable an earlier pass declared, when this is that one declared again, so that a reference spelled
+    /// otherwise (<c>v</c> for <c>V</c>) is the same variable and not a second one. The reference's own spelling when <see langword="null"/>.
+    /// </param>
+    public Symbol BuildImplicitLocal(SimpleNameExpressionNode node, Uri procedureUri, string? name = null)
     {
         var range = RangeOf(node);
+        name ??= node.IdentifierName;
         return new VBLocalVariableSymbol(
-            workspaceRoot, procedureUri, node.IdentifierName, ScopeKind.Local, range, range,
-            ResolvedType: ImplicitOrDeclaredType(node.IdentifierName, asType: null, node.TypeHint, procedureUri),
+            workspaceRoot, procedureUri, name, ScopeKind.Local, range, range,
+            ResolvedType: ImplicitOrDeclaredType(name, asType: null, node.TypeHint, procedureUri),
             DeclaredBy: LocalDeclarationKind.Implicit);
     }
 
@@ -797,12 +818,14 @@ public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind me
     /// access modifier — marked as implicit so that a later pass can tell it from one the source declares.
     /// </remarks>
     /// <param name="node">The simple name expression that declared it.</param>
-    public Symbol BuildImplicitModuleVariable(SimpleNameExpressionNode node)
+    /// <param name="name"><inheritdoc cref="BuildImplicitLocal" path="/param[@name='name']"/></param>
+    public Symbol BuildImplicitModuleVariable(SimpleNameExpressionNode node, string? name = null)
     {
         var range = RangeOf(node);
+        name ??= node.IdentifierName;
         return new VBModuleFieldVariableMemberSymbol(
-                workspaceRoot, moduleUri, node.IdentifierName, memberScope,
-                ImplicitOrDeclaredType(node.IdentifierName, asType: null, node.TypeHint, moduleUri), range, range, AccessModifier.Implicit)
+                workspaceRoot, moduleUri, name, memberScope,
+                ImplicitOrDeclaredType(name, asType: null, node.TypeHint, moduleUri), range, range, AccessModifier.Implicit)
             .With(SymbolProperties.ImplicitlyDeclared, true);
     }
 

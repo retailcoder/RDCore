@@ -291,9 +291,11 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// (<strong>MS-VBAL §6.1.2.11.1.22</strong>).
     /// </summary>
     /// <remarks>
-    /// "With user-defined types, <c>Len</c> returns the size as it will be written to the file" — the
-    /// concatenation of the members with no padding between them, which is what a <c>Put</c> statement writes
-    /// and therefore what this has to agree with. <see cref="LenB"/> is the in-memory size instead.
+    /// "With user-defined types, <c>Len</c> returns the size as it will be written to the file". 👉 RD-VBA reports what MS-VBA
+    /// does instead: the members' memory widths with no padding between them, a variable-length <c>String</c>, an object or a
+    /// resizable array member counting as the pointer it is, a <c>Variant</c> as 24 bytes in a 64-bit environment, and a
+    /// fixed-length <c>String</c> as its characters (<see cref="VBUserDefinedTypeLayout.UnpaddedSize"/>). <see cref="LenB"/>
+    /// is the in-memory size, padding included.
     /// </remarks>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> Len(VBVariantValue expression)
         => Measure(expression, inMemory: false);
@@ -325,46 +327,26 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             return RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(VBNullValue.Null));
         }
 
-        return Length(value, inMemory) is { } length
-            ? RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(new VBLongValue(length)))
-            : NotImplemented<VBVariantValue>(inMemory ? nameof(LenB) : nameof(Len));
+        return RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(new VBLongValue(Length(value, inMemory))));
     }
 
-    private static int? Length(VBTypedValue value, bool inMemory) => value switch
+    private int Length(VBTypedValue value, bool inMemory) => value switch
     {
         // a fixed-length String is its declared length, whatever it currently holds.
         VBFixedStringValue fixedString => inMemory ? 2 * fixedString.Length : fixedString.Length,
         // "Returns a Long containing the number of characters in a string", and LenB "returns the number of
         // bytes used to represent that string" - every byte of its data, a trailing one included.
         VBStringValue text => inMemory ? text.ByteLength : text.Length,
-        // the two UDT sizes: LenB's is the padded in-memory one the value reports, Len's is the unpadded
-        // concatenation a record is written from.
-        VBUserDefinedTypeValue udt => inMemory ? udt.Size : SerializedSize(udt),
+        // the two UDT sizes, laid out for the environment's pointer width: LenB's is the padded in-memory one, Len's the
+        // same widths with no padding.
+        VBUserDefinedTypeValue udt => RecordLength(VBUserDefinedTypeLayout.Of(udt, session.Environment.Is64Bit ? 8 : 4), inMemory),
         // "the number of bytes required to store a variable on the current platform", which for every scalar
         // is the size the value itself reports.
         VBEmptyValue => 0,
         _ => value.Size,
     };
 
-    // Len of a UDT is "the size as it will be written to the file": the members' own file widths, added up,
-    // with none of the padding LenB counts. A variable-length String member is the case MS-VBAL warns about -
-    // "Len might not be able to determine the actual number of storage bytes required when used with
-    // variable-length strings in user-defined data types" - and its file width is its characters.
-    private static int? SerializedSize(VBUserDefinedTypeValue udt)
-    {
-        var total = 0;
-        for (var index = 0; index < udt.Fields.Length; index++)
-        {
-            if (udt.FieldAt(index) is not { } field || Length(field, inMemory: false) is not { } width)
-            {
-                return null;
-            }
-
-            total += width;
-        }
-
-        return total;
-    }
+    private static int RecordLength(VBUserDefinedTypeLayout layout, bool inMemory) => inMemory ? layout.Size : layout.UnpaddedSize;
 
     // a Variant's own TypeInfo mirrors what it wraps while the instance stays a VBVariantValue, so measuring
     // one has to see the wrapped value - "if the variable name is a Variant, Len/LenB treats it the same as a
@@ -1587,11 +1569,15 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// <c>vbFromUnicode</c> writes its characters as that code page's bytes, a character the code page lacks being what its
     /// encoder maps it to; LocaleID does not change the code page. A Null String is Null.
     /// <para>
-    /// 👉 <c>vbUnicode</c> converts first and <c>vbFromUnicode</c> last, so a case conversion sees the characters the bytes are and
-    /// is what gets written; <c>vbProperCase</c> also lowercases the rest of each word, and starts none after punctuation, a
-    /// no-break space, or an ideographic space outside an East Asian locale. Both conversions of a pair (<c>vbWide</c> and <c>vbNarrow</c>, <c>vbKatakana</c>
-    /// and <c>vbHiragana</c>, <c>vbUnicode</c> and <c>vbFromUnicode</c>), a Conversion outside 0 to 255, and a LocaleID that names
-    /// no locale are error 5.
+    /// 👉 As MS-VBA does, every other conversion reads the String in the ANSI code page of LocaleID's locale (the environment's when
+    /// LocaleID is left out or 0, or when the locale has none), and writes it back from it: a character the code page lacks is the
+    /// one its encoder maps it to (<c>α</c> is <c>a</c> in Windows-1252, an ideographic space a space) or <c>?</c>, before any
+    /// conversion sees it. The casing is not the locale's own: a character is cased only to one that cases back to it, so the
+    /// Turkish <c>i</c> is <c>I</c>, and <c>ı</c>, <c>İ</c>, <c>µ</c> and <c>ς</c> stay as they are. <c>vbProperCase</c> also
+    /// lowercases the rest of each word, and starts none after punctuation, a no-break space, or an ideographic space outside an
+    /// East Asian locale. <c>vbUnicode</c> or <c>vbFromUnicode</c> with any other conversion, both conversions of a pair
+    /// (<c>vbWide</c> and <c>vbNarrow</c>, <c>vbKatakana</c> and <c>vbHiragana</c>), a Conversion outside 0 to 255, and a LocaleID
+    /// that names no locale are error 5.
     /// </para>
     /// <para>
     /// <c>vbWide</c> and <c>vbNarrow</c> convert between narrow characters and their wide forms, and <c>vbKatakana</c> and
@@ -1602,9 +1588,9 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// as a space does.
     /// </para>
     /// <para>
-    /// 👉 The conversions are made in one order, whatever their sum: <c>vbUnicode</c>, the case, <c>vbWide</c>, <c>vbKatakana</c> or
-    /// <c>vbHiragana</c>, <c>vbNarrow</c>, then <c>vbFromUnicode</c>; so a halfwidth katakana widened is a katakana the syllabary
-    /// conversion sees, and a hiragana made a katakana can be narrowed.
+    /// 👉 The conversions are made in one order, whatever their sum: the case, <c>vbWide</c>, <c>vbKatakana</c> or
+    /// <c>vbHiragana</c>, then <c>vbNarrow</c>; so a halfwidth katakana widened is a katakana the syllabary conversion sees, and a
+    /// hiragana made a katakana can be narrowed.
     /// </para>
     /// </remarks>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> StrConv(VBVariantValue @string, VBStrConv conversion, VBLongValue? localeID = default)
@@ -1632,6 +1618,12 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             {
                 return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), $"Conversion cannot combine {names}");
             }
+        }
+
+        const int byteConversions = (int)(VBStrConv.VBUnicode | VBStrConv.VBFromUnicode);
+        if ((settings & byteConversions) != 0 && (settings & ~byteConversions) != 0)
+        {
+            return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), "Conversion cannot combine vbUnicode or vbFromUnicode with another conversion");
         }
 
         // LocaleID has no default: left out, it is null, and 0 is the environment's locale too.
@@ -1667,13 +1659,25 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         }
 
         var ansi = session.Environment.AnsiEncoding;
-        var converted = (settings & (int)VBStrConv.VBUnicode) != 0 ? ansi.GetString(text.GetBytes()) : Text(text);
-        var casing = culture.TextInfo;
+        if ((settings & (int)VBStrConv.VBUnicode) != 0)
+        {
+            return InVariant(ansi.GetString(text.GetBytes()));
+        }
+
+        if ((settings & (int)VBStrConv.VBFromUnicode) != 0)
+        {
+            return InVariant(VBStringValue.FromBytes(ansi.GetBytes(Text(text))));
+        }
+
+        // MS-VBA converts in the locale's ANSI code page, so a character it lacks is lost before any conversion sees it.
+        var localeCodePage = localeID is { Value: not 0 } ? culture.TextInfo.ANSICodePage : 0;
+        var codePage = localeCodePage == 0 ? ansi : CodePagesEncodingProvider.Instance.GetEncoding(localeCodePage) ?? ansi;
+        var converted = codePage.GetString(codePage.GetBytes(Text(text)));
         converted = (VBStrConv)(settings & (int)VBStrConv.VBProperCase) switch
         {
-            VBStrConv.VBUpperCase => casing.ToUpper(converted),
-            VBStrConv.VBLowerCase => casing.ToLower(converted),
-            VBStrConv.VBProperCase => ProperCased(converted, casing, isEastAsian),
+            VBStrConv.VBUpperCase => Cased(converted, UpperOf),
+            VBStrConv.VBLowerCase => Cased(converted, LowerOf),
+            VBStrConv.VBProperCase => ProperCased(converted, isEastAsian),
             _ => converted,
         };
 
@@ -1683,9 +1687,7 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             : converted;
         converted = (settings & (int)VBStrConv.VBNarrow) != 0 ? EastAsianText.Narrowed(converted) : converted;
 
-        return (settings & (int)VBStrConv.VBFromUnicode) != 0
-            ? InVariant(VBStringValue.FromBytes(ansi.GetBytes(converted)))
-            : InVariant(converted);
+        return InVariant(codePage.GetString(codePage.GetBytes(converted)));
     }
 
     // "mutually exclusive, for example, vbUnicode + vbFromUnicode": each pair converts one way and its opposite.
@@ -1705,18 +1707,41 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
 
     // vbProperCase: each word's first character up and every other one down, a word beginning where the String does and after
     // a word separator, and nowhere else.
-    private static string ProperCased(string text, TextInfo casing, bool isEastAsian)
+    private static string ProperCased(string text, bool isEastAsian)
     {
-        var characters = casing.ToLower(text).ToCharArray();
+        var characters = Cased(text, LowerOf).ToCharArray();
         for (var index = 0; index < characters.Length; index++)
         {
             if (index == 0 || WordSeparators.Contains(characters[index - 1]) || isEastAsian && characters[index - 1] == IdeographicSpace)
             {
-                characters[index] = casing.ToUpper(characters[index]);
+                characters[index] = UpperOf(characters[index]);
             }
         }
 
         return new string(characters);
+    }
+
+    private static string Cased(string text, Func<char, char> casing)
+        => string.Create(text.Length, (text, casing), static (characters, state) =>
+        {
+            for (var index = 0; index < characters.Length; index++)
+            {
+                characters[index] = state.casing(state.text[index]);
+            }
+        });
+
+    // MS-VBA's casing pairs only characters that case back to each other, whatever the locale: the Turkish i is I and I is i, and
+    // a character whose case maps elsewhere (ı to I, İ to i, µ to Μ, ς to Σ) stays as it is.
+    private static char UpperOf(char character)
+    {
+        var upper = char.ToUpperInvariant(character);
+        return char.ToLowerInvariant(upper) == character ? upper : character;
+    }
+
+    private static char LowerOf(char character)
+    {
+        var lower = char.ToLowerInvariant(character);
+        return char.ToUpperInvariant(lower) == character ? lower : character;
     }
 
     /// <inheritdoc/>

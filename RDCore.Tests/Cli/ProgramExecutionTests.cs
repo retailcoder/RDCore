@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using RDCore.CLI.Host;
 using RDCore.CLI.Host.Handlers;
+using RDCore.Parsing;
 using RDCore.Runtime.Execution;
+using RDCore.SDK.Model.AST.Abstract;
+using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
 
@@ -473,7 +476,21 @@ public sealed class ProgramExecutionTests
     // ---- breakpoints ----
 
     private static Task<HostDebugBreakpointsResult> SetBreakpoints(EnvironmentSessionProvider provider, params int[] lines)
-        => new HostDebugBreakpointsHandler(provider).Handle(new HostDebugBreakpointsParams { ModuleName = "Program", Lines = lines }, CancellationToken.None).WaitAsync(Patience);
+        => SetBreakpointLines(provider, [.. lines.Select(line => new HostBreakpointLine { Line = line })]);
+
+    private static Task<HostDebugBreakpointsResult> SetBreakpointLines(EnvironmentSessionProvider provider, params HostBreakpointLine[] breakpoints)
+        => new HostDebugBreakpointsHandler(provider).Handle(new HostDebugBreakpointsParams { ModuleName = "Program", Breakpoints = breakpoints }, CancellationToken.None).WaitAsync(Patience);
+
+    // a condition reaches the host parsed, as the language server parses it: the value of an assignment in a procedure of its own.
+    private static HostBreakpointLine Conditional(int line, string condition)
+    {
+        var parse = new ModuleParser().Parse(new Uri("file:///c:/ws/Condition.bas"), $"Public Sub C()\r\n__e = {condition}\r\nEnd Sub\r\n");
+        Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
+        var assignment = Descendants(parse.SyntaxTree!).OfType<AssignmentStatementNode>().Single();
+        return new HostBreakpointLine { Line = line, ConditionJson = PlatformJson.Serialize<ExpressionNode>(assignment.Value) };
+    }
+
+    private static IEnumerable<SyntaxNode> Descendants(SyntaxNode node) => node.Children.SelectMany(Descendants).Prepend(node);
 
     private static readonly string Counting = Program(
         "Public Total As Long",
@@ -562,7 +579,7 @@ public sealed class ProgramExecutionTests
         => await DebugAsync(Counting, async (provider, _, _) =>
         {
             var set = await new HostDebugBreakpointsHandler(provider)
-                .Handle(new HostDebugBreakpointsParams { ModuleName = "Nothing", Lines = [5] }, CancellationToken.None).WaitAsync(Patience);
+                .Handle(new HostDebugBreakpointsParams { ModuleName = "Nothing", Breakpoints = [new HostBreakpointLine { Line = 5 }] }, CancellationToken.None).WaitAsync(Patience);
 
             Assert.IsFalse(set.Judged, "there is no code to judge a line by");
             Assert.IsFalse(set.Breakpoints.Single().Verified);
@@ -603,12 +620,157 @@ public sealed class ProgramExecutionTests
             Assert.AreEqual(2, provider.Session.CallStack.Depth);
         });
 
+    // ---- conditional and disabled breakpoints ----
+
+    [TestMethod]
+    public async Task AConditionalBreakpoint_IsWaitedAt_OnlyWhenItsConditionIsTrue_InTheActivationThatReachesIt()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            var set = await SetBreakpointLines(provider, Conditional(5, "i = 2"));
+
+            Assert.IsTrue(set.Breakpoints.Single().Verified);
+            Assert.IsNull(set.Breakpoints.Single().ConditionError);
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome, hit.ErrorMessage);
+            Assert.AreEqual(5, hit.ErrorLine);
+            CollectionAssert.AreEqual(new[] { "1" }, Lines(hit), "the first round went past it: i was 1");
+
+            var done = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Completed, done.Outcome, done.ErrorMessage);
+            CollectionAssert.AreEqual(new[] { "3", "6", "done" }, Lines(done), "the third round went past it too");
+        });
+
+    [TestMethod]
+    public async Task AConditionalBreakpoint_WhoseConditionIsNeverTrue_IsNeverWaitedAt()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            _ = await SetBreakpointLines(provider, Conditional(5, "i > 10"));
+
+            var done = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Completed, done.Outcome, done.ErrorMessage);
+        });
+
+    [TestMethod]
+    public async Task AConditionalBreakpoint_WhoseConditionRaisesAnError_IsWaitedAt()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            _ = await SetBreakpointLines(provider, Conditional(5, "1 / 0 > i"));
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome, "a condition that cannot be evaluated is not passed over in silence");
+            Assert.AreEqual(5, hit.ErrorLine);
+            Assert.IsFalse(string.IsNullOrEmpty(hit.ConditionError), "the program is said to wait on what the condition raised");
+            Assert.AreEqual(0, hit.ErrorNumber, "the error is the condition's, and not the program's");
+        });
+
+    [TestMethod]
+    public async Task AConditionalBreakpoint_WhoseConditionHasANameNothingDefines_IsWaitedAt_AndSaysWhichName()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            _ = await SetBreakpointLines(provider, Conditional(5, "nowhere > i"));
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome);
+            StringAssert.Contains(hit.ConditionError, "nowhere");
+        });
+
+    [TestMethod]
+    public async Task ABreakpoint_WithoutACondition_SaysNoConditionFailed()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            _ = await SetBreakpoints(provider, 5);
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome);
+            Assert.AreEqual(string.Empty, hit.ConditionError);
+        });
+
+    [TestMethod]
+    public async Task ADisabledBreakpoint_IsJudged_AndNotWaitedAt()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            var set = await SetBreakpointLines(provider, new HostBreakpointLine { Line = 5, IsEnabled = false });
+
+            Assert.IsTrue(set.Breakpoints.Single().Verified, "its line is judged as any other's is");
+            Assert.AreEqual(ExecutionOutcome.Completed, (await Resume(provider)).Outcome);
+        });
+
+    [TestMethod]
+    public async Task ABreakpoint_WhoseConditionIsNotAnExpression_IsRefused_AndNotWaitedAt()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            var set = await SetBreakpointLines(provider, new HostBreakpointLine { Line = 5, ConditionJson = "this is not a tree" });
+
+            Assert.IsNotNull(set.Breakpoints.Single().ConditionError);
+            Assert.AreEqual(ExecutionOutcome.Completed, (await Resume(provider)).Outcome);
+        });
+
+    [TestMethod]
+    public async Task ABreakpoint_InAProcedureAConditionCalls_IsNotWaitedAt()
+        => await DebugAsync(Program(
+            "Public Total As Long",
+            "Public Sub Main()",
+            "    Stop",
+            "    Total = 1",
+            "    Total = 2",
+            "End Sub",
+            "Private Function Check() As Boolean",
+            "    Check = True",
+            "End Function"), async (provider, _, _) =>
+        {
+            _ = await SetBreakpointLines(provider, Conditional(4, "Check()"), new HostBreakpointLine { Line = 7 });
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome, hit.ErrorMessage);
+            Assert.AreEqual(4, hit.ErrorLine, "the condition's call is the debugger's, not the program's");
+            Assert.AreEqual(1, provider.Session.CallStack.Depth);
+            Assert.AreEqual(ExecutionOutcome.Completed, (await Resume(provider)).Outcome);
+        });
+
+    [TestMethod]
+    public async Task ARunTimeError_InsideGoSubs_HasThemInItsStackTrace_InnermostFirst()
+        => await ModuleWorkspace.InspectAsync(NoClasses, Program(
+            "Public Sub Main()",
+            "    GoSub First",
+            "    Exit Sub",
+            "First:",
+            "    GoSub Second",
+            "    Return",
+            "Second:",
+            "    Debug.Print 1 / 0",
+            "    Return",
+            "End Sub"), (_, result, _) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.RuntimeError, result.Outcome, result.ErrorMessage);
+            var frame = result.StackTrace.Single();
+            Assert.AreEqual(7, frame.Line);
+            CollectionAssert.AreEqual(new[] { 4, 1 }, frame.ReturnLines.ToArray(), "the GoSub of line 4, which the GoSub of line 1 called");
+            return Task.CompletedTask;
+        });
+
+    [TestMethod]
+    public async Task ARunTimeError_InNoGoSub_HasNoneInItsStackTrace()
+        => await ModuleWorkspace.InspectAsync(NoClasses, Program("Public Sub Main()", "    Debug.Print 1 / 0", "End Sub"), (_, result, _) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.RuntimeError, result.Outcome);
+            Assert.IsEmpty(result.StackTrace.Single().ReturnLines);
+            return Task.CompletedTask;
+        });
+
     [TestMethod]
     public async Task ABreakpoint_IsNotWaitedAtByAProgramNotUnderADebugger()
         => await ModuleWorkspace.InspectAsync(NoClasses, Program("Public Total As Long", "Public Sub Main()", "    Total = 1", "End Sub"), (provider, result, runAgain) =>
         {
             Assert.AreEqual(ExecutionOutcome.Completed, result.Outcome);
-            provider.Session.Halt.Breakpoints.Set(provider.Session.Symbols.TryResolveValue("Program", RDCore.SDK.Model.Symbols.GlobalSymbols.UnresolvedSymbol, out var module) ? module!.Uri.AbsoluteUri : string.Empty, [2]);
+            provider.Session.Halt.Breakpoints.Set(provider.Session.Symbols.TryResolveValue("Program", RDCore.SDK.Model.Symbols.GlobalSymbols.UnresolvedSymbol, out var module) ? module!.Uri.AbsoluteUri : string.Empty, [new RuntimeBreakpoint(2)]);
             return runAgain().ContinueWith(task => Assert.AreEqual(ExecutionOutcome.Completed, task.Result.Outcome));
         });
 

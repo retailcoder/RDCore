@@ -41,9 +41,9 @@ internal interface IProgramDebugService
 
     /// <summary>Sets the lines of a module the program waits at.</summary>
     /// <param name="moduleName">The programmatic name of the module.</param>
-    /// <param name="lines">The zero-based lines, replacing the ones set before.</param>
+    /// <param name="breakpoints">The breakpoints replacing the ones set before.</param>
     /// <param name="token">A token that cancels the request.</param>
-    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<int> lines, CancellationToken token);
+    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token);
 
     /// <summary>The activations of the program that waits, innermost first.</summary>
     /// <param name="token">A token that cancels the request.</param>
@@ -135,16 +135,41 @@ internal sealed class ProgramDebugService(
         return await environment.SendRequestAsync<HostDebugTerminateParams, HostDebugAck>(new HostDebugTerminateParams { Wipe = wipe }, token);
     }
 
-    public async Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<int> lines, CancellationToken token)
+    public async Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token)
     {
         if (orchestration.RuntimeEnvironment is not { } environment)
         {
-            return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, false))] };
+            return new HostDebugBreakpointsResult { Breakpoints = [.. breakpoints.Select(breakpoint => new HostBreakpoint(breakpoint.Line, false))] };
+        }
+
+        // a condition is parsed here, where the parser is, and the host is given the expression. One that is not an expression is refused: its breakpoint goes to the
+        // host disabled, so that the result still has one entry per breakpoint asked for, in order, and its line is judged all the same.
+        var lines = new HostBreakpointLine[breakpoints.Count];
+        var refused = new string?[breakpoints.Count];
+        for (var i = 0; i < breakpoints.Count; i++)
+        {
+            var breakpoint = breakpoints[i];
+            lines[i] = new HostBreakpointLine { Line = breakpoint.Line, IsEnabled = breakpoint.IsEnabled };
+            if (string.IsNullOrWhiteSpace(breakpoint.Condition))
+            {
+                continue;
+            }
+
+            var (condition, error) = await ParseExpressionAsync(breakpoint.Condition, "Condition", token);
+            lines[i] = condition is null
+                ? lines[i] with { IsEnabled = false }
+                : lines[i] with { ConditionJson = PlatformJson.Serialize<ExpressionNode>(condition) };
+            refused[i] = error;
         }
 
         await environment.WaitForReadyAsync(token);
-        return await environment.SendRequestAsync<HostDebugBreakpointsParams, HostDebugBreakpointsResult>(
-            new HostDebugBreakpointsParams { ModuleName = moduleName, Lines = lines }, token);
+        var result = await environment.SendRequestAsync<HostDebugBreakpointsParams, HostDebugBreakpointsResult>(
+            new HostDebugBreakpointsParams { ModuleName = moduleName, Breakpoints = lines }, token);
+
+        return result.Breakpoints.Count != lines.Length ? result : result with
+        {
+            Breakpoints = [.. result.Breakpoints.Select((breakpoint, i) => refused[i] is { } error ? breakpoint with { ConditionError = error } : breakpoint)],
+        };
     }
 
     public async Task<HostDebugStackResult> StackAsync(CancellationToken token)
@@ -177,27 +202,35 @@ internal sealed class ProgramDebugService(
             return new HostDebugEvaluateResult { Error = DebuggerMessages.NoRuntimeEnvironment };
         }
 
-        if (expression.Contains('\n') || expression.Contains('\r') || string.IsNullOrWhiteSpace(expression))
+        var (value, error) = await ParseExpressionAsync(expression, "Evaluate", token);
+        if (value is null)
         {
-            return new HostDebugEvaluateResult { Error = DebuggerMessages.ExpressionIsOneLine };
-        }
-
-        var document = new UriBuilder(new Uri(options.Value.Workspace.WorkspaceUri)) { Fragment = "Evaluate" }.Uri;
-        var parsed = await parsing.ParseFragmentAsync(document, $"Public Sub __Evaluate()\r\n__e = {expression}\r\nEnd Sub\r\n", token);
-        if (!parsed.IsSuccess || parsed.SyntaxTree is null)
-        {
-            return new HostDebugEvaluateResult { Error = parsed.SyntaxErrors.FirstOrDefault()?.Description ?? DebuggerMessages.NotAnExpression };
-        }
-
-        var assignments = Descendants(parsed.SyntaxTree).OfType<AssignmentStatementNode>().ToArray();
-        if (assignments is not [{ Value: { } value }])
-        {
-            return new HostDebugEvaluateResult { Error = DebuggerMessages.NotOneExpression };
+            return new HostDebugEvaluateResult { Error = error };
         }
 
         await environment.WaitForReadyAsync(token);
         return await environment.SendRequestAsync<HostDebugEvaluateParams, HostDebugEvaluateResult>(
             new HostDebugEvaluateParams { FrameId = frameId, Json = PlatformJson.Serialize<ExpressionNode>(value) }, token);
+    }
+
+    // An expression is parsed as the value of an assignment in a procedure of its own, which is where the parser has expressions; the fragment names the document it is
+    // parsed as. What is not one expression on one line is refused, with what the parser says of it when it says something.
+    private async Task<(ExpressionNode? Expression, string? Error)> ParseExpressionAsync(string expression, string fragment, CancellationToken token)
+    {
+        if (expression.Contains('\n') || expression.Contains('\r') || string.IsNullOrWhiteSpace(expression))
+        {
+            return (null, DebuggerMessages.ExpressionIsOneLine);
+        }
+
+        var document = new UriBuilder(new Uri(options.Value.Workspace.WorkspaceUri)) { Fragment = fragment }.Uri;
+        var parsed = await parsing.ParseFragmentAsync(document, $"Public Sub __{fragment}()\r\n__e = {expression}\r\nEnd Sub\r\n", token);
+        if (!parsed.IsSuccess || parsed.SyntaxTree is null)
+        {
+            return (null, parsed.SyntaxErrors.FirstOrDefault()?.Description ?? DebuggerMessages.NotAnExpression);
+        }
+
+        var assignments = Descendants(parsed.SyntaxTree).OfType<AssignmentStatementNode>().ToArray();
+        return assignments is [{ Value: { } value }] ? (value, null) : (null, DebuggerMessages.NotOneExpression);
     }
 
     public async Task<HostDebugEvaluateResult> ExecuteAsync(int frameId, string text, CancellationToken token)

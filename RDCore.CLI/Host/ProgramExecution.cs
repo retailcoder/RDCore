@@ -6,9 +6,14 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Semantics.Instructions;
+using RDCore.SDK.Semantics.Static;
+using RDCore.SDK.Semantics.Static.Abstract;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Types;
+using RDCore.Symbols;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime;
@@ -260,28 +265,64 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     /// Sets the lines of a module that a program under a debugger waits at.
     /// </summary>
     /// <param name="moduleName">The programmatic name of the module.</param>
-    /// <param name="lines">The zero-based lines of the source. None removes them.</param>
+    /// <param name="breakpoints">The breakpoints, one per zero-based line of the source. None removes them.</param>
     /// <returns>Each line, and whether a statement of the module's loaded code begins on it.</returns>
     /// <remarks>
     /// A breakpoint is where an instruction is, and a line no statement begins on is reported as not verified - nothing would ever wait there, and a client is to drop it.
     /// Every line is kept all the same, since the code can be loaded again before the program runs (a shell redefines its program at each <c>RUN</c>), and what is
     /// verified is a fact about the code that is loaded now. Whether it is the code the person means is what <see cref="HostDebugBreakpointsResult.Judged"/> says.
+    /// A disabled breakpoint is judged as any other is, and is not waited at; neither is one whose condition the request did not carry an expression for.
     /// </remarks>
-    public HostDebugBreakpointsResult SetBreakpoints(string moduleName, IReadOnlyList<int> lines)
+    public HostDebugBreakpointsResult SetBreakpoints(string moduleName, IReadOnlyList<HostBreakpointLine> breakpoints)
     {
         var session = provider.Session;
         if (!session.Symbols.TryResolveValue(moduleName, GlobalSymbols.UnresolvedSymbol, out var module) || module is null)
         {
-            return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, false))] };
+            return new HostDebugBreakpointsResult { Breakpoints = [.. breakpoints.Select(breakpoint => new HostBreakpoint(breakpoint.Line, false))] };
         }
 
-        session.Halt.Breakpoints.Set(module.Uri.AbsoluteUri, lines);
+        var refused = new string?[breakpoints.Count];
+        var waited = new List<RuntimeBreakpoint>(breakpoints.Count);
+        for (var i = 0; i < breakpoints.Count; i++)
+        {
+            var breakpoint = breakpoints[i];
+            if (!TryReadCondition(breakpoint.ConditionJson, out var condition))
+            {
+                refused[i] = Resources.Host_RequestCarriedNoExpression;
+            }
+            else if (breakpoint.IsEnabled)
+            {
+                waited.Add(new RuntimeBreakpoint(breakpoint.Line, condition));
+            }
+        }
+
+        session.Halt.Breakpoints.Set(module.Uri.AbsoluteUri, waited);
         var bodies = provider.Image.BodiesOf(module.Uri);
         return new HostDebugBreakpointsResult
         {
-            Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, IBreakpointTable.Verify(bodies, line)))],
+            Breakpoints = [.. breakpoints.Select((breakpoint, i) => new HostBreakpoint(breakpoint.Line, IBreakpointTable.Verify(bodies, breakpoint.Line), refused[i]))],
             Judged = bodies.Any(),
         };
+    }
+
+    // a breakpoint without a condition has none to read; one with a condition that is not an expression's tree is refused.
+    private static bool TryReadCondition(string? json, out ExpressionNode? condition)
+    {
+        condition = null;
+        if (string.IsNullOrEmpty(json))
+        {
+            return true;
+        }
+
+        try
+        {
+            condition = PlatformJson.Deserialize<ExpressionNode>(json);
+            return condition is not null;
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -350,8 +391,23 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     public HostDebugEvaluateResult Execute(RuntimeExecutionPipeline pipeline, int frameId, SyntaxNode statement)
         => InFrame(frameId, ofAStatement: true, (session, stack, selected, procedure) =>
         {
+            if (DeclareImplicitly(session, statement, selected, procedure) is { } refused)
+            {
+                return (null, refused);
+            }
+
+            // what is wrong with the statement is found out as it is for the procedure's own code (ModuleLoader), in the procedure's scope - an assignment to a
+            // function of a library is not a variable there either - and a statement that is wrong does not run.
+            var block = new StatementBlock([statement]);
+            if (session.Symbols.ScopeOf(procedure.Uri) is { } scope
+                && StatementStaticSemanticsEvaluator.Analyze(procedure.SemanticId, block, new StaticSemanticsOptions(Language: session.Environment.Language), MemberKind.Procedure,
+                    new StaticEvaluationContext(session.Symbols.Resolver, scope)).CompileErrors is [var error, ..])
+            {
+                return (null, string.IsNullOrEmpty(error.Verbose) || error.Verbose == error.Description ? error.Description : $"{error.Description}: {error.Verbose}");
+            }
+
             var options = new InstructionLoweringOptions(IsReleaseBuild: !session.IsDebugBuild(), Language: session.Environment.Language);
-            var lowered = InstructionListLowering.Lower(new StatementBlock([statement]), options, MemberKind.Procedure);
+            var lowered = InstructionListLowering.Lower(block, options, MemberKind.Procedure);
             var scratch = (CallStackFrame)session.Symbols.CreateFrame(selected.NodeId, selected.StaticSymbol, selected.Directives);
             (scratch.Procedure, scratch.Body) = (procedure, lowered.InstructionList);
 
@@ -364,7 +420,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             return outcome.Kind switch
             {
                 RuntimeExecutionOutcomeKind.Error => (null, outcome.ErrorInfo!.Description),
-                RuntimeExecutionOutcomeKind.InternalError => (null, Resources.Host_CannotRunYet),
+                RuntimeExecutionOutcomeKind.InternalError => (null, UnevaluableBecause(session, statement, procedure.Uri, Resources.Host_CannotRunYet)),
                 _ => (null, null),
             };
         });
@@ -413,7 +469,10 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                     if (halt is RuntimeHaltKind.End)
                     {
                         EndSuspended(session, wipe: true);
-                        return Unevaluated(ofAStatement ? Resources.Host_TheStatementEndedTheProgram : Resources.Host_TheExpressionEndedTheProgram, output);
+                        return Unevaluated(ofAStatement ? Resources.Host_TheStatementEndedTheProgram : Resources.Host_TheExpressionEndedTheProgram, output) with
+                        {
+                            EndedTheProgram = true,
+                        };
                     }
 
                     return Unevaluated(ofAStatement ? Resources.Host_TheStatementWasStopped : Resources.Host_TheExpressionWasStopped, output);
@@ -452,15 +511,68 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
         }
     }
 
-    // The evaluator answers an internal error for a name nothing defines, since static semantics were to have rejected it. What a person is told is the name: the first
-    // one in the expression that does not resolve from the procedure. An expression every name of which resolves is one the interpreter cannot evaluate.
-    private static string UnevaluableBecause(IRuntimeSession session, ExpressionNode expression, Uri scope)
+    // MS-VBAL 5.6.10: a name the procedure does not see, typed where the program waits, declares a variable as it would in the procedure's own code - a Variant
+    // that is Empty, so ?x prints an empty line - unless the module says Option Explicit (MS-VBAL 5.2.1.3), where it is not defined and nothing runs. Where the
+    // variable lives is the environment's to say (ImplicitDeclarationScope), as for code: in a BASIC shell a variable of the module, which a statement typed at
+    // the prompt with no program waiting declares as well; in VBA and VB6 a local of the procedure the activation is of, on that activation. A class member's
+    // activation has no module storage to give it, and gives it a local. The name is declared before the statement runs, so that what it reads is a variable.
+    private static string? DeclareImplicitly(IRuntimeSession session, SyntaxNode statement, CallStackFrame selected, VBTypeMemberSymbol procedure)
     {
-        var undefined = Descendants(expression)
+        var resolver = session.Symbols.Resolver;
+        var references = SymbolBuilder.ImplicitDeclarationCandidates(statement)
+            .DistinctBy(name => name.IdentifierName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        // an implicit local declared by a statement typed in another activation of the procedure is one this activation has no storage for yet.
+        foreach (var reference in references)
+        {
+            if (resolver.ResolveValue(reference, ScopeKind.Local, procedure.Uri).Symbol is VBLocalVariableSymbol { DeclaredBy: LocalDeclarationKind.Implicit } local
+                && local.ParentUri.AbsoluteUri == procedure.Uri.AbsoluteUri && !selected.TryResolve(local, out _))
+            {
+                selected.PushDeclaredAtAStop(local, local.ResolvedType.DefaultValue);
+            }
+        }
+
+        var undeclared = references.Where(name => resolver.ResolveValue(name, ScopeKind.Local, procedure.Uri).IsUnbound).ToArray();
+        if (undeclared.Length == 0)
+        {
+            return null;
+        }
+
+        if (selected.Directives.Explicit)
+        {
+            return string.Format(Resources.Host_VariableNotDefined, undeclared[0].IdentifierName);
+        }
+
+        var builder = new SymbolBuilder(procedure.WorkspaceRoot, procedure.ParentUri, ScopeKind.Module, resolver, VBVariantType.TypeInfo);
+        var ofTheModule = session.Environment.Language.ImplicitDeclarationScope is ImplicitDeclarationScope.Module && selected.Target is null;
+        foreach (var name in undeclared)
+        {
+            if (ofTheModule)
+            {
+                _ = session.Symbols.TryDefine(builder.BuildImplicitModuleVariable(name), ScopeKind.Module);
+                continue;
+            }
+
+            var local = (VBLocalVariableSymbol)builder.BuildImplicitLocal(name, procedure.Uri);
+            if (session.Symbols.TryDefine(local, ScopeKind.Local))
+            {
+                selected.PushDeclaredAtAStop(local, local.ResolvedType.DefaultValue);
+            }
+        }
+
+        return null;
+    }
+
+    // The evaluator answers an internal error for a name nothing defines, since static semantics were to have rejected it. What a person is told is the name: the first
+    // one in the expression - or the statement - that does not resolve from the procedure. One every name of which resolves is one the interpreter cannot run yet.
+    private static string UnevaluableBecause(IRuntimeSession session, SyntaxNode node, Uri scope, string? otherwise = null)
+    {
+        var undefined = Descendants(node)
             .OfType<SimpleNameExpressionNode>()
             .FirstOrDefault(name => !session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, scope).IsResolved);
 
-        return undefined is null ? Resources.Host_CannotEvaluateYet : string.Format(Resources.Host_NameIsNotDefined, undefined.IdentifierName);
+        return undefined is null ? otherwise ?? Resources.Host_CannotEvaluateYet : string.Format(Resources.Host_NameIsNotDefined, undefined.IdentifierName);
     }
 
     // why nothing can be asked of the program that does not wait.
@@ -674,6 +786,9 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             ErrorMessage = error?.Description ?? string.Empty,
             ErrorCode = error?.ToDiagnosticCode() ?? string.Empty,
             ErrorTitle = error is null ? string.Empty : error.AsErrorInfo.ToDiagnosticTitle(),
+            ConditionError = session.Halt.StoppedOnCondition is { } failure
+                ? failure.Error?.Description ?? UnevaluableBecause(session, failure.Condition, failure.Scope)
+                : string.Empty,
         };
     }
 
@@ -808,7 +923,8 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                 .. session.Errors.StackTrace.Frames.Select(frame => new ExecuteStackFrame(
                     frame.ProcedureName,
                     frame.Location?.Range.Start.Line ?? -1,
-                    frame.Location?.Range.Start.Character ?? -1)),
+                    frame.Location?.Range.Start.Character ?? -1,
+                    frame.GoSubs.IsDefaultOrEmpty ? null : [.. frame.GoSubs.Select(gosub => gosub.Range.Start.Line)])),
             ],
         };
     }

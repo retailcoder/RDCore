@@ -257,7 +257,16 @@ namespace RDCore.LanguageServer.Debugging {
                 return ResourceManager.GetString("StopAtBreakpoint", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Paused on breakpoint: its condition could not be evaluated ({0}).
+        /// </summary>
+        internal static string StopAtBreakpointConditionFailed {
+            get {
+                return ResourceManager.GetString("StopAtBreakpointConditionFailed", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to Paused on Stop statement.
         /// </summary>

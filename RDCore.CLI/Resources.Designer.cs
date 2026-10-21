@@ -61,24 +61,6 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Times the interpreter on a workspace, or on the built-in corpus: parse, load, sweep, then each Bench* case..
-        /// </summary>
-        public static string Bench_Summary {
-            get {
-                return ResourceManager.GetString("Bench_Summary", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to --runs must be at least 1..
-        /// </summary>
-        public static string Bench_RunsMustBePositive {
-            get {
-                return ResourceManager.GetString("Bench_RunsMustBePositive", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to (built-in corpus).
         /// </summary>
         public static string Bench_BuiltInCorpus {
@@ -93,6 +75,24 @@ namespace RDCore.CLI {
         public static string Bench_NoCases {
             get {
                 return ResourceManager.GetString("Bench_NoCases", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to --runs must be at least 1..
+        /// </summary>
+        public static string Bench_RunsMustBePositive {
+            get {
+                return ResourceManager.GetString("Bench_RunsMustBePositive", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Times the interpreter on a workspace, or on the built-in corpus: parse, load, sweep, then each Bench* case..
+        /// </summary>
+        public static string Bench_Summary {
+            get {
+                return ResourceManager.GetString("Bench_Summary", resourceCulture);
             }
         }
         
@@ -195,62 +195,6 @@ namespace RDCore.CLI {
             }
         }
         
-        /// <summary>Looks up a localized string similar to Export Library.</summary>
-        public static string ExportLibrary_Title {
-            get {
-                return ResourceManager.GetString("ExportLibrary_Title", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to Describes a type library of this machine as a library description file that a project can reference by name..</summary>
-        public static string ExportLibrary_Summary {
-            get {
-                return ResourceManager.GetString("ExportLibrary_Summary", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to Type libraries are read from the registry and files of a Windows machine: this command only runs on Windows..</summary>
-        public static string ExportLibrary_WindowsOnly {
-            get {
-                return ResourceManager.GetString("ExportLibrary_WindowsOnly", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to This machine has no type library &apos;{0}&apos;..</summary>
-        public static string ExportLibrary_NotFound {
-            get {
-                return ResourceManager.GetString("ExportLibrary_NotFound", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to Library &apos;{0}&apos; described: {1}.</summary>
-        public static string ExportLibrary_Written {
-            get {
-                return ResourceManager.GetString("ExportLibrary_Written", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to {0} class(es), {1} enumeration(s), {2} member(s)..</summary>
-        public static string ExportLibrary_Counts {
-            get {
-                return ResourceManager.GetString("ExportLibrary_Counts", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to Depends on: {0}..</summary>
-        public static string ExportLibrary_DependsOn {
-            get {
-                return ResourceManager.GetString("ExportLibrary_DependsOn", resourceCulture);
-            }
-        }
-
-        /// <summary>Looks up a localized string similar to Not described: {0}..</summary>
-        public static string ExportLibrary_Skipped {
-            get {
-                return ResourceManager.GetString("ExportLibrary_Skipped", resourceCulture);
-            }
-        }
-
         /// <summary>
         ///   Looks up a localized string similar to Reflects an extension executable&apos;s advertised capabilities into an extension manifest..
         /// </summary>
@@ -288,11 +232,317 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to {0} class(es), {1} enumeration(s), {2} member(s)..
+        /// </summary>
+        public static string ExportLibrary_Counts {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Counts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Depends on: {0}. A project cannot reference this library without them; export them too (--dependencies)..
+        /// </summary>
+        public static string ExportLibrary_DependsOn {
+            get {
+                return ResourceManager.GetString("ExportLibrary_DependsOn", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This machine has no type library &apos;{0}&apos;. A library is given as a file, as the identifier the machine gave it, or by its name..
+        /// </summary>
+        public static string ExportLibrary_NotFound {
+            get {
+                return ResourceManager.GetString("ExportLibrary_NotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Not described: {0}..
+        /// </summary>
+        public static string ExportLibrary_Skipped {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Skipped", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Describes a type library of this machine as a library description file that a project can reference by name..
+        /// </summary>
+        public static string ExportLibrary_Summary {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Export Library.
+        /// </summary>
+        public static string ExportLibrary_Title {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Type libraries are read from the registry and files of a Windows machine: this command only runs on Windows..
+        /// </summary>
+        public static string ExportLibrary_WindowsOnly {
+            get {
+                return ResourceManager.GetString("ExportLibrary_WindowsOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Library &apos;{0}&apos; described: {1}.
+        /// </summary>
+        public static string ExportLibrary_Written {
+            get {
+                return ResourceManager.GetString("ExportLibrary_Written", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to RDCore™ Extension.
         /// </summary>
         public static string Extension_DefaultDescription {
             get {
                 return ResourceManager.GetString("Extension_DefaultDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to a program is running.
+        /// </summary>
+        public static string Host_AProgramIsRunning {
+            get {
+                return ResourceManager.GetString("Host_AProgramIsRunning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the interpreter cannot evaluate this yet.
+        /// </summary>
+        public static string Host_CannotEvaluateYet {
+            get {
+                return ResourceManager.GetString("Host_CannotEvaluateYet", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the interpreter reached something it cannot run yet.
+        /// </summary>
+        public static string Host_CannotRunYet {
+            get {
+                return ResourceManager.GetString("Host_CannotRunYet", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} changed while the program waited: run it again to pick the changes up.
+        /// </summary>
+        public static string Host_ChangedWhileWaiting_Goto {
+            get {
+                return ResourceManager.GetString("Host_ChangedWhileWaiting_Goto", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {0} changed while the program waited, and a program is resumed on the code it was suspended with: run it again to pick the changes up.
+        /// </summary>
+        public static string Host_ChangedWhileWaiting_Resume {
+            get {
+                return ResourceManager.GetString("Host_ChangedWhileWaiting_Resume", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to module &apos;{0}&apos; is not defined in the session.
+        /// </summary>
+        public static string Host_ModuleIsNotDefined {
+            get {
+                return ResourceManager.GetString("Host_ModuleIsNotDefined", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is not defined.
+        /// </summary>
+        public static string Host_NameIsNotDefined {
+            get {
+                return ResourceManager.GetString("Host_NameIsNotDefined", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Variable not defined: &apos;{0}&apos;.
+        /// </summary>
+        public static string Host_VariableNotDefined {
+            get {
+                return ResourceManager.GetString("Host_VariableNotDefined", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to no program is suspended.
+        /// </summary>
+        public static string Host_NoProgramIsSuspended {
+            get {
+                return ResourceManager.GetString("Host_NoProgramIsSuspended", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to there is no runtime session.
+        /// </summary>
+        public static string Host_NoRuntimeSession {
+            get {
+                return ResourceManager.GetString("Host_NoRuntimeSession", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to there is no runtime session to run in.
+        /// </summary>
+        public static string Host_NoRuntimeSessionToRunIn {
+            get {
+                return ResourceManager.GetString("Host_NoRuntimeSessionToRunIn", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to no statement of the procedure begins at that line or after it.
+        /// </summary>
+        public static string Host_NoStatementAtOrAfterLine {
+            get {
+                return ResourceManager.GetString("Host_NoStatementAtOrAfterLine", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to there is no such activation.
+        /// </summary>
+        public static string Host_NoSuchActivation {
+            get {
+                return ResourceManager.GetString("Host_NoSuchActivation", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the procedure has no label &apos;{0}&apos;.
+        /// </summary>
+        public static string Host_NoSuchLabel {
+            get {
+                return ResourceManager.GetString("Host_NoSuchLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}.{1}&apos; is not a procedure of the module.
+        /// </summary>
+        public static string Host_NotAProcedureOfTheModule {
+            get {
+                return ResourceManager.GetString("Host_NotAProcedureOfTheModule", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the request carried no expression.
+        /// </summary>
+        public static string Host_RequestCarriedNoExpression {
+            get {
+                return ResourceManager.GetString("Host_RequestCarriedNoExpression", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the request carried no parsed module.
+        /// </summary>
+        public static string Host_RequestCarriedNoParsedModule {
+            get {
+                return ResourceManager.GetString("Host_RequestCarriedNoParsedModule", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the request carried no statement.
+        /// </summary>
+        public static string Host_RequestCarriedNoStatement {
+            get {
+                return ResourceManager.GetString("Host_RequestCarriedNoStatement", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the expression ended the program.
+        /// </summary>
+        public static string Host_TheExpressionEndedTheProgram {
+            get {
+                return ResourceManager.GetString("Host_TheExpressionEndedTheProgram", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the expression was stopped by a Stop.
+        /// </summary>
+        public static string Host_TheExpressionWasStopped {
+            get {
+                return ResourceManager.GetString("Host_TheExpressionWasStopped", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the program is running.
+        /// </summary>
+        public static string Host_TheProgramIsRunning {
+            get {
+                return ResourceManager.GetString("Host_TheProgramIsRunning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the program was interrupted.
+        /// </summary>
+        public static string Host_TheProgramWasInterrupted {
+            get {
+                return ResourceManager.GetString("Host_TheProgramWasInterrupted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the statement ended the program.
+        /// </summary>
+        public static string Host_TheStatementEndedTheProgram {
+            get {
+                return ResourceManager.GetString("Host_TheStatementEndedTheProgram", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the statement was stopped by a Stop.
+        /// </summary>
+        public static string Host_TheStatementWasStopped {
+            get {
+                return ResourceManager.GetString("Host_TheStatementWasStopped", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to &lt;unavailable&gt;.
+        /// </summary>
+        public static string Host_ValueUnavailable {
+            get {
+                return ResourceManager.GetString("Host_ValueUnavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the program waits in no procedure.
+        /// </summary>
+        public static string Host_WaitsInNoProcedure {
+            get {
+                return ResourceManager.GetString("Host_WaitsInNoProcedure", resourceCulture);
             }
         }
         
@@ -375,8 +625,7 @@ namespace RDCore.CLI {
         ///                             -----             +------                  
         ///                            -----         ----   -------------          
         ///                            +---          -----   +-----------+         
-        ///                            ----          +--+   ----++ +-----          
-        ///  [rest of string was truncated]&quot;;.
+        ///                            ----          +--+   ----++ +-----       [rest of string was truncated]&quot;;.
         /// </summary>
         public static string RDCoreSplash_Background {
             get {
@@ -389,7 +638,7 @@ namespace RDCore.CLI {
         ///&gt;=&gt;    &gt;=&gt;   &gt;=&gt;   &gt;=&gt;          &gt;=&gt;       &gt;=&gt;  &gt;&gt;   &gt;=&gt;       &gt;&gt;=&gt;             &gt;=&gt;   &gt;=&gt; &gt;=&gt;       &gt;=&gt; 
         ///&gt;=&gt;    &gt;=&gt;   &gt;=&gt;    &gt;=&gt;          &gt;=&gt;     &gt;=&gt;   &gt;&gt;    &gt;=&gt;     &gt;&gt; &gt;=&gt;           &gt;=&gt;        &gt;=&gt;       &gt;=&gt; 
         ///&gt;&gt; &gt;==&gt;      &gt;=&gt;    &gt;=&gt; &gt;====&gt;    &gt;=&gt;   &gt;=&gt;    &gt;==&gt;&gt;=&gt;      &gt;=&gt;  &gt;=&gt;          &gt;=&gt;        &gt;=&gt;       &gt;=&gt; 
-        ///&gt;=&gt;  &gt;=&gt;     &gt;=&gt;    &gt;=&gt;            &gt;=&gt; &gt;=&gt;     &gt;&gt;    &gt;=&gt;   &gt;=====&gt;&gt;=&gt;         &gt;=&gt;        &gt;=&gt;     [rest of string was truncated]&quot;;.
+        ///&gt;=&gt;  &gt;=&gt;     &gt;=&gt;    &gt;=&gt;            &gt;=&gt; &gt;=&gt;     &gt;&gt;    &gt;=&gt;   &gt;=====&gt;&gt;=&gt;         &gt;=&gt;        &gt;=&gt; [rest of string was truncated]&quot;;.
         /// </summary>
         public static string RDCoreSplash_Foreground {
             get {
@@ -441,7 +690,7 @@ namespace RDCore.CLI {
                 return ResourceManager.GetString("Repl_Break", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to BREAK IN {0}.
         /// </summary>
@@ -450,13 +699,121 @@ namespace RDCore.CLI {
                 return ResourceManager.GetString("Repl_Break_InLine", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Sets or clears a breakpoint at a line (BREAK 40). BREAK alone lists them, BREAK CLEAR removes them all..
+        /// </summary>
+        public static string Repl_Break_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Break_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to BREAKPOINT CLEARED AT {0}.
+        /// </summary>
+        public static string Repl_Breakpoint_Cleared {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_Cleared", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to BREAKPOINT CONDITION FAILED: {0}.
+        /// </summary>
+        public static string Repl_Breakpoint_ConditionFailed {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_ConditionFailed", resourceCulture);
+            }
+        }
 
+        /// <summary>
+        ///   Looks up a localized string similar to CONDITION REFUSED AT {0}: {1}.
+        /// </summary>
+        public static string Repl_Breakpoint_ConditionRefused {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_ConditionRefused", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to BREAKPOINT DISABLED AT {0}.
+        /// </summary>
+        public static string Repl_Breakpoint_Disabled {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_Disabled", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to (DISABLED).
+        /// </summary>
+        public static string Repl_Breakpoint_DisabledMark {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_DisabledMark", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to BREAKPOINT ENABLED AT {0}.
+        /// </summary>
+        public static string Repl_Breakpoint_Enabled {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_Enabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to BREAKPOINTS: {0}.
+        /// </summary>
+        public static string Repl_Breakpoint_List {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_List", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to NO BREAKPOINTS.
+        /// </summary>
+        public static string Repl_Breakpoint_None {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_None", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to BREAKPOINT SET AT {0}.
+        /// </summary>
+        public static string Repl_Breakpoint_Set {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_Set", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to CAN&apos;T CONTINUE.
+        /// </summary>
+        public static string Repl_CantContinue {
+            get {
+                return ResourceManager.GetString("Repl_CantContinue", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Looks up a localized string similar to Clears the console content..
         /// </summary>
         public static string Repl_Clear_Summary {
             get {
                 return ResourceManager.GetString("Repl_Clear_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Continues the program that was stopped, from where it stopped or from a line (CONT 200)..
+        /// </summary>
+        public static string Repl_Cont_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Cont_Summary", resourceCulture);
             }
         }
         
@@ -475,6 +832,15 @@ namespace RDCore.CLI {
         public static string Repl_FileNotFound {
             get {
                 return ResourceManager.GetString("Repl_FileNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Selects the procedure VARS is about: FRAME 1 is the one that called..
+        /// </summary>
+        public static string Repl_Frame_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Frame_Summary", resourceCulture);
             }
         }
         
@@ -502,84 +868,6 @@ namespace RDCore.CLI {
         public static string Repl_List_Summary {
             get {
                 return ResourceManager.GetString("Repl_List_Summary", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Break_Summary {
-            get {
-                return ResourceManager.GetString("Repl_Break_Summary", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Cont_Summary {
-            get {
-                return ResourceManager.GetString("Repl_Cont_Summary", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Step_Summary {
-            get {
-                return ResourceManager.GetString("Repl_Step_Summary", resourceCulture);
-            }
-        }
-        
-        public static string Repl_CantContinue {
-            get {
-                return ResourceManager.GetString("Repl_CantContinue", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Breakpoint_Set {
-            get {
-                return ResourceManager.GetString("Repl_Breakpoint_Set", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Breakpoint_Cleared {
-            get {
-                return ResourceManager.GetString("Repl_Breakpoint_Cleared", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Breakpoint_List {
-            get {
-                return ResourceManager.GetString("Repl_Breakpoint_List", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Breakpoint_None {
-            get {
-                return ResourceManager.GetString("Repl_Breakpoint_None", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Suspended {
-            get {
-                return ResourceManager.GetString("Repl_Suspended", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Stack_Summary {
-            get {
-                return ResourceManager.GetString("Repl_Stack_Summary", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Vars_Summary {
-            get {
-                return ResourceManager.GetString("Repl_Vars_Summary", resourceCulture);
-            }
-        }
-        
-        public static string Repl_NotStopped {
-            get {
-                return ResourceManager.GetString("Repl_NotStopped", resourceCulture);
-            }
-        }
-        
-        public static string Repl_Frame_Summary {
-            get {
-                return ResourceManager.GetString("Repl_Frame_Summary", resourceCulture);
             }
         }
         
@@ -701,6 +989,15 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to PROGRAM NOT STOPPED.
+        /// </summary>
+        public static string Repl_NotStopped {
+            get {
+                return ResourceManager.GetString("Repl_NotStopped", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Reads the byte at a session memory address..
         /// </summary>
         public static string Repl_Peek_Summary {
@@ -782,6 +1079,33 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Shows the procedures the stopped program is in, innermost first..
+        /// </summary>
+        public static string Repl_Stack_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Stack_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Runs one statement of the program that was stopped: STEP (over calls), STEP INTO, STEP OUT..
+        /// </summary>
+        public static string Repl_Step_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Step_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to PROGRAM STOPPED: CONT, STEP, RUN OR NEW.
+        /// </summary>
+        public static string Repl_Suspended {
+            get {
+                return ResourceManager.GetString("Repl_Suspended", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to SYNTAX ERROR.
         /// </summary>
         public static string Repl_SyntaxError {
@@ -827,6 +1151,15 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Shows the variables of the stopped program: VARS, or VARS 1 for the procedure that called..
+        /// </summary>
+        public static string Repl_Vars_Summary {
+            get {
+                return ResourceManager.GetString("Repl_Vars_Summary", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to ™(Trademark registrations pending) • &quot;Rubberduck-VBA&quot; (&quot;RD-VBA&quot;) • &quot;Rubberduck Core&quot; (&quot;RDCore&quot;) • &quot;VIVAT CUCUMIS&quot; | 9562-7303 Québec inc..
         /// </summary>
         public static string TrademarkNotice {
@@ -850,156 +1183,6 @@ namespace RDCore.CLI {
         public static string Warn_ThemingDisabled_Verbose {
             get {
                 return ResourceManager.GetString("Warn_ThemingDisabled_Verbose", resourceCulture);
-            }
-        }
-
-        public static string Host_AProgramIsRunning {
-            get {
-                return ResourceManager.GetString("Host_AProgramIsRunning", resourceCulture);
-            }
-        }
-
-        public static string Host_TheProgramIsRunning {
-            get {
-                return ResourceManager.GetString("Host_TheProgramIsRunning", resourceCulture);
-            }
-        }
-
-        public static string Host_NoProgramIsSuspended {
-            get {
-                return ResourceManager.GetString("Host_NoProgramIsSuspended", resourceCulture);
-            }
-        }
-
-        public static string Host_ChangedWhileWaiting_Resume {
-            get {
-                return ResourceManager.GetString("Host_ChangedWhileWaiting_Resume", resourceCulture);
-            }
-        }
-
-        public static string Host_ChangedWhileWaiting_Goto {
-            get {
-                return ResourceManager.GetString("Host_ChangedWhileWaiting_Goto", resourceCulture);
-            }
-        }
-
-        public static string Host_WaitsInNoProcedure {
-            get {
-                return ResourceManager.GetString("Host_WaitsInNoProcedure", resourceCulture);
-            }
-        }
-
-        public static string Host_NoSuchLabel {
-            get {
-                return ResourceManager.GetString("Host_NoSuchLabel", resourceCulture);
-            }
-        }
-
-        public static string Host_NoStatementAtOrAfterLine {
-            get {
-                return ResourceManager.GetString("Host_NoStatementAtOrAfterLine", resourceCulture);
-            }
-        }
-
-        public static string Host_NoSuchActivation {
-            get {
-                return ResourceManager.GetString("Host_NoSuchActivation", resourceCulture);
-            }
-        }
-
-        public static string Host_TheExpressionEndedTheProgram {
-            get {
-                return ResourceManager.GetString("Host_TheExpressionEndedTheProgram", resourceCulture);
-            }
-        }
-
-        public static string Host_TheExpressionWasStopped {
-            get {
-                return ResourceManager.GetString("Host_TheExpressionWasStopped", resourceCulture);
-            }
-        }
-
-        public static string Host_CannotEvaluateYet {
-            get {
-                return ResourceManager.GetString("Host_CannotEvaluateYet", resourceCulture);
-            }
-        }
-
-        public static string Host_NameIsNotDefined {
-            get {
-                return ResourceManager.GetString("Host_NameIsNotDefined", resourceCulture);
-            }
-        }
-
-        public static string Host_TheProgramWasInterrupted {
-            get {
-                return ResourceManager.GetString("Host_TheProgramWasInterrupted", resourceCulture);
-            }
-        }
-
-        public static string Host_CannotRunYet {
-            get {
-                return ResourceManager.GetString("Host_CannotRunYet", resourceCulture);
-            }
-        }
-
-        public static string Host_NoRuntimeSession {
-            get {
-                return ResourceManager.GetString("Host_NoRuntimeSession", resourceCulture);
-            }
-        }
-
-        public static string Host_NoRuntimeSessionToRunIn {
-            get {
-                return ResourceManager.GetString("Host_NoRuntimeSessionToRunIn", resourceCulture);
-            }
-        }
-
-        public static string Host_RequestCarriedNoExpression {
-            get {
-                return ResourceManager.GetString("Host_RequestCarriedNoExpression", resourceCulture);
-            }
-        }
-
-        public static string Host_RequestCarriedNoParsedModule {
-            get {
-                return ResourceManager.GetString("Host_RequestCarriedNoParsedModule", resourceCulture);
-            }
-        }
-
-        public static string Host_ModuleIsNotDefined {
-            get {
-                return ResourceManager.GetString("Host_ModuleIsNotDefined", resourceCulture);
-            }
-        }
-
-        public static string Host_NotAProcedureOfTheModule {
-            get {
-                return ResourceManager.GetString("Host_NotAProcedureOfTheModule", resourceCulture);
-            }
-        }
-
-        public static string Host_ValueUnavailable {
-            get {
-                return ResourceManager.GetString("Host_ValueUnavailable", resourceCulture);
-            }
-        }
-
-        public static string Host_TheStatementEndedTheProgram {
-            get {
-                return ResourceManager.GetString("Host_TheStatementEndedTheProgram", resourceCulture);
-            }
-        }
-
-        public static string Host_TheStatementWasStopped {
-            get {
-                return ResourceManager.GetString("Host_TheStatementWasStopped", resourceCulture);
-            }
-        }
-
-        public static string Host_RequestCarriedNoStatement {
-            get {
-                return ResourceManager.GetString("Host_RequestCarriedNoStatement", resourceCulture);
             }
         }
     }

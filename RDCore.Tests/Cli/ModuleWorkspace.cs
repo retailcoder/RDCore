@@ -161,11 +161,12 @@ internal static class ModuleWorkspace
     /// <param name="debug">Whether the program runs under a debugger: a <c>Stop</c> suspends it, and the first run answers that it waits.</param>
     /// <param name="cancelAfter">How long the first run has before its request is cancelled, counted from when it starts and not from when the workspace
     /// began to be composed. Never, when omitted.</param>
+    /// <param name="language">The language the workspace is written in; RD-VBA when omitted.</param>
     public static Task InspectAsync(
         IReadOnlyList<(string Name, string Source)> classes, string program,
         Func<EnvironmentSessionProvider, ExecuteSessionResult, Func<Task<ExecuteSessionResult>>, Task> inspect, TimeSpan? cancelAfter = null, bool debug = false,
-        WorkspaceLibraries? libraries = null)
-        => RunCoreAsync(classes, program, errorsOnly: false, inspect: inspect, cancelAfter: cancelAfter, debug: debug, libraries: libraries);
+        WorkspaceLibraries? libraries = null, SupportedLanguage? language = null)
+        => RunCoreAsync(classes, program, errorsOnly: false, language: language, inspect: inspect, cancelAfter: cancelAfter, debug: debug, libraries: libraries);
 
     private static async Task<string[]> RunCoreAsync(
         IReadOnlyList<(string Name, string Source)> classes, string program, bool errorsOnly, Func<EnvironmentSessionProvider, Task>? afterLoading = null,

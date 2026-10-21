@@ -23,12 +23,13 @@ internal static class ReplExecution
     /// Whether the program runs under a debugger, when the platform has one: a <c>STOP</c> or a breakpoint then leaves it waiting, to be gone on with by <c>CONT</c>
     /// or <c>STEP</c>. A break at the keyboard pauses it then, instead of cancelling the request that runs it.
     /// </param>
-    /// <param name="immediate">
-    /// Whether the entry point is a statement typed at the prompt. While a program waits it is run alongside it and the program waits still, which is how its
-    /// variables are read and set at a stop.
+    /// <param name="statement">
+    /// The statement typed at the prompt, when the entry point is one. While a program waits it is run in the activation <c>FRAME</c> selected and the program waits
+    /// still, which is how its variables are read and set at a stop; <paramref name="source"/> is then not sent, since the program's code is not to be loaded again
+    /// under it.
     /// </param>
     public static async Task ExecuteAsync(
-        ReplCommandContext context, string source, string entryPoint, CancellationToken token, bool debug = false, bool immediate = false)
+        ReplCommandContext context, string source, string entryPoint, CancellationToken token, bool debug = false, string? statement = null)
     {
         if (!context.Platform.Provides<SessionExecute>())
         {
@@ -37,9 +38,9 @@ internal static class ReplExecution
             return;
         }
 
-        if (immediate && context.Debugger.State is ReplDebugState.Suspended && context.Platform.Provides<ProgramDebugging>())
+        if (statement is not null && context.Debugger.State is ReplDebugState.Suspended && context.Platform.Provides<ProgramDebugging>())
         {
-            await ExecuteAlongsideAsync(context, source, entryPoint, token);
+            await ExecuteInFrameAsync(context, statement, token);
             return;
         }
 
@@ -50,7 +51,7 @@ internal static class ReplExecution
             return;
         }
 
-        await context.Debugger.PushBreakpointsAsync(context, token);
+        Report(context, await context.Debugger.PushBreakpointsAsync(context, token));
         context.Debugger.Running();
         try
         {
@@ -73,15 +74,34 @@ internal static class ReplExecution
         }
     }
 
-    // A statement typed while a program waits runs in the session as the program left it, and the program waits still - unless the statement was an END, which is
-    // the end of the program. What the statement printed, or what stopped it, is said as it is for any run, and is no business of what the program is doing.
-    private static async Task ExecuteAlongsideAsync(ReplCommandContext context, string source, string entryPoint, CancellationToken token)
+    // a breakpoint whose condition is refused is dropped before the program goes, and the person is told which, and why: BREAK refuses the condition as it is typed,
+    // and this is the one a platform that did not debug then refuses now.
+    private static void Report(ReplCommandContext context, IReadOnlyList<(Breakpoint Breakpoint, string Reason)> refused)
+    {
+        foreach (var (breakpoint, reason) in refused)
+        {
+            context.Console.WriteMessage(MessageKind.Error, string.Format(Resources.Repl_Breakpoint_ConditionRefused, breakpoint.LineNumber, reason));
+        }
+    }
+
+    // A statement typed while a program waits runs in the activation FRAME selected, as if it were written in that procedure: its names are the procedure's, so a
+    // local is read and set as the program has it, and a name the procedure does not see is not defined - the statement is not the program's code, and declares
+    // nothing in it. The program waits still, unless the statement was an END, which is the end of it. What the statement printed, or why it could not run, is said.
+    private static async Task ExecuteInFrameAsync(ReplCommandContext context, string statement, CancellationToken token)
     {
         var waitsBefore = context.Debugger.StoppedAt;
-        var result = await context.Platform.ExecuteAsync(source, ReplProgram.ModuleName, entryPoint, debug: false, immediate: true, token);
-        Render(context, result);
+        var result = await context.Platform.ExecuteInFrameAsync(context.Debugger.SelectedFrame, statement, token);
+        foreach (var line in result.Output)
+        {
+            context.Console.WriteLine(line);
+        }
 
-        if (result.Outcome is ExecutionOutcome.Halted)
+        if (result.Error is { } error)
+        {
+            context.Console.WriteMessage(MessageKind.Error, error);
+        }
+
+        if (result.EndedTheProgram)
         {
             context.Debugger.Idle();
         }
@@ -98,7 +118,7 @@ internal static class ReplExecution
     /// <param name="step">How far the program goes, or <see langword="null"/> for as far as it goes.</param>
     public static async Task ResumeAsync(ReplCommandContext context, StepKind? step)
     {
-        await context.Debugger.PushBreakpointsAsync(context, CancellationToken.None);
+        Report(context, await context.Debugger.PushBreakpointsAsync(context, CancellationToken.None));
         var waitedBefore = context.Debugger.StoppedAt;
         context.Debugger.Running();
         try
@@ -181,6 +201,12 @@ internal static class ReplExecution
                 var waitsBefore = program.LineNumberAt(result.ErrorLine);
                 context.Debugger.Suspended(waitsBefore);
                 console.WriteLine(waitsBefore is { } waiting ? string.Format(Resources.Repl_Break_InLine, waiting) : Resources.Repl_Break);
+
+                // a breakpoint whose condition could not be evaluated is waited at, and what the condition raised is said with it.
+                if (result.ConditionError.Length > 0)
+                {
+                    console.WriteMessage(MessageKind.Warning, string.Format(Resources.Repl_Breakpoint_ConditionFailed, result.ConditionError));
+                }
                 break;
 
             // it cannot go on, and what it was before is what it is: the caller says which.
@@ -259,7 +285,11 @@ internal static class ReplExecution
             // line number is captured (Erl is one value, not one per activation) - so the buffer maps it back.
             // TODO carry a line number per activation once a frame knows its own instruction list.
             var line = program.LineNumberAt(frame.Line);
-            yield return line is { } number ? $"  {frame.Procedure} {number}" : $"  {frame.Procedure}";
+            var at = line is { } number ? $"  {frame.Procedure} {number}" : $"  {frame.Procedure}";
+
+            // and how the activation got there, when it was by a GoSub: from the line of the last one it had not returned from, and the one before that - as STACK
+            // says it of a program that waits.
+            yield return at + string.Concat(frame.ReturnLines.Select(gosub => program.LineNumberAt(gosub) is { } from ? $" from {from}" : string.Empty));
         }
     }
 }

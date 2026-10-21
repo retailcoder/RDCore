@@ -62,11 +62,7 @@ internal sealed class ProgramInspector(IEnvironmentSessionProvider provider)
         => frame.ErrorHandler is { ActiveError: not null, HandlerEntry: { } entry } && frame.Body is { } body ? body.LabelAt(entry) : null;
 
     // the GoSub statements the activation has not returned from, innermost first: each return offset is the instruction after its GoSub.
-    private static int[] ReturnLines(CallStackFrame frame)
-        => frame.Body is not { } body
-            ? []
-            : [.. frame.GoSubReturns
-                .Select(returnOffset => returnOffset - 1 >= 0 && returnOffset - 1 < body.Items.Length ? body.Items[returnOffset - 1].Node?.SourceLocation.Range.Start.Line ?? -1 : -1)];
+    private static int[] ReturnLines(CallStackFrame frame) => [.. frame.GoSubLocations().Select(location => location?.Range.Start.Line ?? -1)];
 
     /// <summary>
     /// The variables of an activation, or the parts of one of them.
@@ -109,6 +105,12 @@ internal sealed class ProgramInspector(IEnvironmentSessionProvider provider)
         };
 
         foreach (var symbol in InDeclarationOrder(parameters.Concat(locals).Where(symbol => symbol is VBParameterSymbol or VBLocalVariableSymbol)))
+        {
+            yield return Describe(symbol.Name, ValueOf(frame, symbol));
+        }
+
+        // and the ones a statement typed at a stop declared, which the procedure's code does not, after the ones it does.
+        foreach (var symbol in frame.DeclaredAtAStop)
         {
             yield return Describe(symbol.Name, ValueOf(frame, symbol));
         }

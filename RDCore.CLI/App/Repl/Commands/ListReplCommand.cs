@@ -1,3 +1,4 @@
+using RDCore.CLI.Themes;
 using RDCore.SDK.ConsoleIO.Model;
 
 namespace RDCore.CLI.App.Repl.Commands;
@@ -9,11 +10,17 @@ namespace RDCore.CLI.App.Repl.Commands;
 /// The argument is a BASIC line range: <c>LIST</c>, <c>LIST 100</c>, <c>LIST 100-200</c>,
 /// <c>LIST 100-</c> (from there on) or <c>LIST -200</c> (up to there).
 /// </remarks>
-internal sealed class ListReplCommand : IReplCommand
+internal sealed class ListReplCommand(IAppThemeService Themes) : IReplCommand
 {
     public string Name => ReplCommandNames.List;
     public IReadOnlyList<string> Aliases => [];
     public string Summary => Resources.Repl_List_Summary;
+
+    private static readonly string enabledGlyph = "●";
+    private static readonly string disabledGlyph = "○";
+    private static readonly string conditionalGlyph = "◆";
+    private static readonly string disabledConditionalGlyph = "◈";
+
 
     public async Task<ReplCommandResult> ExecuteAsync(ReplCommandContext context, string arguments, CancellationToken token)
     {
@@ -29,16 +36,25 @@ internal sealed class ListReplCommand : IReplCommand
         var width = lines.Length == 0 ? 0 : lines.Max(line => line.Number).ToString().Length;
         var highlighted = lines.Length == 0 ? null : await TokensByLineAsync(context, token);
         var debugger = context.Debugger;
+
         foreach (var (number, statement) in lines)
         {
             var text = $"{number} {statement}";
 
             // A listing has a margin of one character for the mark of a breakpoint, and a space between it and the line. The line is marked as a whole when it has
             // one, or is the statement the program that was stopped waits before; the mark in the margin is outside that, on the shell's own background.
-            var hasBreakpoint = debugger.Breakpoints.Contains(number);
+            var breakpoint = debugger.Breakpoints.SingleOrDefault(bp => bp.LineNumber == number);
             var waitsBefore = debugger.State is ReplDebugState.Suspended && debugger.StoppedAt == number;
-            var margin = hasBreakpoint ? new ReplTextRun("●", ReplTextStyle.BreakpointGlyph) : new ReplTextRun(" ", ReplTextStyle.Plain);
-            var style = waitsBefore ? ReplLineStyle.CurrentStatement : hasBreakpoint ? ReplLineStyle.Breakpoint : ReplLineStyle.Plain;
+            var glyph = breakpoint == default ? " "
+                : breakpoint.ConditionExpression != null ?
+                    breakpoint.Enabled ? conditionalGlyph : disabledConditionalGlyph
+                : breakpoint.Enabled ? enabledGlyph : disabledGlyph;
+
+            var margin = breakpoint != default ? new ReplTextRun(glyph, ReplTextStyle.BreakpointGlyph) : new ReplTextRun(" ", ReplTextStyle.Plain);
+
+            var style = waitsBefore ? ReplLineStyle.CurrentStatement
+                : breakpoint == default ? ReplLineStyle.Plain
+                : ReplLineStyle.Breakpoint;
 
             var padding = new ReplTextRun(" " + new string(' ', width - number.ToString().Length), ReplTextStyle.Plain);
             ReplTextRun[] runs = highlighted is not null && highlighted.TryGetValue(context.Program.IndexOf(number), out var tokens)
