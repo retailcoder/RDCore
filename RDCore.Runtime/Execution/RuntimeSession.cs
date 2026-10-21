@@ -201,6 +201,22 @@ internal sealed class SessionHalt : ISessionHalt
 
     public IVBRaisableError? StoppedOnError { get; private set; }
 
+    public BreakpointConditionFailure? StoppedOnCondition { get; private set; }
+
+    // set before the program waits and left until it is resumed, as StoppedOnError is.
+    public bool TrySuspendOnCondition(BreakpointConditionFailure failure, SourceLocation? location)
+    {
+        StoppedOnCondition = failure;
+        try
+        {
+            return TrySuspend(RuntimeHaltKind.Break, location);
+        }
+        finally
+        {
+            StoppedOnCondition = null;
+        }
+    }
+
     private IVBRaisableError? _lastWaitedAt;
 
     public bool TrySuspendOnError(IVBRaisableError error, bool handled)

@@ -85,7 +85,10 @@ public sealed class AppTheme(ThemeDocument document)
     public ThemeSplashStyles Splash => new(Resolve(document.Splash.Logo), Resolve(document.Splash.Title));
 
     /// <summary>The resolved style tokens of what a listing shows of the debugger.</summary>
-    public ThemeDebugStyles Debug => new(Resolve(document.Debug.Breakpoint), Resolve(document.Debug.BreakpointGlyph), Resolve(document.Debug.CurrentStatement));
+    public ThemeDebugStyles Debug => new(
+        Resolve(document.Debug.Breakpoint),
+        Resolve(document.Debug.BreakpointGlyph),
+        Resolve(document.Debug.CurrentStatement));
 
     private static string Key(MessageKind kind) => kind.ToString().ToLowerInvariant();
 

@@ -230,6 +230,16 @@ public sealed class ErrObjectTests
     }
 
     [TestMethod]
+    public void StackTrace_OfAnActivationInsideGoSubs_SaysWhichGoSubsItCameFrom_InnermostFirst()
+    {
+        var module = new Uri("file:///c:/ws/Module1.bas");
+        var frame = new VBStackTraceFrame("Main", new SourceLocation(module, new SourceRange(7, 4, 7, 20)),
+            [new SourceLocation(module, new SourceRange(4, 4, 4, 16)), new SourceLocation(module, new SourceRange(1, 4, 1, 15))]);
+
+        Assert.AreEqual("Main (8:5) from (5:5) from (2:5)", frame.ToString());
+    }
+
+    [TestMethod]
     public void StackTrace_ListsTheActivationsInnermostFirst()
     {
         // 🎯 RDCore's own, not MS-VBAL's: VBA can say what an error was but never where it came from.

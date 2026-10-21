@@ -93,6 +93,40 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     // set once a program that waited for the cancellation was resumed: a cancelled token stays cancelled, and it was one break.
     private bool _cancellationAcknowledged;
 
+    // above zero while a breakpoint's condition is evaluated: a procedure the condition calls runs on this executor, and neither waits at a breakpoint nor ends a step.
+    private int _conditionDepth;
+
+    // Whether the program waits at a breakpoint that was reached: always for one with no condition, and for one with a condition when it is True. A condition that
+    // raises an error waits the program as well - a breakpoint that is passed over because its condition is wrong is one the person never learns is wrong - and the
+    // failure says what the error was, for the program to be said to wait on it (ISessionHalt.TrySuspendOnCondition).
+    private bool IsMet(IRuntimeSession session, ExpressionNode? condition, Uri scope, RuntimeEvaluationContext context, out BreakpointConditionFailure? failure)
+    {
+        failure = null;
+        if (condition is null)
+        {
+            return true;
+        }
+
+        RuntimeSemanticsEvaluationResult result;
+        _conditionDepth++;
+        try
+        {
+            result = conditions.EvaluateBoolean(session, condition, context);
+        }
+        finally
+        {
+            _conditionDepth--;
+        }
+
+        if (!result.IsSuccess)
+        {
+            failure = new BreakpointConditionFailure(condition, scope, result.ErrorInfo);
+            return true;
+        }
+
+        return ((VBBooleanValue)result.Result!).Value.StoredValue != 0;
+    }
+
     /// <summary>
     /// Runs <paramref name="frame"/> against <paramref name="list"/> from its current <c>Pc</c> until
     /// the outcome is anything other than <c>Next</c>/<c>Branch</c>.
@@ -259,8 +293,9 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 return RuntimeExecutionOutcome.Break;
             }
 
-            // a step the program was resumed with ends here, before the instruction it was asked to stop at.
-            if (session.Halt.TakeStep(session.CallStack.Depth))
+            // a step the program was resumed with ends here, before the instruction it was asked to stop at - and not in a procedure a breakpoint's condition calls,
+            // which is the debugger's own evaluation and not the program's.
+            if (_conditionDepth == 0 && session.Halt.TakeStep(session.CallStack.Depth))
             {
                 var stepLocation = list.Items[activation.Pc].Node?.SourceLocation;
                 if (!session.Halt.TrySuspend(RuntimeHaltKind.Break, stepLocation))
@@ -282,11 +317,15 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             // a breakpoint is waited at before its instruction, once: the program that is resumed from it does not wait there again.
             var waitedHere = activation.WaitedAt == activation.Pc;
             activation.WaitedAt = -1;
-            if (!waitedHere && session.Halt.Gate is not null && session.Halt.Breakpoints.HasAny && activation.Procedure is { } owner
-                && session.Halt.Breakpoints.IsAt(owner.ParentUri.AbsoluteUri, list, activation.Pc))
+            if (!waitedHere && _conditionDepth == 0 && session.Halt.Gate is not null && session.Halt.Breakpoints.HasAny && activation.Procedure is { } owner
+                && session.Halt.Breakpoints.IsAt(owner.ParentUri.AbsoluteUri, list, activation.Pc, out var breakpointCondition)
+                && IsMet(session, breakpointCondition, owner.Uri, ResolveContext(context, activation, list, list.Items[activation.Pc]), out var conditionFailure))
             {
                 var breakpointLocation = list.Items[activation.Pc].Node?.SourceLocation;
-                if (!session.Halt.TrySuspend(RuntimeHaltKind.Break, breakpointLocation))
+                var waited = conditionFailure is null
+                    ? session.Halt.TrySuspend(RuntimeHaltKind.Break, breakpointLocation)
+                    : session.Halt.TrySuspendOnCondition(conditionFailure, breakpointLocation);
+                if (!waited)
                 {
                     session.Halt.Request(RuntimeHaltKind.Break, breakpointLocation);
                     return RuntimeExecutionOutcome.Break;

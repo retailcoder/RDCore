@@ -4,7 +4,6 @@ using OmniSharp.Extensions.DebugAdapter.Protocol.Models;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Requests;
 using OmniSharp.Extensions.DebugAdapter.Protocol.Server;
 using OmniSharp.Extensions.JsonRpc;
-using OmniSharp.Extensions.JsonRpc.Server;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using DapThread = OmniSharp.Extensions.DebugAdapter.Protocol.Models.Thread;
@@ -236,17 +235,17 @@ internal sealed class ProgramDebugAdapter(
 
     public async Task<SetBreakpointsResponse> Handle(SetBreakpointsArguments request, CancellationToken cancellationToken)
     {
-        var requested = request.Breakpoints?.Select(breakpoint => ToLine(breakpoint.Line)).ToArray() ?? [];
+        var requested = request.Breakpoints?.Select(breakpoint => new SessionBreakpointLine { Line = ToLine(breakpoint.Line), Condition = breakpoint.Condition }).ToArray() ?? [];
         await _opened.Task.WaitAsync(cancellationToken);
 
         if (request.Source?.Path is not { } path || !workspace.TryGetModule(path, out var module))
         {
             return new SetBreakpointsResponse
             {
-                Breakpoints = new Container<Breakpoint>(requested.Select(line => new Breakpoint
+                Breakpoints = new Container<Breakpoint>(requested.Select(dto => new Breakpoint
                 {
                     Verified = false,
-                    Line = ToClientLine(line),
+                    Line = ToClientLine(dto.Line),
                     Message = DebuggerMessages.FileNotInWorkspace,
                 })),
             };
@@ -255,18 +254,21 @@ internal sealed class ProgramDebugAdapter(
         var result = await debugging.SetBreakpointsAsync(module, requested, cancellationToken);
         lock (_sync)
         {
-            _breakpointLines[module] = [.. result.Breakpoints.Where(breakpoint => breakpoint.Verified).Select(breakpoint => breakpoint.Line)];
+            _breakpointLines[module] = [.. result.Breakpoints.Where(IsWaitedAt).Select(breakpoint => breakpoint.Line)];
             _clientPaths[module] = path;
         }
+
+        // a breakpoint whose condition is refused is never waited at, which is what a client shows a breakpoint that is not verified as.
+        static bool IsWaitedAt(HostBreakpoint breakpoint) => breakpoint.Verified && breakpoint.ConditionError is null;
 
         return new SetBreakpointsResponse
         {
             Breakpoints = new Container<Breakpoint>(result.Breakpoints.Select(breakpoint => new Breakpoint
             {
-                Verified = breakpoint.Verified,
+                Verified = IsWaitedAt(breakpoint),
                 Line = ToClientLine(breakpoint.Line),
                 Source = request.Source,
-                Message = breakpoint.Verified ? null : DebuggerMessages.NoStatementOnLine,
+                Message = breakpoint.ConditionError ?? (breakpoint.Verified ? null : DebuggerMessages.NoStatementOnLine),
             })),
         };
     }
@@ -441,6 +443,21 @@ internal sealed class ProgramDebugAdapter(
             _server!.SendStopped(new StoppedEvent
             {
                 Reason = StoppedEventReason.Exception,
+                Description = text,
+                Text = text,
+                ThreadId = ThreadId,
+                AllThreadsStopped = true,
+            });
+            return;
+        }
+
+        // a breakpoint whose condition could not be evaluated is waited at, and says what the condition raised: it is a breakpoint, and not an error of the program's.
+        if (result.ConditionError.Length > 0)
+        {
+            var text = string.Format(DebuggerMessages.StopAtBreakpointConditionFailed, result.ConditionError);
+            _server!.SendStopped(new StoppedEvent
+            {
+                Reason = StoppedEventReason.Breakpoint,
                 Description = text,
                 Text = text,
                 ThreadId = ThreadId,

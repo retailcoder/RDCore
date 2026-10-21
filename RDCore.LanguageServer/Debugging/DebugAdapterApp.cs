@@ -123,6 +123,7 @@ internal sealed class DebugAdapterApp(
                 SupportsTerminateRequest = true,
                 SupportsEvaluateForHovers = true,
                 SupportsExceptionInfoRequest = true,
+                SupportsConditionalBreakpoints = true,
                 ExceptionBreakpointFilters = new Container<ExceptionBreakpointsFilter>(
                     new ExceptionBreakpointsFilter { Filter = ProgramDebugAdapter.UnhandledErrors, Label = DebuggerMessages.FilterUnhandledErrors, Default = true },
                     new ExceptionBreakpointsFilter { Filter = ProgramDebugAdapter.AllErrors, Label = DebuggerMessages.FilterAllErrors }),

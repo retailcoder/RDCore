@@ -11,7 +11,7 @@ namespace RDCore.Runtime.StdLib;
 /// <remarks>
 /// <para>
 /// The wide form of a narrow character is the one Unicode gives as its compatibility mapping: the ASCII characters from <c>!</c> to
-/// <c>~</c> and the fullwidth forms (U+FF01 to U+FF5E), a space and the ideographic space (U+3000), the halfwidth katakana, Japanese
+/// <c>~</c> but the backslash, which MS-VBA neither widens nor narrows, and the fullwidth forms (U+FF01 to U+FF5E), a space and the ideographic space (U+3000), the halfwidth katakana, Japanese
 /// punctuation and Hangul (U+FF61 to U+FFDC) and the characters they are forms of, and the symbols <c>¢ £ ¬ ¯ ¦ ¥ ₩</c> and their
 /// fullwidth forms (U+FFE0 to U+FFE6). A halfwidth voiced or semi-voiced sound mark after a halfwidth katakana that has a voiced or
 /// semi-voiced form makes that one katakana (<c>ｶﾞ</c> is <c>ガ</c>), and a voiced katakana is narrowed to the two (<c>ガ</c> is
@@ -38,9 +38,13 @@ internal static class EastAsianText
     static EastAsianText()
     {
         var wide = new Dictionary<char, char> { [' '] = '\u3000' };
+        // MS-VBA leaves the backslash and the fullwidth one as they are, in every East Asian locale.
         for (var character = '!'; character <= '~'; character++)
         {
-            wide[character] = (char)(character + 0xFEE0);
+            if (character != '\\')
+            {
+                wide[character] = (char)(character + 0xFEE0);
+            }
         }
 
         // a halfwidth Hangul letter and its wide form, a compatibility jamo, both map to the same conjoining jamo.

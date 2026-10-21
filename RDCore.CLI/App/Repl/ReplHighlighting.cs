@@ -39,6 +39,7 @@ public enum ReplTextStyle
 
     /// <summary>The mark in the margin of a line that has a breakpoint - the theme's <c>debug.breakpoint-glyph</c>.</summary>
     BreakpointGlyph,
+
 }
 
 /// <summary>

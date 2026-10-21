@@ -1,6 +1,9 @@
+using RDCore.Runtime.Execution.Frames;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Errors;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using System.Collections.Immutable;
 
 namespace RDCore.Runtime.Execution;
 
@@ -71,11 +74,15 @@ internal sealed class SessionErrorState(ICallStack callStack) : ISessionErrorSta
     }
 
     // the faulting statement's location belongs to the innermost activation and only to it: a caller's
-    // activation record does not say where in itself it is suspended.
+    // activation record does not say where in itself it is suspended. The GoSubs every activation has not
+    // returned from are its own, and are captured now: by the time anyone reads the trace they are popped.
     private VBStackTrace Capture(IVBRaisableError error)
         => new(
         [
             .. callStack.Frames.Select((frame, depth)
-                => new VBStackTraceFrame(frame.StaticSymbol.Name, depth == 0 ? error.Location : null)),
+                => new VBStackTraceFrame(frame.StaticSymbol.Name, depth == 0 ? error.Location : null, GoSubsOf(frame))),
         ]);
+
+    private static ImmutableArray<SourceLocation> GoSubsOf(ICallStackFrame frame)
+        => frame is CallStackFrame activation ? [.. activation.GoSubLocations().OfType<SourceLocation>()] : [];
 }
