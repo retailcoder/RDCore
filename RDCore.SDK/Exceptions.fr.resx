@@ -456,6 +456,9 @@
   <data name="VBCompileError_ClassHasNoDefaultMember_Verbose" xml:space="preserve">
     <value>{0} n'a aucun membre par défaut pour lui donner une valeur, ce qui rend statiquement invalide sa coercition Let en une valeur (MS-VBAL §5.5.1.1). MS-VBA le compile, et lève l'erreur d'exécution 438 (Cette propriété ou méthode n'est pas gérée par cet objet) à l'exécution.</value>
   </data>
+  <data name="VBCompileError_InvalidParamArrayUse_ByRef_Verbose" xml:space="preserve">
+    <value>Le ParamArray {0} est passé au paramètre ByRef {1}: un ParamArray est un tableau des valeurs que l'appel a recueillies, pas une variable dont un paramètre par référence pourrait être un second nom (MS-VBAL §5.3.1.11). Passez-le ByVal, ou passez-en un élément.</value>
+  </data>
   <data name="VBCompileError_NothingIsNotAValue_Verbose" xml:space="preserve">
     <value>Nothing n'est aucun objet, et n'a donc aucune valeur : une valeur est attendue ici.</value>
   </data>

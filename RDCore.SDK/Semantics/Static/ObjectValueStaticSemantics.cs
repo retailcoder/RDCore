@@ -195,6 +195,15 @@ public static class ObjectValueStaticSemantics
     /// <param name="context">The compile-time context the callee is evaluated against.</param>
     /// <param name="callee">The expression the call is written on.</param>
     public static ImmutableArray<VBParameterSymbol>? ParametersOfCallee(StaticEvaluationContext context, ExpressionNode callee)
+        => MemberOfCallee(context, callee) is { } member ? ParametersOf(member) : null;
+
+    /// <summary>
+    /// The procedure a call written on <paramref name="callee"/> calls - by its bare name, qualified by the project or module that declares it, or as a
+    /// member of an object of a class; <see langword="null"/> when it calls no procedure that is known (an array, a late-bound member).
+    /// </summary>
+    /// <param name="context">The compile-time context the callee is evaluated against.</param>
+    /// <param name="callee">The expression the call is written on.</param>
+    public static VBTypeMemberSymbol? MemberOfCallee(StaticEvaluationContext context, ExpressionNode callee)
     {
         var symbol = callee switch
         {
@@ -207,7 +216,7 @@ public static class ObjectValueStaticSemantics
             _ => null,
         };
 
-        return symbol is VBReturningMemberSymbol or VBProcedureMemberSymbol ? ParametersOf((VBTypeMemberSymbol)symbol) : null;
+        return symbol is VBReturningMemberSymbol or VBProcedureMemberSymbol ? (VBTypeMemberSymbol)symbol : null;
     }
 
     // the parameters of a procedure, whichever kind of member declares it.

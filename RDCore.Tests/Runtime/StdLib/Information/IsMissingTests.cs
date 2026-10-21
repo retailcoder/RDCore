@@ -127,7 +127,6 @@ public sealed class IsMissingTests
 
     // MS-VBA refuses a ParamArray as the argument of a ByRef parameter of a procedure of the code's own, as a compile error (recorded in Excel).
     [TestMethod]
-    [Ignore("VBC09305 Invalid ParamArray use is not issued: a ParamArray passed to a ByRef parameter of the workspace's code compiles, and is passed as a value.")]
     public async Task AParamArray_PassedToAByRefParameter_IsInvalidParamArrayUse()
     {
         var errors = await RDCore.Tests.Cli.ModuleWorkspace.LoadErrorsAsync([],

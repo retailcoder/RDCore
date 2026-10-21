@@ -456,6 +456,9 @@
   <data name="VBCompileError_ClassHasNoDefaultMember_Verbose" xml:space="preserve">
     <value>{0} has no default member to give it a value, which makes it statically invalid to Let-coerce to one (MS-VBAL §5.5.1.1). MS-VBA compiles it, and raises run-time error 438 (Object doesn't support this property or method) when it runs.</value>
   </data>
+  <data name="VBCompileError_InvalidParamArrayUse_ByRef_Verbose" xml:space="preserve">
+    <value>ParamArray {0} is passed to ByRef parameter {1}: a ParamArray is an array of the values the call collected, not a variable a reference parameter can be a second name for (MS-VBAL §5.3.1.11). Pass it ByVal, or pass an element of it.</value>
+  </data>
   <data name="VBCompileError_NothingIsNotAValue_Verbose" xml:space="preserve">
     <value>Nothing is no object, and so has no value: a value is expected here.</value>
   </data>
