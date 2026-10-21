@@ -198,6 +198,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC01002](rdc01002.md)|Hungarian notation — a name that begins with a prefix that states its type|
 |[RDC11005](rdc11005.md)|Bitwise operator — a logical operator given numbers, which works on their bits|
 |[RDC11006](rdc11006.md)|Ambiguous concatenation — two String values joined with +|
+|[RDC11011](rdc11011.md)|Variant number compared with a Variant String — the number is less, whatever the values|
 
 ---
 > ⏭️ [**VBC00001** Syntax error](vbc00001.md)

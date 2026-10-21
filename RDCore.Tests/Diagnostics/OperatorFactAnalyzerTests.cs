@@ -7,7 +7,7 @@ using RDCore.Tests.Cli;
 namespace RDCore.Tests.Diagnostics;
 
 /// <summary>
-/// <c>RDC11005</c> and <c>RDC11006</c>: analyzers that read what the host states about the operations of the code (<see cref="RDCore.SDK.Platform.Protocol.OperatorFactDto"/>).
+/// <c>RDC11005</c>, <c>RDC11006</c> and <c>RDC11011</c>: analyzers that read what the host states about the operations of the code (<see cref="RDCore.SDK.Platform.Protocol.OperatorFactDto"/>).
 /// </summary>
 [TestClass]
 public sealed class OperatorFactAnalyzerTests
@@ -58,5 +58,43 @@ public sealed class OperatorFactAnalyzerTests
     public async Task ALogicalOperatorOverBooleans_IsLogic()
     {
         Assert.IsEmpty(await FindAsync(new BitwiseSemanticsAnalyzer(), "ByVal a As Boolean, ByVal b As Boolean", "Dim r As Boolean", "r = a And b"));
+    }
+
+    [TestMethod]
+    [DataRow("<")]
+    [DataRow("=")]
+    [DataRow(">=")]
+    public async Task AVariantNumberComparedWithAVariantString_IsLessWhateverTheirValues(string op)
+    {
+        var finding = (await FindAsync(new VariantNumberStringComparisonAnalyzer(), "",
+            "Dim a As Variant, b As Variant, r As Boolean", "a = 5", "b = \"4\"", $"r = a {op} b")).Single();
+
+        Assert.AreEqual(RDCoreDiagnosticId.VariantNumberStringComparison, finding.Id);
+        Assert.AreEqual(DiagnosticSeverity.Warning, finding.Severity);
+        Assert.AreEqual(6, finding.Range.Start.Line);
+    }
+
+    [TestMethod]
+    public async Task AVariantNumberComparedWithAVariantString_FromAnInputBox_IsReported()
+    {
+        var finding = (await FindAsync(new VariantNumberStringComparisonAnalyzer(), "",
+            "Dim n As Variant, i As Variant", "n = InputBox(\"How many?\")", "i = 1", "If i <= n Then Debug.Print i")).Single();
+
+        Assert.AreEqual(RDCoreDiagnosticId.VariantNumberStringComparison, finding.Id);
+    }
+
+    [TestMethod]
+    [DataRow("Dim a As Long, b As Variant, r As Boolean", DisplayName = "a declared number")]
+    [DataRow("Dim a As Variant, b As String, r As Boolean", DisplayName = "a declared String")]
+    public async Task AComparisonWithADeclaredOperand_ComparesTheValues(string declarations)
+    {
+        Assert.IsEmpty(await FindAsync(new VariantNumberStringComparisonAnalyzer(), "", declarations, "a = 5", "b = \"4\"", "r = a < b"));
+    }
+
+    [TestMethod]
+    public async Task TwoVariantNumbers_AreComparedAsNumbers()
+    {
+        Assert.IsEmpty(await FindAsync(new VariantNumberStringComparisonAnalyzer(), "",
+            "Dim a As Variant, b As Variant, r As Boolean", "a = 5", "b = 4", "r = a < b"));
     }
 }

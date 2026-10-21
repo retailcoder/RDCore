@@ -56,6 +56,10 @@ The short-circuit runs before normal coercion because normal coercion would othe
 `String` to a number. Because the case is reduced to synthetic ranks, the `Variant` String/Numeric case needs no
 separate evaluation path.
 
+The comparison is legitimate, and almost never meant: the analysis states it as a fact of the operation
+(`ComparisonOperatorSemanticFlags.IsVariantStringNumericException`), and RDCore.Diagnostics reports it as
+[`RDC11011`](../diagnostics/rdc11011.md), a warning.
+
 ### String comparison
 
 Each of the six operators compares two `String` operands as

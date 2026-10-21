@@ -79,4 +79,5 @@ public enum RDCoreDiagnosticId
     EnumerationOverArray,
     LateBoundMemberAccess,
     UnresolvedLateBoundMemberAccess,
+    VariantNumberStringComparison = 11011, // two Variants, a number and a String: the number is always less
 }

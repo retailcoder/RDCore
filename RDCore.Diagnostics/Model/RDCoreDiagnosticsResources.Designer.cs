@@ -482,5 +482,14 @@ namespace RDCore.Diagnostics.Model {
                 return ResourceManager.GetString("UseMeaningfulIdentifierNames_TooShort_Message", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; compare un Variant qui contient un nombre à un Variant qui contient une String: le nombre est toujours plus petit que la String, quelles que soient leurs valeurs..
+        /// </summary>
+        public static string VariantNumberStringComparison_Message {
+            get {
+                return ResourceManager.GetString("VariantNumberStringComparison_Message", resourceCulture);
+            }
+        }
     }
 }

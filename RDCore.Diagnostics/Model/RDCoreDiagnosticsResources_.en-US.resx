@@ -258,4 +258,7 @@
   <data name="MisleadingByRefParameter_Message" xml:space="preserve">
     <value>ByRef has no effect on '{0}', the value parameter of a property Let or Set: it is always passed ByVal.</value>
   </data>
+  <data name="VariantNumberStringComparison_Message" xml:space="preserve">
+    <value>'{0}' compares a Variant holding a number with a Variant holding a String: the number is always less than the String, whatever their values.</value>
+  </data>
 </root>
