@@ -36,11 +36,73 @@ public sealed class StrConvTests
         => Assert.AreEqual(expected, TextOf(Module().StrConv(V(text), VBStrConv.VBProperCase)));
 
     [TestMethod]
-    [DataRow("a b", "A b")]
-    [DataRow("a b", "A b")]
-    [DataRow("a　b", "A　b")]
+    [DataRow("a\u00A0b", "A\u00A0b")]
     public void StrConv_ProperCase_StartsNoWordAfterAnotherSpace(string text, string expected)
         => Assert.AreEqual(expected, TextOf(Module().StrConv(V(text), VBStrConv.VBProperCase)));
+
+    // measured in MS-VBA (Excel, 64-bit, en-US, Windows-1252).
+    [TestMethod]
+    [DataRow("abc　def", 3, 0, "Abc Def")]
+    [DataRow("abc　def", 3, 1033, "Abc Def")]
+    [DataRow("abc def", 3, 0, "Abc Def")]
+    [DataRow("abc def", 3, 1041, "Abc?def")]
+    [DataRow("αβ γδ", 1, 0, "Aß ?D")]
+    [DataRow("ΑΒ ΓΔ", 2, 0, "?? g?")]
+    [DataRow("αβ γδ", 3, 0, "Aß ?d")]
+    [DataRow("αβ γδ", 3, 1032, "Αβ Γδ")]
+    [DataRow("αβ γδ", 1, 1032, "ΑΒ ΓΔ")]
+    [DataRow("αβ γδ", 3, 1041, "Αβ Γδ")]
+    [DataRow("αβ γδ", 3, 1049, "?? ??")]
+    [DataRow("αβ γδ क", 3, 1081, "Aß ?d ?")]
+    [DataRow("аб в", 3, 1049, "Аб В")]
+    [DataRow("āb āc", 3, 0, "Ab Ac")]
+    [DataRow("āb", 1, 0, "AB")]
+    [DataRow("😀ab", 3, 0, "??ab")]
+    [DataRow("ﬁx yz", 3, 0, "?x Yz")]
+    [DataRow("﻿a", 3, 0, "?a")]
+    [DataRow("a", 3, 0, "?a")]
+    [DataRow("€ab", 3, 0, "€ab")]
+    [DataRow("\u0080ab", 3, 0, "?ab")]
+    [DataRow("\u009Fa", 3, 0, "?a")]
+    [DataRow("\u0081ab", 3, 0, "\u0081ab")]
+    [DataRow("\u008Da", 3, 0, "\u008Da")]
+    [DataRow("ａa", 3, 1033, "Aa")]
+    [DataRow("あい ab", 3, 1033, "?? Ab")]
+    [DataRow("あい ab", 3, 1041, "あい Ab")]
+    [DataRow("가 ab", 3, 1042, "가 Ab")]
+    [DataRow("中 abα", 3, 2052, "中 Abα")]
+    [DataRow("ǆa", 3, 1050, "?a")]
+    [DataRow("a α", 4, 1041, "ａ？α")]
+    [DataRow("あ ā", 16, 1041, "ア??")]
+    [DataRow("ａ ā", 8, 1041, "a??")]
+    [DataRow("ab cd", 3 + 4, 1041, "Ａｂ？ｃｄ")]
+    public void StrConv_ConvertsInTheAnsiCodePageOfItsLocale(string text, int conversion, int lcid, string expected)
+        => Assert.AreEqual(expected, TextOf(Module().StrConv(V(text), Conversion(conversion), lcid == 0 ? null : L(lcid))));
+
+    // a data row cannot hold a lone surrogate: the test runner's serialization replaces it.
+    [TestMethod]
+    public void StrConv_ALoneSurrogate_IsAQuestionMark()
+        => Assert.AreEqual("?ab", TextOf(Module().StrConv(V("\uD83Dab"), VBStrConv.VBProperCase)));
+
+    // measured in MS-VBA: a character cases only to one that cases back to it, whatever the locale.
+    [TestMethod]
+    [DataRow("iKIı", 1, 1055, "IKIı")]
+    [DataRow("IİKi", 2, 1055, "iİki")]
+    [DataRow("iKI", 3, 1055, "Iki")]
+    [DataRow("iKI", 3, 1033, "Iki")]
+    [DataRow("İA", 2, 1033, "ia")]
+    [DataRow("µa", 1, 0, "µA")]
+    [DataRow("µa", 3, 0, "µa")]
+    [DataRow("ÿ", 1, 0, "Ÿ")]
+    [DataRow("Ÿ", 2, 0, "ÿ")]
+    [DataRow("ÿa", 3, 0, "Ÿa")]
+    [DataRow("šœ", 1, 0, "ŠŒ")]
+    [DataRow("ßa", 3, 0, "ßa")]
+    [DataRow("ςΐ", 1, 1032, "ςΐ")]
+    [DataRow("ΣΣ", 3, 1032, "Σσ")]
+    [DataRow("ａｂ cd", 3, 1041, "Ａｂ Cd")]
+    public void StrConv_CasesOnlyToACharacterThatCasesBack(string text, int conversion, int lcid, string expected)
+        => Assert.AreEqual(expected, TextOf(Module().StrConv(V(text), Conversion(conversion), lcid == 0 ? null : L(lcid))));
 
     [TestMethod]
     public void StrConv_OfZero_IsTheStringUnchanged()
@@ -76,20 +138,17 @@ public sealed class StrConvTests
     }
 
     [TestMethod]
-    public void StrConv_ACaseConversion_ComesAfterUnicodeAndBeforeFromUnicode()
-    {
-        Assert.AreEqual("É", TextOf(Module().StrConv(V(Bytes(0xE9)), Conversion(64 + 1))), "it cases the character the byte is");
-        CollectionAssert.AreEqual(new byte[] { 0xC9 }, BytesOf(Module().StrConv(V("é"), Conversion(128 + 1))), "it writes the cased character");
-        CollectionAssert.AreEqual(new byte[] { 0x41, 0x62, 0x63 }, BytesOf(Module().StrConv(V("abc"), Conversion(128 + 3))));
-        Assert.AreEqual("A\0B\0C\0", TextOf(Module().StrConv(V("abc"), Conversion(64 + 1))));
-    }
-
-    [TestMethod]
     [DataRow(-1)]
     [DataRow(256)]
     [DataRow(512)]
     [DataRow(1024)]
     [DataRow(64 + 128)]
+    [DataRow(64 + 1)]
+    [DataRow(128 + 2)]
+    [DataRow(128 + 3)]
+    [DataRow(64 + 4)]
+    [DataRow(128 + 16)]
+    [DataRow(128 + 8)]
     [DataRow(4 + 8)]
     [DataRow(16 + 32)]
     public void StrConv_AnUndefinedOrMutuallyExclusiveConversion_IsError5(int conversion)
@@ -109,15 +168,20 @@ public sealed class StrConvTests
 
     private const int Japanese = 1041;
 
+    // a Japanese environment's ANSI code page: a conversion reads the String in it.
+    private const int JapaneseCodePage = 932;
+
     [TestMethod]
     [DataRow("abc 123!~", "ａｂｃ　１２３！～")]
     [DataRow("ｶﾞｷﾞﾊﾟﾝ ｳﾞ", "ガギパン　ヴ")]
     [DataRow("｢ｱｲｳ｣､｡･ｰ", "「アイウ」、。・ー")]
     [DataRow("ﾞ", "゛")]
-    [DataRow("¥¢", "￥￠")]
+    [DataRow("¥¢", "\\￠")]
+    [DataRow("¦¯", "｜￣")]
+    [DataRow("\\", "\\")]
     [DataRow("ひらがな漢字", "ひらがな漢字")]
     public void StrConv_Wide_WidensTheNarrowCharacters(string text, string expected)
-        => Assert.AreEqual(expected, TextOf(Module(Japanese).StrConv(V(text), VBStrConv.VBWide)));
+        => Assert.AreEqual(expected, TextOf(Module(Japanese, JapaneseCodePage).StrConv(V(text), VBStrConv.VBWide)));
 
     [TestMethod]
     [DataRow("ａｂｃ　１２３！～", "abc 123!~")]
@@ -125,22 +189,33 @@ public sealed class StrConvTests
     [DataRow("「アイウ」、。・ー", "｢ｱｲｳ｣､｡･ｰ")]
     [DataRow("ひらがな漢字", "ひらがな漢字")]
     public void StrConv_Narrow_NarrowsTheWideCharacters(string text, string expected)
-        => Assert.AreEqual(expected, TextOf(Module(Japanese).StrConv(V(text), VBStrConv.VBNarrow)));
+        => Assert.AreEqual(expected, TextOf(Module(Japanese, JapaneseCodePage).StrConv(V(text), VBStrConv.VBNarrow)));
+
+    // measured in MS-VBA: the backslash and the fullwidth one stay as they are in every East Asian locale.
+    [TestMethod]
+    [DataRow("\\", 4, 2052, "\\")]
+    [DataRow("\\", 4, 1042, "\\")]
+    [DataRow("\\¥", 4, 1028, "\\￥")]
+    [DataRow("＼", 8, 2052, "＼")]
+    [DataRow("＼￥", 8, 1041, "＼\\")]
+    public void StrConv_TheBackslash_HasNoWideForm(string text, int conversion, int lcid, string expected)
+        => Assert.AreEqual(expected, TextOf(Module().StrConv(V(text), Conversion(conversion), L(lcid))));
 
     [TestMethod]
     public void StrConv_KatakanaAndHiragana_ConvertBetweenTheSyllabaries()
     {
-        Assert.AreEqual("ヒラガナ ヴヽ", TextOf(Module(Japanese).StrConv(V("ひらがな ゔゝ"), VBStrConv.VBKatakana)));
-        Assert.AreEqual("かたかな ゔゞ ヷ", TextOf(Module(Japanese).StrConv(V("カタカナ ヴヾ ヷ"), VBStrConv.VBHiragana)));
-        Assert.AreEqual("ｶﾀｶﾅ", TextOf(Module(Japanese).StrConv(V("ｶﾀｶﾅ"), VBStrConv.VBHiragana)), "a halfwidth katakana has no hiragana");
+        Assert.AreEqual("ヒラガナ ヴヽ", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("ひらがな ゔゝ"), VBStrConv.VBKatakana)));
+        Assert.AreEqual("ヒ ヴヽ", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("ひ ゔゝ"), VBStrConv.VBKatakana)), "932 has no ゔ, and reads it as ヴ");
+        Assert.AreEqual("かたかな ヴゞ ?", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("カタカナ ヴヾ ヷ"), VBStrConv.VBHiragana)));
+        Assert.AreEqual("ｶﾀｶﾅ", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("ｶﾀｶﾅ"), VBStrConv.VBHiragana)), "a halfwidth katakana has no hiragana");
     }
 
     [TestMethod]
     public void StrConv_TheConversions_AreMadeInOneOrder()
     {
-        Assert.AreEqual("かたかな", TextOf(Module(Japanese).StrConv(V("ｶﾀｶﾅ"), VBStrConv.VBWide | VBStrConv.VBHiragana)), "widened, then a hiragana");
-        Assert.AreEqual("ﾋﾗｶﾞﾅ", TextOf(Module(Japanese).StrConv(V("ひらがな"), VBStrConv.VBKatakana | VBStrConv.VBNarrow)), "a katakana, then narrowed");
-        Assert.AreEqual("ＡＢＣ", TextOf(Module(Japanese).StrConv(V("abc"), VBStrConv.VBUpperCase | VBStrConv.VBWide)));
+        Assert.AreEqual("かたかな", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("ｶﾀｶﾅ"), VBStrConv.VBWide | VBStrConv.VBHiragana)), "widened, then a hiragana");
+        Assert.AreEqual("ﾋﾗｶﾞﾅ", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("ひらがな"), VBStrConv.VBKatakana | VBStrConv.VBNarrow)), "a katakana, then narrowed");
+        Assert.AreEqual("ＡＢＣ", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("abc"), VBStrConv.VBUpperCase | VBStrConv.VBWide)));
     }
 
     [TestMethod]
@@ -148,14 +223,16 @@ public sealed class StrConvTests
     {
         Assert.AreEqual("ａｂｃ", TextOf(Module().StrConv(V("abc"), VBStrConv.VBWide, L(2052))), "Chinese is an East Asian locale");
         Assert.AreEqual("ㄱ", TextOf(Module().StrConv(V("\uFFA1"), VBStrConv.VBWide, L(1042))), "so is Korean, whose halfwidth Hangul widens");
-        Assert.AreEqual(InvalidProcedureCall, ErrorOf(Module(Japanese).StrConv(V("abc"), VBStrConv.VBWide, L(1033))));
+        Assert.AreEqual(InvalidProcedureCall, ErrorOf(Module(Japanese, JapaneseCodePage).StrConv(V("abc"), VBStrConv.VBWide, L(1033))));
     }
 
     [TestMethod]
     public void StrConv_ProperCase_InAnEastAsianLocale_StartsAWordAfterAnIdeographicSpace()
     {
-        Assert.AreEqual("Abc\u3000Def", TextOf(Module(Japanese).StrConv(V("abc\u3000def"), VBStrConv.VBProperCase)));
-        Assert.AreEqual("Abc\u3000def", TextOf(Module(1033).StrConv(V("abc\u3000def"), VBStrConv.VBProperCase)));
+        Assert.AreEqual("Abc\u3000Def", TextOf(Module(Japanese, JapaneseCodePage).StrConv(V("abc\u3000def"), VBStrConv.VBProperCase)));
+        Assert.AreEqual("Abc\u3000Def", TextOf(Module().StrConv(V("abc\u3000def"), VBStrConv.VBProperCase, L(2052))));
+        Assert.AreEqual("Abc\u3000Def", TextOf(Module().StrConv(V("abc\u3000def"), VBStrConv.VBProperCase, L(1042))));
+        Assert.AreEqual("Abc Def", TextOf(Module(1033).StrConv(V("abc\u3000def"), VBStrConv.VBProperCase)), "Windows-1252 has no ideographic space");
     }
 
     [TestMethod]
@@ -172,17 +249,13 @@ public sealed class StrConvTests
         => Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, ErrorOf(Module().StrConv(VMissing, Conversion(-1))));
 
     [TestMethod]
-    public void StrConv_CasesByItsLocaleID_OrTheEnvironmentsCulture()
+    public void StrConv_ConvertsInLocaleIDsCodePage_OrTheEnvironments()
     {
-        Assert.AreEqual("İ", TextOf(Module().StrConv(V("i"), VBStrConv.VBUpperCase, L(1055))), "Turkish has a dotted I");
-        Assert.AreEqual("ı", TextOf(Module().StrConv(V("I"), VBStrConv.VBLowerCase, L(1055))), "and a dotless i");
-        Assert.AreEqual("İkı", TextOf(Module().StrConv(V("iKI"), VBStrConv.VBProperCase, L(1055))));
-        Assert.AreEqual("I", TextOf(Module().StrConv(V("i"), VBStrConv.VBUpperCase)));
-
-        var turkish = Module(lcid: 1055);
-        Assert.AreEqual("İ", TextOf(turkish.StrConv(V("i"), VBStrConv.VBUpperCase)), "the environment's, left out");
-        Assert.AreEqual("İ", TextOf(turkish.StrConv(V("i"), VBStrConv.VBUpperCase, L(0))), "and at 0");
-        Assert.AreEqual("I", TextOf(turkish.StrConv(V("i"), VBStrConv.VBUpperCase, L(1033))));
+        var greek = Module(codePage: 1253);
+        Assert.AreEqual("Α", TextOf(greek.StrConv(V("α"), VBStrConv.VBUpperCase)), "the environment's, left out");
+        Assert.AreEqual("Α", TextOf(greek.StrConv(V("α"), VBStrConv.VBUpperCase, L(0))), "and at 0");
+        Assert.AreEqual("A", TextOf(greek.StrConv(V("α"), VBStrConv.VBUpperCase, L(1033))));
+        Assert.AreEqual("A", TextOf(Module(lcid: 1032).StrConv(V("α"), VBStrConv.VBUpperCase)), "the environment's code page, not its locale's");
     }
 
     [TestMethod]

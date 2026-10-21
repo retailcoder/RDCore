@@ -594,32 +594,36 @@ then compares the two as the relational operators do, a trailing byte included, 
 
 `Conversion` is a sum of `VbStrConv` values. A value outside `0` to `255` is error `5`, and so is one that names both of
 a pair MS-VBAL makes "mutually exclusive": `vbUnicode` and `vbFromUnicode`, `vbWide` and `vbNarrow`, `vbKatakana` and
-`vbHiragana`.
+`vbHiragana`. As in MS-VBA, `vbUnicode` or `vbFromUnicode` with any other conversion is error `5` too.
 
-- `vbUpperCase` and `vbLowerCase` case as `UCase` and `LCase` do, in `LocaleID`'s regional settings or the
-  environment's.
-- `vbProperCase` lowercases the `String`, then uppercases its first character and each one after one of MS-VBAL's seven
-  word separators (`Chr$(0)`, `Chr$(9)` to `Chr$(13)`, `Chr$(32)`), and no other: `"o'neil-smith"` is `"O'neil-smith"`,
-  and a no-break or em space starts no word. In an East Asian locale the ideographic space starts one, "the actual value for
-  a space" varying "for DBCS" - as in MS-VBA (recorded in Excel, `LocaleID` `&H411`, `&H804`, `&H404` and `&H412`).
-  🚧 MS-VBA also passes the `String` through the `LocaleID`'s ANSI code page: in en-US an ideographic space comes back a
-  space (U+0020), and starts a word; in an East Asian locale a no-break space comes back `?`. RD-VBA keeps every character.
 - `vbUnicode` reads the `String`'s bytes, a trailing one included, as text in "the default code page of the system", the
   environment's ANSI code page. `vbFromUnicode` writes the characters as that code page's bytes: `"abc"` becomes a
-  `String` of three bytes. A `LocaleID` changes the casing only, never the code page.
+  `String` of three bytes. A `LocaleID` does not change that code page.
+- Every other conversion reads the `String` in the ANSI code page of `LocaleID`'s locale, and writes the result back from
+  it, as MS-VBA does. Left out or `0`, or naming a locale with no ANSI code page, it is the environment's code page. A
+  character the code page lacks is the one its encoder maps it to, or `?`, before any conversion sees it: in Windows-1252
+  `Î±` is `a`, `Ä` is `a`, an ideographic or em space is a space, and `Î³` is `?`; in Windows-932 a no-break space is `?`,
+  `Â¥` is `\`, and `ã‚”` is `ãƒ´`.
+- `vbUpperCase` and `vbLowerCase` case each character to the one Unicode gives, only when that one cases back to it, in
+  any locale: the Turkish `i` is `I`, and `Ä±`, `Ä°`, `Âµ` and `Ï‚` stay as they are. That is MS-VBA's casing (recorded in
+  Excel), not the locale's.
+- `vbProperCase` lowercases the `String`, then uppercases its first character and each one after one of MS-VBAL's seven
+  word separators (`Chr$(0)`, `Chr$(9)` to `Chr$(13)`, `Chr$(32)`), and no other: `"o'neil-smith"` is `"O'neil-smith"`,
+  and a no-break space starts no word. In an East Asian locale the ideographic space starts one, "the actual value for
+  a space" varying "for DBCS" - as in MS-VBA (recorded in Excel, `LocaleID` `&H411`, `&H804`, `&H404` and `&H412`).
+  Elsewhere the code page has read it as a space, which starts one too.
 - `vbWide` writes each narrow character as its wide form and `vbNarrow` the other way round, the forms being Unicode's
   compatibility mappings: ASCII `!` to `~` and the fullwidth forms, a space and the ideographic space, the halfwidth
-  katakana, Japanese punctuation and Hangul and their wide forms, and `¢ £ ¬ ¯ ¦ ¥ ₩` and theirs. A halfwidth katakana
-  and a halfwidth voiced or semi-voiced sound mark widen to one katakana (`ｶﾞ` is `ガ`), and a voiced katakana narrows to
-  the two. A hiragana has no narrow form and stays wide.
+  katakana, Japanese punctuation and Hangul and their wide forms, and `Â¢ Â£ Â¬ Â¯ Â¦ Â¥ â‚©` and theirs. MS-VBA leaves the
+  backslash and the fullwidth backslash as they are, and so does RD-VBA. A halfwidth katakana and a halfwidth voiced or
+  semi-voiced sound mark widen to one katakana (`ï½¶ï¾ž` is `ã‚¬`), and a voiced katakana narrows to the two. A hiragana has no
+  narrow form and stays wide.
 - `vbKatakana` writes each hiragana as its katakana, and `vbHiragana` each katakana as its hiragana; a katakana with no
-  hiragana (`ヷ` to `ヺ`, the halfwidth ones) stays.
-- The conversions are made in one order: `vbUnicode`, the case, `vbWide`, `vbKatakana` or `vbHiragana`, `vbNarrow`, then
-  `vbFromUnicode`. So a case conversion sees the characters the bytes are, and is what gets written; a halfwidth katakana
-  widened is a katakana for `vbHiragana`, and a hiragana made a katakana can be narrowed.
+  hiragana (`ãƒ·` to `ãƒº`, the halfwidth ones) stays.
+- The conversions are made in one order: the case, `vbWide`, `vbKatakana` or `vbHiragana`, then `vbNarrow`. So a halfwidth
+  katakana widened is a katakana for `vbHiragana`, and a hiragana made a katakana can be narrowed.
 - A `Conversion` of `0` gives the `String` as it was given, a trailing byte and all. Every other conversion reads its
   characters, so a trailing byte is dropped unless `vbUnicode` reads it.
-
 MS-VBAL's declaration makes `LocaleID` required, which would make `StrConv(s, vbProperCase)` error `449`. RD-VBA declares
 it optional, with no default: left out, or `0`, it is the environment's locale. A `LocaleID` that names no locale is
 error `5`, and so are `LOCALE_USER_DEFAULT` and `LOCALE_SYSTEM_DEFAULT` (`1024` and `2048`).

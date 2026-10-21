@@ -1587,11 +1587,15 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// <c>vbFromUnicode</c> writes its characters as that code page's bytes, a character the code page lacks being what its
     /// encoder maps it to; LocaleID does not change the code page. A Null String is Null.
     /// <para>
-    /// 👉 <c>vbUnicode</c> converts first and <c>vbFromUnicode</c> last, so a case conversion sees the characters the bytes are and
-    /// is what gets written; <c>vbProperCase</c> also lowercases the rest of each word, and starts none after punctuation, a
-    /// no-break space, or an ideographic space outside an East Asian locale. Both conversions of a pair (<c>vbWide</c> and <c>vbNarrow</c>, <c>vbKatakana</c>
-    /// and <c>vbHiragana</c>, <c>vbUnicode</c> and <c>vbFromUnicode</c>), a Conversion outside 0 to 255, and a LocaleID that names
-    /// no locale are error 5.
+    /// 👉 As MS-VBA does, every other conversion reads the String in the ANSI code page of LocaleID's locale (the environment's when
+    /// LocaleID is left out or 0, or when the locale has none), and writes it back from it: a character the code page lacks is the
+    /// one its encoder maps it to (<c>α</c> is <c>a</c> in Windows-1252, an ideographic space a space) or <c>?</c>, before any
+    /// conversion sees it. The casing is not the locale's own: a character is cased only to one that cases back to it, so the
+    /// Turkish <c>i</c> is <c>I</c>, and <c>ı</c>, <c>İ</c>, <c>µ</c> and <c>ς</c> stay as they are. <c>vbProperCase</c> also
+    /// lowercases the rest of each word, and starts none after punctuation, a no-break space, or an ideographic space outside an
+    /// East Asian locale. <c>vbUnicode</c> or <c>vbFromUnicode</c> with any other conversion, both conversions of a pair
+    /// (<c>vbWide</c> and <c>vbNarrow</c>, <c>vbKatakana</c> and <c>vbHiragana</c>), a Conversion outside 0 to 255, and a LocaleID
+    /// that names no locale are error 5.
     /// </para>
     /// <para>
     /// <c>vbWide</c> and <c>vbNarrow</c> convert between narrow characters and their wide forms, and <c>vbKatakana</c> and
@@ -1602,9 +1606,9 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// as a space does.
     /// </para>
     /// <para>
-    /// 👉 The conversions are made in one order, whatever their sum: <c>vbUnicode</c>, the case, <c>vbWide</c>, <c>vbKatakana</c> or
-    /// <c>vbHiragana</c>, <c>vbNarrow</c>, then <c>vbFromUnicode</c>; so a halfwidth katakana widened is a katakana the syllabary
-    /// conversion sees, and a hiragana made a katakana can be narrowed.
+    /// 👉 The conversions are made in one order, whatever their sum: the case, <c>vbWide</c>, <c>vbKatakana</c> or
+    /// <c>vbHiragana</c>, then <c>vbNarrow</c>; so a halfwidth katakana widened is a katakana the syllabary conversion sees, and a
+    /// hiragana made a katakana can be narrowed.
     /// </para>
     /// </remarks>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> StrConv(VBVariantValue @string, VBStrConv conversion, VBLongValue? localeID = default)
@@ -1632,6 +1636,12 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             {
                 return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), $"Conversion cannot combine {names}");
             }
+        }
+
+        const int byteConversions = (int)(VBStrConv.VBUnicode | VBStrConv.VBFromUnicode);
+        if ((settings & byteConversions) != 0 && (settings & ~byteConversions) != 0)
+        {
+            return Fail<VBVariantValue>(VBRuntimeErrorId.InvalidProcedureCallOrArgument, nameof(StrConv), "Conversion cannot combine vbUnicode or vbFromUnicode with another conversion");
         }
 
         // LocaleID has no default: left out, it is null, and 0 is the environment's locale too.
@@ -1667,13 +1677,25 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
         }
 
         var ansi = session.Environment.AnsiEncoding;
-        var converted = (settings & (int)VBStrConv.VBUnicode) != 0 ? ansi.GetString(text.GetBytes()) : Text(text);
-        var casing = culture.TextInfo;
+        if ((settings & (int)VBStrConv.VBUnicode) != 0)
+        {
+            return InVariant(ansi.GetString(text.GetBytes()));
+        }
+
+        if ((settings & (int)VBStrConv.VBFromUnicode) != 0)
+        {
+            return InVariant(VBStringValue.FromBytes(ansi.GetBytes(Text(text))));
+        }
+
+        // MS-VBA converts in the locale's ANSI code page, so a character it lacks is lost before any conversion sees it.
+        var localeCodePage = localeID is { Value: not 0 } ? culture.TextInfo.ANSICodePage : 0;
+        var codePage = localeCodePage == 0 ? ansi : CodePagesEncodingProvider.Instance.GetEncoding(localeCodePage) ?? ansi;
+        var converted = codePage.GetString(codePage.GetBytes(Text(text)));
         converted = (VBStrConv)(settings & (int)VBStrConv.VBProperCase) switch
         {
-            VBStrConv.VBUpperCase => casing.ToUpper(converted),
-            VBStrConv.VBLowerCase => casing.ToLower(converted),
-            VBStrConv.VBProperCase => ProperCased(converted, casing, isEastAsian),
+            VBStrConv.VBUpperCase => Cased(converted, UpperOf),
+            VBStrConv.VBLowerCase => Cased(converted, LowerOf),
+            VBStrConv.VBProperCase => ProperCased(converted, isEastAsian),
             _ => converted,
         };
 
@@ -1683,9 +1705,7 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             : converted;
         converted = (settings & (int)VBStrConv.VBNarrow) != 0 ? EastAsianText.Narrowed(converted) : converted;
 
-        return (settings & (int)VBStrConv.VBFromUnicode) != 0
-            ? InVariant(VBStringValue.FromBytes(ansi.GetBytes(converted)))
-            : InVariant(converted);
+        return InVariant(codePage.GetString(codePage.GetBytes(converted)));
     }
 
     // "mutually exclusive, for example, vbUnicode + vbFromUnicode": each pair converts one way and its opposite.
@@ -1705,18 +1725,41 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
 
     // vbProperCase: each word's first character up and every other one down, a word beginning where the String does and after
     // a word separator, and nowhere else.
-    private static string ProperCased(string text, TextInfo casing, bool isEastAsian)
+    private static string ProperCased(string text, bool isEastAsian)
     {
-        var characters = casing.ToLower(text).ToCharArray();
+        var characters = Cased(text, LowerOf).ToCharArray();
         for (var index = 0; index < characters.Length; index++)
         {
             if (index == 0 || WordSeparators.Contains(characters[index - 1]) || isEastAsian && characters[index - 1] == IdeographicSpace)
             {
-                characters[index] = casing.ToUpper(characters[index]);
+                characters[index] = UpperOf(characters[index]);
             }
         }
 
         return new string(characters);
+    }
+
+    private static string Cased(string text, Func<char, char> casing)
+        => string.Create(text.Length, (text, casing), static (characters, state) =>
+        {
+            for (var index = 0; index < characters.Length; index++)
+            {
+                characters[index] = state.casing(state.text[index]);
+            }
+        });
+
+    // MS-VBA's casing pairs only characters that case back to each other, whatever the locale: the Turkish i is I and I is i, and
+    // a character whose case maps elsewhere (ı to I, İ to i, µ to Μ, ς to Σ) stays as it is.
+    private static char UpperOf(char character)
+    {
+        var upper = char.ToUpperInvariant(character);
+        return char.ToLowerInvariant(upper) == character ? upper : character;
+    }
+
+    private static char LowerOf(char character)
+    {
+        var lower = char.ToLowerInvariant(character);
+        return char.ToUpperInvariant(lower) == character ? lower : character;
     }
 
     /// <inheritdoc/>
