@@ -135,9 +135,9 @@ public sealed class LenAndLenBTests
     }
 
     [TestMethod]
-    public void Len_OfAUserDefinedType_IsTheSizeAsWrittenToTheFile()
+    public void Len_OfAUserDefinedType_IsItsUnpaddedSize()
     {
-        // a Byte then a Long: 5 bytes concatenated, which is what a Put writes.
+        // a Byte then a Long: 5 bytes concatenated.
         var type = Udt("TMixed", ("B", VBByteType.TypeInfo), ("L", VBLongType.TypeInfo));
 
         Assert.Contains("5", Run([("Rec", type)], "Debug.Print Len(Rec)")[0]);
@@ -164,27 +164,27 @@ public sealed class LenAndLenBTests
     }
 
     [TestMethod]
-    public void Len_OfARecordWithAStringMember_CountsTheCharactersItHolds()
+    public void Len_OfARecordWithAStringMember_CountsThePointer()
     {
         // the case the specification warns about - "Len might not be able to determine the actual number of
-        // storage bytes required when used with variable-length strings in user-defined data types" - because
-        // the answer changes with the content: 4 bytes of Long plus however long the string currently is.
+        // storage bytes required when used with variable-length strings in user-defined data types" - and MS-VBA
+        // counts the member's pointer, whatever it points at: 4 bytes of Long and 8 of pointer, in a 64-bit environment.
         var type = Udt("TNamed", ("Id", VBLongType.TypeInfo), ("Name", VBStringType.TypeInfo));
 
         var output = Run([("Rec", type)], "Rec.Name = \"Ducky\"", "Debug.Print Len(Rec)");
 
-        Assert.Contains("9", output[0]);
+        Assert.Contains("12", output[0]);
     }
 
     [TestMethod]
-    public void LenB_OfARecordWithAStringMember_CountsThePointer()
+    public void LenB_OfARecordWithAStringMember_CountsThePointer_Aligned()
     {
-        // in memory the member is a pointer, whatever it points at - so LenB does not move when the string does.
+        // in memory the member is a pointer aligned to its own width, whatever it points at.
         var type = Udt("TNamed", ("Id", VBLongType.TypeInfo), ("Name", VBStringType.TypeInfo));
 
         var output = Run([("Rec", type)], "Rec.Name = \"Ducky\"", "Debug.Print LenB(Rec)");
 
-        Assert.Contains("8", output[0]);
+        Assert.Contains("16", output[0]);
     }
 
     [TestMethod]

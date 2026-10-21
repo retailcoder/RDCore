@@ -291,9 +291,11 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
     /// (<strong>MS-VBAL §6.1.2.11.1.22</strong>).
     /// </summary>
     /// <remarks>
-    /// "With user-defined types, <c>Len</c> returns the size as it will be written to the file" — the
-    /// concatenation of the members with no padding between them, which is what a <c>Put</c> statement writes
-    /// and therefore what this has to agree with. <see cref="LenB"/> is the in-memory size instead.
+    /// "With user-defined types, <c>Len</c> returns the size as it will be written to the file". 👉 RD-VBA reports what MS-VBA
+    /// does instead: the members' memory widths with no padding between them, a variable-length <c>String</c>, an object or a
+    /// resizable array member counting as the pointer it is, a <c>Variant</c> as 24 bytes in a 64-bit environment, and a
+    /// fixed-length <c>String</c> as its characters (<see cref="VBUserDefinedTypeLayout.UnpaddedSize"/>). <see cref="LenB"/>
+    /// is the in-memory size, padding included.
     /// </remarks>
     public RuntimeSemanticsEvaluationResult<VBVariantValue> Len(VBVariantValue expression)
         => Measure(expression, inMemory: false);
@@ -325,46 +327,26 @@ public sealed class StdStrings(IRuntimeSession session) : IStdStringsModule
             return RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(VBNullValue.Null));
         }
 
-        return Length(value, inMemory) is { } length
-            ? RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(new VBLongValue(length)))
-            : NotImplemented<VBVariantValue>(inMemory ? nameof(LenB) : nameof(Len));
+        return RuntimeSemanticsEvaluationResult<VBVariantValue>.Success(new VBVariantValue(new VBLongValue(Length(value, inMemory))));
     }
 
-    private static int? Length(VBTypedValue value, bool inMemory) => value switch
+    private int Length(VBTypedValue value, bool inMemory) => value switch
     {
         // a fixed-length String is its declared length, whatever it currently holds.
         VBFixedStringValue fixedString => inMemory ? 2 * fixedString.Length : fixedString.Length,
         // "Returns a Long containing the number of characters in a string", and LenB "returns the number of
         // bytes used to represent that string" - every byte of its data, a trailing one included.
         VBStringValue text => inMemory ? text.ByteLength : text.Length,
-        // the two UDT sizes: LenB's is the padded in-memory one the value reports, Len's is the unpadded
-        // concatenation a record is written from.
-        VBUserDefinedTypeValue udt => inMemory ? udt.Size : SerializedSize(udt),
+        // the two UDT sizes, laid out for the environment's pointer width: LenB's is the padded in-memory one, Len's the
+        // same widths with no padding.
+        VBUserDefinedTypeValue udt => RecordLength(VBUserDefinedTypeLayout.Of(udt, session.Environment.Is64Bit ? 8 : 4), inMemory),
         // "the number of bytes required to store a variable on the current platform", which for every scalar
         // is the size the value itself reports.
         VBEmptyValue => 0,
         _ => value.Size,
     };
 
-    // Len of a UDT is "the size as it will be written to the file": the members' own file widths, added up,
-    // with none of the padding LenB counts. A variable-length String member is the case MS-VBAL warns about -
-    // "Len might not be able to determine the actual number of storage bytes required when used with
-    // variable-length strings in user-defined data types" - and its file width is its characters.
-    private static int? SerializedSize(VBUserDefinedTypeValue udt)
-    {
-        var total = 0;
-        for (var index = 0; index < udt.Fields.Length; index++)
-        {
-            if (udt.FieldAt(index) is not { } field || Length(field, inMemory: false) is not { } width)
-            {
-                return null;
-            }
-
-            total += width;
-        }
-
-        return total;
-    }
+    private static int RecordLength(VBUserDefinedTypeLayout layout, bool inMemory) => inMemory ? layout.Size : layout.UnpaddedSize;
 
     // a Variant's own TypeInfo mirrors what it wraps while the instance stays a VBVariantValue, so measuring
     // one has to see the wrapped value - "if the variable name is a Variant, Len/LenB treats it the same as a

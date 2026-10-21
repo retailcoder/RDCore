@@ -480,29 +480,29 @@ one function with two exceptions (strings and UDTs), rather than two functions.
 |A fixed-length `String`|Its declared length.|Twice its declared length.|
 |`Null`|`Null`|`Null`|
 |Any other scalar|The bytes it occupies.|The same as `Len`: the bytes it occupies.|
-|A UDT|"the size as it will be written to the file"|"the in-memory size, including any implementation-specific padding between elements"|
+|A UDT|"the size as it will be written to the file": 👉 its members' memory widths, with no padding|"the in-memory size, including any implementation-specific padding between elements"|
 
 #### UDT sizes
 
 The UDT row is the one that needs the platform to know two different sizes for the same value. 🎯 A UDT has two
-sizes: `Len` reports its serialized size (its members concatenated, with no padding), and `LenB` reports its
-in-memory size, which is also what
-[VBUserDefinedTypeValue](../api/RDCore.SDK.Model.Values.Intrinsic.VBUserDefinedTypeValue.html)`.Size` reports.
+sizes, and RD-VBA measures both as MS-VBA does (recorded in Excel, 64-bit), for the environment's pointer width:
 
-[**RD-VBAL §2.5.2.1.3** User-Defined Type (UDT) Values](rd-vbal.2.5.2.1.3.udt-values.md) defines both UDT sizes and
-holds the padding rule. `Strings.Len` and `Strings.LenB` make both sizes of a UDT observable to a program.
+- `LenB` is its in-memory size: each member aligned to its own width (up to 8), and the whole padded to its widest
+  member's.
+- `Len` is the same members' widths added up with no padding, a fixed-length `String` counted as its characters and a
+  nested record or an array's elements as their own `Len`.
 
-A record whose members include a variable-length `String` is the case MS-VBAL warns cannot be predicted: "`Len` might
-not be able to determine the actual number of storage bytes required when used with variable-length strings in
-user-defined data types". For such a record, `Len` counts the characters the member currently holds and `LenB` counts
-the pointer, so the two move independently of each other.
+A variable-length `String`, an object, a `LongPtr` and a resizable array member are each a pointer (8 bytes in a 64-bit
+environment), a `Variant` is 24 (16 in a 32-bit one), and a fixed-size array member is its elements inline. So `Len` of
+`{ a As Long, s As String }` is `12` whatever `s` holds, and its `LenB` is `16`; `{ a As Byte, b As String * 3 }` is
+`4` and `7`.
 
-🚧 MS-VBA measures a record differently (recorded in Excel, 64-bit): `Len` counts a variable-length `String`, an object
-or an array member as an 8-byte pointer and a `Variant` member as its 24 bytes - `Len` of `{ a As Long, s As String }` is
-`12` whatever `s` holds, and its `LenB` is `16` - where RD-VBA's `Len` is `4` plus `s`'s characters, and its `LenB` a
-32-bit layout's. A record with an object or an array member is not measured yet. Which of the two RD-VBA follows is not
-decided.
+👉 This is not "the size as it will be written to the file": a `Put` of a record writes a variable-length `String`
+member as its length and its characters. MS-VBAL warns that "`Len` might not be able to determine the actual number of
+storage bytes required when used with variable-length strings in user-defined data types"; MS-VBA, and RD-VBA, count the
+pointer.
 
+[**RD-VBAL §2.5.2.1.3** User-Defined Type (UDT) Values](rd-vbal.2.5.2.1.3.udt-values.md) holds the padding rule.
 An object is measured as its value, what its default member returns: `Len` of an object whose default member returns a
 `Long` is `4`, the size of a `Long`.
 
