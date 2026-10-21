@@ -227,6 +227,14 @@ public record class ExecuteSessionResult
     public long ErrorLineNumber { get; init; }
 
     /// <summary>
+    /// Why the condition of the breakpoint the program waits at could not be evaluated, when <see cref="Outcome"/> is <see cref="ExecutionOutcome.Suspended"/> and that
+    /// is why it waits: a breakpoint whose condition raises an error is waited at (see <see cref="RDCore.SDK.Runtime.Abstract.Execution.RuntimeBreakpoint.Condition"/>),
+    /// and this is what the person is told of it. Empty otherwise. The program does not wait on the error: it is the condition's and not the program's, and
+    /// <see cref="ErrorNumber"/> stays <c>0</c>.
+    /// </summary>
+    public string ConditionError { get; init; } = string.Empty;
+
+    /// <summary>
     /// 🎯 The call stack the error was raised on, innermost activation first - what <c>Err.StackTrace</c>
     /// reports. Empty for any other outcome.
     /// </summary>

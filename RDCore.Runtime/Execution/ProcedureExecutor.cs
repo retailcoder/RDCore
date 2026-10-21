@@ -97,10 +97,11 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     private int _conditionDepth;
 
     // Whether the program waits at a breakpoint that was reached: always for one with no condition, and for one with a condition when it is True. A condition that
-    // raises an error waits the program as well - a breakpoint that is passed over because its condition is wrong is one the person never learns is wrong - and what
-    // the error was is for the person to ask of the condition, which is in scope where the program waits.
-    private bool IsMet(IRuntimeSession session, ExpressionNode? condition, RuntimeEvaluationContext context)
+    // raises an error waits the program as well - a breakpoint that is passed over because its condition is wrong is one the person never learns is wrong - and the
+    // failure says what the error was, for the program to be said to wait on it (ISessionHalt.TrySuspendOnCondition).
+    private bool IsMet(IRuntimeSession session, ExpressionNode? condition, Uri scope, RuntimeEvaluationContext context, out BreakpointConditionFailure? failure)
     {
+        failure = null;
         if (condition is null)
         {
             return true;
@@ -117,7 +118,13 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             _conditionDepth--;
         }
 
-        return !result.IsSuccess || ((VBBooleanValue)result.Result!).Value.StoredValue != 0;
+        if (!result.IsSuccess)
+        {
+            failure = new BreakpointConditionFailure(condition, scope, result.ErrorInfo);
+            return true;
+        }
+
+        return ((VBBooleanValue)result.Result!).Value.StoredValue != 0;
     }
 
     /// <summary>
@@ -312,10 +319,13 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             activation.WaitedAt = -1;
             if (!waitedHere && _conditionDepth == 0 && session.Halt.Gate is not null && session.Halt.Breakpoints.HasAny && activation.Procedure is { } owner
                 && session.Halt.Breakpoints.IsAt(owner.ParentUri.AbsoluteUri, list, activation.Pc, out var breakpointCondition)
-                && IsMet(session, breakpointCondition, ResolveContext(context, activation, list, list.Items[activation.Pc])))
+                && IsMet(session, breakpointCondition, owner.Uri, ResolveContext(context, activation, list, list.Items[activation.Pc]), out var conditionFailure))
             {
                 var breakpointLocation = list.Items[activation.Pc].Node?.SourceLocation;
-                if (!session.Halt.TrySuspend(RuntimeHaltKind.Break, breakpointLocation))
+                var waited = conditionFailure is null
+                    ? session.Halt.TrySuspend(RuntimeHaltKind.Break, breakpointLocation)
+                    : session.Halt.TrySuspendOnCondition(conditionFailure, breakpointLocation);
+                if (!waited)
                 {
                     session.Halt.Request(RuntimeHaltKind.Break, breakpointLocation);
                     return RuntimeExecutionOutcome.Break;

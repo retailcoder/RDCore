@@ -197,7 +197,7 @@ public interface IReplPlatformClient
     /// <param name="moduleName">The module's programmatic name.</param>
     /// <param name="breakpoints">The breakpoints to set.</param>
     /// <param name="token">A token that cancels the request.</param>
-    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token);
+    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token);
 
     /// <summary>
     /// Asks the language server for the activations of the program that waits, innermost first.

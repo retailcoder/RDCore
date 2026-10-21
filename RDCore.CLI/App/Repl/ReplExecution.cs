@@ -191,6 +191,12 @@ internal static class ReplExecution
                 var waitsBefore = program.LineNumberAt(result.ErrorLine);
                 context.Debugger.Suspended(waitsBefore);
                 console.WriteLine(waitsBefore is { } waiting ? string.Format(Resources.Repl_Break_InLine, waiting) : Resources.Repl_Break);
+
+                // a breakpoint whose condition could not be evaluated is waited at, and what the condition raised is said with it.
+                if (result.ConditionError.Length > 0)
+                {
+                    console.WriteMessage(MessageKind.Warning, string.Format(Resources.Repl_Breakpoint_ConditionFailed, result.ConditionError));
+                }
                 break;
 
             // it cannot go on, and what it was before is what it is: the caller says which.

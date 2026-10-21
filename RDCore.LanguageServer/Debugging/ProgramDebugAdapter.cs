@@ -235,7 +235,7 @@ internal sealed class ProgramDebugAdapter(
 
     public async Task<SetBreakpointsResponse> Handle(SetBreakpointsArguments request, CancellationToken cancellationToken)
     {
-        var requested = request.Breakpoints?.Select(breakpoint => new BreakpointDto { Line = ToLine(breakpoint.Line), Condition = breakpoint.Condition }).ToArray() ?? [];
+        var requested = request.Breakpoints?.Select(breakpoint => new SessionBreakpointLine { Line = ToLine(breakpoint.Line), Condition = breakpoint.Condition }).ToArray() ?? [];
         await _opened.Task.WaitAsync(cancellationToken);
 
         if (request.Source?.Path is not { } path || !workspace.TryGetModule(path, out var module))
@@ -443,6 +443,21 @@ internal sealed class ProgramDebugAdapter(
             _server!.SendStopped(new StoppedEvent
             {
                 Reason = StoppedEventReason.Exception,
+                Description = text,
+                Text = text,
+                ThreadId = ThreadId,
+                AllThreadsStopped = true,
+            });
+            return;
+        }
+
+        // a breakpoint whose condition could not be evaluated is waited at, and says what the condition raised: it is a breakpoint, and not an error of the program's.
+        if (result.ConditionError.Length > 0)
+        {
+            var text = string.Format(DebuggerMessages.StopAtBreakpointConditionFailed, result.ConditionError);
+            _server!.SendStopped(new StoppedEvent
+            {
+                Reason = StoppedEventReason.Breakpoint,
                 Description = text,
                 Text = text,
                 ThreadId = ThreadId,

@@ -43,7 +43,7 @@ internal interface IProgramDebugService
     /// <param name="moduleName">The programmatic name of the module.</param>
     /// <param name="breakpoints">The breakpoints replacing the ones set before.</param>
     /// <param name="token">A token that cancels the request.</param>
-    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token);
+    Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token);
 
     /// <summary>The activations of the program that waits, innermost first.</summary>
     /// <param name="token">A token that cancels the request.</param>
@@ -135,7 +135,7 @@ internal sealed class ProgramDebugService(
         return await environment.SendRequestAsync<HostDebugTerminateParams, HostDebugAck>(new HostDebugTerminateParams { Wipe = wipe }, token);
     }
 
-    public async Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token)
+    public async Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token)
     {
         if (orchestration.RuntimeEnvironment is not { } environment)
         {

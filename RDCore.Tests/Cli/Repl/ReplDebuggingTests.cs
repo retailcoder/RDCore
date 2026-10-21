@@ -29,7 +29,7 @@ public sealed class ReplDebuggingTests
         _platform.Provides<SessionExecute>().Returns(true);
         _platform.Provides<SessionDiscard>().Returns(true);
         _platform.Provides<ProgramDebugging>().Returns(true);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<SessionBreakpointLine>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult()));
         _context = new ReplCommandContext(_program, _console, _platform, new ReplDocument(_program, _platform), []);
 
@@ -56,10 +56,10 @@ public sealed class ReplDebuggingTests
 
     // the platform refuses every condition that is not an expression the way the language server does: by the breakpoint's place in the request.
     private void RefuseCondition(string condition, string reason)
-        => _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+        => _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<SessionBreakpointLine>>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(new HostDebugBreakpointsResult
             {
-                Breakpoints = [.. call.Arg<IReadOnlyList<BreakpointDto>>().Select(breakpoint =>
+                Breakpoints = [.. call.Arg<IReadOnlyList<SessionBreakpointLine>>().Select(breakpoint =>
                     new HostBreakpoint(breakpoint.Line, false, breakpoint.Condition == condition ? reason : null))],
             }));
 
@@ -70,7 +70,7 @@ public sealed class ReplDebuggingTests
     {
         _ = _context.Debugger.ToggleBreakpoint(10);
         _ = _context.Debugger.ToggleBreakpoint(20);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<SessionBreakpointLine>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult
             {
                 Breakpoints = [new HostBreakpoint(1, true), new HostBreakpoint(2, false)],
@@ -88,7 +88,7 @@ public sealed class ReplDebuggingTests
     {
         _ = _context.Debugger.ToggleBreakpoint(10);
         _ = _context.Debugger.ToggleBreakpoint(20);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<SessionBreakpointLine>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult
             {
                 Breakpoints = [new HostBreakpoint(1, false), new HostBreakpoint(2, false)],
@@ -105,7 +105,7 @@ public sealed class ReplDebuggingTests
     public async Task ABreakpoint_IsNotDropped_BeforeTheProgramHasRun()
     {
         _ = _context.Debugger.ToggleBreakpoint(10);
-        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+        _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<SessionBreakpointLine>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new HostDebugBreakpointsResult { Breakpoints = [new HostBreakpoint(1, false)], Judged = true }));
 
         await CommandAsync(new BreakReplCommand(), "20");
@@ -114,6 +114,18 @@ public sealed class ReplDebuggingTests
     }
 
     // ---- a program that waits ----
+
+    [TestMethod]
+    public async Task ARun_ThatWaitsAtABreakpointWhoseConditionFailed_SaysWhereAndWhatTheConditionRaised()
+    {
+        ExecuteReturns(SuspendedAt(2) with { ConditionError = "Division by zero" });
+
+        await RunAsync();
+
+        _console.Received().WriteLine(string.Format(Resources.Repl_Break_InLine, 20));
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Warning, string.Format(Resources.Repl_Breakpoint_ConditionFailed, "Division by zero"));
+        Assert.AreEqual(ReplDebugState.Suspended, _context.Debugger.State);
+    }
 
     [TestMethod]
     public async Task ARun_ThatStops_WaitsAndSaysWhere()
@@ -147,7 +159,7 @@ public sealed class ReplDebuggingTests
         await RunAsync();
 
         // before the program runs, and again once it has, to hear which of them the loaded program can have.
-        await _platform.Received(2).SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<BreakpointDto>>(lines => lines.SequenceEqual(new[] { new BreakpointDto { Line = 3 } })), Arg.Any<CancellationToken>());
+        await _platform.Received(2).SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<SessionBreakpointLine>>(lines => lines.SequenceEqual(new[] { new SessionBreakpointLine { Line = 3 } })), Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -356,7 +368,7 @@ public sealed class ReplDebuggingTests
 
         Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var breakpoint));
         Assert.AreEqual("X > 1  And  S = \"a  b\"", breakpoint.ConditionExpression, "the spaces in a string literal are the string's");
-        await _platform.Received().SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<BreakpointDto>>(sent =>
+        await _platform.Received().SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<SessionBreakpointLine>>(sent =>
             sent.Single().Condition == breakpoint.ConditionExpression && sent.Single().IsEnabled), Arg.Any<CancellationToken>());
         _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Set, 30));
     }
@@ -405,7 +417,7 @@ public sealed class ReplDebuggingTests
         Assert.IsFalse(disabled.Enabled);
         Assert.AreEqual("X = 2", disabled.ConditionExpression, "a disabled breakpoint keeps its condition");
         _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Disabled, 30));
-        await _platform.Received().SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<BreakpointDto>>(sent => !sent.Single().IsEnabled), Arg.Any<CancellationToken>());
+        await _platform.Received().SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<SessionBreakpointLine>>(sent => !sent.Single().IsEnabled), Arg.Any<CancellationToken>());
 
         await CommandAsync(new BreakReplCommand(), "toggle 30");
         Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var enabled));

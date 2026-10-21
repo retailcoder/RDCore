@@ -710,6 +710,9 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             ErrorMessage = error?.Description ?? string.Empty,
             ErrorCode = error?.ToDiagnosticCode() ?? string.Empty,
             ErrorTitle = error is null ? string.Empty : error.AsErrorInfo.ToDiagnosticTitle(),
+            ConditionError = session.Halt.StoppedOnCondition is { } failure
+                ? failure.Error?.Description ?? UnevaluableBecause(session, failure.Condition, failure.Scope)
+                : string.Empty,
         };
     }
 

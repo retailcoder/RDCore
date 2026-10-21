@@ -511,4 +511,7 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Repl_Breakpoint_ConditionRefused" xml:space="preserve">
     <value>CONDITION REFUSED AT {0}: {1}</value>
   </data>
+  <data name="Repl_Breakpoint_ConditionFailed" xml:space="preserve">
+    <value>BREAKPOINT CONDITION FAILED: {0}</value>
+  </data>
 </root>

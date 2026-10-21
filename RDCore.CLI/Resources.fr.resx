@@ -509,4 +509,7 @@
   <data name="Repl_Breakpoint_ConditionRefused" xml:space="preserve">
     <value>CONDITION REFUSÉE À {0} : {1}</value>
   </data>
+  <data name="Repl_Breakpoint_ConditionFailed" xml:space="preserve">
+    <value>ÉCHEC DE LA CONDITION DU POINT D'ARRÊT : {0}</value>
+  </data>
 </root>

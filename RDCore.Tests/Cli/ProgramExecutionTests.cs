@@ -664,6 +664,32 @@ public sealed class ProgramExecutionTests
 
             Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome, "a condition that cannot be evaluated is not passed over in silence");
             Assert.AreEqual(5, hit.ErrorLine);
+            Assert.IsFalse(string.IsNullOrEmpty(hit.ConditionError), "the program is said to wait on what the condition raised");
+            Assert.AreEqual(0, hit.ErrorNumber, "the error is the condition's, and not the program's");
+        });
+
+    [TestMethod]
+    public async Task AConditionalBreakpoint_WhoseConditionHasANameNothingDefines_IsWaitedAt_AndSaysWhichName()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            _ = await SetBreakpointLines(provider, Conditional(5, "nowhere > i"));
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome);
+            StringAssert.Contains(hit.ConditionError, "nowhere");
+        });
+
+    [TestMethod]
+    public async Task ABreakpoint_WithoutACondition_SaysNoConditionFailed()
+        => await DebugAsync(Counting, async (provider, _, _) =>
+        {
+            _ = await SetBreakpoints(provider, 5);
+
+            var hit = await Resume(provider);
+
+            Assert.AreEqual(ExecutionOutcome.Suspended, hit.Outcome);
+            Assert.AreEqual(string.Empty, hit.ConditionError);
         });
 
     [TestMethod]

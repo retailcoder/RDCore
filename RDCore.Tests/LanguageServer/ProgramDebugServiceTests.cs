@@ -45,7 +45,7 @@ public sealed class ProgramDebugServiceTests
     [TestMethod]
     public async Task ACondition_ReachesTheHost_AsTheExpressionItParsesTo()
     {
-        var result = await _service.SetBreakpointsAsync("Prog", [new BreakpointDto { Line = 4, Condition = "i > 5" }], CancellationToken.None);
+        var result = await _service.SetBreakpointsAsync("Prog", [new SessionBreakpointLine { Line = 4, Condition = "i > 5" }], CancellationToken.None);
 
         var sent = _sent!.Breakpoints.Single();
         Assert.IsTrue(sent.IsEnabled);
@@ -58,7 +58,7 @@ public sealed class ProgramDebugServiceTests
     public async Task ACondition_ThatIsNotAnExpression_IsRefused_AndItsBreakpointGoesToTheHostDisabled()
     {
         var result = await _service.SetBreakpointsAsync("Prog",
-            [new BreakpointDto { Line = 2 }, new BreakpointDto { Line = 4, Condition = "i >" }, new BreakpointDto { Line = 6, Condition = "i = 1" }], CancellationToken.None);
+            [new SessionBreakpointLine { Line = 2 }, new SessionBreakpointLine { Line = 4, Condition = "i >" }, new SessionBreakpointLine { Line = 6, Condition = "i = 1" }], CancellationToken.None);
 
         CollectionAssert.AreEqual(new[] { 2, 4, 6 }, _sent!.Breakpoints.Select(line => line.Line).ToArray(), "every breakpoint is asked for, in order");
         CollectionAssert.AreEqual(new[] { true, false, true }, _sent.Breakpoints.Select(line => line.IsEnabled).ToArray(), "the one refused is never waited at");
@@ -72,7 +72,7 @@ public sealed class ProgramDebugServiceTests
     [TestMethod]
     public async Task ACondition_OnMoreThanOneLine_IsRefused()
     {
-        var result = await _service.SetBreakpointsAsync("Prog", [new BreakpointDto { Line = 4, Condition = "i > 5\r\nEnd Sub" }], CancellationToken.None);
+        var result = await _service.SetBreakpointsAsync("Prog", [new SessionBreakpointLine { Line = 4, Condition = "i > 5\r\nEnd Sub" }], CancellationToken.None);
 
         Assert.AreEqual(DebuggerMessages.ExpressionIsOneLine, result.Breakpoints.Single().ConditionError);
     }
@@ -80,7 +80,7 @@ public sealed class ProgramDebugServiceTests
     [TestMethod]
     public async Task ADisabledBreakpoint_GoesToTheHost_Disabled()
     {
-        _ = await _service.SetBreakpointsAsync("Prog", [new BreakpointDto { Line = 4, IsEnabled = false, Condition = "i > 5" }], CancellationToken.None);
+        _ = await _service.SetBreakpointsAsync("Prog", [new SessionBreakpointLine { Line = 4, IsEnabled = false, Condition = "i > 5" }], CancellationToken.None);
 
         var sent = _sent!.Breakpoints.Single();
         Assert.IsFalse(sent.IsEnabled);

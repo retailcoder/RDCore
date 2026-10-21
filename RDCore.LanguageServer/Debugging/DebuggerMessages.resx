@@ -66,6 +66,9 @@
   <data name="StopAtBreakpoint" xml:space="preserve">
     <value>Paused on breakpoint</value>
   </data>
+  <data name="StopAtBreakpointConditionFailed" xml:space="preserve">
+    <value>Paused on breakpoint: its condition could not be evaluated ({0})</value>
+  </data>
   <data name="StopAtStopStatement" xml:space="preserve">
     <value>Paused on Stop statement</value>
   </data>

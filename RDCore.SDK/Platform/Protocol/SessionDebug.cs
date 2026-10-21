@@ -61,7 +61,7 @@ public record class SessionDebugBreakpointsParams : IRequest, IRequest<HostDebug
     public string ModuleName { get; init; } = string.Empty;
 
     /// <summary>The breakpoints, one per line of the source. None removes the module's breakpoints.</summary>
-    public IReadOnlyList<BreakpointDto> Breakpoints { get; init; } = [];
+    public IReadOnlyList<SessionBreakpointLine> Breakpoints { get; init; } = [];
 }
 
 /// <summary>
@@ -72,7 +72,7 @@ public record class SessionDebugBreakpointsParams : IRequest, IRequest<HostDebug
 /// is refused there, and the result says why (<see cref="HostBreakpoint.ConditionError"/>); it is not evaluated until the program reaches the line, since what its
 /// names are is the activation's that reaches it.
 /// </remarks>
-public record class BreakpointDto
+public record class SessionBreakpointLine
 {
     /// <summary>The zero-based line of the source.</summary>
     public int Line { get; init; }

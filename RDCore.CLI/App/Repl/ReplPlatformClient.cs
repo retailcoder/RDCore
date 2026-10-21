@@ -100,7 +100,7 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
         => client.SendRequestAsync<SessionDebugGotoParams, HostDebugGotoResult>(new SessionDebugGotoParams { Label = label }, token);
 
     /// <inheritdoc/>
-    public Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<BreakpointDto> breakpoints, CancellationToken token)
+    public Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token)
         => client.SendRequestAsync<SessionDebugBreakpointsParams, HostDebugBreakpointsResult>(
             new SessionDebugBreakpointsParams { ModuleName = moduleName, Breakpoints = breakpoints }, token);
 

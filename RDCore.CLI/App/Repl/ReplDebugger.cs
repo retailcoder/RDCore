@@ -139,7 +139,7 @@ public sealed class ReplDebugger
         }
 
         var breakpoints = _breakpoints.ToArray();
-        var wireBreakpoints = breakpoints.Select(breakpoint => new BreakpointDto
+        var wireBreakpoints = breakpoints.Select(breakpoint => new SessionBreakpointLine
         {
             Line = context.Program.SourceLineOf(breakpoint.LineNumber),
             IsEnabled = breakpoint.Enabled,
