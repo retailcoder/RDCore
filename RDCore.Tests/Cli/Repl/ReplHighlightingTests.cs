@@ -6,9 +6,9 @@ using RDCore.CLI.Themes;
 using RDCore.SDK.ConsoleIO;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Workspace;
-using System.IO.Abstractions.TestingHelpers;
 using Spectre.Console;
 using Spectre.Console.Testing;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace RDCore.Tests.Cli.Repl;
 
@@ -127,6 +127,20 @@ public sealed class ReplHighlightingTests
         return new ReplCommandContext(_program, _console, _platform, new ReplDocument(_program, _platform, workspace), []);
     }
 
+    private IAppThemeService GetMockThemeService()
+    {
+        var themeService = Substitute.For<IAppThemeService>();
+        var theme = new AppTheme(new ThemeDocument
+        {
+            Debug = new()
+            {
+                BreakpointGlyph = "red",
+            }
+        });
+        themeService.Theme.Returns(theme);
+        return themeService;
+    }
+
     [TestMethod]
     public async Task AListing_IsHighlightedByWhatTheLanguageServerSays_AndTheProgramIsADocumentOfIt()
     {
@@ -135,7 +149,7 @@ public sealed class ReplHighlightingTests
             .Returns(Task.FromResult<IReadOnlyList<ReplSemanticToken>>([new(0, 0, 2, Type("number"), 0), new(0, 3, 3, Type("keyword"), 0)]));
         var context = await ContextWithListingAsync();
 
-        await new ListReplCommand().ExecuteAsync(context, "", CancellationToken.None);
+        await new ListReplCommand(GetMockThemeService()).ExecuteAsync(context, "", CancellationToken.None);
 
         await _platform.Received(1).OpenDocumentAsync(Arg.Any<Uri>(), "10 Dim x\r\n", Arg.Any<int>(), Arg.Any<CancellationToken>());
         _console.Received(1).WriteListingLine(Arg.Any<ReplTextRun>(), Arg.Is<IReadOnlyList<ReplTextRun>>(runs => runs.Any(run => run.Style == ReplTextStyle.Keyword && run.Text == "Dim")), ReplLineStyle.Plain);
@@ -150,7 +164,7 @@ public sealed class ReplHighlightingTests
             .Returns(Task.FromResult<IReadOnlyList<ReplSemanticToken>>([new(1, 4, 3, Type("keyword"), 0)]));
         var context = await ContextWithListingAsync();
 
-        await new ListReplCommand().ExecuteAsync(context, "100", CancellationToken.None);
+        await new ListReplCommand(GetMockThemeService()).ExecuteAsync(context, "100", CancellationToken.None);
 
         _console.Received(1).WriteListingLine(Arg.Any<ReplTextRun>(), Arg.Is<IReadOnlyList<ReplTextRun>>(runs =>
             string.Concat(runs.Select(run => run.Text)) == " 100 Dim y" && runs.Any(run => run.Style == ReplTextStyle.Keyword && run.Text == "Dim")), ReplLineStyle.Plain);
@@ -163,7 +177,7 @@ public sealed class ReplHighlightingTests
         _platform.GetSemanticTokensAsync(Arg.Any<Uri>(), Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("the server is gone"));
         var context = await ContextWithListingAsync();
 
-        await new ListReplCommand().ExecuteAsync(context, "", CancellationToken.None);
+        await new ListReplCommand(GetMockThemeService()).ExecuteAsync(context, "", CancellationToken.None);
 
         _console.Received(1).WriteListingLine(Arg.Any<ReplTextRun>(), Arg.Is<IReadOnlyList<ReplTextRun>>(runs => string.Concat(runs.Select(run => run.Text)) == " 10 Dim x"), ReplLineStyle.Plain);
     }
@@ -174,7 +188,7 @@ public sealed class ReplHighlightingTests
         _program.Store(10, "Dim x");
         var context = new ReplCommandContext(_program, _console, _platform, new ReplDocument(_program, _platform), []);
 
-        await new ListReplCommand().ExecuteAsync(context, "", CancellationToken.None);
+        await new ListReplCommand(GetMockThemeService()).ExecuteAsync(context, "", CancellationToken.None);
 
         _console.Received(1).WriteListingLine(Arg.Any<ReplTextRun>(), Arg.Is<IReadOnlyList<ReplTextRun>>(runs => string.Concat(runs.Select(run => run.Text)) == " 10 Dim x"), ReplLineStyle.Plain);
         await _platform.DidNotReceiveWithAnyArgs().GetSemanticTokensAsync(default!, default);

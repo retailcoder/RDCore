@@ -200,6 +200,15 @@
   <data name="DescribeExtension_Summary" xml:space="preserve">
     <value>Génère un manifeste d'extension à partir des capacités déclarées par l'exécutable d'extension.</value>
   </data>
+  <data name="DescribeExtension_DevModeRequired" xml:space="preserve">
+    <value>Cette commande requiert le commutateur --unsafe-dev-mode.</value>
+  </data>
+  <data name="DescribeExtension_Failed" xml:space="preserve">
+    <value>Impossible de décrire l'extension; exécutez cette commande depuis le dossier de l'extension.</value>
+  </data>
+  <data name="DescribeExtension_Written" xml:space="preserve">
+    <value>Manifeste d'extension généré : {0}</value>
+  </data>
   <data name="ExportLibrary_Title" xml:space="preserve">
     <value>Exporter une bibliothèque</value>
   </data>
@@ -223,15 +232,6 @@
   </data>
   <data name="ExportLibrary_Skipped" xml:space="preserve">
     <value>Non décrit : {0}.</value>
-  </data>
-  <data name="DescribeExtension_DevModeRequired" xml:space="preserve">
-    <value>Cette commande requiert le commutateur --unsafe-dev-mode.</value>
-  </data>
-  <data name="DescribeExtension_Failed" xml:space="preserve">
-    <value>Impossible de décrire l'extension; exécutez cette commande depuis le dossier de l'extension.</value>
-  </data>
-  <data name="DescribeExtension_Written" xml:space="preserve">
-    <value>Manifeste d'extension généré : {0}</value>
   </data>
   <data name="Command_Unknown" xml:space="preserve">
     <value>Commande inconnue.</value>
@@ -372,7 +372,7 @@
     <value>Efface le contenu de la console.</value>
   </data>
   <data name="Repl_Break_Summary" xml:space="preserve">
-    <value>Place ou retire un point d'arrêt à une ligne (BREAK 40). BREAK seul les liste, BREAK CLEAR les retire tous.</value>
+    <value>Place ou retire un point d'arrêt à une ligne (BREAK 40), ou en place un qui attend une condition (BREAK 40 I &gt; 5). BREAK TOGGLE 40 le désactive ou le réactive. BREAK seul les liste, BREAK CLEAR les retire tous.</value>
   </data>
   <data name="Repl_Cont_Summary" xml:space="preserve">
     <value>Poursuit le programme interrompu, d'où il s'est arrêté ou à partir d'une ligne (CONT 200).</value>
@@ -449,6 +449,9 @@
   <data name="Host_NameIsNotDefined" xml:space="preserve">
     <value>'{0}' n'est pas défini</value>
   </data>
+  <data name="Host_VariableNotDefined" xml:space="preserve">
+    <value>Variable non définie : '{0}'</value>
+  </data>
   <data name="Host_TheProgramWasInterrupted" xml:space="preserve">
     <value>le programme a été interrompu</value>
   </data>
@@ -496,5 +499,20 @@
   </data>
   <data name="Bench_NoCases" xml:space="preserve">
     <value>Aucun cas : un cas est une Public Sub Bench*() d'un module standard.</value>
+  </data>
+  <data name="Repl_Breakpoint_Enabled" xml:space="preserve">
+    <value>POINT D'ARRÊT ACTIF À {0}</value>
+  </data>
+  <data name="Repl_Breakpoint_Disabled" xml:space="preserve">
+    <value>POINT D'ARRÊT INACTIF À {0}</value>
+  </data>
+  <data name="Repl_Breakpoint_DisabledMark" xml:space="preserve">
+    <value>(INACTIF)</value>
+  </data>
+  <data name="Repl_Breakpoint_ConditionRefused" xml:space="preserve">
+    <value>CONDITION REFUSÉE À {0} : {1}</value>
+  </data>
+  <data name="Repl_Breakpoint_ConditionFailed" xml:space="preserve">
+    <value>ÉCHEC DE LA CONDITION DU POINT D'ARRÊT : {0}</value>
   </data>
 </root>

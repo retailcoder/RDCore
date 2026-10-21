@@ -6,8 +6,14 @@ namespace RDCore.CLI.App.Repl.Commands;
 /// <c>BREAK</c>: sets a breakpoint at a line of the program, or clears the one it has.
 /// </summary>
 /// <remarks>
-/// <c>BREAK 40</c> toggles the breakpoint of line 40; <c>BREAK</c> alone lists them, and <c>BREAK CLEAR</c> clears them all. A program that is run
-/// waits before a line that has one, and <c>CONT</c> or <c>STEP</c> goes on. <c>LIST</c> shows them in its margin.
+/// <c>BREAK 40</c> toggles the breakpoint of line 40; <c>BREAK 40 I &gt; 5</c> sets one that the program waits at only when the condition is <c>True</c>, replacing
+/// the one the line had; <c>BREAK TOGGLE 40</c> disables the breakpoint of line 40 or enables it again, and sets one when the line has none. <c>BREAK</c> alone
+/// lists them, and <c>BREAK CLEAR</c> clears them all. A program that is run waits before a line that has one, and <c>CONT</c> or <c>STEP</c> goes on. <c>LIST</c>
+/// shows them in its margin.
+/// <para>
+/// A condition is parsed when it is set, and one that is not an expression is refused there. It is evaluated when the program reaches the line, in the procedure
+/// that reaches it - not before, since the names it has are that procedure's, and its locals are not there until it runs.
+/// </para>
 /// </remarks>
 internal sealed class BreakReplCommand : IReplCommand
 {
@@ -24,39 +30,107 @@ internal sealed class BreakReplCommand : IReplCommand
         {
             context.Console.WriteLine(debugger.Breakpoints.Count == 0
                 ? Resources.Repl_Breakpoint_None
-                : string.Format(Resources.Repl_Breakpoint_List, string.Join(", ", debugger.Breakpoints)));
+                : string.Format(Resources.Repl_Breakpoint_List, string.Join(", ", debugger.Breakpoints.Select(Describe))));
             return ReplCommandResult.Continue;
         }
 
         if (string.Equals(text, "CLEAR", StringComparison.OrdinalIgnoreCase))
         {
             debugger.ClearBreakpoints();
-            await TellAsync(context, token);
+            _ = await TellAsync(context, token);
             context.Console.WriteLine(Resources.Repl_Breakpoint_None);
             return ReplCommandResult.Continue;
         }
 
-        if (!int.TryParse(text, out var number))
+        // the line number is the first word, and whatever follows it is the condition, as it was typed: a string literal in it keeps its spaces.
+        var (first, rest) = SplitFirstWord(text);
+        if (first.Equals("TOGGLE", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!int.TryParse(rest, out var line))
+            {
+                context.Console.WriteMessage(MessageKind.Error, Resources.Repl_SyntaxError, arguments);
+                return ReplCommandResult.Continue;
+            }
+
+            if (!IsALine(context, line))
+            {
+                return ReplCommandResult.Continue;
+            }
+
+            var existed = debugger.TryGetBreakpoint(line, out _);
+            var enabled = debugger.ToggleEnabled(line);
+            _ = await TellAsync(context, token);
+            context.Console.WriteLine(string.Format(!existed ? Resources.Repl_Breakpoint_Set : enabled ? Resources.Repl_Breakpoint_Enabled : Resources.Repl_Breakpoint_Disabled, line));
+            return ReplCommandResult.Continue;
+        }
+
+        if (!int.TryParse(first, out var number))
         {
             context.Console.WriteMessage(MessageKind.Error, Resources.Repl_SyntaxError, arguments);
             return ReplCommandResult.Continue;
         }
 
-        // a breakpoint is on a line of the program, and a line that is not there is not one: it is as undefined as it is for a GOTO.
-        if (context.Program.IndexOf(number) < 0)
+        if (!IsALine(context, number))
         {
-            context.Console.WriteMessage(MessageKind.Error, Resources.Repl_UndefinedLine, number.ToString());
             return ReplCommandResult.Continue;
         }
 
-        var set = debugger.Toggle(number);
-        await TellAsync(context, token);
-        context.Console.WriteLine(string.Format(set ? Resources.Repl_Breakpoint_Set : Resources.Repl_Breakpoint_Cleared, number));
+        if (rest.Length == 0)
+        {
+            var set = debugger.ToggleBreakpoint(number);
+            _ = await TellAsync(context, token);
+            context.Console.WriteLine(string.Format(set ? Resources.Repl_Breakpoint_Set : Resources.Repl_Breakpoint_Cleared, number));
+            return ReplCommandResult.Continue;
+        }
+
+        // a condition replaces the breakpoint the line had; one the platform refuses leaves the line with the breakpoint it had before.
+        var hadOne = debugger.TryGetBreakpoint(number, out var previous);
+        debugger.SetBreakpoint(new Breakpoint(number, Enabled: true, rest));
+        var refused = await TellAsync(context, token);
+        var refusal = refused.FirstOrDefault(entry => entry.Breakpoint.LineNumber == number);
+        if (refusal.Reason is { } reason)
+        {
+            if (hadOne)
+            {
+                debugger.SetBreakpoint(previous);
+                _ = await TellAsync(context, token);
+            }
+
+            context.Console.WriteMessage(MessageKind.Error, string.Format(Resources.Repl_Breakpoint_ConditionRefused, number, reason));
+            return ReplCommandResult.Continue;
+        }
+
+        context.Console.WriteLine(string.Format(Resources.Repl_Breakpoint_Set, number));
         return ReplCommandResult.Continue;
+    }
+
+    // a breakpoint is on a line of the program, and a line that is not there is not one: it is as undefined as it is for a GOTO.
+    private static bool IsALine(ReplCommandContext context, int number)
+    {
+        if (context.Program.IndexOf(number) >= 0)
+        {
+            return true;
+        }
+
+        context.Console.WriteMessage(MessageKind.Error, Resources.Repl_UndefinedLine, number.ToString());
+        return false;
+    }
+
+    private static (string Word, string Remainder) SplitFirstWord(string text)
+    {
+        var space = text.IndexOf(' ');
+        return space < 0 ? (text, string.Empty) : (text[..space], text[(space + 1)..].Trim());
+    }
+
+    // how BREAK lists a breakpoint: its line, the condition it waits on, and whether it is off.
+    private static string Describe(Breakpoint breakpoint)
+    {
+        var described = breakpoint.ConditionExpression is { } condition ? $"{breakpoint.LineNumber} [{condition}]" : breakpoint.LineNumber.ToString();
+        return breakpoint.Enabled ? described : $"{described} {Resources.Repl_Breakpoint_DisabledMark}";
     }
 
     // a program that waits goes on with the lines the platform has, and the next one that is run is told them anyway; telling it now makes a
     // breakpoint set while a program waits one that is waited at when it goes on.
-    private static Task TellAsync(ReplCommandContext context, CancellationToken token)
+    private static Task<IReadOnlyList<(Breakpoint Breakpoint, string Reason)>> TellAsync(ReplCommandContext context, CancellationToken token)
         => context.Debugger.PushBreakpointsAsync(context, token);
 }

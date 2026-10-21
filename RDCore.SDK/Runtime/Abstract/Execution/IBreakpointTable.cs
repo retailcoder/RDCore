@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Semantics.Instructions;
 
 namespace RDCore.SDK.Runtime.Abstract.Execution;
@@ -28,8 +29,8 @@ public interface IBreakpointTable
     /// Replaces the breakpoints of a module.
     /// </summary>
     /// <param name="module">The address of the module, as its symbol has it.</param>
-    /// <param name="lines">The zero-based lines of the source. None removes the module's breakpoints.</param>
-    void Set(string module, IReadOnlyCollection<int> lines);
+    /// <param name="breakpoints">The breakpoints, one per line. None removes the module's breakpoints.</param>
+    void Set(string module, IReadOnlyCollection<RuntimeBreakpoint> breakpoints);
 
     /// <summary>
     /// Removes every breakpoint.
@@ -42,7 +43,10 @@ public interface IBreakpointTable
     /// <param name="module">The address of the module whose procedure the body is of.</param>
     /// <param name="body">The body.</param>
     /// <param name="offset">The offset of the instruction about to run.</param>
-    bool IsAt(string module, InstructionList body, int offset);
+    /// <param name="condition">
+    /// The <see cref="RuntimeBreakpoint.Condition"/> of the breakpoint there, which the interpreter evaluates before it waits; <see langword="null"/> when it has none.
+    /// </param>
+    bool IsAt(string module, InstructionList body, int offset, out ExpressionNode? condition);
 
     /// <summary>
     /// Whether a line is one a program can wait at: a statement of one of the bodies begins on it.

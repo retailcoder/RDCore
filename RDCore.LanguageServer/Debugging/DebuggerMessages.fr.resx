@@ -66,6 +66,9 @@
   <data name="StopAtBreakpoint" xml:space="preserve">
     <value>Interrompu sur un point d'arrêt</value>
   </data>
+  <data name="StopAtBreakpointConditionFailed" xml:space="preserve">
+    <value>Interrompu sur un point d'arrêt : sa condition n'a pas pu être évaluée ({0})</value>
+  </data>
   <data name="StopAtStopStatement" xml:space="preserve">
     <value>Interrompu sur une instruction Stop</value>
   </data>

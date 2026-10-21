@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Source;
 
@@ -128,7 +129,33 @@ public interface ISessionHalt
     /// through every activation it passes, and is waited at where it was raised and not again.
     /// </returns>
     bool TrySuspendOnError(IVBRaisableError error, bool handled);
+
+    /// <summary>
+    /// The condition of the breakpoint the program waits at, while it waits because the condition could not be evaluated (see <see cref="TrySuspendOnCondition"/>), and
+    /// has not yet been resumed. <see langword="null"/> otherwise.
+    /// </summary>
+    BreakpointConditionFailure? StoppedOnCondition { get; }
+
+    /// <summary>
+    /// Offers the program to the <see cref="Gate"/> to wait at a breakpoint whose condition could not be evaluated, as it would at any breakpoint, with
+    /// <see cref="StoppedOnCondition"/> saying why for as long as it waits.
+    /// </summary>
+    /// <param name="failure">The condition, and what it raised.</param>
+    /// <param name="location">Where the breakpoint is: the instruction the program waits before.</param>
+    /// <returns><see langword="true"/> when the program waited and was resumed, as <see cref="TrySuspend"/> says.</returns>
+    bool TrySuspendOnCondition(BreakpointConditionFailure failure, SourceLocation? location);
 }
+
+/// <summary>
+/// A breakpoint's condition that could not be evaluated where the program reached the line (see <see cref="RuntimeBreakpoint.Condition"/>).
+/// </summary>
+/// <param name="Condition">The condition.</param>
+/// <param name="Scope">The procedure it was evaluated in: its names are that procedure's.</param>
+/// <param name="Error">
+/// The run-time error the evaluation raised; <see langword="null"/> when there is none to say - the interpreter could not evaluate the expression, as for a name nothing
+/// defines, which static semantics would have rejected in code.
+/// </param>
+public sealed record class BreakpointConditionFailure(ExpressionNode Condition, Uri Scope, IVBRaisableError? Error);
 
 /// <summary>
 /// Which run-time errors a program under a debugger waits at.

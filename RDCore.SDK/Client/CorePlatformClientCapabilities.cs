@@ -266,6 +266,9 @@ public static class RDCorePlatformProtocol
     /// <summary>Asks the language server for the value of an expression, as text, in an activation of the program that waits. See <see cref="HostDebugEvaluate"/>.</summary>
     public const string SessionDebugEvaluate = "rdcore/session/debug/evaluate";
 
+    /// <summary>Asks the language server to run a statement, as text, in an activation of the program that waits. See <see cref="HostDebugExecute"/>.</summary>
+    public const string SessionDebugExecute = "rdcore/session/debug/execute";
+
     /// <summary>
     /// Asks the environment host to end a program that is running or waits.
     /// </summary>

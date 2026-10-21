@@ -1,5 +1,6 @@
 ﻿using RDCore.Runtime.Execution;
 using RDCore.SDK.Model.AST.Abstract;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types.Abstract;
@@ -199,6 +200,15 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     public IReadOnlyCollection<int> GoSubReturns => (IReadOnlyCollection<int>?)_goSubReturns ?? [];
 
     /// <summary>
+    /// Where the <c>GoSub</c> statements this activation has not <c>Return</c>ed from are, innermost first: how it got to where it is. Each is the instruction
+    /// before its return offset; <see langword="null"/> for one the body does not place.
+    /// </summary>
+    public IEnumerable<SourceLocation?> GoSubLocations()
+        => Body is not { } body
+            ? []
+            : GoSubReturns.Select(returnOffset => returnOffset - 1 >= 0 && returnOffset - 1 < body.Items.Length ? body.Items[returnOffset - 1].Node?.SourceLocation : null);
+
+    /// <summary>
     /// Pops this activation's own GoSub Resumption List and returns the offset a <c>Return</c> statement
     /// branches to.
     /// </summary>
@@ -235,6 +245,26 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         // attach it to — matches RuntimeSymbolResolver.TryAllocate's own documented contract.
         _ = _addresses.TryAllocate(symbol, value, out _);
     }
+
+    /// <summary>
+    /// Declares <paramref name="symbol"/> on this frame as <see cref="Push"/> does, for a local the procedure's code does not declare: one a statement typed where the
+    /// program waits declared implicitly (<strong>MS-VBAL §5.6.10</strong>). It is a local of this activation from then on, and is among
+    /// <see cref="DeclaredAtAStop"/>, since the procedure's symbol does not list it.
+    /// </summary>
+    /// <param name="symbol">The local.</param>
+    /// <param name="value">Its initial value: <c>Empty</c>, for the <c>Variant</c> an implicit declaration is.</param>
+    public void PushDeclaredAtAStop(Symbol symbol, VBTypedValue value)
+    {
+        Push(symbol, value);
+        (_declaredAtAStop ??= []).Add(symbol);
+    }
+
+    /// <summary>
+    /// The locals of this activation that statements typed where the program waited declared (<see cref="PushDeclaredAtAStop"/>), in the order they were.
+    /// </summary>
+    public IReadOnlyList<Symbol> DeclaredAtAStop => (IReadOnlyList<Symbol>?)_declaredAtAStop ?? [];
+
+    private List<Symbol>? _declaredAtAStop;
 
     /// <summary>
     /// Declares <paramref name="symbol"/> on this frame as a <c>ByRef</c> reference parameter binding

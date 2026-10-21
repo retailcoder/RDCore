@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Semantics.Instructions;
 using System.Collections.Immutable;
@@ -13,21 +14,29 @@ namespace RDCore.Runtime.Execution;
 public sealed class BreakpointTable : IBreakpointTable
 {
     private readonly Lock _sync = new();
-    private volatile ImmutableDictionary<string, ImmutableHashSet<int>> _lines = ImmutableDictionary<string, ImmutableHashSet<int>>.Empty;
+    private volatile ImmutableDictionary<string, ImmutableDictionary<int, ExpressionNode?>> _lines = ImmutableDictionary<string, ImmutableDictionary<int, ExpressionNode?>>.Empty;
     private int _version;
     private readonly ConditionalWeakTable<InstructionList, Resolved> _resolved = [];
 
-    private sealed record Resolved(int Version, string Module, ImmutableHashSet<int> Offsets);
+    // the conditions by offset: a breakpoint with no condition is an offset whose value is null.
+    private sealed record Resolved(int Version, string Module, ImmutableDictionary<int, ExpressionNode?> Offsets);
 
     /// <inheritdoc/>
     public bool HasAny => !_lines.IsEmpty;
 
     /// <inheritdoc/>
-    public void Set(string module, IReadOnlyCollection<int> lines)
+    public void Set(string module, IReadOnlyCollection<RuntimeBreakpoint> breakpoints)
     {
+        // one breakpoint per line: a line asked for twice is the last one asked.
+        var lines = ImmutableDictionary.CreateBuilder<int, ExpressionNode?>();
+        foreach (var breakpoint in breakpoints)
+        {
+            lines[breakpoint.Line] = breakpoint.Condition;
+        }
+
         lock (_sync)
         {
-            _lines = lines.Count == 0 ? _lines.Remove(module) : _lines.SetItem(module, [.. lines]);
+            _lines = lines.Count == 0 ? _lines.Remove(module) : _lines.SetItem(module, lines.ToImmutable());
             _version++;
         }
     }
@@ -37,13 +46,13 @@ public sealed class BreakpointTable : IBreakpointTable
     {
         lock (_sync)
         {
-            _lines = ImmutableDictionary<string, ImmutableHashSet<int>>.Empty;
+            _lines = ImmutableDictionary<string, ImmutableDictionary<int, ExpressionNode?>>.Empty;
             _version++;
         }
     }
 
     /// <inheritdoc/>
-    public bool IsAt(string module, InstructionList body, int offset)
+    public bool IsAt(string module, InstructionList body, int offset, out ExpressionNode? condition)
     {
         var version = Volatile.Read(ref _version);
         if (!_resolved.TryGetValue(body, out var resolved) || resolved.Version != version || resolved.Module != module)
@@ -52,24 +61,24 @@ public sealed class BreakpointTable : IBreakpointTable
             _resolved.AddOrUpdate(body, resolved);
         }
 
-        return resolved.Offsets.Contains(offset);
+        return resolved.Offsets.TryGetValue(offset, out condition);
     }
 
     // the first instruction of the body that begins on each of the module's lines.
-    private ImmutableHashSet<int> Resolve(string module, InstructionList body)
+    private ImmutableDictionary<int, ExpressionNode?> Resolve(string module, InstructionList body)
     {
         if (!_lines.TryGetValue(module, out var lines))
         {
-            return [];
+            return ImmutableDictionary<int, ExpressionNode?>.Empty;
         }
 
-        var offsets = ImmutableHashSet.CreateBuilder<int>();
+        var offsets = ImmutableDictionary.CreateBuilder<int, ExpressionNode?>();
         var seen = new HashSet<int>();
         foreach (var instruction in body.Items)
         {
-            if (instruction.Node is { } node && node.SourceLocation.Range.Start.Line is var line && lines.Contains(line) && seen.Add(line))
+            if (instruction.Node is { } node && node.SourceLocation.Range.Start.Line is var line && lines.TryGetValue(line, out var condition) && seen.Add(line))
             {
-                offsets.Add(instruction.Offset);
+                offsets[instruction.Offset] = condition;
             }
         }
 

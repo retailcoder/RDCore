@@ -100,9 +100,9 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
         => client.SendRequestAsync<SessionDebugGotoParams, HostDebugGotoResult>(new SessionDebugGotoParams { Label = label }, token);
 
     /// <inheritdoc/>
-    public Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<int> lines, CancellationToken token)
+    public Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token)
         => client.SendRequestAsync<SessionDebugBreakpointsParams, HostDebugBreakpointsResult>(
-            new SessionDebugBreakpointsParams { ModuleName = moduleName, Lines = lines }, token);
+            new SessionDebugBreakpointsParams { ModuleName = moduleName, Breakpoints = breakpoints }, token);
 
     /// <inheritdoc/>
     public Task<HostDebugStackResult> GetStackAsync(CancellationToken token)
@@ -112,6 +112,11 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
     public Task<HostDebugVariablesResult> GetVariablesAsync(int frameId, HostVariableScope scope, int reference, CancellationToken token)
         => client.SendRequestAsync<SessionDebugVariablesParams, HostDebugVariablesResult>(
             new SessionDebugVariablesParams { FrameId = frameId, Scope = scope, Reference = reference }, token);
+
+    /// <inheritdoc/>
+    public Task<HostDebugEvaluateResult> ExecuteInFrameAsync(int frameId, string statement, CancellationToken token)
+        => client.SendRequestAsync<SessionDebugExecuteParams, HostDebugEvaluateResult>(
+            new SessionDebugExecuteParams { FrameId = frameId, Statement = statement }, token);
 
     /// <inheritdoc/>
     public Task<AnalyzeSessionResult> AnalyzeAsync(string source, string moduleName, CancellationToken token)

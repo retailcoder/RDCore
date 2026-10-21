@@ -132,8 +132,29 @@ public record class HostDebugBreakpointsParams : IRequest, IRequest<HostDebugBre
     /// <summary>The programmatic name of the module.</summary>
     public string ModuleName { get; init; } = string.Empty;
 
-    /// <summary>The zero-based lines of the source. None removes the module's breakpoints.</summary>
-    public IReadOnlyList<int> Lines { get; init; } = [];
+    /// <summary>The breakpoints, one per line of the source. None removes the module's breakpoints.</summary>
+    public IReadOnlyList<HostBreakpointLine> Breakpoints { get; init; } = [];
+}
+
+/// <summary>
+/// A breakpoint asked of the host: a line, whether it is on, and the condition it waits on.
+/// </summary>
+/// <remarks>
+/// A disabled breakpoint is sent all the same: its line is judged like any other's (<see cref="HostBreakpoint.Verified"/>), and the program does not wait at it.
+/// </remarks>
+public record class HostBreakpointLine
+{
+    /// <summary>The zero-based line of the source.</summary>
+    public int Line { get; init; }
+
+    /// <summary>Whether the program waits at the line. A disabled breakpoint is kept, and is not waited at.</summary>
+    public bool IsEnabled { get; init; } = true;
+
+    /// <summary>
+    /// The <see cref="System.Text.Json"/> representation of the condition, an <c>ExpressionNode</c> (see <see cref="PlatformJson"/>), or <see langword="null"/> for a
+    /// breakpoint that is always waited at. It travels as a parsed tree for the reason <see cref="HostDebugEvaluateParams.Json"/> does.
+    /// </summary>
+    public string? ConditionJson { get; init; }
 }
 
 /// <summary>
@@ -157,7 +178,11 @@ public record class HostDebugBreakpointsResult
 /// </summary>
 /// <param name="Line">The zero-based line it was asked for.</param>
 /// <param name="Verified">Whether a statement of the module's loaded code begins on the line, which is what a program can wait before.</param>
-public record class HostBreakpoint(int Line, bool Verified);
+/// <param name="ConditionError">
+/// Why the breakpoint's condition was refused - it is not an expression - or <see langword="null"/> when it has none or it was accepted. A breakpoint whose condition is
+/// refused is not waited at: a client is to tell the person why, and drop it.
+/// </param>
+public record class HostBreakpoint(int Line, bool Verified, string? ConditionError = null);
 
 /// <summary>
 /// Request for <c>rdcore/host/debug/stack</c>: the activations of the program that waits, innermost first.
@@ -308,4 +333,10 @@ public record class HostDebugEvaluateResult
 
     /// <summary>What a call in the expression printed, one entry per line: output for a debug console, and not the program's.</summary>
     public IReadOnlyList<string> Output { get; init; } = [];
+
+    /// <summary>
+    /// Whether what ran ended the program that waited - an <c>End</c> typed at the stop, or one in a procedure it called. The program is then over, and nothing waits
+    /// any more; <see cref="Error"/> says so.
+    /// </summary>
+    public bool EndedTheProgram { get; init; }
 }
