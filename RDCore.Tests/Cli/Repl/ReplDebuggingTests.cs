@@ -128,6 +128,25 @@ public sealed class ReplDebuggingTests
     }
 
     [TestMethod]
+    public async Task ARunTimeError_InsideGoSubs_SaysInItsStackTraceWhichGoSubsItCameFrom()
+    {
+        // source lines 1..3 are program lines 10..30: the error at 30, in the GoSub of 20, which the GoSub of 10 called.
+        ExecuteReturns(new ExecuteSessionResult
+        {
+            Outcome = ExecutionOutcome.RuntimeError,
+            ErrorLine = 3,
+            ErrorCode = "VBR00011",
+            ErrorMessage = "Division by zero",
+            StackTrace = [new ExecuteStackFrame("Main", 3, 0, [2, 1])],
+        });
+
+        await RunAsync();
+
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Error, Arg.Any<string>(),
+            Arg.Is<string>(detail => detail.Contains("Main 30 from 20 from 10")));
+    }
+
+    [TestMethod]
     public async Task ARun_ThatStops_WaitsAndSaysWhere()
     {
         ExecuteReturns(SuspendedAt(2));

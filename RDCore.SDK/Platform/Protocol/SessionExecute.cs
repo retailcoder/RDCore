@@ -257,4 +257,12 @@ public record class ExecuteSessionResult
 /// where in itself it is suspended.
 /// </param>
 /// <param name="Character">Zero-based character within <paramref name="Line"/>, or <c>-1</c>.</param>
-public record class ExecuteStackFrame(string Procedure, int Line = -1, int Character = -1);
+/// <param name="ReturnLines">
+/// The zero-based lines of the <c>GoSub</c> statements the activation had not <c>Return</c>ed from when the error was raised, innermost first - how it got to where it
+/// was, as <see cref="HostStackFrame.ReturnLines"/> says it of a program that waits. Empty for an activation in no <c>GoSub</c>.
+/// </param>
+public record class ExecuteStackFrame(string Procedure, int Line = -1, int Character = -1, IReadOnlyList<int>? ReturnLines = null)
+{
+    /// <summary>The lines of the <c>GoSub</c> statements the activation would have returned to; none for one that was in none.</summary>
+    public IReadOnlyList<int> ReturnLines { get; init; } = ReturnLines ?? [];
+}

@@ -12,16 +12,25 @@ namespace RDCore.SDK.Model.Errors;
 /// raised in — that is the faulting statement — and not for its callers, whose activation records do
 /// not carry the location of the call they are suspended at.
 /// </param>
-public readonly record struct VBStackTraceFrame(string ProcedureName, SourceLocation? Location)
+/// <param name="GoSubs">
+/// Where the <c>GoSub</c> statements the activation had not <c>Return</c>ed from were, innermost first: how it got to where it was, within the procedure. It is the
+/// activation's GoSub Resumption List (<strong>MS-VBAL §5.4.2.14</strong>) when the error was raised, and is empty for an activation in no <c>GoSub</c>.
+/// </param>
+public readonly record struct VBStackTraceFrame(string ProcedureName, SourceLocation? Location, ImmutableArray<SourceLocation> GoSubs = default)
 {
     /// <summary>
     /// The frame as one line: the procedure's name, and the 1-based line and column of the faulting
-    /// statement when that is known.
+    /// statement when that is known, then the <c>GoSub</c> statements it came from.
     /// </summary>
     public override string ToString()
-        => Location is { Uri: not null } location
+    {
+        var frame = Location is { Uri: not null } location
             ? $"{ProcedureName} ({location.Range.Start.Line + 1}:{location.Range.Start.Character + 1})"
             : ProcedureName;
+        return GoSubs.IsDefaultOrEmpty
+            ? frame
+            : frame + string.Concat(GoSubs.Select(gosub => $" from ({gosub.Range.Start.Line + 1}:{gosub.Range.Start.Character + 1})"));
+    }
 }
 
 /// <summary>

@@ -850,7 +850,8 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                 .. session.Errors.StackTrace.Frames.Select(frame => new ExecuteStackFrame(
                     frame.ProcedureName,
                     frame.Location?.Range.Start.Line ?? -1,
-                    frame.Location?.Range.Start.Character ?? -1)),
+                    frame.Location?.Range.Start.Character ?? -1,
+                    frame.GoSubs.IsDefaultOrEmpty ? null : [.. frame.GoSubs.Select(gosub => gosub.Range.Start.Line)])),
             ],
         };
     }

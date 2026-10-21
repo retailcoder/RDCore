@@ -285,7 +285,11 @@ internal static class ReplExecution
             // line number is captured (Erl is one value, not one per activation) - so the buffer maps it back.
             // TODO carry a line number per activation once a frame knows its own instruction list.
             var line = program.LineNumberAt(frame.Line);
-            yield return line is { } number ? $"  {frame.Procedure} {number}" : $"  {frame.Procedure}";
+            var at = line is { } number ? $"  {frame.Procedure} {number}" : $"  {frame.Procedure}";
+
+            // and how the activation got there, when it was by a GoSub: from the line of the last one it had not returned from, and the one before that - as STACK
+            // says it of a program that waits.
+            yield return at + string.Concat(frame.ReturnLines.Select(gosub => program.LineNumberAt(gosub) is { } from ? $" from {from}" : string.Empty));
         }
     }
 }

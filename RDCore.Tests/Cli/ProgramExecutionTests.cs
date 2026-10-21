@@ -736,6 +736,36 @@ public sealed class ProgramExecutionTests
         });
 
     [TestMethod]
+    public async Task ARunTimeError_InsideGoSubs_HasThemInItsStackTrace_InnermostFirst()
+        => await ModuleWorkspace.InspectAsync(NoClasses, Program(
+            "Public Sub Main()",
+            "    GoSub First",
+            "    Exit Sub",
+            "First:",
+            "    GoSub Second",
+            "    Return",
+            "Second:",
+            "    Debug.Print 1 / 0",
+            "    Return",
+            "End Sub"), (_, result, _) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.RuntimeError, result.Outcome, result.ErrorMessage);
+            var frame = result.StackTrace.Single();
+            Assert.AreEqual(7, frame.Line);
+            CollectionAssert.AreEqual(new[] { 4, 1 }, frame.ReturnLines.ToArray(), "the GoSub of line 4, which the GoSub of line 1 called");
+            return Task.CompletedTask;
+        });
+
+    [TestMethod]
+    public async Task ARunTimeError_InNoGoSub_HasNoneInItsStackTrace()
+        => await ModuleWorkspace.InspectAsync(NoClasses, Program("Public Sub Main()", "    Debug.Print 1 / 0", "End Sub"), (_, result, _) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.RuntimeError, result.Outcome);
+            Assert.IsEmpty(result.StackTrace.Single().ReturnLines);
+            return Task.CompletedTask;
+        });
+
+    [TestMethod]
     public async Task ABreakpoint_IsNotWaitedAtByAProgramNotUnderADebugger()
         => await ModuleWorkspace.InspectAsync(NoClasses, Program("Public Total As Long", "Public Sub Main()", "    Total = 1", "End Sub"), (provider, result, runAgain) =>
         {

@@ -1,5 +1,6 @@
 ﻿using RDCore.Runtime.Execution;
 using RDCore.SDK.Model.AST.Abstract;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types.Abstract;
@@ -197,6 +198,15 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// The offsets this activation returns to, innermost first: the instruction after each <c>GoSub</c> that has not been <c>Return</c>ed from yet (its GoSub Resumption List).
     /// </summary>
     public IReadOnlyCollection<int> GoSubReturns => (IReadOnlyCollection<int>?)_goSubReturns ?? [];
+
+    /// <summary>
+    /// Where the <c>GoSub</c> statements this activation has not <c>Return</c>ed from are, innermost first: how it got to where it is. Each is the instruction
+    /// before its return offset; <see langword="null"/> for one the body does not place.
+    /// </summary>
+    public IEnumerable<SourceLocation?> GoSubLocations()
+        => Body is not { } body
+            ? []
+            : GoSubReturns.Select(returnOffset => returnOffset - 1 >= 0 && returnOffset - 1 < body.Items.Length ? body.Items[returnOffset - 1].Node?.SourceLocation : null);
 
     /// <summary>
     /// Pops this activation's own GoSub Resumption List and returns the offset a <c>Return</c> statement
