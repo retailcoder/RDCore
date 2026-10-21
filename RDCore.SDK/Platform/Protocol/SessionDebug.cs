@@ -123,3 +123,22 @@ public record class SessionDebugEvaluateParams : IRequest, IRequest<HostDebugEva
     /// <summary>The expression, as it would be written in the procedure of the activation.</summary>
     public string Expression { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// Request for <c>rdcore/session/debug/execute</c>: runs a statement, written as text, in an activation of the program that waits - the answer to a line typed in the
+/// immediate window of a procedure that is stopped. The language server parses it and has the host run it. The language-server side of
+/// <see cref="HostDebugExecuteParams"/>.
+/// </summary>
+/// <remarks>
+/// The statement's names are the activation's: a local of the procedure is the local the program goes on with, and a name the procedure does not see is not defined
+/// - it declares nothing, since a statement typed at a stop is not part of the program's code. <c>?</c> is the immediate window's <c>Debug.Print</c>.
+/// </remarks>
+[Method(RDCorePlatformProtocol.SessionDebugExecute, Direction.ClientToServer)]
+public record class SessionDebugExecuteParams : IRequest, IRequest<HostDebugEvaluateResult>
+{
+    /// <inheritdoc cref="SessionDebugEvaluateParams.FrameId"/>
+    public int FrameId { get; init; }
+
+    /// <summary>The statement, as it would be written in the procedure of the activation; one line.</summary>
+    public string Statement { get; init; } = string.Empty;
+}

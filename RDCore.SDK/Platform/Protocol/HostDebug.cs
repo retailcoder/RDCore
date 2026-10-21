@@ -333,4 +333,10 @@ public record class HostDebugEvaluateResult
 
     /// <summary>What a call in the expression printed, one entry per line: output for a debug console, and not the program's.</summary>
     public IReadOnlyList<string> Output { get; init; } = [];
+
+    /// <summary>
+    /// Whether what ran ended the program that waited - an <c>End</c> typed at the stop, or one in a procedure it called. The program is then over, and nothing waits
+    /// any more; <see cref="Error"/> says so.
+    /// </summary>
+    public bool EndedTheProgram { get; init; }
 }

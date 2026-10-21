@@ -8,6 +8,7 @@ using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Workspace;
 using RDCore.Symbols;
 
@@ -98,6 +99,43 @@ public sealed class ImplicitModuleVariableTests
             Assert.IsEmpty(symbols.OfType<VBModuleFieldVariableMemberSymbol>(), $"{scope}");
             Assert.IsEmpty(symbols.OfType<VBLocalVariableSymbol>(), $"{scope}");
         }
+    }
+
+    // what a session holds after an earlier pass declared the name: the resolver answers with that pass's own implicit variable, whatever the reference's spelling.
+    private static ISymbolResolver HoldingEarlierPass(Symbol earlier)
+    {
+        var resolver = Substitute.For<ISymbolResolver>();
+        resolver.ResolveValue(Arg.Is<string>(name => string.Equals(name, earlier.Name, StringComparison.OrdinalIgnoreCase)), Arg.Any<ScopeKind>(), Arg.Any<Uri>())
+            .Returns(SymbolResolutionResult.Resolved(earlier));
+        return resolver;
+    }
+
+    [TestMethod]
+    public void AtModuleScope_ANameAnEarlierPassDeclared_IsDeclaredAgainUnderItsOwnSpelling_HoweverTheReferenceSpellsIt()
+    {
+        // MS-VBAL 3.3.5: two identifiers that differ only in case are the same identifier. A shell's line that says ?v after one that said ?V is the same
+        // variable, and not a second one the session then finds two of.
+        var earlier = Provide("Sub Immediate()\r\nDebug.Print V\r\nEnd Sub\r\n", ImplicitDeclarationScope.Module)
+            .OfType<VBModuleFieldVariableMemberSymbol>().Single();
+
+        var symbols = Provide("Sub Immediate()\r\nDebug.Print v\r\nEnd Sub\r\n", ImplicitDeclarationScope.Module, HoldingEarlierPass(earlier));
+
+        var variable = symbols.OfType<VBModuleFieldVariableMemberSymbol>().Single();
+        Assert.AreEqual("V", variable.Name);
+        Assert.AreEqual(earlier.Uri.AbsoluteUri, variable.Uri.AbsoluteUri, "the same identity, and so the same variable in the session");
+    }
+
+    [TestMethod]
+    public void AtProcedureScope_ALocalAnEarlierPassDeclared_IsDeclaredAgainUnderItsOwnSpelling_HoweverTheReferenceSpellsIt()
+    {
+        var earlier = Provide("Sub Foo()\r\nA = 1\r\nEnd Sub\r\n", ImplicitDeclarationScope.Procedure)
+            .OfType<VBLocalVariableSymbol>().Single();
+
+        var symbols = Provide("Sub Foo()\r\na = 1\r\nEnd Sub\r\n", ImplicitDeclarationScope.Procedure, HoldingEarlierPass(earlier));
+
+        var local = symbols.OfType<VBLocalVariableSymbol>().Single();
+        Assert.AreEqual("A", local.Name);
+        Assert.AreEqual(earlier.Uri.AbsoluteUri, local.Uri.AbsoluteUri);
     }
 
     [TestMethod]

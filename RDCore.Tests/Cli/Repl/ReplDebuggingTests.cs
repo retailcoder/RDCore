@@ -698,19 +698,49 @@ public sealed class ReplDebuggingTests
 
     // ---- a statement typed while the program waits ----
 
+    private void ExecuteInFrameReturns(HostDebugEvaluateResult result)
+        => _platform.ExecuteInFrameAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(result));
+
     [TestMethod]
-    public async Task AStatement_TypedWhileTheProgramWaits_RunsAlongsideIt_AndTheProgramWaitsStill()
+    public async Task AStatement_TypedWhileTheProgramWaits_RunsInTheActivationItWaitsIn_AndTheProgramWaitsStill()
     {
         ExecuteReturns(SuspendedAt(2));
         await RunAsync();
-        ExecuteReturns(new ExecuteSessionResult { Outcome = ExecutionOutcome.Completed, Output = ["1"] });
+        ExecuteInFrameReturns(new HostDebugEvaluateResult { Success = true, Output = ["1"] });
 
-        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, immediate: true);
+        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, statement: "?v");
 
-        await _platform.Received(1).ExecuteAsync("src", "Program", "Immediate", false, true, Arg.Any<CancellationToken>());
+        await _platform.Received(1).ExecuteInFrameAsync(0, "?v", Arg.Any<CancellationToken>());
+        await _platform.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<string>(), "Immediate", Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
         _console.Received().WriteLine("1");
         Assert.AreEqual(ReplDebugState.Suspended, _context.Debugger.State);
         Assert.AreEqual(20, _context.Debugger.StoppedAt);
+    }
+
+    [TestMethod]
+    public async Task AStatement_TypedWhileTheProgramWaits_RunsInTheActivationFrameSelected()
+    {
+        ExecuteReturns(SuspendedAt(2));
+        await RunAsync();
+        _context.Debugger.SelectedFrame = 1;
+        ExecuteInFrameReturns(new HostDebugEvaluateResult { Success = true });
+
+        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, statement: "X = 2");
+
+        await _platform.Received(1).ExecuteInFrameAsync(1, "X = 2", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task AStatement_ThatCannotRunWhereTheProgramWaits_SaysWhy_AndTheProgramWaitsStill()
+    {
+        ExecuteReturns(SuspendedAt(2));
+        await RunAsync();
+        ExecuteInFrameReturns(new HostDebugEvaluateResult { Error = "'nowhere' is not defined" });
+
+        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, statement: "?nowhere");
+
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Error, "'nowhere' is not defined");
+        Assert.AreEqual(ReplDebugState.Suspended, _context.Debugger.State);
     }
 
     [TestMethod]
@@ -718,9 +748,9 @@ public sealed class ReplDebuggingTests
     {
         ExecuteReturns(SuspendedAt(2));
         await RunAsync();
-        ExecuteReturns(new ExecuteSessionResult { Outcome = ExecutionOutcome.Halted });
+        ExecuteInFrameReturns(new HostDebugEvaluateResult { Error = "ended", EndedTheProgram = true });
 
-        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, immediate: true);
+        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, statement: "END");
 
         Assert.AreEqual(ReplDebugState.Idle, _context.Debugger.State);
     }
@@ -731,9 +761,10 @@ public sealed class ReplDebuggingTests
         _platform.ExecuteAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ExecuteSessionResult { Outcome = ExecutionOutcome.Completed }));
 
-        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, immediate: true);
+        await ReplExecution.ExecuteAsync(_context, "src", ReplProgram.ImmediateEntryPointName, CancellationToken.None, statement: "?v");
 
         await _platform.Received(1).ExecuteAsync("src", "Program", "Immediate", Arg.Any<CancellationToken>());
+        await _platform.DidNotReceiveWithAnyArgs().ExecuteInFrameAsync(default, default!, default);
     }
 
     // ---- LIST ----

@@ -135,3 +135,17 @@ internal sealed class SessionDebugEvaluateHandler(IProgramDebugService debugging
         return debugging.EvaluateAsync(request.FrameId, request.Expression, token);
     }
 }
+
+/// <summary>
+/// Handles <c>rdcore/session/debug/execute</c>: has the component that owns the runtime session run the statement a client wrote in an activation of the program that
+/// waits.
+/// </summary>
+internal sealed class SessionDebugExecuteHandler(IProgramDebugService debugging, IPlatformClientCapabilitiesService clientCapabilities)
+    : RDCoreRequestHandler<SessionDebugExecuteParams, HostDebugEvaluateResult>
+{
+    protected override Task<HostDebugEvaluateResult> HandleAsync(SessionDebugExecuteParams request, CancellationToken token)
+    {
+        SessionDebugRelay.RequireCapability(clientCapabilities);
+        return debugging.ExecuteAsync(request.FrameId, request.Statement, token);
+    }
+}

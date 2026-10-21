@@ -23,12 +23,13 @@ internal static class ReplExecution
     /// Whether the program runs under a debugger, when the platform has one: a <c>STOP</c> or a breakpoint then leaves it waiting, to be gone on with by <c>CONT</c>
     /// or <c>STEP</c>. A break at the keyboard pauses it then, instead of cancelling the request that runs it.
     /// </param>
-    /// <param name="immediate">
-    /// Whether the entry point is a statement typed at the prompt. While a program waits it is run alongside it and the program waits still, which is how its
-    /// variables are read and set at a stop.
+    /// <param name="statement">
+    /// The statement typed at the prompt, when the entry point is one. While a program waits it is run in the activation <c>FRAME</c> selected and the program waits
+    /// still, which is how its variables are read and set at a stop; <paramref name="source"/> is then not sent, since the program's code is not to be loaded again
+    /// under it.
     /// </param>
     public static async Task ExecuteAsync(
-        ReplCommandContext context, string source, string entryPoint, CancellationToken token, bool debug = false, bool immediate = false)
+        ReplCommandContext context, string source, string entryPoint, CancellationToken token, bool debug = false, string? statement = null)
     {
         if (!context.Platform.Provides<SessionExecute>())
         {
@@ -37,9 +38,9 @@ internal static class ReplExecution
             return;
         }
 
-        if (immediate && context.Debugger.State is ReplDebugState.Suspended && context.Platform.Provides<ProgramDebugging>())
+        if (statement is not null && context.Debugger.State is ReplDebugState.Suspended && context.Platform.Provides<ProgramDebugging>())
         {
-            await ExecuteAlongsideAsync(context, source, entryPoint, token);
+            await ExecuteInFrameAsync(context, statement, token);
             return;
         }
 
@@ -83,15 +84,24 @@ internal static class ReplExecution
         }
     }
 
-    // A statement typed while a program waits runs in the session as the program left it, and the program waits still - unless the statement was an END, which is
-    // the end of the program. What the statement printed, or what stopped it, is said as it is for any run, and is no business of what the program is doing.
-    private static async Task ExecuteAlongsideAsync(ReplCommandContext context, string source, string entryPoint, CancellationToken token)
+    // A statement typed while a program waits runs in the activation FRAME selected, as if it were written in that procedure: its names are the procedure's, so a
+    // local is read and set as the program has it, and a name the procedure does not see is not defined - the statement is not the program's code, and declares
+    // nothing in it. The program waits still, unless the statement was an END, which is the end of it. What the statement printed, or why it could not run, is said.
+    private static async Task ExecuteInFrameAsync(ReplCommandContext context, string statement, CancellationToken token)
     {
         var waitsBefore = context.Debugger.StoppedAt;
-        var result = await context.Platform.ExecuteAsync(source, ReplProgram.ModuleName, entryPoint, debug: false, immediate: true, token);
-        Render(context, result);
+        var result = await context.Platform.ExecuteInFrameAsync(context.Debugger.SelectedFrame, statement, token);
+        foreach (var line in result.Output)
+        {
+            context.Console.WriteLine(line);
+        }
 
-        if (result.Outcome is ExecutionOutcome.Halted)
+        if (result.Error is { } error)
+        {
+            context.Console.WriteMessage(MessageKind.Error, error);
+        }
+
+        if (result.EndedTheProgram)
         {
             context.Debugger.Idle();
         }

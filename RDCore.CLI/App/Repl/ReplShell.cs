@@ -153,7 +153,8 @@ internal sealed class ReplShell(
 
     /// Runs one unnumbered statement on the spot. It is compiled as a procedure of the same module
     /// the program lives in, so it sees the same scope the program does, and a break cancels it the
-    /// same way it cancels a RUN.
+    /// same way it cancels a RUN. While a program waits it runs in the activation FRAME selected
+    /// instead, and sees that procedure's locals.
     private async Task RunImmediateAsync(ReplCommandContext context, string statement, CancellationToken token)
     {
         using var running = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -161,7 +162,7 @@ internal sealed class ReplShell(
         try
         {
             await ReplExecution.ExecuteAsync(
-                context, program.ToImmediateModuleSource(statement), ReplProgram.ImmediateEntryPointName, running.Token, immediate: true);
+                context, program.ToImmediateModuleSource(statement), ReplProgram.ImmediateEntryPointName, running.Token, statement: statement);
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {

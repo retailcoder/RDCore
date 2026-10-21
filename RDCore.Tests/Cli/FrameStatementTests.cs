@@ -144,6 +144,39 @@ public sealed class FrameStatementTests
         });
 
     [TestMethod]
+    public async Task AStatement_SpellingALocalOtherwise_IsAboutThatLocal()
+        => await DebugAsync(async provider =>
+        {
+            // MS-VBAL 3.3.5: a name is the same name in any case.
+            var done = await Execute(provider, 0, "Debug.Print LOCAL");
+
+            Assert.IsTrue(done.Success, done.Error);
+            CollectionAssert.AreEqual(new[] { "3" }, done.Output.Select(line => line.Trim()).ToArray());
+        });
+
+    [TestMethod]
+    public async Task AStatement_WithANameTheProcedureDoesNotSee_SaysWhichName_AndDeclaresNothing()
+        => await DebugAsync(async provider =>
+        {
+            var done = await Execute(provider, 0, "Debug.Print nowhere");
+
+            Assert.IsFalse(done.Success);
+            StringAssert.Contains(done.Error, "nowhere");
+            Assert.IsFalse(provider.Session.Symbols.TryResolveValue("nowhere", RDCore.SDK.Model.Symbols.GlobalSymbols.UnresolvedSymbol, out _), "a statement typed at a stop is not the program's code");
+            Assert.AreEqual(ProgramState.Suspended, provider.Execution.State);
+        });
+
+    [TestMethod]
+    public async Task AnEnd_RunInTheProgram_EndsIt_AndSaysSo()
+        => await DebugAsync(async provider =>
+        {
+            var done = await Execute(provider, 0, "End");
+
+            Assert.IsTrue(done.EndedTheProgram);
+            Assert.AreEqual(ProgramState.Idle, provider.Execution.State);
+        });
+
+    [TestMethod]
     public async Task TheProgram_GoesOnAfterStatementsWereRunInIt()
         => await DebugAsync(async provider =>
         {

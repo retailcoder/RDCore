@@ -114,6 +114,11 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
             new SessionDebugVariablesParams { FrameId = frameId, Scope = scope, Reference = reference }, token);
 
     /// <inheritdoc/>
+    public Task<HostDebugEvaluateResult> ExecuteInFrameAsync(int frameId, string statement, CancellationToken token)
+        => client.SendRequestAsync<SessionDebugExecuteParams, HostDebugEvaluateResult>(
+            new SessionDebugExecuteParams { FrameId = frameId, Statement = statement }, token);
+
+    /// <inheritdoc/>
     public Task<AnalyzeSessionResult> AnalyzeAsync(string source, string moduleName, CancellationToken token)
         => client.SendRequestAsync<AnalyzeSessionParams, AnalyzeSessionResult>(
             new AnalyzeSessionParams { Source = source, ModuleName = moduleName }, token);

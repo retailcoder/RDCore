@@ -400,7 +400,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             return outcome.Kind switch
             {
                 RuntimeExecutionOutcomeKind.Error => (null, outcome.ErrorInfo!.Description),
-                RuntimeExecutionOutcomeKind.InternalError => (null, Resources.Host_CannotRunYet),
+                RuntimeExecutionOutcomeKind.InternalError => (null, UnevaluableBecause(session, statement, procedure.Uri, Resources.Host_CannotRunYet)),
                 _ => (null, null),
             };
         });
@@ -449,7 +449,10 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                     if (halt is RuntimeHaltKind.End)
                     {
                         EndSuspended(session, wipe: true);
-                        return Unevaluated(ofAStatement ? Resources.Host_TheStatementEndedTheProgram : Resources.Host_TheExpressionEndedTheProgram, output);
+                        return Unevaluated(ofAStatement ? Resources.Host_TheStatementEndedTheProgram : Resources.Host_TheExpressionEndedTheProgram, output) with
+                        {
+                            EndedTheProgram = true,
+                        };
                     }
 
                     return Unevaluated(ofAStatement ? Resources.Host_TheStatementWasStopped : Resources.Host_TheExpressionWasStopped, output);
@@ -489,14 +492,14 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     }
 
     // The evaluator answers an internal error for a name nothing defines, since static semantics were to have rejected it. What a person is told is the name: the first
-    // one in the expression that does not resolve from the procedure. An expression every name of which resolves is one the interpreter cannot evaluate.
-    private static string UnevaluableBecause(IRuntimeSession session, ExpressionNode expression, Uri scope)
+    // one in the expression - or the statement - that does not resolve from the procedure. One every name of which resolves is one the interpreter cannot run yet.
+    private static string UnevaluableBecause(IRuntimeSession session, SyntaxNode node, Uri scope, string? otherwise = null)
     {
-        var undefined = Descendants(expression)
+        var undefined = Descendants(node)
             .OfType<SimpleNameExpressionNode>()
             .FirstOrDefault(name => !session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, scope).IsResolved);
 
-        return undefined is null ? Resources.Host_CannotEvaluateYet : string.Format(Resources.Host_NameIsNotDefined, undefined.IdentifierName);
+        return undefined is null ? otherwise ?? Resources.Host_CannotEvaluateYet : string.Format(Resources.Host_NameIsNotDefined, undefined.IdentifierName);
     }
 
     // why nothing can be asked of the program that does not wait.
