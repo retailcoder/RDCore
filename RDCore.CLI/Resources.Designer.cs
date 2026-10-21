@@ -374,7 +374,16 @@ namespace RDCore.CLI {
                 return ResourceManager.GetString("Host_NameIsNotDefined", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Variable not defined: &apos;{0}&apos;.
+        /// </summary>
+        public static string Host_VariableNotDefined {
+            get {
+                return ResourceManager.GetString("Host_VariableNotDefined", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to no program is suspended.
         /// </summary>

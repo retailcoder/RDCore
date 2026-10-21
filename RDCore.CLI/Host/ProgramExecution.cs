@@ -6,9 +6,14 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Semantics.Instructions;
+using RDCore.SDK.Semantics.Static;
+using RDCore.SDK.Semantics.Static.Abstract;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Types;
+using RDCore.Symbols;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime;
@@ -386,8 +391,23 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     public HostDebugEvaluateResult Execute(RuntimeExecutionPipeline pipeline, int frameId, SyntaxNode statement)
         => InFrame(frameId, ofAStatement: true, (session, stack, selected, procedure) =>
         {
+            if (DeclareImplicitly(session, statement, selected, procedure) is { } refused)
+            {
+                return (null, refused);
+            }
+
+            // what is wrong with the statement is found out as it is for the procedure's own code (ModuleLoader), in the procedure's scope - an assignment to a
+            // function of a library is not a variable there either - and a statement that is wrong does not run.
+            var block = new StatementBlock([statement]);
+            if (session.Symbols.ScopeOf(procedure.Uri) is { } scope
+                && StatementStaticSemanticsEvaluator.Analyze(procedure.SemanticId, block, new StaticSemanticsOptions(Language: session.Environment.Language), MemberKind.Procedure,
+                    new StaticEvaluationContext(session.Symbols.Resolver, scope)).CompileErrors is [var error, ..])
+            {
+                return (null, string.IsNullOrEmpty(error.Verbose) || error.Verbose == error.Description ? error.Description : $"{error.Description}: {error.Verbose}");
+            }
+
             var options = new InstructionLoweringOptions(IsReleaseBuild: !session.IsDebugBuild(), Language: session.Environment.Language);
-            var lowered = InstructionListLowering.Lower(new StatementBlock([statement]), options, MemberKind.Procedure);
+            var lowered = InstructionListLowering.Lower(block, options, MemberKind.Procedure);
             var scratch = (CallStackFrame)session.Symbols.CreateFrame(selected.NodeId, selected.StaticSymbol, selected.Directives);
             (scratch.Procedure, scratch.Body) = (procedure, lowered.InstructionList);
 
@@ -489,6 +509,59 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
                 _alongside = false;
             }
         }
+    }
+
+    // MS-VBAL 5.6.10: a name the procedure does not see, typed where the program waits, declares a variable as it would in the procedure's own code - a Variant
+    // that is Empty, so ?x prints an empty line - unless the module says Option Explicit (MS-VBAL 5.2.1.3), where it is not defined and nothing runs. Where the
+    // variable lives is the environment's to say (ImplicitDeclarationScope), as for code: in a BASIC shell a variable of the module, which a statement typed at
+    // the prompt with no program waiting declares as well; in VBA and VB6 a local of the procedure the activation is of, on that activation. A class member's
+    // activation has no module storage to give it, and gives it a local. The name is declared before the statement runs, so that what it reads is a variable.
+    private static string? DeclareImplicitly(IRuntimeSession session, SyntaxNode statement, CallStackFrame selected, VBTypeMemberSymbol procedure)
+    {
+        var resolver = session.Symbols.Resolver;
+        var references = SymbolBuilder.ImplicitDeclarationCandidates(statement)
+            .DistinctBy(name => name.IdentifierName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        // an implicit local declared by a statement typed in another activation of the procedure is one this activation has no storage for yet.
+        foreach (var reference in references)
+        {
+            if (resolver.ResolveValue(reference, ScopeKind.Local, procedure.Uri).Symbol is VBLocalVariableSymbol { DeclaredBy: LocalDeclarationKind.Implicit } local
+                && local.ParentUri.AbsoluteUri == procedure.Uri.AbsoluteUri && !selected.TryResolve(local, out _))
+            {
+                selected.PushDeclaredAtAStop(local, local.ResolvedType.DefaultValue);
+            }
+        }
+
+        var undeclared = references.Where(name => resolver.ResolveValue(name, ScopeKind.Local, procedure.Uri).IsUnbound).ToArray();
+        if (undeclared.Length == 0)
+        {
+            return null;
+        }
+
+        if (selected.Directives.Explicit)
+        {
+            return string.Format(Resources.Host_VariableNotDefined, undeclared[0].IdentifierName);
+        }
+
+        var builder = new SymbolBuilder(procedure.WorkspaceRoot, procedure.ParentUri, ScopeKind.Module, resolver, VBVariantType.TypeInfo);
+        var ofTheModule = session.Environment.Language.ImplicitDeclarationScope is ImplicitDeclarationScope.Module && selected.Target is null;
+        foreach (var name in undeclared)
+        {
+            if (ofTheModule)
+            {
+                _ = session.Symbols.TryDefine(builder.BuildImplicitModuleVariable(name), ScopeKind.Module);
+                continue;
+            }
+
+            var local = (VBLocalVariableSymbol)builder.BuildImplicitLocal(name, procedure.Uri);
+            if (session.Symbols.TryDefine(local, ScopeKind.Local))
+            {
+                selected.PushDeclaredAtAStop(local, local.ResolvedType.DefaultValue);
+            }
+        }
+
+        return null;
     }
 
     // The evaluator answers an internal error for a name nothing defines, since static semantics were to have rejected it. What a person is told is the name: the first

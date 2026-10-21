@@ -451,6 +451,9 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Host_NameIsNotDefined" xml:space="preserve">
     <value>'{0}' is not defined</value>
   </data>
+  <data name="Host_VariableNotDefined" xml:space="preserve">
+    <value>Variable not defined: '{0}'</value>
+  </data>
   <data name="Host_TheProgramWasInterrupted" xml:space="preserve">
     <value>the program was interrupted</value>
   </data>

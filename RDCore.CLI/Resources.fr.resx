@@ -449,6 +449,9 @@
   <data name="Host_NameIsNotDefined" xml:space="preserve">
     <value>'{0}' n'est pas défini</value>
   </data>
+  <data name="Host_VariableNotDefined" xml:space="preserve">
+    <value>Variable non définie : '{0}'</value>
+  </data>
   <data name="Host_TheProgramWasInterrupted" xml:space="preserve">
     <value>le programme a été interrompu</value>
   </data>

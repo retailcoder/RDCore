@@ -109,6 +109,12 @@ internal sealed class ProgramInspector(IEnvironmentSessionProvider provider)
             yield return Describe(symbol.Name, ValueOf(frame, symbol));
         }
 
+        // and the ones a statement typed at a stop declared, which the procedure's code does not, after the ones it does.
+        foreach (var symbol in frame.DeclaredAtAStop)
+        {
+            yield return Describe(symbol.Name, ValueOf(frame, symbol));
+        }
+
         if (frame.Procedure is VBFunctionMemberSymbol returning && frame.ReturnValue is { } result)
         {
             yield return Describe(returning.Name, result);

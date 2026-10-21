@@ -247,6 +247,26 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     }
 
     /// <summary>
+    /// Declares <paramref name="symbol"/> on this frame as <see cref="Push"/> does, for a local the procedure's code does not declare: one a statement typed where the
+    /// program waits declared implicitly (<strong>MS-VBAL §5.6.10</strong>). It is a local of this activation from then on, and is among
+    /// <see cref="DeclaredAtAStop"/>, since the procedure's symbol does not list it.
+    /// </summary>
+    /// <param name="symbol">The local.</param>
+    /// <param name="value">Its initial value: <c>Empty</c>, for the <c>Variant</c> an implicit declaration is.</param>
+    public void PushDeclaredAtAStop(Symbol symbol, VBTypedValue value)
+    {
+        Push(symbol, value);
+        (_declaredAtAStop ??= []).Add(symbol);
+    }
+
+    /// <summary>
+    /// The locals of this activation that statements typed where the program waited declared (<see cref="PushDeclaredAtAStop"/>), in the order they were.
+    /// </summary>
+    public IReadOnlyList<Symbol> DeclaredAtAStop => (IReadOnlyList<Symbol>?)_declaredAtAStop ?? [];
+
+    private List<Symbol>? _declaredAtAStop;
+
+    /// <summary>
     /// Declares <paramref name="symbol"/> on this frame as a <c>ByRef</c> reference parameter binding
     /// (<strong>MS-VBAL §5.3.1.11</strong>): <paramref name="address"/> is an existing address — the
     /// caller's own argument variable, not storage this frame allocates or ever frees — so every

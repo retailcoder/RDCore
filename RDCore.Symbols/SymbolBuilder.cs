@@ -528,6 +528,18 @@ public sealed class SymbolBuilder(Uri workspaceRoot, Uri moduleUri, ScopeKind me
             && variable.ParentUri.AbsoluteUri == moduleUri.AbsoluteUri;
 
     /// <summary>
+    /// The simple name expressions of <paramref name="statement"/>, and of the statements in its body, that sit in the <em>default</em> binding context
+    /// (<strong>MS-VBAL §5.6.10</strong>) — the references an implicit declaration can come from, found as a procedure's are.
+    /// </summary>
+    /// <remarks>
+    /// What a statement run where a program waits declares, when it names what the procedure does not: the same names a procedure's own
+    /// body would have declared, so that the immediate window and the code agree on what is a variable.
+    /// </remarks>
+    /// <param name="statement">The statement.</param>
+    public static IEnumerable<SimpleNameExpressionNode> ImplicitDeclarationCandidates(SyntaxNode statement)
+        => DescendantsAndSelf(statement).SelectMany(ValueContextSimpleNames);
+
+    /// <summary>
     /// The simple name expressions of <paramref name="node"/> that sit in the <em>default</em> binding
     /// context (<strong>MS-VBAL §5.6.10</strong>) — the only ones an implicit declaration can come
     /// from.
