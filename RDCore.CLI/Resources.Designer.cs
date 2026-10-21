@@ -710,6 +710,15 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to CONDITION REFUSED AT {0}: {1}.
+        /// </summary>
+        public static string Repl_Breakpoint_ConditionRefused {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_ConditionRefused", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to BREAKPOINT DISABLED AT {0}.
         /// </summary>
         public static string Repl_Breakpoint_Disabled {
@@ -717,7 +726,16 @@ namespace RDCore.CLI {
                 return ResourceManager.GetString("Repl_Breakpoint_Disabled", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to (DISABLED).
+        /// </summary>
+        public static string Repl_Breakpoint_DisabledMark {
+            get {
+                return ResourceManager.GetString("Repl_Breakpoint_DisabledMark", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to BREAKPOINT ENABLED AT {0}.
         /// </summary>

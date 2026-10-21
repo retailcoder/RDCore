@@ -10,6 +10,6 @@ internal sealed class HostDebugBreakpointsHandler(IEnvironmentSessionProvider se
 {
     protected override Task<HostDebugBreakpointsResult> HandleAsync(HostDebugBreakpointsParams request, CancellationToken token)
         => Task.FromResult(sessionProvider.IsComposed
-            ? sessionProvider.Execution.SetBreakpoints(request.ModuleName, [.. request.Breakpoints.Select(b => b.Line)])
-            : new HostDebugBreakpointsResult { Breakpoints = [.. request.Breakpoints.Select(bp => new HostBreakpoint(bp.Line, false, bp.Condition))] });
+            ? sessionProvider.Execution.SetBreakpoints(request.ModuleName, request.Breakpoints)
+            : new HostDebugBreakpointsResult { Breakpoints = [.. request.Breakpoints.Select(breakpoint => new HostBreakpoint(breakpoint.Line, false))] });
 }

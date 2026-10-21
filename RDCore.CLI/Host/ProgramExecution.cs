@@ -260,28 +260,64 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     /// Sets the lines of a module that a program under a debugger waits at.
     /// </summary>
     /// <param name="moduleName">The programmatic name of the module.</param>
-    /// <param name="lines">The zero-based lines of the source. None removes them.</param>
+    /// <param name="breakpoints">The breakpoints, one per zero-based line of the source. None removes them.</param>
     /// <returns>Each line, and whether a statement of the module's loaded code begins on it.</returns>
     /// <remarks>
     /// A breakpoint is where an instruction is, and a line no statement begins on is reported as not verified - nothing would ever wait there, and a client is to drop it.
     /// Every line is kept all the same, since the code can be loaded again before the program runs (a shell redefines its program at each <c>RUN</c>), and what is
     /// verified is a fact about the code that is loaded now. Whether it is the code the person means is what <see cref="HostDebugBreakpointsResult.Judged"/> says.
+    /// A disabled breakpoint is judged as any other is, and is not waited at; neither is one whose condition the request did not carry an expression for.
     /// </remarks>
-    public HostDebugBreakpointsResult SetBreakpoints(string moduleName, IReadOnlyList<int> lines)
+    public HostDebugBreakpointsResult SetBreakpoints(string moduleName, IReadOnlyList<HostBreakpointLine> breakpoints)
     {
         var session = provider.Session;
         if (!session.Symbols.TryResolveValue(moduleName, GlobalSymbols.UnresolvedSymbol, out var module) || module is null)
         {
-            return new HostDebugBreakpointsResult { Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, false))] };
+            return new HostDebugBreakpointsResult { Breakpoints = [.. breakpoints.Select(breakpoint => new HostBreakpoint(breakpoint.Line, false))] };
         }
 
-        session.Halt.Breakpoints.Set(module.Uri.AbsoluteUri, lines);
+        var refused = new string?[breakpoints.Count];
+        var waited = new List<RuntimeBreakpoint>(breakpoints.Count);
+        for (var i = 0; i < breakpoints.Count; i++)
+        {
+            var breakpoint = breakpoints[i];
+            if (!TryReadCondition(breakpoint.ConditionJson, out var condition))
+            {
+                refused[i] = Resources.Host_RequestCarriedNoExpression;
+            }
+            else if (breakpoint.IsEnabled)
+            {
+                waited.Add(new RuntimeBreakpoint(breakpoint.Line, condition));
+            }
+        }
+
+        session.Halt.Breakpoints.Set(module.Uri.AbsoluteUri, waited);
         var bodies = provider.Image.BodiesOf(module.Uri);
         return new HostDebugBreakpointsResult
         {
-            Breakpoints = [.. lines.Select(line => new HostBreakpoint(line, IBreakpointTable.Verify(bodies, line)))],
+            Breakpoints = [.. breakpoints.Select((breakpoint, i) => new HostBreakpoint(breakpoint.Line, IBreakpointTable.Verify(bodies, breakpoint.Line), refused[i]))],
             Judged = bodies.Any(),
         };
+    }
+
+    // a breakpoint without a condition has none to read; one with a condition that is not an expression's tree is refused.
+    private static bool TryReadCondition(string? json, out ExpressionNode? condition)
+    {
+        condition = null;
+        if (string.IsNullOrEmpty(json))
+        {
+            return true;
+        }
+
+        try
+        {
+            condition = PlatformJson.Deserialize<ExpressionNode>(json);
+            return condition is not null;
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

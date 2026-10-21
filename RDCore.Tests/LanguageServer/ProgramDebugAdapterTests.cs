@@ -56,7 +56,7 @@ public sealed class ProgramDebugAdapterTests
             Debugging.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
                 .Returns(call => Task.FromResult(new HostDebugBreakpointsResult
                 {
-                    Breakpoints = [.. call.Arg<IReadOnlyList<int>>().Select(line => new HostBreakpoint(line, true))],
+                    Breakpoints = [.. call.Arg<IReadOnlyList<BreakpointDto>>().Select(breakpoint => new HostBreakpoint(breakpoint.Line, true))],
                 }));
             Adapter = new ProgramDebugAdapter(Workspace, Debugging, Relay, NullLogger<ProgramDebugAdapter>.Instance);
         }
@@ -239,6 +239,41 @@ public sealed class ProgramDebugAdapterTests
 
         await session.Debugging.Received(1).SetBreakpointsAsync("Prog", Arg.Is<IReadOnlyList<BreakpointDto>>(bp => bp.SequenceEqual(new[] { new BreakpointDto { Line = 11 } })), Arg.Any<CancellationToken>());
         Assert.AreEqual(11, response.Breakpoints.Single().Line);
+    }
+
+    [TestMethod]
+    public async Task ABreakpoint_CarriesItsCondition_ToTheModule()
+    {
+        await using var session = new Session();
+        await session.StartAsync();
+        await session.LaunchAsync();
+
+        _ = await session.SendAsync(new SetBreakpointsArguments
+        {
+            Source = new Source { Path = Path },
+            Breakpoints = new Container<SourceBreakpoint>(new SourceBreakpoint { Line = 12, Condition = "i > 5" }),
+        });
+
+        await session.Debugging.Received(1).SetBreakpointsAsync("Prog", Arg.Is<IReadOnlyList<BreakpointDto>>(bp => bp.SequenceEqual(new[] { new BreakpointDto { Line = 11, Condition = "i > 5" } })), Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ABreakpoint_WhoseConditionIsRefused_IsNotVerified_AndSaysWhy()
+    {
+        await using var session = new Session();
+        session.Debugging.SetBreakpointsAsync("Prog", Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HostDebugBreakpointsResult { Breakpoints = [new HostBreakpoint(11, true, "expected an expression")], Judged = true }));
+        await session.StartAsync();
+        await session.LaunchAsync();
+
+        var response = await session.SendAsync(new SetBreakpointsArguments
+        {
+            Source = new Source { Path = Path },
+            Breakpoints = new Container<SourceBreakpoint>(new SourceBreakpoint { Line = 12, Condition = "i >" }),
+        });
+
+        Assert.IsFalse(response.Breakpoints.Single().Verified, "it is never waited at");
+        Assert.AreEqual("expected an expression", response.Breakpoints.Single().Message);
     }
 
     [TestMethod]

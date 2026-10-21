@@ -52,6 +52,17 @@ public sealed class ReplDebuggingTests
 
     private Task CommandAsync(IReplCommand command, string arguments = "") => command.ExecuteAsync(_context, arguments, CancellationToken.None);
 
+    private int[] BreakpointLines() => [.. _context.Debugger.Breakpoints.Select(breakpoint => breakpoint.LineNumber)];
+
+    // the platform refuses every condition that is not an expression the way the language server does: by the breakpoint's place in the request.
+    private void RefuseCondition(string condition, string reason)
+        => _platform.SetBreakpointsAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<BreakpointDto>>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromResult(new HostDebugBreakpointsResult
+            {
+                Breakpoints = [.. call.Arg<IReadOnlyList<BreakpointDto>>().Select(breakpoint =>
+                    new HostBreakpoint(breakpoint.Line, false, breakpoint.Condition == condition ? reason : null))],
+            }));
+
     // ---- breakpoints the platform can say are wrong ----
 
     [TestMethod]
@@ -69,7 +80,7 @@ public sealed class ReplDebuggingTests
 
         await RunAsync();
 
-        CollectionAssert.AreEqual(new[] { 10 }, _context.Debugger.Breakpoints.ToArray());
+        CollectionAssert.AreEqual(new[] { 10 }, BreakpointLines());
     }
 
     [TestMethod]
@@ -87,7 +98,7 @@ public sealed class ReplDebuggingTests
 
         await RunAsync();
 
-        CollectionAssert.AreEqual(new[] { 10, 20 }, _context.Debugger.Breakpoints.ToArray());
+        CollectionAssert.AreEqual(new[] { 10, 20 }, BreakpointLines());
     }
 
     [TestMethod]
@@ -99,7 +110,7 @@ public sealed class ReplDebuggingTests
 
         await CommandAsync(new BreakReplCommand(), "20");
 
-        CollectionAssert.AreEqual(new[] { 10, 20 }, _context.Debugger.Breakpoints.ToArray(), "what the platform holds is the program it ran last, not this one");
+        CollectionAssert.AreEqual(new[] { 10, 20 }, BreakpointLines(), "what the platform holds is the program it ran last, not this one");
     }
 
     // ---- a program that waits ----
@@ -284,7 +295,7 @@ public sealed class ReplDebuggingTests
     public async Task ABreak_TogglesTheBreakpointOfALine()
     {
         await CommandAsync(new BreakReplCommand(), "30");
-        CollectionAssert.AreEqual(new[] { 30 }, _context.Debugger.Breakpoints.ToArray());
+        CollectionAssert.AreEqual(new[] { 30 }, BreakpointLines());
         _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Set, 30));
 
         await CommandAsync(new BreakReplCommand(), "30");
@@ -334,6 +345,118 @@ public sealed class ReplDebuggingTests
         await _context.Debugger.PushBreakpointsAsync(_context, CancellationToken.None);
 
         Assert.IsEmpty(_context.Debugger.Breakpoints);
+    }
+
+    // ---- conditions and BREAK TOGGLE ----
+
+    [TestMethod]
+    public async Task ABreak_WithAnExpressionAfterTheLine_SetsABreakpointThatWaitsOnIt_AsItWasTyped()
+    {
+        await CommandAsync(new BreakReplCommand(), "30 X > 1  And  S = \"a  b\"");
+
+        Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var breakpoint));
+        Assert.AreEqual("X > 1  And  S = \"a  b\"", breakpoint.ConditionExpression, "the spaces in a string literal are the string's");
+        await _platform.Received().SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<BreakpointDto>>(sent =>
+            sent.Single().Condition == breakpoint.ConditionExpression && sent.Single().IsEnabled), Arg.Any<CancellationToken>());
+        _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Set, 30));
+    }
+
+    [TestMethod]
+    public async Task ABreak_WithACondition_ReplacesTheBreakpointTheLineHad_RatherThanClearingIt()
+    {
+        await CommandAsync(new BreakReplCommand(), "30");
+        await CommandAsync(new BreakReplCommand(), "30 X = 2");
+
+        Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var breakpoint));
+        Assert.AreEqual("X = 2", breakpoint.ConditionExpression);
+    }
+
+    [TestMethod]
+    public async Task ABreak_WhoseConditionIsRefused_SetsNoBreakpoint_AndSaysWhy()
+    {
+        RefuseCondition("X >", "expected an expression");
+
+        await CommandAsync(new BreakReplCommand(), "30 X >");
+
+        Assert.IsEmpty(_context.Debugger.Breakpoints);
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Error, string.Format(Resources.Repl_Breakpoint_ConditionRefused, 30, "expected an expression"));
+        _console.DidNotReceive().WriteLine(string.Format(Resources.Repl_Breakpoint_Set, 30));
+    }
+
+    [TestMethod]
+    public async Task ABreak_WhoseConditionIsRefused_LeavesTheLineWithTheBreakpointItHad()
+    {
+        await CommandAsync(new BreakReplCommand(), "30 X = 2");
+        RefuseCondition("X >", "expected an expression");
+
+        await CommandAsync(new BreakReplCommand(), "30 X >");
+
+        Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var breakpoint));
+        Assert.AreEqual("X = 2", breakpoint.ConditionExpression);
+    }
+
+    [TestMethod]
+    public async Task ABreakToggle_DisablesTheBreakpointOfALine_AndEnablesItAgain()
+    {
+        await CommandAsync(new BreakReplCommand(), "30 X = 2");
+
+        await CommandAsync(new BreakReplCommand(), "TOGGLE 30");
+        Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var disabled));
+        Assert.IsFalse(disabled.Enabled);
+        Assert.AreEqual("X = 2", disabled.ConditionExpression, "a disabled breakpoint keeps its condition");
+        _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Disabled, 30));
+        await _platform.Received().SetBreakpointsAsync("Program", Arg.Is<IReadOnlyList<BreakpointDto>>(sent => !sent.Single().IsEnabled), Arg.Any<CancellationToken>());
+
+        await CommandAsync(new BreakReplCommand(), "toggle 30");
+        Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var enabled));
+        Assert.IsTrue(enabled.Enabled);
+        _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Enabled, 30));
+    }
+
+    [TestMethod]
+    public async Task ABreakToggle_OnALineWithNoBreakpoint_SetsOne()
+    {
+        await CommandAsync(new BreakReplCommand(), "TOGGLE 30");
+
+        Assert.IsTrue(_context.Debugger.TryGetBreakpoint(30, out var breakpoint));
+        Assert.IsTrue(breakpoint.Enabled);
+        Assert.IsNull(breakpoint.ConditionExpression);
+        _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_Set, 30));
+    }
+
+    [TestMethod]
+    public async Task ABreakToggle_OnALineThatIsNotInTheProgram_IsAnUndefinedLine()
+    {
+        await CommandAsync(new BreakReplCommand(), "TOGGLE 99");
+
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Error, Resources.Repl_UndefinedLine, "99");
+        Assert.IsEmpty(_context.Debugger.Breakpoints);
+    }
+
+    [TestMethod]
+    public async Task ABreak_WithNoLine_ListsTheConditionsAndWhichAreDisabled()
+    {
+        await CommandAsync(new BreakReplCommand(), "10");
+        await CommandAsync(new BreakReplCommand(), "20 X > 1");
+        await CommandAsync(new BreakReplCommand(), "TOGGLE 30");
+        await CommandAsync(new BreakReplCommand(), "TOGGLE 30");
+
+        await CommandAsync(new BreakReplCommand());
+
+        _console.Received().WriteLine(string.Format(Resources.Repl_Breakpoint_List, $"10, 20 [X > 1], 30 {Resources.Repl_Breakpoint_DisabledMark}"));
+    }
+
+    [TestMethod]
+    public async Task ARun_DropsABreakpointWhoseConditionIsRefused_AndSaysWhy()
+    {
+        _context.Debugger.SetBreakpoint(new Breakpoint(30, ConditionExpression: "X >"));
+        RefuseCondition("X >", "expected an expression");
+        ExecuteReturns(new ExecuteSessionResult { Outcome = ExecutionOutcome.Completed });
+
+        await RunAsync();
+
+        Assert.IsEmpty(_context.Debugger.Breakpoints);
+        _console.Received().WriteMessage(RDCore.SDK.ConsoleIO.Model.MessageKind.Error, string.Format(Resources.Repl_Breakpoint_ConditionRefused, 30, "expected an expression"));
     }
 
     // ---- clearing the program ----
@@ -645,7 +768,7 @@ public sealed class ReplDebuggingTests
         Assert.AreEqual(ReplLineStyle.Plain, plain.Style);
 
         var marked = Listed(20);
-        Assert.AreEqual("🔴", marked.Margin.Text);
+        Assert.AreEqual("●", marked.Margin.Text);
         Assert.AreEqual(ReplTextStyle.BreakpointGlyph, marked.Margin.Style);
         Assert.AreEqual(ReplLineStyle.Breakpoint, marked.Style);
     }

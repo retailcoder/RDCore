@@ -254,18 +254,21 @@ internal sealed class ProgramDebugAdapter(
         var result = await debugging.SetBreakpointsAsync(module, requested, cancellationToken);
         lock (_sync)
         {
-            _breakpointLines[module] = [.. result.Breakpoints.Where(breakpoint => breakpoint.Verified).Select(breakpoint => breakpoint.Line)];
+            _breakpointLines[module] = [.. result.Breakpoints.Where(IsWaitedAt).Select(breakpoint => breakpoint.Line)];
             _clientPaths[module] = path;
         }
+
+        // a breakpoint whose condition is refused is never waited at, which is what a client shows a breakpoint that is not verified as.
+        static bool IsWaitedAt(HostBreakpoint breakpoint) => breakpoint.Verified && breakpoint.ConditionError is null;
 
         return new SetBreakpointsResponse
         {
             Breakpoints = new Container<Breakpoint>(result.Breakpoints.Select(breakpoint => new Breakpoint
             {
-                Verified = breakpoint.Verified,
+                Verified = IsWaitedAt(breakpoint),
                 Line = ToClientLine(breakpoint.Line),
                 Source = request.Source,
-                Message = breakpoint.Verified ? null : DebuggerMessages.NoStatementOnLine,
+                Message = breakpoint.ConditionError ?? (breakpoint.Verified ? null : DebuggerMessages.NoStatementOnLine),
             })),
         };
     }

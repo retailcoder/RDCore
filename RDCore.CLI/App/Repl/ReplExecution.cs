@@ -50,7 +50,7 @@ internal static class ReplExecution
             return;
         }
 
-        await context.Debugger.PushBreakpointsAsync(context, token);
+        Report(context, await context.Debugger.PushBreakpointsAsync(context, token));
         context.Debugger.Running();
         try
         {
@@ -70,6 +70,16 @@ internal static class ReplExecution
         {
             context.Debugger.Idle();
             throw;
+        }
+    }
+
+    // a breakpoint whose condition is refused is dropped before the program goes, and the person is told which, and why: BREAK refuses the condition as it is typed,
+    // and this is the one a platform that did not debug then refuses now.
+    private static void Report(ReplCommandContext context, IReadOnlyList<(Breakpoint Breakpoint, string Reason)> refused)
+    {
+        foreach (var (breakpoint, reason) in refused)
+        {
+            context.Console.WriteMessage(MessageKind.Error, string.Format(Resources.Repl_Breakpoint_ConditionRefused, breakpoint.LineNumber, reason));
         }
     }
 
@@ -98,7 +108,7 @@ internal static class ReplExecution
     /// <param name="step">How far the program goes, or <see langword="null"/> for as far as it goes.</param>
     public static async Task ResumeAsync(ReplCommandContext context, StepKind? step)
     {
-        await context.Debugger.PushBreakpointsAsync(context, CancellationToken.None);
+        Report(context, await context.Debugger.PushBreakpointsAsync(context, CancellationToken.None));
         var waitedBefore = context.Debugger.StoppedAt;
         context.Debugger.Running();
         try
