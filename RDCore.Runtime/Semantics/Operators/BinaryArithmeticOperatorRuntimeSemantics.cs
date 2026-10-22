@@ -122,6 +122,9 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
         OperatorEvaluationFrame frame)
         => EffectiveTypeOf(OperationPlanner.ForValues(Operator, frame[InputIndex.BinaryLeftOperand].TypeInfo, frame[InputIndex.BinaryRightOperand].TypeInfo), expression);
 
+    // MS-VBAL 5.6.9.3: a Variant operand's overflow of an Integer, Long, Single or Date makes the result the narrowest of Integer, Long or Double it fits.
+    protected override bool PromotesOnOverflow(VBType resultType) => resultType is VBIntegerType or VBLongType or VBSingleType or VBDateType;
+
     // MS-VBAL 5.6.9.3: "If the value type of any operand is an array, UDT or Error, runtime error 13 (Type mismatch) is raised."
     protected override LetCoercionResult ValidateOperand(ISymbolResolver resolver, ExpressionNode expression, OperatorEvaluationFrame frame, InputIndex index)
         => frame[index] is VBErrorValue

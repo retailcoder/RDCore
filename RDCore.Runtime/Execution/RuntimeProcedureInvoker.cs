@@ -76,7 +76,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             return new VBObjectValue(objectId).RuntimeValue;
         }
 
-        return SymbolAddressTable.BoxedValue(parameter.ResolvedType.DefaultValue);
+        // the argument is the caller's, which there is none of: its type's default is what the parameter assumes, and a Variant's says nothing of its subtype.
+        return SymbolAddressTable.BoxedValue(parameter.ResolvedType.DefaultValue.AsAssumed());
     };
 
     private RuntimeSemanticsEvaluationResult Activate(

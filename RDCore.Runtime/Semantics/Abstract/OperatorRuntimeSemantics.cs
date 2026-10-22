@@ -299,6 +299,13 @@ where TFlags : struct, Enum
         var resolver = session.Symbols.Resolver;
         var comparison = session.CurrentStringComparison();
 
+        // the subtype of a Variant decides the effective type, and what is analyzed of the operation: one whose subtype is not known leaves both not known,
+        // and the Empty it assumes is no fact - the operation is stated, with nothing said of it.
+        if (operands.Any(HasUnknownSubtype))
+        {
+            return CreateFact(token, expression, null, default, comparison, isValueKnown: false, StatedErrors.Of(result.ErrorInfo));
+        }
+
         var builder = new SemanticContextFlagsBuilder<TContext, TFlags>();
         Analyze(resolver, builder, expression, comparison, operands);
 
@@ -367,17 +374,41 @@ where TFlags : struct, Enum
     /// <param name="effectiveType">The effective type of the operation.</param>
     protected virtual VBType ResultTypeOf(VBType effectiveType) => effectiveType;
 
+    /// <summary>
+    /// Whether a result of the specified type, of an operation of an operand declared <c>Variant</c>, can be of another type when the value overflows it.
+    /// </summary>
+    /// <remarks>
+    /// 👉 MS-VBAL §5.6.9.3: an arithmetic operator of a <c>Variant</c> operand whose effective type is <c>Integer</c>, <c>Long</c>, <c>Single</c> or
+    /// <c>Date</c> yields the narrowest of <c>Integer</c>, <c>Long</c> or <c>Double</c> its value fits in. A result whose value is not known is then of a
+    /// subtype that is not known either. The base says no: only an arithmetic operator overflows.
+    /// </remarks>
+    /// <param name="resultType">The type of the result, for the effective type of the operation.</param>
+    protected virtual bool PromotesOnOverflow(VBType resultType) => false;
+
+    // a Variant an analysis knows nothing of but that it is a Variant.
+    private static bool HasUnknownSubtype(VBTypedValue operand) => operand is VBVariantValue { IsSubtypeKnown: false };
+
     private VBTypedValue IndeterminateResultOf(OperatorEvaluationFrame frame, RuntimeSemanticsEvaluationResult result, VBType? effectiveType)
     {
-        // the subtype of a Variant decides the effective type, so the type of the result is not known either.
-        if (effectiveType is null || frame.Operands.Any(operand => operand is VBVariantValue { IsIndeterminate: true }))
+        // the subtype of a Variant decides the effective type: one that is not known leaves the type of the result not known either.
+        if (effectiveType is null || frame.Operands.Any(HasUnknownSubtype))
         {
             return VBVariantType.TypeInfo.CreateIndeterminateValue();
         }
 
+        // a Variant whose value is not known, of a subtype that is, yields a Variant of the type the operation's result is - unless overflow could make it
+        // another, which a value that is not known cannot tell.
+        var resultType = ResultTypeOf(effectiveType);
+        if (frame.Operands.Any(operand => operand is VBVariantValue { IsIndeterminate: true }))
+        {
+            return PromotesOnOverflow(resultType)
+                ? VBVariantType.TypeInfo.CreateIndeterminateValue()
+                : new VBVariantValue(resultType.CreateIndeterminateValue()).AsIndeterminate();
+        }
+
         return result.IsSuccess
             ? result.Result!.AsIndeterminate()
-            : ResultTypeOf(effectiveType).CreateIndeterminateValue();
+            : resultType.CreateIndeterminateValue();
     }
 
     private (RuntimeSemanticsEvaluationResult Result, VBType? EffectiveType) EvaluateOperation(

@@ -271,12 +271,13 @@ public class LetCoercionRuntimeSemanticsProvider(
             flags |= ConversionSemanticFlags.Implicit;
         }
 
+        // a Variant whose subtype is not known is a Variant, and nothing more: the Empty it assumes is no fact.
         target.OnConversion(new ConversionFact(
             expression.Identity,
             expression.Location,
             frame.Site,
             frame.OperandIndex,
-            frame.SourceValue.TypeInfo,
+            frame.SourceValue is VBVariantValue { IsSubtypeKnown: false } ? VBVariantType.TypeInfo : frame.SourceValue.TypeInfo,
             frame.DestinationTypeDesc.Target,
             flags,
             IsValueKnown: !frame.SourceValue.IsIndeterminate,

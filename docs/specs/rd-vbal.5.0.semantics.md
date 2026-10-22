@@ -243,6 +243,17 @@ not known returns is not known, whichever procedure is called. A call made with 
 known, returns what the procedure returned. The facts the analysis states as it evaluates the code, and when it states a
 run-time error, are described under [**RD-VBAL §2.6.4** Runtime facts](rd-vbal.2.6.4.rubberduck-core-diagnostics.md#runtime-facts).
 
+A `Variant` whose value is not known can still have a subtype that is
+([VBVariantValue](../api/RDCore.SDK.Model.Values.Intrinsic.VBVariantValue.html)`.IsSubtypeKnown`): one assigned
+`x * 1.5` holds a `Double` whatever `x` is, and a local the code has not assigned yet holds the `Empty` it starts as. Where
+the `Empty` is only what the analysis put in place of a value it does not have - a parameter, whose argument is the
+caller's; a variable of the module or a `Static` local, entered with whatever the rest of the program left in it; what a
+procedure the analysis does not run returns - the subtype is not known either. An operation of a `Variant` whose subtype is
+not known states no effective type and nothing of what it does, a conversion of one states that it converts a `Variant`,
+and what either yields is a `Variant` whose subtype is not known. So is the result of an arithmetic operator of a `Variant`
+whose effective type is `Integer`, `Long`, `Single` or `Date`: the value it overflows to is the narrowest of `Integer`,
+`Long` or `Double` it fits (**MS-VBAL §5.6.9.3**), which a value that is not known cannot tell.
+
 A statement inside an excluded `#If` branch is not analyzed and defines no label (**MS-VBAL §3.4.2**). Lowering a body to
 instructions ([**RD-VBAL §3.5.2** Instruction](rd-vbal.3.5.2.instruction.md)) reports exactly these errors, by calling
 `CheckStructure`: the rules are written in one place, and lowering only acts on the outcome (a jump that lands nowhere has no

@@ -29,7 +29,7 @@ public sealed class AnalysisDefaults(IVariableDefaults declared) : IVariableDefa
     public VBTypedValue DefaultValueOf(Symbol variable)
     {
         var value = declared.DefaultValueOf(variable);
-        return IsMadeByTheCodeThatRuns(variable) ? value : value.AsIndeterminate();
+        return IsMadeByTheCodeThatRuns(variable) ? value : value.AsAssumed();
     }
 
     private static bool IsMadeByTheCodeThatRuns(Symbol variable)

@@ -70,9 +70,9 @@ public abstract record class VBType
     /// </summary>
     /// <remarks>
     /// What an analysis knows of a value that is not a constant is its declared type: the value is indeterminate, and assumes a value of that type
-    /// so that the semantics that evaluate it can.
+    /// so that the semantics that evaluate it can. A <c>Variant</c>'s subtype is not known either (<see cref="VBTypedValue.AsAssumed"/>).
     /// </remarks>
-    public VBTypedValue CreateIndeterminateValue() => DefaultValue.AsIndeterminate();
+    public VBTypedValue CreateIndeterminateValue() => DefaultValue.AsAssumed();
 
     /// <summary>
     /// Prints this <c>VBType</c>'s members for <see cref="object.ToString"/>.

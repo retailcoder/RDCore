@@ -57,5 +57,29 @@ public record class VBVariantValue : VBTypedValue, IVBTypedValue<VBVariantValue,
 
     public VBVariantValue WithValue(VBTypedValue value) => new(value) { TypeInfo = VBVariantType.TypeInfo with { SubType = value.TypeInfo } };
 
+    /// <summary>
+    /// Whether the subtype of this <c>Variant</c> is known: <see langword="false"/> for one an analysis knows nothing of but that it is a <c>Variant</c>.
+    /// </summary>
+    /// <remarks>
+    /// A <c>Variant</c> whose value is not known still has a subtype that is, when what it holds was given a type - <c>v = x * 1.5</c> holds a
+    /// <c>Double</c>, whatever <c>x</c> is - and the effective type of an operation of it is that subtype's. One whose subtype is not known holds an
+    /// <c>Empty</c> that is not known either (<see cref="OfUnknownSubtype"/>): an <c>Empty</c> has one value, so an <c>Empty</c> that is not known can only be
+    /// a subtype that is not. Nothing is planned on the <c>Empty</c> it assumes: an operation of it has no effective type that is known.
+    /// </remarks>
+    public bool IsSubtypeKnown => TypedValue switch
+    {
+        VBVariantValue inner => inner.IsSubtypeKnown,
+        VBEmptyValue { IsIndeterminate: true } => false,
+        _ => true,
+    };
+
+    /// <summary>
+    /// A <c>Variant</c> that is not known, of a subtype that is not known either: what an analysis knows of a <c>Variant</c> nothing has said anything of.
+    /// </summary>
+    public static VBVariantValue OfUnknownSubtype() => (VBVariantValue)new VBVariantValue(VBEmptyValue.Empty.AsIndeterminate()).AsIndeterminate();
+
+    /// <inheritdoc/>
+    public override VBTypedValue AsAssumed() => TypedValue is VBEmptyValue ? OfUnknownSubtype() : AsIndeterminate();
+
     public bool Equals(IVBTypedValue<VBVariantValue, VBRuntimeVariantValue>? other) => Value == other?.Value;
 }

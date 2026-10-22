@@ -60,6 +60,13 @@ public sealed class OperatorFactAnalyzerTests
         Assert.IsEmpty(await FindAsync(new BitwiseSemanticsAnalyzer(), "ByVal a As Boolean, ByVal b As Boolean", "Dim r As Boolean", "r = a And b"));
     }
 
+    // what two Variants hold is not known: neither is whether the operator works on their bits.
+    [TestMethod]
+    public async Task ALogicalOperatorOverVariantsThatAreNotKnown_IsNotReported()
+    {
+        Assert.IsEmpty(await FindAsync(new BitwiseSemanticsAnalyzer(), "ByVal a As Variant, ByVal b As Variant", "Dim r As Variant", "r = a And b"));
+    }
+
     [TestMethod]
     [DataRow("<")]
     [DataRow("=")]

@@ -209,12 +209,86 @@ public sealed class RuntimeFactsExposureTests
         Assert.AreEqual(FixedAssignmentSemanticFlags.UserDefinedTypeCopy | FixedAssignmentSemanticFlags.SourceHoldsVariableLengthString, fact.Flags);
     }
 
+    // a parameter is the caller's argument, which the analysis has none of: its subtype is not known, and the Empty it assumes is no fact.
     [TestMethod]
-    [Ignore("Needs Variant type tracking (deferred types): the analysis does not track the type a Variant holds, so the effective type of an operation of a Variant that is not known is the assumed Empty's (Integer), stated as a fact.")]
     public async Task AnOperationOfAVariantThatIsNotKnown_HasNoKnownEffectiveType()
     {
         var facts = await FactsOfAsync("ByVal v As Variant, ByVal w As Variant", "Dim r As Variant", "r = v + w");
 
         Assert.IsNull(facts.Operations.Single().EffectiveType);
+    }
+
+    [TestMethod]
+    public async Task AnOperationOfAnOperationOfAVariantThatIsNotKnown_HasNoKnownEffectiveType()
+    {
+        var facts = await FactsOfAsync("ByVal v As Variant", "Dim r As Variant, s As Variant", "r = v + 1", "s = r * 2");
+
+        Assert.IsTrue(facts.Operations.All(operation => operation.EffectiveType is null));
+    }
+
+    [TestMethod]
+    public async Task AVariantAssignedADouble_IsADouble_WhateverItsValue()
+    {
+        var facts = await FactsOfAsync("ByVal x As Double", "Dim v As Variant, r As Variant", "v = x * 1.5", "r = v + 1");
+
+        CollectionAssert.AreEqual(new[] { "Double", "Double" }, facts.Operations.Select(operation => operation.EffectiveType?.Name).ToArray());
+    }
+
+    // a local the code has not assigned holds the Empty it starts as.
+    [TestMethod]
+    public async Task ALocalVariantNotYetAssigned_IsEmpty()
+    {
+        var facts = await FactsOfAsync("", "Dim v As Variant, r As Variant", "r = v + 1");
+
+        Assert.AreEqual("Integer", facts.Operations.Single().EffectiveType?.Name);
+    }
+
+    // MS-VBAL 5.6.9.3: a Variant's Integer result that overflows is a Long, or a Double - which a value that is not known cannot tell.
+    [TestMethod]
+    public async Task AVariantResultThatCanOverflow_IsOfASubtypeThatIsNotKnown()
+    {
+        var facts = await FactsOfAsync("ByVal x As Integer", "Dim v As Variant, r As Variant, s As Variant", "v = x", "r = v + 1", "s = r + 1");
+
+        CollectionAssert.AreEqual(new[] { "Integer", null }, facts.Operations.Select(operation => operation.EffectiveType?.Name).ToArray());
+    }
+
+    [TestMethod]
+    public async Task AConversionOfAVariantThatIsNotKnown_IsFromAVariant()
+    {
+        var facts = await FactsOfAsync("ByVal v As Variant", "Dim l As Long", "l = v");
+
+        Assert.AreEqual("Variant", facts.Conversions.Single().Source.Name);
+    }
+
+    [TestMethod]
+    public async Task AConversionOfAVariantAssignedADouble_IsFromADouble()
+    {
+        var facts = await FactsOfAsync("ByVal x As Double", "Dim v As Variant, l As Long", "v = x", "l = v");
+
+        Assert.AreEqual("Double", facts.Conversions.Last().Source.Name);
+    }
+
+    // no operator yields an internal error for a Variant of a subtype that is not known, on either side.
+    [TestMethod]
+    [DataRow("v + w")] [DataRow("v - 1")] [DataRow("2 * v")] [DataRow("v / w")] [DataRow("v \\ 2")] [DataRow("v Mod w")] [DataRow("v ^ 2")]
+    [DataRow("v & w")] [DataRow("v = w")] [DataRow("v <> 1")] [DataRow("v < \"a\"")] [DataRow("v >= w")] [DataRow("v Like \"a*\"")]
+    [DataRow("v And w")] [DataRow("v Or 1")] [DataRow("v Xor w")] [DataRow("v Eqv w")] [DataRow("v Imp w")] [DataRow("Not v")] [DataRow("-v")]
+    public async Task AnyOperatorOfAVariantThatIsNotKnown_IsFullyAnalyzed_WithNoKnownEffectiveType(string operation)
+    {
+        var facts = await FactsOfAsync("ByVal v As Variant, ByVal w As Variant", "Dim r As Variant", $"r = {operation}");
+
+        Assert.IsTrue(facts.IsFullyAnalyzed);
+        Assert.IsEmpty(facts.Errors);
+        Assert.IsTrue(facts.Operations.All(operation => operation.EffectiveType is null));
+    }
+
+    // a module variable is entered with whatever the rest of the program last left in it.
+    [TestMethod]
+    public async Task AnOperationOfAModuleVariant_HasNoKnownEffectiveType()
+    {
+        var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPrivate m As Variant\r\nPublic Sub Main()\r\nDim r As Variant\r\nr = m + 1\r\nEnd Sub\r\n";
+        var model = await ModuleWorkspace.ModelAsync([], program);
+
+        Assert.IsNull(model.Procedures.Single().Runtime!.Operations.Single().EffectiveType);
     }
 }

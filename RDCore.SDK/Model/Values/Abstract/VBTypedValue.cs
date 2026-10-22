@@ -93,6 +93,16 @@ public abstract record class VBTypedValue(VBType TypeInfo)
         => IsIndeterminate ? this : this with { Handle = new IndeterminateBindingHandle(Handle) };
 
     /// <summary>
+    /// Returns what an analysis assumes of this value where it does not trust it - a variable it reads, a value nothing says anything of but its declared
+    /// type: a copy whose value is not known (<see cref="AsIndeterminate"/>).
+    /// </summary>
+    /// <remarks>
+    /// 👉 A <c>Variant</c> that holds <c>Empty</c>, the value every <c>Variant</c> starts as, says nothing of the value it will hold: its subtype is not known
+    /// either (<see cref="Intrinsic.VBVariantValue.IsSubtypeKnown"/>). One that holds a value of another subtype keeps it.
+    /// </remarks>
+    public virtual VBTypedValue AsAssumed() => AsIndeterminate();
+
+    /// <summary>
     /// Returns a copy of this value that is known, when it is not known only because it was read as not known (<see cref="AsIndeterminate"/>).
     /// </summary>
     /// <remarks>
