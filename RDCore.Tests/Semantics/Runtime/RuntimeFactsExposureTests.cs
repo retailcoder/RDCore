@@ -243,13 +243,13 @@ public sealed class RuntimeFactsExposureTests
         Assert.AreEqual("Integer", facts.Operations.Single().EffectiveType?.Name);
     }
 
-    // MS-VBAL 5.6.9.3: a Variant's Integer result that overflows is a Long, or a Double - which a value that is not known cannot tell.
+    // MS-VBAL 5.6.9.3 would make a Variant's Integer result that overflows a Long, or a Double: the analysis presumes it does not overflow.
     [TestMethod]
-    public async Task AVariantResultThatCanOverflow_IsOfASubtypeThatIsNotKnown()
+    public async Task AVariantResultThatCouldOverflow_IsPresumedNotTo()
     {
         var facts = await FactsOfAsync("ByVal x As Integer", "Dim v As Variant, r As Variant, s As Variant", "v = x", "r = v + 1", "s = r + 1");
 
-        CollectionAssert.AreEqual(new[] { "Integer", null }, facts.Operations.Select(operation => operation.EffectiveType?.Name).ToArray());
+        CollectionAssert.AreEqual(new[] { "Integer", "Integer" }, facts.Operations.Select(operation => operation.EffectiveType?.Name).ToArray());
     }
 
     [TestMethod]

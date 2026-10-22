@@ -103,14 +103,15 @@ public sealed class ModuleSweepTests
     [TestMethod]
     public async Task WhatTheStandardLibraryReturnsForAnArgumentThatIsNotKnown_IsConvertedLikeAVariableThatIsNotKnown()
     {
-        // Len returns a Variant, and a Variant that is not known is not known to hold a Long either: 200 + Len(s) is what 200 + v is.
+        // Len returns a Variant that holds a Long, whose value is not known when the argument is not: 200 + Len(s) is a Long that is not known, as
+        // 200 + l is of a Long l whose value is not known.
         var library = Assignment(await FactsOfAsync("Dim s As String", "Dim b As Byte", "b = 200 + Len(s)"));
-        var variable = Assignment(await FactsOfAsync("Dim v As Variant", "Dim b As Byte", "b = 200 + v"));
+        var variable = Assignment(await FactsOfAsync("Dim l As Long", "Dim b As Byte", "b = 200 + l"));
 
         Assert.IsFalse(variable.IsValueKnown);
         Assert.IsFalse(library.IsValueKnown, "200 + Len(s) is not known to fit a Byte");
+        Assert.AreEqual(VBLongType.TypeInfo, library.Source);
         Assert.AreEqual(variable.Source, library.Source);
-        Assert.AreEqual(variable.Flags, library.Flags);
     }
 
     [TestMethod]

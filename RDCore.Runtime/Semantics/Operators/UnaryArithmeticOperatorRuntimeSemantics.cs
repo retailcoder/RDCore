@@ -54,9 +54,6 @@ public abstract record class UnaryArithmeticOperatorRuntimeSemantics(
         ArithmeticOperatorSemanticFlags semanticFlags)
         => new(node.Identity, determineOperatorEffectiveTypeResult, coercionResult, evaluationResult, semanticFlags);
 
-    // MS-VBAL 5.6.9.3: a Variant operand's overflow of an Integer, Long, Single or Date makes the result the narrowest of Integer, Long or Double it fits.
-    protected override bool PromotesOnOverflow(VBType resultType) => resultType is VBIntegerType or VBLongType or VBSingleType or VBDateType;
-
     protected override OperatorFact? CreateFact(
         string token, ExpressionNode expression, VBType? effectiveType, ArithmeticOperatorSemanticFlags flags,
         StringComparisonRules comparison, bool isValueKnown, VBErrorInfo? error)

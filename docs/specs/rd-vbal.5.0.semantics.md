@@ -250,9 +250,11 @@ the `Empty` is only what the analysis put in place of a value it does not have -
 caller's; a variable of the module or a `Static` local, entered with whatever the rest of the program left in it; what a
 procedure the analysis does not run returns - the subtype is not known either. An operation of a `Variant` whose subtype is
 not known states no effective type and nothing of what it does, a conversion of one states that it converts a `Variant`,
-and what either yields is a `Variant` whose subtype is not known. So is the result of an arithmetic operator of a `Variant`
-whose effective type is `Integer`, `Long`, `Single` or `Date`: the value it overflows to is the narrowest of `Integer`,
-`Long` or `Double` it fits (**MS-VBAL §5.6.9.3**), which a value that is not known cannot tell.
+and what either yields is a `Variant` whose subtype is not known. An operation of a `Variant` whose subtype is known yields
+a `Variant` of the type of its result. 👉 The analysis presumes there is no overflow: an `Integer`, `Long`, `Single` or
+`Date` result of an arithmetic operator of a `Variant` that overflows is the narrowest of `Integer`, `Long` or `Double` it
+fits (**MS-VBAL §5.6.9.3**), which a value that is not known cannot tell - an edge case, not worth what the subtype tells
+of every other one.
 
 A statement inside an excluded `#If` branch is not analyzed and defines no label (**MS-VBAL §3.4.2**). Lowering a body to
 instructions ([**RD-VBAL §3.5.2** Instruction](rd-vbal.3.5.2.instruction.md)) reports exactly these errors, by calling
