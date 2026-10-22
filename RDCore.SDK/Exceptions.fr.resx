@@ -462,6 +462,9 @@
   <data name="VBCompileError_LenOfADefaultMemberValue_Verbose" xml:space="preserve">
     <value>Len et LenB prennent une expression String ou le nom d'une variable (MS-VBAL §6.1.2.11.1.22): un objet de {0} vaut ce que retourne son membre par défaut {1}, une valeur de type {2}, qui n'est ni l'un ni l'autre.</value>
   </data>
+  <data name="VBCompileError_InvalidParamArrayUse_ByRef_Verbose" xml:space="preserve">
+    <value>Le ParamArray {0} est passé au paramètre ByRef {1}: un ParamArray est un tableau des valeurs que l'appel a recueillies, pas une variable dont un paramètre par référence pourrait être un second nom (MS-VBAL §5.3.1.11). Passez-le ByVal, ou passez-en un élément.</value>
+  </data>
   <data name="VBCompileError_NothingIsNotAValue_Verbose" xml:space="preserve">
     <value>Nothing n'est aucun objet, et n'a donc aucune valeur : une valeur est attendue ici.</value>
   </data>

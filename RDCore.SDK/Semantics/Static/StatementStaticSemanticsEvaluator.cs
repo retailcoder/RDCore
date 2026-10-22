@@ -391,9 +391,12 @@ public static class StatementStaticSemanticsEvaluator
                     ExpressionStaticSemanticsEvaluator.MarkPassedAsArguments(context, callStatement.Arguments);
                 }
 
-                // an object given to a parameter that expects a value of it must have one (MS-VBAL §5.5.1.1).
-                if (ObjectValueStaticSemantics.ParametersOfCallee(context, callStatement.Callee) is { } parameters
-                    && ObjectValueStaticSemantics.ArgumentsError(context, parameters, callStatement.Arguments) is { } argumentError)
+                // a ParamArray is no variable a ByRef parameter can be bound to (MS-VBAL §5.3.1.11), and an object given to a parameter that expects a
+                // value of it must have one (MS-VBAL §5.5.1.1).
+                if (ObjectValueStaticSemantics.MemberOfCallee(context, callStatement.Callee) is { } calledMember
+                    && ObjectValueStaticSemantics.ParametersOfCallee(context, callStatement.Callee) is { } parameters
+                    && (ParamArrayStaticSemantics.ArgumentsError(context, calledMember, parameters, callStatement.Arguments)
+                        ?? ObjectValueStaticSemantics.ArgumentsError(context, parameters, callStatement.Arguments)) is { } argumentError)
                 {
                     walk.Errors.Add(argumentError);
                 }

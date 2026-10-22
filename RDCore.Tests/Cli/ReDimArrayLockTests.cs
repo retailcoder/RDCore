@@ -112,12 +112,25 @@ public sealed class ReDimArrayLockTests
 
     // an argument is evaluated once: its subscript too, when there is no such element, which is error 9 (recorded in Excel).
     [TestMethod]
-    [Ignore("An element that cannot be bound by reference - outside the bounds - falls back to being evaluated as a value, which evaluates its subscripts " +
-        "again (RuntimeExpressionEvaluator.TryResolveElementByRefArgument).")]
     public async Task AnElementOutsideTheBounds_PassedByRef_HasItsSubscriptEvaluatedOnce()
         => CollectionAssert.AreEqual(new[] { "1 9" },
             await RunAsync(
                 "Private Function NextIndex() As Long\r\ncalls = calls + 1\r\nNextIndex = 9\r\nEnd Function\r\nPublic Sub Hold(ByRef x As Long)\r\nEnd Sub",
+                "On Error Resume Next", "ReDim arr(1 To 3)", "calls = 0", "Hold arr(NextIndex())", "Debug.Print calls & \" \" & Err.Number"));
+
+    [TestMethod]
+    public async Task AnElementInsideTheBounds_PassedByRef_HasItsSubscriptEvaluatedOnce()
+        => CollectionAssert.AreEqual(new[] { "1 0" },
+            await RunAsync(
+                "Private Function NextIndex() As Long\r\ncalls = calls + 1\r\nNextIndex = 2\r\nEnd Function\r\nPublic Sub Hold(ByRef x As Long)\r\nEnd Sub",
+                "On Error Resume Next", "ReDim arr(1 To 3)", "calls = 0", "Hold arr(NextIndex())", "Debug.Print calls & \" \" & Err.Number"));
+
+    // a subscript that raises an error raises it once: the argument is not evaluated again as a value.
+    [TestMethod]
+    public async Task AnElementWhoseSubscriptRaises_PassedByRef_HasItsSubscriptEvaluatedOnce()
+        => CollectionAssert.AreEqual(new[] { "1 5" },
+            await RunAsync(
+                "Private Function NextIndex() As Long\r\ncalls = calls + 1\r\nErr.Raise 5\r\nEnd Function\r\nPublic Sub Hold(ByRef x As Long)\r\nEnd Sub",
                 "On Error Resume Next", "ReDim arr(1 To 3)", "calls = 0", "Hold arr(NextIndex())", "Debug.Print calls & \" \" & Err.Number"));
 
     [TestMethod]

@@ -716,6 +716,14 @@ namespace RDCore.SDK {
                 return ResourceManager.GetString("VBCompileError_LenOfADefaultMemberValue_Verbose", resourceCulture);
             }
         }
+        
+        ///   Looks up a localized string similar to ParamArray {0} is passed to ByRef parameter {1}: a ParamArray is an array of the values the call collected, not a variable a reference parameter can be a second name for (MS-VBAL §5.3.1.11). Pass it ByVal, or pass an element of it..
+        /// </summary>
+        public static string VBCompileError_InvalidParamArrayUse_ByRef_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_InvalidParamArrayUse_ByRef_Verbose", resourceCulture);
+            }
+        }
 
         /// <summary>
         ///   Looks up a localized string similar to Nothing is no object, and so has no value: a value is expected here..
