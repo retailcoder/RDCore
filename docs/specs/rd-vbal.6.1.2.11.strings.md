@@ -503,8 +503,19 @@ storage bytes required when used with variable-length strings in user-defined da
 pointer.
 
 [**RD-VBAL §2.5.2.1.3** User-Defined Type (UDT) Values](rd-vbal.2.5.2.1.3.udt-values.md) holds the padding rule.
-An object is measured as its value, what its default member returns: `Len` of an object whose default member returns a
-`Long` is `4`, the size of a `Long`.
+
+#### A string expression, or a variable
+
+`Expression` is "any valid string expression, or any valid variable name", and RD-VBA checks it at compile time, as
+MS-VBA does (recorded in Excel). A `String`, a `Variant` (`Now`, `CVar(x)`, `Null`, `Empty`), a late-bound object and a
+record are read as a value. A value of any other declared type must be a variable - a variable or a parameter, in
+parentheses or not, a field of a record, an element of an array - whose size is measured: `Len(5)`, `Len(1 + 2)`,
+`Len(True)`, `Len(FnLong())`, `Len(k)` of a constant and `Len(o.Value)` of a property are
+[`VBC09333`](../diagnostics/vbc09333.md) Variable required.
+
+An object stands for what its default member returns, which is no variable: `Len` of an object whose default member
+returns a `String` or a `Variant` counts its characters, and of one whose default member returns anything else - a
+`Long`, an object - is `VBC09333`. An object whose class has no default member is read when it runs.
 
 #### Declared types at external dispatch
 

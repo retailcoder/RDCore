@@ -13,13 +13,14 @@ Where a value is expected, an object stands for its _simple data value_: what it
 checks at compile time that it can have one, as MS-VBA does (recorded in Excel, each statement compiled alone) - and, where
 the specification makes it a compile-time validation, where MS-VBA does not:
 
-|The object|Where a value of a declared type is expected|`Abs`, `Int`, `Fix`, `Len`, `LenB`|Where a `Variant` is expected|
-|---|---|---|---|
-|The `Nothing` literal|[`VBC09304`](../diagnostics/vbc09304.md) Invalid use of object|`VBC09304`|compiles|
-|Of a class whose default member takes an argument (a `Collection`)|[`VBC09339`](../diagnostics/vbc09339.md) Argument not optional|`VBC09339`|compiles|
-|Of a class whose default member returns an object|[`VBC09310`](../diagnostics/vbc09310.md) Type mismatch|compiles|compiles|
-|Of a class whose default member returns a value|compiles|compiles|compiles|
-|Of a class that has no default member|`VBC09310` Type mismatch 👉|compiles|compiles; `VBC09310` 👉 assigned to a `Variant` with `Let`|
+|The object|Where a value of a declared type is expected|`Abs`, `Int`, `Fix`|`Len`, `LenB`|Where a `Variant` is expected|
+|---|---|---|---|---|
+|The `Nothing` literal|[`VBC09304`](../diagnostics/vbc09304.md) Invalid use of object|`VBC09304`|`VBC09304`|compiles|
+|Of a class whose default member takes an argument (a `Collection`)|[`VBC09339`](../diagnostics/vbc09339.md) Argument not optional|`VBC09339`|`VBC09339`|compiles|
+|Of a class whose default member returns an object|[`VBC09310`](../diagnostics/vbc09310.md) Type mismatch|compiles|[`VBC09333`](../diagnostics/vbc09333.md) Variable required|compiles|
+|Of a class whose default member returns a `String` or a `Variant`|compiles|compiles|compiles|compiles|
+|Of a class whose default member returns another value|compiles|compiles|`VBC09333` Variable required|compiles|
+|Of a class that has no default member|`VBC09310` Type mismatch 👉|compiles|compiles|compiles; `VBC09310` 👉 assigned to a `Variant` with `Let`|
 
 A value of a declared type is expected:
 
@@ -31,7 +32,9 @@ A value of a declared type is expected:
   `Variant`: the conversions `CBool` to `CVErr` (not `CVar`, `CVDate` or `CDec`), `Sgn`, and the `$` functions of the
   `Strings` module (`Left$`, `Mid$`, `Trim$`, …).
 
-`Abs`, `Int`, `Fix`, `Len` and `LenB` expect a value of any type. Every other parameter declared `Variant` takes an object
+`Abs`, `Int` and `Fix` expect a value of any type. `Len` and `LenB` expect "any valid string expression, or any valid
+variable name" ([**RD-VBAL §6.1.2.11.1.22**](rd-vbal.6.1.2.11.strings.md#61211122-len--lenb)): an object's value is no
+variable, so it must be a `String` or a `Variant`. Every other parameter declared `Variant` takes an object
 as it is: `CVar`, `Round`, `Hex`, `Str`, `Left`, `Mid`, `Trim`, the functions of `DateTime` and `Information`, `IIf`,
 `Choose`. A standard-library parameter says which it is with
 [StdLibValueAttribute](../api/RDCore.SDK.Runtime.Abstract.StdLib.StdLibValueAttribute.html).
@@ -43,8 +46,6 @@ declared `Variant`, and `Abs`, `Int`, `Fix`, `Len` and `LenB`, take the object a
 time's. And the specification asks only for an "accessible default Property Get or function", where MS-VBA also asks
 that it take no argument, which RD-VBA does too.
 
-🚧 MS-VBA says "Variable required - can't assign to this expression" for `Len` and `LenB` of an object whose default
-member returns an object; RD-VBA compiles it, and reads the default member when it runs.
 
 ---
 > ⏮️ [**RD-VBAL §5.5.1** Let-coercion](rd-vbal.5.5.1.let-coercion.md) | ⏭️ [**RD-VBAL §5.5.1.2** Runtime semantics](rd-vbal.5.5.1.2.runtime-semantics.md)

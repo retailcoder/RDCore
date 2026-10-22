@@ -158,10 +158,20 @@ public sealed class ObjectValueCompileErrorTests
     }
 
     [TestMethod]
-    [Ignore("MS-VBA says 'Variable required - can't assign to this expression' for Len and LenB of an object whose default member returns an object; "
-        + "RD-VBA compiles it, and reads the default member when it runs.")]
     [DataRow("v = Len(New DfltChain)")]
     [DataRow("v = LenB(New DfltChain)")]
     public Task LenOfAnObjectWhoseDefaultMemberReturnsAnObject_IsVariableRequired(string statement)
         => AssertCompiles(statement, "Variable required");
+
+    // MS-VBAL §6.1.2.11.1.22: "any valid string expression, or any valid variable name" - an object stands for its default member's value, which is
+    // neither unless it is a String or a Variant.
+    [TestMethod]
+    [DataRow("v = Len(New DfltNum)", "Variable required")]
+    [DataRow("v = Len(New DfltVar)", Compiles)]
+    [DataRow("v = Len(New NoDflt)", Compiles)]
+    [DataRow("v = Len(New DfltArg)", ArgumentNotOptional)]
+    [DataRow("v = Len(c)", ArgumentNotOptional)]
+    [DataRow("v = Len(New Collection)", ArgumentNotOptional)]
+    [DataRow("v = Len(Nothing)", InvalidUseOfObject)]
+    public Task LenOfAnObject(string statement, string expected) => AssertCompiles(statement, expected);
 }

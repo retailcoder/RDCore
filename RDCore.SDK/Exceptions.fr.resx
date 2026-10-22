@@ -456,6 +456,15 @@
   <data name="VBCompileError_ClassHasNoDefaultMember_Verbose" xml:space="preserve">
     <value>{0} n'a aucun membre par défaut pour lui donner une valeur, ce qui rend statiquement invalide sa coercition Let en une valeur (MS-VBAL §5.5.1.1). MS-VBA le compile, et lève l'erreur d'exécution 438 (Cette propriété ou méthode n'est pas gérée par cet objet) à l'exécution.</value>
   </data>
+  <data name="VBCompileError_LenOfAValue_Verbose" xml:space="preserve">
+    <value>Len et LenB prennent une expression String ou le nom d'une variable (MS-VBAL §6.1.2.11.1.22): ceci est une valeur de type {0}, qui n'est ni l'un ni l'autre. Assignez-la à une variable de ce type pour mesurer la variable, ou convertissez-la en String pour en compter les caractères.</value>
+  </data>
+  <data name="VBCompileError_LenOfADefaultMemberValue_Verbose" xml:space="preserve">
+    <value>Len et LenB prennent une expression String ou le nom d'une variable (MS-VBAL §6.1.2.11.1.22): un objet de {0} vaut ce que retourne son membre par défaut {1}, une valeur de type {2}, qui n'est ni l'un ni l'autre.</value>
+  </data>
+  <data name="VBCompileError_InvalidParamArrayUse_ByRef_Verbose" xml:space="preserve">
+    <value>Le ParamArray {0} est passé au paramètre ByRef {1}: un ParamArray est un tableau des valeurs que l'appel a recueillies, pas une variable dont un paramètre par référence pourrait être un second nom (MS-VBAL §5.3.1.11). Passez-le ByVal, ou passez-en un élément.</value>
+  </data>
   <data name="VBCompileError_NothingIsNotAValue_Verbose" xml:space="preserve">
     <value>Nothing n'est aucun objet, et n'a donc aucune valeur : une valeur est attendue ici.</value>
   </data>
