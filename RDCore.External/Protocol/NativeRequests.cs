@@ -137,6 +137,12 @@ public sealed record class NativeArgument
     /// The record a <see cref="NativeSlot.Record"/> argument is the address of.
     /// </summary>
     public NativeRecord? Record { get; init; }
+
+    /// <summary>
+    /// How many bytes into the <see cref="Record"/> the address the function is given is: <c>0</c> for a record, the offset of the element for the data of
+    /// an array one of whose elements is the argument.
+    /// </summary>
+    public int Offset { get; init; }
 }
 
 /// <summary>

@@ -144,10 +144,12 @@ public sealed class DeclaredProcedureProvider(IRuntimeSession session, INativeLi
         // the variable an argument names, when it names one: what the function writes to is written to it.
         IBindingHandle? variable = null;
         VBType? referenced = null;
+        VBArrayElementLocation? element = null;
         while (argument is VBRuntimeReference reference && resolver.TryRead(reference.Value, out var cell))
         {
             variable = cell;
             referenced ??= reference.DeclaredType;
+            element ??= reference.Element;
             argument = cell.Value;
         }
 
@@ -170,6 +172,18 @@ public sealed class DeclaredProcedureProvider(IRuntimeSession session, INativeLi
         if (typed is null)
         {
             return false;
+        }
+
+        // an element of an array is passed where it is in the array's data: the function is given its address, and what it writes there and after it is the
+        // array's elements afterwards (MS-VBA, recorded in Excel: RtlMoveMemory buf(0), src(0), 4 fills all four). A Variant parameter takes the element as a
+        // VARIANT of its own, and an array of strings, Variant values or objects passes its element as a variable of its own.
+        if (element is { } location && byReference && declared is not VBVariantType
+            && NativeRecords.TryDescribeElements(location, pointerWidth, (subscripts, value) => WriteElement(resolver, location.Array, subscripts, value),
+                out var data, out var offset, out var takeData))
+        {
+            described = new NativeArgument { Slot = NativeSlot.Record, ByReference = true, Record = data, Offset = offset, WritesBack = true };
+            takeBack = takeData;
+            return true;
         }
 
         // a user-defined type is passed by its address, the address of a copy of it the function may write to; what it wrote is the variable's fields
@@ -239,6 +253,18 @@ public sealed class DeclaredProcedureProvider(IRuntimeSession session, INativeLi
         };
         takeBack = Into(typed.TypeInfo);
         return true;
+    }
+
+    // what the function left in an element is the element's: assigned to its cell, as an assignment to the element is.
+    private static void WriteElement(ISymbolResolver resolver, VBArrayValue array, int[] subscripts, VBTypedValue value)
+    {
+        if (array.GetElementHandle(subscripts) is { } cell && cell.BindingCapabilities.HasFlag(BindingCapabilities.SetValue))
+        {
+            cell.SetValue(resolver, value.RuntimeValue);
+            return;
+        }
+
+        array.TrySetElement(new ValueBindingHandle(value.RuntimeValue), subscripts);
     }
 
     // what a function declared to return a type returns, natively.

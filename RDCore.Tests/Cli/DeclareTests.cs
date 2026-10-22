@@ -31,14 +31,41 @@ public sealed class DeclareTests
 
     // an element of an array is a variable (MS-VBAL §5.6.13.1), and MS-VBA passes its address: the function writes the element (recorded in Excel).
     [TestMethod]
-    [Ignore("An element of an array passed by reference to a Declare is a copy: the native marshaller takes values and the addresses of variables, and an " +
-        "element has a cell and no address (RuntimeExpressionEvaluator.TryResolveByRefArgument skips elements for an external call).")]
     public async Task AnElementOfAnArray_PassedByRef_IsWrittenByTheFunction()
         => CollectionAssert.AreEqual(new[] { "True" }, await Run(
             "Private Declare PtrSafe Function QueryPerformanceFrequency Lib \"kernel32\" (ByRef lpFrequency As Currency) As Long",
             "Dim f(0) As Currency",
             "QueryPerformanceFrequency f(0)",
             "Debug.Print f(0) > 0"));
+
+    // MS-VBA passes the address of the element where it is in the array's data: the function writes the elements after it too (recorded in Excel).
+    private const string CopyMemory =
+        "Private Declare PtrSafe Sub CopyMemory Lib \"kernel32\" Alias \"RtlMoveMemory\" (Destination As Any, Source As Any, ByVal Length As LongPtr)";
+
+    [TestMethod]
+    public async Task AnElementOfAnArray_PassedAsAny_IsTheStartOfTheArraysData()
+        => CollectionAssert.AreEqual(new[] { "1234" }, await Run(CopyMemory,
+            "Dim a(3) As Byte, b(3) As Byte, i As Long",
+            "For i = 0 To 3: b(i) = i + 1: Next",
+            "CopyMemory a(0), b(0), 4",
+            "Debug.Print CStr(a(0)) & a(1) & a(2) & a(3)"));
+
+    [TestMethod]
+    public async Task AnElementOfAnArray_PassedAsAny_IsWhereItIsInTheArraysData()
+        => CollectionAssert.AreEqual(new[] { "0120" }, await Run(CopyMemory,
+            "Dim a(3) As Byte, b(3) As Byte, i As Long",
+            "For i = 0 To 3: b(i) = i + 1: Next",
+            "CopyMemory a(1), b(0), 2",
+            "Debug.Print CStr(a(0)) & a(1) & a(2) & a(3)"));
+
+    [TestMethod]
+    public async Task AnElementOfAnArrayOfLongs_PassedAsALong_IsTheStartOfTheArraysData()
+        => CollectionAssert.AreEqual(new[] { "789" }, await Run(
+            "Private Declare PtrSafe Sub CopyLong Lib \"kernel32\" Alias \"RtlMoveMemory\" (Destination As Long, Source As Long, ByVal Length As LongPtr)",
+            "Dim l(2) As Long, m(2) As Long",
+            "m(0) = 7: m(1) = 8: m(2) = 9",
+            "CopyLong l(0), m(0), 12",
+            "Debug.Print CStr(l(0)) & l(1) & l(2)"));
 
     [TestMethod]
     public async Task ASub_IsCalledWithANumberByValue()

@@ -126,7 +126,8 @@ public sealed class NativeCallService(INativePlatform platform) : INativeLibrary
                 _free.Add(() => Marshal.FreeHGlobal(block));
             }
 
-            Add(typeof(IntPtr), block);
+            // the address of the record, or of the element of an array's data the argument is.
+            Add(typeof(IntPtr), block + argument.Offset);
             written = () => new ExternalValue
             {
                 Kind = ExternalValueKind.Array,

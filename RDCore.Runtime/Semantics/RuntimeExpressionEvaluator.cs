@@ -2027,10 +2027,11 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         reference = VBRuntimeReference.NullRef;
 
         // an element of an array is a variable (MS-VBAL §5.6.13.1), passed by reference as one: MS-VBA writes what the callee assigns to the element, and the
-        // array is locked for as long as the call runs (ICallStackFrame.LocksArray). A Declare's parameter is laid out by the marshaller, which takes a copy.
-        if (!external && argument is IndexExpressionNode element)
+        // array is locked for as long as the call runs (ICallStackFrame.LocksArray). A Declare is given the element where it is in the array: the reference
+        // says which one, and the marshaller passes the array's data from there (a String a Declare takes ByVal is a buffer, not this).
+        if (argument is IndexExpressionNode element && (!external || RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind)))
         {
-            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference);
+            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference, external);
         }
 
         // `As Any` is a parameter of a Declare that takes whatever it is given, a variable of any type by reference - and passes it as the type it is.
@@ -2078,7 +2079,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     // default, as an assignment to it would. A callee that is not a variable - a function, a property - is not reached into: its element is a value.
     private bool TryResolveElementByRefArgument(
         IRuntimeSession session, RuntimeEvaluationContext context, IndexExpressionNode element, VBParameterSymbol parameter, List<MemoryAddress> borrowed,
-        out VBRuntimeReference reference)
+        out VBRuntimeReference reference, bool external = false)
     {
         reference = VBRuntimeReference.NullRef;
         if (element.Arguments.IsDefaultOrEmpty || !DenotesAVariable(session, context, element.Callee))
@@ -2093,8 +2094,9 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             held = wrapped;
         }
 
+        // `As Any` takes an element of any type, as it takes a variable of any type.
         if (held is not VBArrayValue { IsIndeterminate: false } array
-            || (!IsOfDeclaredType(parameter, array.ItemType) && parameter.ResolvedType is not VBVariantType)
+            || (!IsOfDeclaredType(parameter, array.ItemType) && parameter.ResolvedType is not VBVariantType && !(external && parameter.ResolvedType is VBUnknownType))
             || EvaluateSubscripts(session, context, element.Arguments, out var indices, out var indicesKnown) is not null
             || !indicesKnown
             || array.GetElementHandle(indices) is not { } cell)
@@ -2114,7 +2116,10 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         }
 
         borrowed.Add(address);
-        reference = new VBRuntimeReference(address, ReferencedType(parameter, array.ItemType));
+        reference = external
+            ? new VBRuntimeReference(address, parameter.ResolvedType is VBUnknownType ? array.ItemType : ReferencedType(parameter, array.ItemType),
+                new VBArrayElementLocation(array, indices))
+            : new VBRuntimeReference(address, ReferencedType(parameter, array.ItemType));
         return true;
     }
 

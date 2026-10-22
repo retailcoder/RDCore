@@ -8,6 +8,7 @@ using RDCore.SDK.Model.Values;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Model.Values.Runtime;
 
 namespace RDCore.Runtime.Execution.External.Native;
 
@@ -60,6 +61,82 @@ internal static class NativeRecords
             }
         };
         return true;
+    }
+
+    /// <summary>
+    /// Describes the data of an array as MS-VBA passes it when one of its elements is the argument of a <c>ByRef</c> parameter: every element where it is in
+    /// memory, and the address of the one given - so a function that fills a buffer (<c>RtlMoveMemory buf(0), …</c>) writes the elements after it too.
+    /// </summary>
+    /// <param name="element">The array, and the element given.</param>
+    /// <param name="pointerWidth">The width of a pointer in the environment the function runs in.</param>
+    /// <param name="write">Writes what the function left in an element into it, by its subscripts.</param>
+    /// <param name="record">The array's data, as it is passed.</param>
+    /// <param name="offset">How many bytes from the start of the data the element given is: the address the function is given.</param>
+    /// <param name="takeBack">Takes back what the function left in every element.</param>
+    /// <returns>
+    /// <see langword="false"/> for an array of strings, <c>Variant</c> values or objects, whose element is passed as a variable of its own (MS-VBA converts
+    /// each to what the function takes); and for one whose elements cannot be passed yet.
+    /// </returns>
+    public static bool TryDescribeElements(VBArrayElementLocation element, int pointerWidth, Action<int[], VBTypedValue> write,
+        out NativeRecord record, out int offset, out Action<ExternalValue> takeBack)
+    {
+        record = new NativeRecord();
+        offset = 0;
+        takeBack = _ => { };
+
+        var array = element.Array;
+        var itemType = array.ItemType;
+        if (itemType is VBStringType or VBVariantType or VBObjectType or VBClassType or VBArrayType)
+        {
+            return false;
+        }
+
+        var target = FlatIndexOf(array, element.Subscripts);
+        var leaves = new List<Leaf>();
+        var end = 0;
+        var alignment = 1;
+        for (var index = 0; index < array.Length; index++)
+        {
+            var subscripts = SubscriptsOf(array, index);
+            var first = leaves.Count;
+            if (!TryLayField(array.ElementAt(index), itemType, 0, end, pointerWidth, leaves,
+                written => write(subscripts, NativeValues.Typed(written, itemType)), out end, out var elementAlignment))
+            {
+                return false;
+            }
+
+            if (index == target && leaves.Count > first)
+            {
+                offset = leaves[first].Field.Offset;
+            }
+
+            alignment = Math.Max(alignment, elementAlignment);
+        }
+
+        record = new NativeRecord { Size = AlignedTo(end, alignment), Fields = [.. leaves.Select(leaf => leaf.Field)] };
+        takeBack = written =>
+        {
+            var elements = written.Elements ?? [];
+            for (var index = 0; index < leaves.Count && index < elements.Length; index++)
+            {
+                leaves[index].TakeBack(ExternalValues.FromWire(elements[index], NoObject));
+            }
+        };
+        return true;
+    }
+
+    // the flat index of the element its subscripts select: the first dimension varies fastest, as the array's own store does (SubscriptsOf, the other way).
+    private static int FlatIndexOf(VBArrayValue array, int[] subscripts)
+    {
+        var flat = 0;
+        var stride = 1;
+        for (var dimension = 0; dimension < array.Rank && dimension < subscripts.Length; dimension++)
+        {
+            flat += (subscripts[dimension] - array.Dimensions[dimension].LowerBound) * stride;
+            stride *= array.Dimensions[dimension].Length;
+        }
+
+        return flat;
     }
 
     // lays a type out from the offset it starts at: its size, and the boundary it is aligned to, are what a field of it takes.
