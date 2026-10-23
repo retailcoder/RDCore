@@ -16,8 +16,9 @@ namespace RDCore.Runtime.Semantics.Operators;
 /// Double, runtime error 6 (Overflow) is raised." With no Variant operand, and for any other effective type, the overflow is error 6.
 /// </para>
 /// <para>
-/// 👉 Only an integral effective type overflows by raising, which is what this is for: a Single or a Double operation that leaves its range yields an
-/// infinity, as IEEE 754 arithmetic does. The specification lists no rule for a Byte effective type, which has none here: it is error 6.
+/// The specification lists no rule for a Byte effective type, and MS-VBA widens it as it does an Integer: a Variant Byte result that overflows is an Integer
+/// (<c>200 + 100</c> = Integer 300), or wider (recorded in Excel). An integral effective type overflows by raising, which is what <see cref="Widens"/> is
+/// for; a Single operation that leaves its range yields an infinity, as IEEE 754 arithmetic does, which <see cref="WidensSingle"/> is for.
 /// </para>
 /// </remarks>
 internal static class VariantArithmeticOverflow
@@ -28,7 +29,18 @@ internal static class VariantArithmeticOverflow
     /// <param name="frame">The frame of the operation: what it says of its operands as they were given (<see cref="OperatorEvaluationFrame.HasVariantOperand"/>).</param>
     /// <param name="effectiveType">The effective type of the operation.</param>
     public static bool Widens(OperatorEvaluationFrame frame, VBType effectiveType)
-        => frame.HasVariantOperand && effectiveType is VBIntegerType or VBLongType;
+        => frame.HasVariantOperand && effectiveType is VBByteType or VBIntegerType or VBLongType;
+
+    /// <summary>
+    /// Whether a Single operation of finite operands whose value is not finite - outside the range of a Single - is evaluated again, in a wider type: with a
+    /// Variant operand, a Double (<c>3E+38 * 10</c> = Double 3.00000000549776E+39, recorded in Excel).
+    /// </summary>
+    /// <param name="frame">The frame of the operation.</param>
+    /// <param name="value">The value of the operation, as a Single.</param>
+    /// <param name="lhs">The left operand.</param>
+    /// <param name="rhs">The right operand.</param>
+    public static bool WidensSingle(OperatorEvaluationFrame frame, float value, float lhs, float rhs)
+        => frame.HasVariantOperand && !float.IsFinite(value) && float.IsFinite(lhs) && float.IsFinite(rhs);
 
     /// <summary>
     /// The value of an operation that overflowed its effective type, computed as a Double, in the narrowest of Integer, Long and Double that holds it; or

@@ -251,9 +251,10 @@ caller's; a variable of the module or a `Static` local, entered with whatever th
 procedure the analysis does not run returns - the subtype is not known either. An operation of a `Variant` whose subtype is
 not known states no effective type and nothing of what it does, a conversion of one states that it converts a `Variant`,
 and what either yields is a `Variant` whose subtype is not known. An operation of a `Variant` whose subtype is known yields
-a `Variant` of the type of its result. 👉 The analysis presumes there is no overflow: an `Integer`, `Long`, `Single` or
+a `Variant` of the type of its result. 👉 The analysis presumes there is no overflow: a `Byte`, `Integer`, `Long`, `Single` or
 `Date` result of an arithmetic operator of a `Variant` that overflows is the narrowest of `Integer`, `Long` or `Double` it
-fits (**MS-VBAL §5.6.9.3**), which a value that is not known cannot tell - an edge case, not worth what the subtype tells
+fits (**MS-VBAL §5.6.9.3**, which lists no `Byte`: MS-VBA widens one as it does an `Integer`, `CByte(200) + CByte(100)` being the
+`Integer` 300 - recorded in Excel), which a value that is not known cannot tell - an edge case, not worth what the subtype tells
 of every other one.
 
 A statement inside an excluded `#If` branch is not analyzed and defines no label (**MS-VBAL §3.4.2**). Lowering a body to

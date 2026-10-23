@@ -70,7 +70,7 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
                 VBIntegerType => new VBIntegerValue(EvaluateManagedNumericOp(((VBIntegerValue)lhs).Value, ((VBIntegerValue)rhs).Value)),
                 VBLongType => new VBLongValue(EvaluateManagedNumericOp(((VBLongValue)lhs).Value, ((VBLongValue)rhs).Value)),
                 VBLongLongType => new VBLongLongValue(EvaluateManagedNumericOp(((VBLongLongValue)lhs).Value, ((VBLongLongValue)rhs).Value)),
-                VBSingleType => new VBSingleValue(EvaluateManagedNumericOp(((VBSingleValue)lhs).Value, ((VBSingleValue)rhs).Value)),
+                VBSingleType => SingleResult(frame, (VBSingleValue)lhs, (VBSingleValue)rhs),
                 VBDoubleType => new VBDoubleValue(EvaluateManagedNumericOp(((VBDoubleValue)lhs).Value, ((VBDoubleValue)rhs).Value)),
                 VBCurrencyType => new VBCurrencyValue(EvaluateManagedNumericOp(((VBCurrencyValue)lhs).Value.Value, ((VBCurrencyValue)rhs).Value.Value)),
                 VBDecimalType => new VBDecimalValue(EvaluateManagedNumericOp(((VBDecimalValue)lhs).Value, ((VBDecimalValue)rhs).Value)),
@@ -91,6 +91,19 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
         {
             return OnDivisionByZero(expression, Exceptions.VBDivisionOp_DivisionByZero);
         }
+    }
+
+    // a Variant Single result outside the range of a Single is computed again as a Double (VariantArithmeticOverflow.WidensSingle); one no Double holds is an
+    // overflow.
+    private VBTypedValue SingleResult(OperatorEvaluationFrame frame, VBSingleValue lhs, VBSingleValue rhs)
+    {
+        var value = EvaluateManagedNumericOp(lhs.Value, rhs.Value);
+        if (!VariantArithmeticOverflow.WidensSingle(frame, value, lhs.Value, rhs.Value))
+        {
+            return new VBSingleValue(value);
+        }
+
+        return VariantArithmeticOverflow.Widened(EvaluateManagedNumericOp((double)lhs.Value, rhs.Value)) ?? throw new OverflowException();
     }
 
     protected sealed override OperatorAnalysisContext<ArithmeticOperatorSemanticFlags> CreateAnalysisContext(
