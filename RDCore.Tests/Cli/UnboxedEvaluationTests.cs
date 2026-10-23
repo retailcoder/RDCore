@@ -48,6 +48,12 @@ public sealed class UnboxedEvaluationTests
     [DataRow("Dim d As Double, n As Long ;; For d = 0 To 2 Step 0.5 ;; n = n + 1 ;; Next ;; Debug.Print n & \" \" & d", "5 2.5", DisplayName = "a Double counter, a fractional step")]
     [DataRow("Dim i As Long, n As Long ;; For i = 1 To 10 ;; i = i + 1 ;; n = n + 1 ;; Next ;; Debug.Print n & \" \" & i", "5 11", DisplayName = "a counter its body assigns")]
     [DataRow("Dim i As Integer ;; For i = 32766 To 32767 ;; Next ;; Debug.Print Err.Number & \" \" & i", "6 32767", DisplayName = "an Integer counter stepped past its range")]
+    [DataRow("Dim v As Variant, n As Long ;; For v = 1 To 5 ;; n = n + v ;; Next ;; Debug.Print n & \" \" & v & \" \" & TypeName(v)", "15 6 Integer", DisplayName = "a Variant counter")]
+    [DataRow("Dim v As Variant, n As Long ;; For v = 32765 To 32767 ;; n = n + 1 ;; Next ;; Debug.Print n & \" \" & v & \" \" & TypeName(v)", "3 32768 Long", DisplayName = "a Variant counter widened past its end")]
+    [DataRow("Dim v As Variant, n As Long ;; For v = 0 To 1 Step 0.25 ;; n = n + 1 ;; Next ;; Debug.Print n & \" \" & v & \" \" & TypeName(v)", "5 1.25 Double", DisplayName = "a Variant counter, a fractional step")]
+    [DataRow("Dim v As Variant, n As Long ;; For v = 10 To 1 Step -3 ;; n = n + v ;; Next ;; Debug.Print n & \" \" & v", "22 -2", DisplayName = "a Variant counter, stepping down")]
+    [DataRow("Dim v As Variant, n As Long ;; For v = CByte(250) To CByte(255) ;; n = n + 1 ;; Next ;; Debug.Print n & \" \" & v & \" \" & TypeName(v)", "6 256 Integer", DisplayName = "a Variant Byte counter widened past its end")]
+    [DataRow("Dim v As Variant, s As Variant ;; s = 0# ;; For v = 1 To 1000 ;; s = s + v ;; Next ;; Debug.Print s & \" \" & TypeName(s)", "500500 Double", DisplayName = "a Variant sum over a Variant counter")]
     public void AForLoop_SteppedOnPayloads_IsWhatTheBoxedEvaluationSteps(string body, string printed)
         => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
 
@@ -101,6 +107,34 @@ public sealed class UnboxedEvaluationTests
     public void ACurrencyOrADate_OnPayloads_IsWhatTheBoxedEvaluationEvaluates(string body, string printed)
         => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
 
+    // a Variant that holds a scalar, as a payload of its subtype (S1.4): a plan made for what it holds, and whatever overflows widened by the boxed
+    // evaluation as MS-VBA widens it (recorded in Excel).
+    [TestMethod]
+    [DataRow("Dim v As Variant ;; v = 5 ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "6 Integer", DisplayName = "a Variant Integer plus one")]
+    [DataRow("Dim v As Variant ;; v = 32767 ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "32768 Long", DisplayName = "a Variant Integer widened to a Long")]
+    [DataRow("Dim v As Variant ;; v = 2147483647 ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "2147483648 Double", DisplayName = "a Variant Long widened to a Double")]
+    [DataRow("Dim v As Variant, d As Double ;; v = 3 ;; d = 0.5 ;; v = v * d ;; Debug.Print v & \" \" & TypeName(v)", "1.5 Double", DisplayName = "a Variant times a Double")]
+    [DataRow("Dim v As Variant, l As Long ;; v = 2.5 ;; l = v ;; Debug.Print l", "2", DisplayName = "a Variant Double assigned to a Long (boxed)")]
+    [DataRow("Dim v As Variant ;; v = CByte(255) ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "256 Integer", DisplayName = "a Variant Byte widened to an Integer")]
+    [DataRow("Dim v As Variant ;; v = True ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "0 Integer", DisplayName = "a Variant Boolean plus one")]
+    [DataRow("Dim v As Variant, n As Long ;; v = 7 ;; If v > 5 Then n = 1 ;; Debug.Print n", "1", DisplayName = "a Variant in a condition")]
+    [DataRow("Dim v As Variant ;; v = 10 ;; v = -v ;; Debug.Print v & \" \" & TypeName(v)", "-10 Integer", DisplayName = "a Variant negated")]
+    [DataRow("Dim v As Variant ;; v = -32768 ;; v = -v ;; Debug.Print v & \" \" & TypeName(v)", "32768 Long", DisplayName = "the least Variant Integer negated, widened")]
+    [DataRow("Dim v As Variant ;; v = \"5\" ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "6 Double", DisplayName = "a Variant String plus one (boxed)")]
+    [DataRow("Dim v As Variant ;; v = Null ;; v = v + 1 ;; Debug.Print IsNull(v)", "True", DisplayName = "a Variant Null plus one (boxed)")]
+    [DataRow("Dim v As Variant ;; v = v + 1 ;; Debug.Print v & \" \" & TypeName(v)", "1 Integer", DisplayName = "an Empty Variant plus one (boxed)")]
+    [DataRow("Dim v As Variant, w As Variant ;; v = 10 ;; w = 3 ;; Debug.Print v \\ w & \" \" & v Mod w & \" \" & v / w", "3 1 3.33333333333333", DisplayName = "two Variants divided")]
+    [DataRow("Dim v As Variant ;; v = #1/1/2020# ;; v = v + 1 ;; Debug.Print TypeName(v) & \" \" & CDbl(v)", "Date 43832", DisplayName = "a Variant Date plus a day")]
+    [DataRow("Dim v As Variant ;; v = 1.5@ ;; v = v * 2 ;; Debug.Print v & \" \" & TypeName(v)", "3 Currency", DisplayName = "a Variant Currency doubled")]
+    [DataRow("Dim v As Variant ;; v = CLng(5) ;; v = v + CLng(1) ;; Debug.Print TypeName(v)", "Long", DisplayName = "a Variant Long plus a Long")]
+    [DataRow("Dim v As Variant, w As Variant ;; v = 5 ;; w = v ;; v = 6 ;; Debug.Print w", "5", DisplayName = "a Variant assigned is a copy")]
+    [DataRow("Dim v As Variant, w As Variant ;; v = 200 ;; w = 200 ;; v = v * w ;; Debug.Print v & \" \" & TypeName(v)", "40000 Long", DisplayName = "two Variant Integers multiplied, widened")]
+    [DataRow("Dim v As Variant ;; v = CByte(10) ;; v = Not v ;; Debug.Print v & \" \" & TypeName(v)", "245 Byte", DisplayName = "a Variant Byte inverted")]
+    [DataRow("Dim v As Variant ;; v = CByte(200) ;; v = v + CByte(100) ;; Debug.Print v & \" \" & TypeName(v)", "300 Integer", DisplayName = "two Variant Bytes added, widened to an Integer")]
+    [DataRow("Dim v As Variant ;; v = CSng(3E+38) ;; v = v * CSng(10) ;; Debug.Print TypeName(v) & \" \" & v", "Double 3.00000000549776E+39", DisplayName = "a Variant Single widened to a Double")]
+    public void AVariantHoldingAScalar_OnPayloads_IsWhatTheBoxedEvaluationEvaluates(string body, string printed)
+        => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
+
     // the conditions of If, Do, While and Case on payloads; an error in a condition is the boxed evaluation's, and On Error Resume Next goes on into the
     // statement that follows it - the Then of an If (recorded in Excel).
     [TestMethod]
@@ -152,6 +186,8 @@ public sealed class UnboxedEvaluationTests
     [DataRow("Function Quot(ByVal A As Long, ByVal B As Long) As Long ;; Quot = A \\ B ;; End Function", "Debug.Print Quot(7, 0) ;; Debug.Print Err.Number", "11", DisplayName = "an error in the callee")]
     [DataRow("Sub Loop10(ByRef N As Long) ;; Dim i As Long ;; For i = 1 To 10 ;; N = N + i ;; Next ;; End Sub", "Dim s As Long ;; Loop10 s ;; Loop10 s ;; Debug.Print s", "110", DisplayName = "a sum accumulated by reference")]
     [DataRow("Function Half2(ByVal A As Long) As Double ;; Half2 = A / 2 ;; End Function", "Debug.Print Half2(2.5) & \" \" & Half2(3.5)", "1 2", DisplayName = "an argument rounded to its parameter (boxed)")]
+    [DataRow("Function Dbl(ByVal x As Variant) As Variant ;; Dbl = x * 2 ;; End Function", "Debug.Print Dbl(21) & \" \" & TypeName(Dbl(21))", "42 Integer", DisplayName = "a Variant passed by value and returned")]
+    [DataRow("Sub Inc(ByRef x As Variant) ;; x = x + 1 ;; End Sub", "Dim v As Variant ;; v = 1 ;; Inc v ;; Inc v ;; Debug.Print v", "3", DisplayName = "a Variant passed by reference")]
     public void ACall_OnPayloads_IsWhatTheBoxedEvaluationCalls(string procedures, string body, string printed)
     {
         var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\n"

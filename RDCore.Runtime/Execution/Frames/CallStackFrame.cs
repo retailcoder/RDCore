@@ -3,6 +3,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
@@ -294,12 +295,19 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         // the variable is a cell of the activation, which takes no session memory until something asks for its address (IR lowering S1.1, Q1): most
         // locals are never passed by reference, and an activation of them reserves nothing. One the layout has a slot for is held in it (S1.1b).
         // A variable of a scalar type holds its value as a payload, which an expression of it is evaluated on (S1.2), in a cell made of the value as it is.
-        var cell = UnboxedEvaluation.IsEnabled && ScalarPayload.IsScalar(value.TypeInfo) && value is { IsIndeterminate: false, Handle: ValueBindingHandle boxed }
+        // A Variant that holds a scalar (or nothing yet) holds it as a payload too (S1.4), which its subtype is the type of.
+        IBindingHandle cell = UnboxedEvaluation.IsEnabled && ScalarPayload.IsScalar(value.TypeInfo) && value is { IsIndeterminate: false, Handle: ValueBindingHandle boxed }
             && ScalarCell.TryCreate(value.TypeInfo, boxed.Value, out var scalar)
                 ? scalar!
-                : SymbolAddressTable.FreshBinding(value);
+                : UnboxedEvaluation.IsEnabled && value is VBVariantValue { IsIndeterminate: false, TypedValue: var held } && IsImmutable(held)
+                    && VariantCell.TryCreate(VBVariantType.TypeInfo, new VBRuntimeVariantValue(held.TypeInfo.VarType(), held), out var variant)
+                    ? variant!
+                    : SymbolAddressTable.FreshBinding(value);
         Hold(symbol, cell, value.Size, slot);
     }
+
+    // a value a Variant cell can share with what it was made of, which nothing changes in place: a scalar, Empty, Null.
+    private static bool IsImmutable(VBTypedValue value) => ScalarPayload.IsScalar(value.TypeInfo) || value is VBEmptyValue or VBNullValue;
 
     /// <summary>
     /// Declares the parameter <paramref name="symbol"/> on this frame, holding <paramref name="value"/> - the argument a call passes by value, already
@@ -316,6 +324,13 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         if (UnboxedEvaluation.IsEnabled && ScalarCell.TryCreate(type, value, out var scalar))
         {
             Hold(symbol, scalar!, type.DefaultValue.Size, slot);
+            return;
+        }
+
+        if (UnboxedEvaluation.IsEnabled && value is VBRuntimeVariantValue { WrappedValue: { IsIndeterminate: false } held } && IsImmutable(held)
+            && VariantCell.TryCreate(type, value, out var variant))
+        {
+            Hold(symbol, variant!, type.DefaultValue.Size, slot);
             return;
         }
 
