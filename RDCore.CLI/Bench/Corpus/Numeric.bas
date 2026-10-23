@@ -39,4 +39,16 @@ Public Sub BenchVariantSum()
     For I = 1 To Iterations
         S = S + I
     Next
+End Sub
+
+' fixed-point and date arithmetic: a Currency sum of a Long counter, and a Date a thousandth of a day further each time.
+Public Sub BenchCurrencyAndDate()
+    Dim I As Long
+    Dim C As Currency
+    Dim D As Date
+    D = #1/1/2000#
+    For I = 1 To Iterations
+        C = C + I
+        D = D + 0.001
+    Next
 End Sub

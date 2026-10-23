@@ -156,14 +156,55 @@ public sealed partial class RuntimeExpressionEvaluator
             return true;
         }
 
+        // a Currency is a whole number in an integer type when it is one, which nothing rounds; as a floating-point value it is the Double nearest a
+        // decimal number, which is the boxed coercion's.
+        if (payload.Type is VBCurrencyType)
+        {
+            return destination is VBByteType or VBIntegerType or VBLongType or VBLongLongType && payload.Integral % ScalarPayload.CurrencyScale == 0
+                && ScalarPayload.TryIntegral(destination, payload.Integral / ScalarPayload.CurrencyScale, out converted);
+        }
+
+        if (destination is VBCurrencyType)
+        {
+            return TryConvertToCurrency(payload, out converted);
+        }
+
         return (payload.IsIntegral, destination) switch
         {
             (true, VBByteType or VBIntegerType or VBLongType or VBLongLongType) => ScalarPayload.TryIntegral(destination, payload.Integral, out converted),
-            (true, VBDoubleType) => ScalarPayload.TryFloating(destination, payload.Integral, out converted),
+            (true, VBDoubleType or VBDateType) => ScalarPayload.TryFloating(destination, payload.Integral, out converted),
             (true, VBSingleType) when payload.Type is not VBLongLongType => ScalarPayload.TryFloating(destination, payload.Integral, out converted),
+            // a Date is its serial (MS-VBAL §5.5.1.2.3), and a number in the range of the serials is a Date.
             (false, VBDoubleType) => ScalarPayload.TryFloating(destination, payload.Floating, out converted),
+            (false, VBDateType) => ScalarPayload.TryFloating(destination, payload.Floating, out converted),
             _ => false,
         };
+    }
+
+    // MS-VBAL §5.5.1.2.1: a whole number is a Currency when it is in its range; a Double when it has no more than four decimal places - and few enough
+    // digits that the Decimal the boxed coercion makes of it, rounded to 15 significant digits, is the decimal number it is the Double nearest to.
+    private static bool TryConvertToCurrency(ScalarPayload payload, out ScalarPayload converted)
+    {
+        converted = default;
+        if (payload.IsIntegral)
+        {
+            if (payload.Integral is < long.MinValue / ScalarPayload.CurrencyScale or > long.MaxValue / ScalarPayload.CurrencyScale)
+            {
+                return false;
+            }
+
+            converted = ScalarPayload.OfCurrency(payload.Integral * ScalarPayload.CurrencyScale);
+            return true;
+        }
+
+        var scaled = payload.Floating * ScalarPayload.CurrencyScale;
+        if (payload.Type is not VBDoubleType || Math.Abs(scaled) >= 1e15 || scaled != Math.Floor(scaled) || scaled / ScalarPayload.CurrencyScale != payload.Floating)
+        {
+            return false;
+        }
+
+        converted = ScalarPayload.OfCurrency((long)scaled);
+        return true;
     }
 
     // MS-VBAL §5.6.9.3: the operators on their effective type, as the boxed evaluation does them (checked, in the type's own width); a result that does not
@@ -182,6 +223,14 @@ public sealed partial class RuntimeExpressionEvaluator
                 // operands were coerced to (a floating-point operand is rounded to it, which is the boxed coercion's).
                 (VBByteType or VBIntegerType or VBLongType or VBLongLongType, Tokens.IntegerDivisionOp) when r.Integral != 0 => ScalarPayload.TryIntegral(effective, checked(l.Integral / r.Integral), out result),
                 (VBByteType or VBIntegerType or VBLongType or VBLongLongType, Tokens.ModuloOp) when r.Integral != 0 => ScalarPayload.TryIntegral(effective, checked(l.Integral % r.Integral), out result),
+                // a Currency is its ten-thousandths: a sum is theirs, and a product is theirs divided by 10,000 - when nothing rounds it, which the boxed
+                // evaluation does, to even (recorded in Excel).
+                (VBCurrencyType, Tokens.AdditionOp) => Currency(checked(l.Integral + r.Integral), out result),
+                (VBCurrencyType, Tokens.SubtractionOp) => Currency(checked(l.Integral - r.Integral), out result),
+                (VBCurrencyType, Tokens.MultiplicationOp) => TryMultiplyCurrency(l.Integral, r.Integral, out result),
+                // a Date operation is evaluated in Double (OperationPlan.OperandDestination), and is a Date when it is a date's serial.
+                (VBDateType, Tokens.AdditionOp) => ScalarPayload.TryFloating(effective, l.Floating + r.Floating, out result),
+                (VBDateType, Tokens.SubtractionOp) => ScalarPayload.TryFloating(effective, l.Floating - r.Floating, out result),
                 (VBSingleType, Tokens.AdditionOp) => ScalarPayload.TryFloating(effective, (float)l.Floating + (float)r.Floating, out result),
                 (VBSingleType, Tokens.SubtractionOp) => ScalarPayload.TryFloating(effective, (float)l.Floating - (float)r.Floating, out result),
                 (VBSingleType, Tokens.MultiplicationOp) => ScalarPayload.TryFloating(effective, (float)l.Floating * (float)r.Floating, out result),
@@ -260,6 +309,32 @@ public sealed partial class RuntimeExpressionEvaluator
         }
 
         // the negation of the least value of an integer type is not in its range (MS-VBA: Overflow), which the boxed evaluation raises.
-        return operand.Integral != long.MinValue && ScalarPayload.TryIntegral(operand.Type, -operand.Integral, out result);
+        if (operand.Integral == long.MinValue)
+        {
+            return false;
+        }
+
+        return operand.Type is VBCurrencyType
+            ? Currency(-operand.Integral, out result)
+            : ScalarPayload.TryIntegral(operand.Type, -operand.Integral, out result);
+    }
+
+    private static bool Currency(long scaled, out ScalarPayload result)
+    {
+        result = ScalarPayload.OfCurrency(scaled);
+        return true;
+    }
+
+    private static bool TryMultiplyCurrency(long l, long r, out ScalarPayload result)
+    {
+        result = default;
+        var product = (Int128)l * r;
+        if (product % ScalarPayload.CurrencyScale != 0)
+        {
+            return false;
+        }
+
+        var scaled = product / ScalarPayload.CurrencyScale;
+        return scaled >= long.MinValue && scaled <= long.MaxValue && Currency((long)scaled, out result);
     }
 }

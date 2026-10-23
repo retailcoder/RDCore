@@ -14,7 +14,7 @@ namespace RDCore.SDK.Model.Types;
 /// The <em>managed type</em> of a value of this data type is <c>float</c>.<br/>
 /// 👉 Implements <see cref="IFloatingPointNumericType"/>.
 /// </remarks>
-public record class VBSingleType() : VBNumericType<float>(VBTypeNames.VBSingle), IFloatingPointNumericType
+public sealed record class VBSingleType() : VBNumericType<float>(VBTypeNames.VBSingle), IFloatingPointNumericType
 {
     /// <summary>
     /// The number of significant digits retained in a String representation of a value of this type.

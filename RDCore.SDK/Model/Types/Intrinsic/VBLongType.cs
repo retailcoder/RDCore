@@ -14,7 +14,7 @@ namespace RDCore.SDK.Model.Types;
 /// The <em>managed type</em> of a value of this data type is <c>int</c>.<br/>
 /// 👉 Implements <see cref="IIntegralNumericType"/>.
 /// </remarks>
-public record class VBLongType() : VBNumericType<int>(VBTypeNames.VBLong), IIntegralNumericType
+public sealed record class VBLongType() : VBNumericType<int>(VBTypeNames.VBLong), IIntegralNumericType
 {
     private static readonly Lazy<VBLongType> _instance = new(() => new(), LazyThreadSafetyMode.PublicationOnly);
     /// <summary>

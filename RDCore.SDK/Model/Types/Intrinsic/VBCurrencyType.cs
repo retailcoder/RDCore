@@ -13,7 +13,7 @@ namespace RDCore.SDK.Model.Types;
 /// The <em>managed type</em> of a value of this data type is <c>decimal</c>.<br/>
 /// 👉 Implements <see cref="IFixedPointNumericType"/>.
 /// </remarks>
-public record class VBCurrencyType() : VBNumericType<VBRuntimeCurrencyValue>(VBTypeNames.VBCurrency), IFixedPointNumericType
+public sealed record class VBCurrencyType() : VBNumericType<VBRuntimeCurrencyValue>(VBTypeNames.VBCurrency), IFixedPointNumericType
 {
     private static readonly Lazy<VBCurrencyType> _instance = new(() => new(), LazyThreadSafetyMode.PublicationOnly);
     /// <summary>

@@ -7,7 +7,8 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 namespace RDCore.Runtime.Execution.Frames;
 
 /// <summary>
-/// The cell of a variable of a scalar type - <c>Byte</c>, <c>Integer</c>, <c>Long</c>, <c>LongLong</c>, <c>Single</c>, <c>Double</c>, <c>Boolean</c> - that holds
+/// The cell of a variable of a scalar type - <c>Byte</c>, <c>Integer</c>, <c>Long</c>, <c>LongLong</c>, <c>Single</c>, <c>Double</c>, <c>Boolean</c>,
+/// <c>Currency</c>, <c>Date</c> - that holds
 /// its value as a payload rather than a boxed runtime value (IR lowering S1.2): what an expression evaluated on payloads reads and writes, without making a
 /// value of it.
 /// </summary>
@@ -103,24 +104,27 @@ internal sealed class ScalarCell : IKnowledgeBinding
 
 /// <summary>
 /// A value of a scalar type, as the payload of a <see cref="ScalarCell"/> or of an expression evaluated on payloads: an integer type in
-/// <see cref="Integral"/> - a <c>Boolean</c> as its -1 or 0 - and a floating-point one in <see cref="Floating"/>.
+/// <see cref="Integral"/> - a <c>Boolean</c> as its -1 or 0, a <c>Currency</c> as its ten-thousandths - and a floating-point one in <see cref="Floating"/>,
+/// a <c>Date</c> as its serial.
 /// </summary>
-/// <param name="Type">The type of the value: <c>Byte</c>, <c>Integer</c>, <c>Long</c>, <c>LongLong</c>, <c>Single</c>, <c>Double</c> or <c>Boolean</c>.</param>
-/// <param name="Integral">The value of an integer type, or of a <c>Boolean</c>.</param>
-/// <param name="Floating">The value of a floating-point type.</param>
+/// <param name="Type">The type of the value: <c>Byte</c>, <c>Integer</c>, <c>Long</c>, <c>LongLong</c>, <c>Single</c>, <c>Double</c>, <c>Boolean</c>,
+/// <c>Currency</c> or <c>Date</c>.</param>
+/// <param name="Integral">The value of an integer type, of a <c>Boolean</c>, or of a <c>Currency</c> scaled by 10,000.</param>
+/// <param name="Floating">The value of a floating-point type, or the serial of a <c>Date</c>.</param>
 internal readonly record struct ScalarPayload(VBType Type, long Integral, double Floating)
 {
+    /// <summary>What a <c>Currency</c> is scaled by, to be held in <see cref="Integral"/>.</summary>
+    public const long CurrencyScale = 10000;
+
     /// <summary>Whether a value of <paramref name="type"/> is held as a payload.</summary>
-    public static bool IsScalar(VBType type) => type is VBByteType or VBIntegerType or VBLongType or VBLongLongType or VBSingleType or VBDoubleType or VBBooleanType;
+    public static bool IsScalar(VBType type)
+        => type is VBByteType or VBIntegerType or VBLongType or VBLongLongType or VBSingleType or VBDoubleType or VBBooleanType or VBCurrencyType or VBDateType;
 
-    /// <summary>Whether the value is held in <see cref="Integral"/>: one of the integer types, or a <c>Boolean</c>.</summary>
-    public bool IsIntegral => Type is not (VBSingleType or VBDoubleType);
+    /// <summary>Whether the value is held in <see cref="Integral"/>: one of the integer types, a <c>Boolean</c> or a <c>Currency</c>.</summary>
+    public bool IsIntegral => Type is not (VBSingleType or VBDoubleType or VBDateType);
 
-    /// <summary>Whether the value is not zero: what it is let-coerced to a <c>Boolean</c> as (MS-VBAL §5.5.1.2.2).</summary>
+    /// <summary>Whether the value is not zero: what it is let-coerced to a <c>Boolean</c> as (MS-VBAL §5.5.1.2.2, §5.5.1.2.3).</summary>
     public bool IsTrue => IsIntegral ? Integral != 0 : Floating != 0;
-
-    /// <summary>The value as a <c>double</c>, whatever its type.</summary>
-    public double AsDouble => IsIntegral ? Integral : Floating;
 
     /// <summary>
     /// The payload of <paramref name="value"/>, a runtime value of <paramref name="type"/>.
@@ -137,6 +141,8 @@ internal readonly record struct ScalarPayload(VBType Type, long Integral, double
             (VBSingleType, VBRuntimeValue<float> s) => new(type, 0, s.Value),
             (VBDoubleType, VBRuntimeValue<double> d) => new(type, 0, d.Value),
             (VBBooleanType, VBRuntimeBooleanValue b) => new(type, b.StoredValue, 0),
+            (VBCurrencyType, VBRuntimeValue<VBRuntimeCurrencyValue> c) => new(type, c.Value.StoredValue, 0),
+            (VBDateType, VBRuntimeValue<double> d) => new(type, 0, d.Value),
             _ => default,
         };
 
@@ -163,13 +169,22 @@ internal readonly record struct ScalarPayload(VBType Type, long Integral, double
     /// <summary>The <c>Boolean</c> payload of <paramref name="value"/>.</summary>
     public static ScalarPayload OfBoolean(bool value) => new(VBBooleanType.TypeInfo, value ? -1 : 0, 0);
 
+    /// <summary>The <c>Currency</c> payload of a value scaled by <see cref="CurrencyScale"/>, which any <c>long</c> is.</summary>
+    public static ScalarPayload OfCurrency(long scaled) => new(VBCurrencyType.TypeInfo, scaled, 0);
+
     /// <summary>
-    /// The payload of a floating-point value of <paramref name="type"/>, if it is a finite one in its range.
+    /// The payload of a floating-point value of <paramref name="type"/>, if it is a finite one in its range - a date's serial, for a <c>Date</c>
+    /// (<see cref="VBDateType.IsValidSerial"/>).
     /// </summary>
     public static bool TryFloating(VBType type, double value, out ScalarPayload payload)
     {
         payload = new(type, 0, type is VBSingleType ? (float)value : value);
-        return type is VBSingleType or VBDoubleType && double.IsFinite(payload.Floating);
+        return type switch
+        {
+            VBSingleType or VBDoubleType => double.IsFinite(payload.Floating),
+            VBDateType => VBDateType.IsValidSerial(value),
+            _ => false,
+        };
     }
 
     /// <summary>The runtime value the payload is the value of.</summary>
@@ -181,6 +196,8 @@ internal readonly record struct ScalarPayload(VBType Type, long Integral, double
         VBLongLongType => new VBRuntimeValue<long>(Integral),
         VBSingleType => new VBRuntimeValue<float>((float)Floating),
         VBBooleanType => new VBRuntimeBooleanValue((short)Integral),
+        VBCurrencyType => new VBRuntimeValue<VBRuntimeCurrencyValue>(new VBRuntimeCurrencyValue(Integral)),
+        // a Double, or the serial of a Date.
         _ => new VBRuntimeValue<double>(Floating),
     };
 }
