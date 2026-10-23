@@ -58,7 +58,8 @@ public sealed class SessionSymbolsStorageAllocationTests
 
         var handle = symbols.Resolver.GetValue(field);
 
-        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle, handle, "should hold the type's default value until assigned");
+        // the cell holds the default: a cell of its own, which a variable of a scalar type holds as a payload (IR lowering S1.5).
+        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle.Value, handle.Value, "should hold the type's default value until assigned");
     }
 
     [TestMethod]
@@ -72,7 +73,7 @@ public sealed class SessionSymbolsStorageAllocationTests
 
         var handle = symbols.Resolver.GetValue(global);
 
-        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle, handle);
+        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle.Value, handle.Value);
     }
 
     [TestMethod]
@@ -103,7 +104,7 @@ public sealed class SessionSymbolsStorageAllocationTests
 
         var handle = symbols.Resolver.GetValue(local);
 
-        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle, handle, "should hold the type's default value until assigned");
+        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle.Value, handle.Value, "should hold the type's default value until assigned");
     }
 
     [TestMethod]
@@ -154,7 +155,7 @@ public sealed class SessionSymbolsStorageAllocationTests
         Assert.IsTrue(symbols.TryDefine(field, ScopeKind.Module));
         Assert.IsFalse(symbols.TryDefine(field, ScopeKind.Module), "an identical redefinition is a no-op, not a re-allocation");
 
-        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle, symbols.Resolver.GetValue(field));
+        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle.Value, symbols.Resolver.GetValue(field).Value);
     }
 
     [TestMethod]

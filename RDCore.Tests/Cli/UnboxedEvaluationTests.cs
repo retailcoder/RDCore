@@ -175,6 +175,21 @@ public sealed class UnboxedEvaluationTests
         CollectionAssert.AreEqual(new[] { "terminated", "dropped 2" }, output.TakeLast(2).ToArray());
     }
 
+    // the variables of a module and Static locals held as payloads, resolved once for each place they are named (S1.5): a value they keep, an overflow
+    // the boxed evaluation's error, and what an End resets them to.
+    [TestMethod]
+    public async Task AModuleVariableAndAStaticLocal_OnPayloads_KeepTheirValues()
+    {
+        var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPrivate total As Integer\r\nPrivate v As Variant\r\n"
+            + "Private Function Counted() As Long\r\nStatic n As Long\r\nn = n + 1\r\nCounted = n\r\nEnd Function\r\n"
+            + "Private Sub Add(ByVal by As Integer)\r\ntotal = total + by\r\nEnd Sub\r\n"
+            + "Public Sub Main()\r\nOn Error Resume Next\r\nDim i As Long, c As Long\r\nFor i = 1 To 3\r\nc = Counted()\r\nNext\r\n"
+            + "Add 30000\r\nAdd 2000\r\nAdd 1000\r\nv = 5\r\nv = v * total\r\n"
+            + "Debug.Print c & \" \" & Err.Number & \" \" & total & \" \" & v & \" \" & TypeName(v)\r\nEnd Sub\r\n";
+
+        Assert.AreEqual("3 6 32000 160000 Long", (await RunAsync([], program)).Last());
+    }
+
     [TestMethod]
     public async Task Strings_ComparedUnderOptionCompareText_IgnoreCase()
     {

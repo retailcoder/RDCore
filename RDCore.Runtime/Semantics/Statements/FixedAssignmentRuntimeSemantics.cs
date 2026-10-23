@@ -75,7 +75,7 @@ public sealed record class FixedAssignmentRuntimeSemantics(
             return RuntimeExecutionOutcome.InternalError;
         }
 
-        var handle = bound is not null ? RuntimeExpressionEvaluator.BindingOf(session, bound).Handle : session.Symbols.Resolver.GetValue(symbol!);
+        var handle = bound is not null ? Expressions.BindingOf(session, bound).Handle : session.Symbols.Resolver.GetValue(symbol!);
         var current = ((SDK.Model.Symbols.Abstract.ITypedSymbol)symbol!).ResolvedType.CreateValue(handle.ForReading());
 
         var evaluated = Expressions.Evaluate(session, assignment.Value, context);

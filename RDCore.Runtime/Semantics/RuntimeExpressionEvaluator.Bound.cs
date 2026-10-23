@@ -1,4 +1,5 @@
 using RDCore.Runtime.Execution.Frames;
+using RDCore.Runtime.Execution.Memory;
 using RDCore.Runtime.Semantics.Literals;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
@@ -101,12 +102,39 @@ public sealed partial class RuntimeExpressionEvaluator
     /// </summary>
     /// <param name="session">The session the variable lives in.</param>
     /// <param name="variable">The bound variable.</param>
-    internal static (IBindingHandle Handle, VBType? ReferencedType) BindingOf(IRuntimeSession session, BoundVariable variable)
-        => variable.Slot is { } slot && session.CallStack.Current is CallStackFrame frame
-            && frame.TryReadSlot(slot, variable.Variable, out var handle, out var referenced)
-                ? (handle, referenced)
-                : (session.Symbols.Resolver.GetValue(variable.Variable),
-                    session.CallStack.Current is { } current && current.TryGetReferencedType(variable.Variable, out var type) ? type : null);
+    internal (IBindingHandle Handle, VBType? ReferencedType) BindingOf(IRuntimeSession session, BoundVariable variable)
+    {
+        if (variable.Slot is { } slot && session.CallStack.Current is CallStackFrame frame
+            && frame.TryReadSlot(slot, variable.Variable, out var handle, out var referenced))
+        {
+            return (handle, referenced);
+        }
+
+        // a variable of the session - of a module, global, or a Static local - is the same cell from wherever it is read, for as long as nothing is
+        // allocated, freed or rebound in storage: resolved once for each place it is named, rather than looked up by its symbol each time (S1.5).
+        if (IsSessionVariable(variable.Variable) && session.Storage is SessionStorage storage)
+        {
+            if (_sessionCells.TryGetValue(variable, out var known) && ReferenceEquals(known.Storage, storage) && known.Generation == storage.Generation)
+            {
+                return (known.Cell, null);
+            }
+
+            var cell = session.Symbols.Resolver.GetValue(variable.Variable);
+            _sessionCells[variable] = new SessionCell(storage, storage.Generation, cell);
+            return (cell, null);
+        }
+
+        return (session.Symbols.Resolver.GetValue(variable.Variable),
+            session.CallStack.Current is { } current && current.TryGetReferencedType(variable.Variable, out var type) ? type : null);
+    }
+
+    // a variable whose storage is the session's, which no activation and no object holds: one of a module, a global, a Static local.
+    private static bool IsSessionVariable(Symbol variable)
+        => variable.ScopeKind is ScopeKind.Module or ScopeKind.Global || variable is VBLocalVariableSymbol { IsStatic: true };
+
+    private sealed record class SessionCell(SessionStorage Storage, int Generation, IBindingHandle Cell);
+
+    private readonly ConcurrentDictionary<BoundVariable, SessionCell> _sessionCells = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Let-coerces a value by the plan of its coercion (<see cref="Plans.PlanExecutor.TryConvert"/>), when nothing observes the evaluation and the value and

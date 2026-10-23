@@ -24,12 +24,19 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
     // address (those only ever grow from a non-negative offset).
     private int _nextInertAddress = -1;
 
+    /// <summary>
+    /// How many times what is bound at an address has changed: an allocation, a deallocation, a rebinding (a <c>POKE</c>). A binding read through an
+    /// address is the binding there for as long as this has not changed (IR lowering S1.5).
+    /// </summary>
+    public int Generation { get; private set; }
+
     public bool TryAllocate(int size, IBindingHandle handle, out MemoryAddress address)
     {
         if (size <= 0)
         {
             address = new MemoryAddress(_nextInertAddress--);
             _handleByAddress[address] = handle;
+            Generation++;
             return true;
         }
 
@@ -39,6 +46,7 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
         }
 
         _handleByAddress[address] = handle;
+        Generation++;
         return true;
     }
 
@@ -47,6 +55,7 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
 
     public bool TryDeallocate(MemoryAddress address)
     {
+        Generation++;
         if (address.Value < 0)
         {
             return _handleByAddress.Remove(address);
@@ -63,6 +72,7 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
         }
 
         _handleByAddress[address] = handle;
+        Generation++;
         return true;
     }
 

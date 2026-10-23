@@ -266,7 +266,7 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
 
         // MS-VBAL §5.3.1.11: a Variant reference parameter bound to a variable of another type is Set-assigned as that variable is declared.
         var (boundHandle, referenced) = bound is not null
-            ? RuntimeExpressionEvaluator.BindingOf(session, bound)
+            ? _expressionEvaluator.BindingOf(session, bound)
             : ((IBindingHandle?)null, session.CallStack.Current is { } frame && frame.TryGetReferencedType((Symbol)target, out var referencedType) ? referencedType : null);
         var declared = referenced ?? target.ResolvedType;
 

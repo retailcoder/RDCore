@@ -37,6 +37,25 @@ Public Sub BenchModuleVariableLoop()
     Next
 End Sub
 
+' the loop of BenchModuleVariableLoop over a local: what a module variable is measured against.
+Public Sub BenchLocalVariableLoop()
+    Dim I As Long
+    Dim Local As Long
+    For I = 1 To Iterations
+        Local = Local + 1
+    Next
+End Sub
+
+' the same loop over a Static local, which lives as long as the module does.
+Public Sub BenchStaticVariableLoop()
+    Dim I As Long
+    Static Kept As Long
+    Kept = 0
+    For I = 1 To Iterations
+        Kept = Kept + 1
+    Next
+End Sub
+
 ' Currency's payload is a scaled integer, which a value of it divides on every read today.
 Public Sub BenchCurrencySum()
     Dim I As Long

@@ -46,7 +46,8 @@ internal sealed class SymbolAddressTable(ISessionStorage storage)
             storage.TryDeallocate(previous);
         }
 
-        if (!storage.TryAllocate(value.Size, FreshBinding(value), out address))
+        // a variable of a scalar type (or a Variant holding one) is held as a payload, as a local is (IR lowering S1.5, Frames.CallStackFrame.CellFor).
+        if (!storage.TryAllocate(value.Size, Frames.CallStackFrame.CellFor(value), out address))
         {
             _addressBySymbol.Remove(symbol.SemanticId);
             return false;

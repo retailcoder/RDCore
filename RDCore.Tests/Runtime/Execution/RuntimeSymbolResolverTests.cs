@@ -54,7 +54,8 @@ public sealed class RuntimeSymbolResolverTests
 
         Assert.IsTrue(sut.TryAllocate(symbol, value, out _));
 
-        Assert.AreEqual(value.Handle, sut.GetValue(symbol));
+        // the cell holds the value: a cell of its own, which a variable of a scalar type holds as a payload (IR lowering S1.5).
+        Assert.AreEqual(value.Handle.Value, sut.GetValue(symbol).Value);
     }
 
     [TestMethod]
@@ -67,7 +68,7 @@ public sealed class RuntimeSymbolResolverTests
         Assert.IsTrue(sut.TryAllocate(symbol, value, out var address));
 
         Assert.IsTrue(sut.TryRead(address, out var handle));
-        Assert.AreEqual(value.Handle, handle);
+        Assert.AreEqual(value.Handle.Value, handle!.Value);
     }
 
     [TestMethod]
@@ -132,13 +133,13 @@ public sealed class RuntimeSymbolResolverTests
 
         Assert.IsTrue(sut.TryAllocate(symbol, second, out var secondAddress));
 
-        Assert.AreEqual(second.Handle, sut.GetValue(symbol));
+        Assert.AreEqual(second.Handle.Value, sut.GetValue(symbol).Value);
         // the first block was genuinely freed (not leaked): a same-size re-allocation reuses it
         // immediately, per SessionMemory's free-list fast path (SessionMemoryTests.TryAllocate_ReusesFreeMemory).
         Assert.AreEqual(firstAddress, secondAddress);
         // and reading it returns the CURRENT handle, not a stale leftover from the first allocation.
         Assert.IsTrue(storage.TryRead(secondAddress, out var bound));
-        Assert.AreEqual(second.Handle, bound);
+        Assert.AreEqual(second.Handle.Value, bound!.Value);
     }
 
     [TestMethod]
