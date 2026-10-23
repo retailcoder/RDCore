@@ -165,13 +165,13 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
                 // ByVal, or ByRef with a non-addressable argument (a literal, an expression result) -
                 // MS-VBAL §5.3.1.11's own "otherwise" case: a fresh local, Let-assigned from the
                 // argument's value, never aliasing anything the caller can see again.
-                frame.PushArgument(parameter, parameter.ResolvedType, arguments[i], activation.Layout.ParameterSlots[i]);
+                var held = frame.HoldArgument(parameter, parameter.ResolvedType, arguments[i], activation.Layout.ParameterSlots[i]);
 
                 // the local holds what it was given for as long as the activation does, whatever the caller does with its own variable meanwhile -
                 // Me as much as any: a member that lets go of the last variable of its own object still runs on a live object. An object New is
                 // initializing is held by the New expression's temporary (ObjectReferences.HoldTemporarily) until the statement is over, so letting go
                 // of Me when Initialize returns does not destroy it. A parameter of a type that holds no object (a number, a String) has nothing to count.
-                if (ObjectReferences.CanHoldAnObject(parameter.ResolvedType) && frame.TryResolve(parameter, out var cell))
+                if (ObjectReferences.CanHoldAnObject(parameter.ResolvedType) && (held ?? (frame.TryResolve(parameter, out var resolved) ? resolved : null)) is { } cell)
                 {
                     ObjectReferences.Rebind(Session, cell, ObjectReferences.Held.None);
                 }
@@ -225,11 +225,13 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             ObjectReferences.Release(Session, frame.ResultCell);
         }
 
-        foreach (var local in locals)
+        // the cells are read by the number of their slot when they have one (S1.4c), and looked up by their symbol otherwise.
+        var layout = frame.Layout;
+        for (var i = 0; i < locals.Length; i++)
         {
             // a variable of a type that holds no object (a number, a String) has nothing to let go of, and is not looked up (S1.3).
-            if (local is not VBLocalVariableSymbol { IsStatic: false } variable || !ObjectReferences.CanHoldAnObject(variable.ResolvedType)
-                || !frame.TryResolve(variable, out var handle))
+            if (locals[i] is not VBLocalVariableSymbol { IsStatic: false } variable || !ObjectReferences.CanHoldAnObject(variable.ResolvedType)
+                || CellOf(frame, variable, layout is { LocalSlots.Length: var count } && count == locals.Length ? layout.LocalSlots[i] : -1) is not { } handle)
             {
                 continue;
             }
@@ -243,7 +245,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         for (var i = 0; arguments is not null && i < parameters.Length; i++)
         {
             var parameter = parameters[i];
-            if (!IsAliased(parameter, arguments[i]) && ObjectReferences.CanHoldAnObject(parameter.ResolvedType) && frame.TryResolve(parameter, out var handle))
+            if (!IsAliased(parameter, arguments[i]) && ObjectReferences.CanHoldAnObject(parameter.ResolvedType)
+                && CellOf(frame, parameter, layout is { ParameterSlots.Length: var count } && count == parameters.Length ? layout.ParameterSlots[i] : -1) is { } handle)
             {
                 ObjectReferences.Release(Session, handle);
             }
@@ -357,6 +360,10 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             : ModuleDirectives.None;
 
     internal static bool IsByRef(ParameterKind kind) => kind is ParameterKind.ImplicitByRef or ParameterKind.ExplicitByRef;
+
+    // the cell of a variable of the activation: the one in its slot, or the one its symbol resolves to.
+    private static IBindingHandle? CellOf(CallStackFrame frame, Symbol variable, int slot)
+        => frame.TryGetSlotCell(slot, out var cell) || frame.TryResolve(variable, out cell) ? cell : null;
 
     // a ByRef parameter whose argument is a variable is an alias of it (MS-VBAL §5.3.1.11); any other is a fresh local, given a copy of its argument.
     private static bool IsAliased(VBParameterSymbol parameter, IRuntimeValue argument)

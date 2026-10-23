@@ -49,7 +49,8 @@ public sealed class ObjectInstanceTests
 
         sut.Push(field, value);
 
-        Assert.AreEqual(value.Handle, sut.GetValue(field));
+        // the field's cell holds the value: a cell of its own, which a field of a scalar type holds as a payload (IR lowering S1.4c).
+        Assert.AreEqual(value.Handle.Value, sut.GetValue(field).Value);
     }
 
     [TestMethod]
@@ -63,7 +64,7 @@ public sealed class ObjectInstanceTests
         sut.Push(field, value);
 
         Assert.IsTrue(sut.TryResolve(field, out var handle));
-        Assert.AreEqual(value.Handle, handle);
+        Assert.AreEqual(value.Handle.Value, handle!.Value);
     }
 
     [TestMethod]
@@ -137,8 +138,8 @@ public sealed class ObjectInstanceTests
         first.Push(field, firstValue);
         second.Push(field, secondValue);
 
-        Assert.AreEqual(firstValue.Handle, first.GetValue(field));
-        Assert.AreEqual(secondValue.Handle, second.GetValue(field));
+        Assert.AreEqual(firstValue.Handle.Value, first.GetValue(field).Value);
+        Assert.AreEqual(secondValue.Handle.Value, second.GetValue(field).Value);
 
         first.GetValue(field).SetValue(Substitute.For<ISymbolResolver>(), new VBLongValue(42).RuntimeValue);
 

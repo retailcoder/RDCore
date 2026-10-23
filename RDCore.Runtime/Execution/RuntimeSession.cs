@@ -319,10 +319,11 @@ internal sealed class SessionObjects : ISessionObjects
         => _roots.TryGetValue(instance, out var roots) && IndexOfRoot(roots, handle) >= 0;
 
     // a handle is a root by identity: handles are records, and two variables holding the same object compare equal by value while being two references.
-    // Searched without a predicate, which would be made for each reference counted (IR lowering S1.3).
+    // Searched without a predicate, which would be made for each reference counted (IR lowering S1.3), from the last: the cell that lets go of an object is
+    // most often the last that took it - a parameter, a local, a temporary (S1.4c).
     private static int IndexOfRoot(List<IBindingHandle> roots, IBindingHandle handle)
     {
-        for (var i = 0; i < roots.Count; i++)
+        for (var i = roots.Count - 1; i >= 0; i--)
         {
             if (ReferenceEquals(roots[i], handle))
             {

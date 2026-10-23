@@ -148,6 +148,33 @@ public sealed class UnboxedEvaluationTests
     [DataRow("Dim s As String, v As Variant ;; v = \"q\" ;; s = v ;; Debug.Print s", "q", DisplayName = "a Variant String assigned to a String (boxed)")]    public void AString_OnItsText_IsWhatTheBoxedEvaluationEvaluates(string body, string printed)
         => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
 
+    private static (string Name, string Source) Class(string name, params string[] body)
+        => (name, $"VERSION 1.0 CLASS\r\nBEGIN\r\n  MultiUse = -1  'True\r\nEND\r\nAttribute VB_Name = \"{name}\"\r\nOption Explicit\r\n{string.Join("\r\n", body)}\r\n");
+
+    // the fields of an object held as payloads, as a local is (S1.4c): each object its own, an overflow the boxed evaluation's error.
+    [TestMethod]
+    public async Task TheScalarFieldsOfAnObject_OnPayloads_AreItsOwn()
+    {
+        var counter = Class("Tally", "Private n As Integer", "Public Sub Bump(ByVal by As Integer)", "n = n + by", "End Sub",
+            "Public Property Get Value() As Integer", "Value = n", "End Property");
+        var program = Program("Dim a As New Tally, b As New Tally", "a.Bump 10", "a.Bump 20", "b.Bump 1", "a.Bump 32767",
+            "Debug.Print Err.Number & \" \" & a.Value & \" \" & b.Value");
+
+        Assert.AreEqual("6 30 1", (await RunAsync([counter], program)).Last());
+    }
+
+    // a Variant field that held an object lets go of it when a number is assigned to it, which is where the object's Terminate runs.
+    [TestMethod]
+    public async Task AVariantFieldThatHeldAnObject_LetsItGo_WhenANumberIsAssigned()
+    {
+        var token = Class("Token", "Private Sub Class_Terminate()", "Debug.Print \"terminated\"", "End Sub");
+        var holder = Class("Holder", "Private v As Variant", "Public Sub Take()", "Set v = New Token", "End Sub",
+            "Public Sub Drop()", "v = 1", "v = v + 1", "Debug.Print \"dropped \" & v", "End Sub");
+        var output = await RunAsync([token, holder], Program("Dim h As New Holder", "h.Take", "h.Drop"));
+
+        CollectionAssert.AreEqual(new[] { "terminated", "dropped 2" }, output.TakeLast(2).ToArray());
+    }
+
     [TestMethod]
     public async Task Strings_ComparedUnderOptionCompareText_IgnoreCase()
     {

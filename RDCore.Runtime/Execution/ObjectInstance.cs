@@ -32,7 +32,9 @@ public sealed class ObjectInstance(VBRuntimeObjectId objectId, VBClassModuleSymb
             throw new InvalidOperationException($"'{field.Uri}' is already declared on this instance.");
         }
 
-        _ = _addresses.TryAllocate(field, value, out _);
+        // a field of a scalar type (or a Variant holding one) is held as a payload, as a local is (IR lowering S1.4c, Frames.CallStackFrame.CellFor): what
+        // the code of the class evaluates its fields on.
+        _ = _addresses.TryAllocate(field, value.Size, Frames.CallStackFrame.CellFor(value), out _);
     }
 
     /// <inheritdoc/>

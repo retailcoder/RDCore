@@ -5,6 +5,7 @@ using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
@@ -294,17 +295,23 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     {
         // the variable is a cell of the activation, which takes no session memory until something asks for its address (IR lowering S1.1, Q1): most
         // locals are never passed by reference, and an activation of them reserves nothing. One the layout has a slot for is held in it (S1.1b).
-        // A variable of a scalar type holds its value as a payload, which an expression of it is evaluated on (S1.2), in a cell made of the value as it is.
-        // A Variant that holds a scalar (or nothing yet) holds it as a payload too (S1.4), which its subtype is the type of.
-        IBindingHandle cell = UnboxedEvaluation.IsEnabled && ScalarPayload.IsScalar(value.TypeInfo) && value is { IsIndeterminate: false, Handle: ValueBindingHandle boxed }
+        Hold(symbol, CellFor(value), value.Size, slot);
+    }
+
+    /// <summary>
+    /// The cell a variable that starts as <paramref name="value"/> is held in - a local's, a field's of an object: a variable of a scalar type holds its value
+    /// as a payload, which an expression of it is evaluated on (IR lowering S1.2), in a cell made of the value as it is; a Variant that holds a scalar (or
+    /// nothing yet) holds it as a payload too (S1.4), which its subtype is the type of; anything else is a fresh copy of the value
+    /// (<see cref="SymbolAddressTable.FreshBinding"/>).
+    /// </summary>
+    internal static IBindingHandle CellFor(VBTypedValue value)
+        => UnboxedEvaluation.IsEnabled && ScalarPayload.IsScalar(value.TypeInfo) && value is { IsIndeterminate: false, Handle: ValueBindingHandle boxed }
             && ScalarCell.TryCreate(value.TypeInfo, boxed.Value, out var scalar)
                 ? scalar!
                 : UnboxedEvaluation.IsEnabled && value is VBVariantValue { IsIndeterminate: false, TypedValue: var held } && IsImmutable(held)
                     && VariantCell.TryCreate(VBVariantType.TypeInfo, new VBRuntimeVariantValue(held.TypeInfo.VarType(), held), out var variant)
                     ? variant!
                     : SymbolAddressTable.FreshBinding(value);
-        Hold(symbol, cell, value.Size, slot);
-    }
 
     // a value a Variant cell can share with what it was made of, which nothing changes in place: a scalar, Empty, Null.
     private static bool IsImmutable(VBTypedValue value) => ScalarPayload.IsScalar(value.TypeInfo) || value is VBEmptyValue or VBNullValue;
@@ -319,22 +326,43 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// </remarks>
     /// <param name="slot">The number of the parameter's slot, when the caller knows it (<see cref="Push"/>); <c>-1</c> to look it up.</param>
     /// <exception cref="InvalidOperationException"><paramref name="symbol"/> is already declared on this frame.</exception>
-    public void PushArgument(Symbol symbol, VBType type, IRuntimeValue value, int slot = -1)
+    public void PushArgument(Symbol symbol, VBType type, IRuntimeValue value, int slot = -1) => _ = HoldArgument(symbol, type, value, slot);
+
+    /// <summary>
+    /// <see cref="PushArgument"/>, which says what cell the parameter was given - <see langword="null"/> when it was given one the way any declaration is
+    /// (<see cref="Push(Symbol, VBTypedValue, int)"/>), which is looked up to be read.
+    /// </summary>
+    internal IBindingHandle? HoldArgument(Symbol symbol, VBType type, IRuntimeValue value, int slot)
     {
         if (UnboxedEvaluation.IsEnabled && ScalarCell.TryCreate(type, value, out var scalar))
         {
-            Hold(symbol, scalar!, type.DefaultValue.Size, slot);
-            return;
+            return Hold(symbol, scalar!, type.DefaultValue.Size, slot);
         }
 
         if (UnboxedEvaluation.IsEnabled && value is VBRuntimeVariantValue { WrappedValue: { IsIndeterminate: false } held } && IsImmutable(held)
             && VariantCell.TryCreate(type, value, out var variant))
         {
-            Hold(symbol, variant!, type.DefaultValue.Size, slot);
-            return;
+            return Hold(symbol, variant!, type.DefaultValue.Size, slot);
+        }
+
+        // an object - the Me of a member, an object passed by value - is the cell of its reference, which is what a value of it would be copied into (S1.4c).
+        if (UnboxedEvaluation.IsEnabled && type is VBClassType or VBObjectType && value is VBRuntimeValue<VBRuntimeObjectId>)
+        {
+            return Hold(symbol, new ValueBindingHandle(value), type.DefaultValue.Size, slot);
         }
 
         Push(symbol, type.CreateValue(new ValueBindingHandle(value)), slot);
+        return null;
+    }
+
+    /// <summary>
+    /// The cell held in slot <paramref name="slot"/> of the activation's layout, when it holds one rather than an address (IR lowering S1.4c): what a
+    /// variable that has a slot is, read by number rather than looked up by its symbol.
+    /// </summary>
+    internal bool TryGetSlotCell(int slot, [NotNullWhen(true)] out IBindingHandle? cell)
+    {
+        cell = (uint)slot < (uint)_slots.Length && _slots[slot] is { IsFilled: true, Cell: { } held } ? held : null;
+        return cell is not null;
     }
 
     /// <summary>
@@ -361,7 +389,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     internal FrameLayout? Layout => _layout;
 
     // a slot the caller numbered is the one of this activation's layout, which is what the caller read the number from: no symbol is looked up (S1.3).
-    private void Hold(Symbol symbol, IBindingHandle cell, int size, int slot)
+    private IBindingHandle Hold(Symbol symbol, IBindingHandle cell, int size, int slot)
     {
         if ((uint)slot < (uint)_slots.Length || TryGetOwnSlot(symbol, out slot))
         {
@@ -373,7 +401,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
             }
 
             held = new Slot(true, default, cell, null, size);
-            return;
+            return cell;
         }
 
         if (!(_declared ??= []).Add(symbol.SemanticId))
@@ -382,6 +410,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         }
 
         (_cells ??= [])[symbol.SemanticId] = (cell, size);
+        return cell;
     }
 
     /// <summary>

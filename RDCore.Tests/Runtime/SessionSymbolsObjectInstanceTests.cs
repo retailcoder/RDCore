@@ -47,7 +47,7 @@ public sealed class SessionSymbolsObjectInstanceTests
 
         var instance = symbols.CreateInstance(new VBRuntimeObjectId(), classModule);
 
-        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle, instance.GetValue(field));
+        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle.Value, instance.GetValue(field).Value);
     }
 
     [TestMethod]

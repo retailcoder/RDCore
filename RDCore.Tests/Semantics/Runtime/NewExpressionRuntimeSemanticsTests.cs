@@ -58,7 +58,7 @@ public sealed class NewExpressionRuntimeSemanticsTests
         var objectValue = Assert.IsInstanceOfType<VBObjectValue>(result.Result);
         Assert.IsFalse(objectValue.IsNothing());
         Assert.IsTrue(session.Symbols.TryGetInstance(objectValue.Value, out var instance));
-        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle, instance!.GetValue(field));
+        Assert.AreEqual(VBLongType.TypeInfo.DefaultValue.Handle.Value, instance!.GetValue(field).Value);
     }
 
     [TestMethod]
