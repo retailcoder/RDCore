@@ -196,7 +196,8 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
     // they read share with it.
     private RuntimeExecutionOutcome ExecuteLetAssignment(IRuntimeSession session, RuntimeEvaluationContext context, AssignmentStatementNode assignment)
     {
-        // a numeric scalar variable assigned an expression of them is assigned on payloads (IR lowering S1.2), which make no value of the expression.
+        // a scalar variable, or the result of a function of a scalar type, assigned an expression of them is assigned on payloads (IR lowering S1.2,
+        // S1.3), which make no value of the expression.
         if (_expressionEvaluator.TryAssignUnboxed(session, assignment.Target, assignment.Value, context))
         {
             return RuntimeExecutionOutcome.Next;
@@ -206,6 +207,12 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         if (!valueResult.IsSuccess)
         {
             return valueResult.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(valueResult.ErrorInfo!);
+        }
+
+        // what a call returned, a scalar, is written to a scalar variable as its payload (S1.3).
+        if (_expressionEvaluator.TryAssignValueUnboxed(session, assignment.Target, valueResult.Result!, context))
+        {
+            return RuntimeExecutionOutcome.Next;
         }
 
         return _assignments.Assign(session, context, assignment, assignment.Target, assignment.Value, valueResult.Result!);

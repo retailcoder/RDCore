@@ -25,7 +25,7 @@ public sealed class RuntimeCallStack : StackManager<CallStackFrame>, ICallStack
     /// The activation on top of the stack - unless one was <see cref="Select"/>ed, and nothing has been pushed since: then the one that was.
     /// </remarks>
     public CallStackFrame? Current
-        => _selected is not null && Frames.Count == _selectedDepth ? _selected : Frames.Count > 0 ? Frames.First() : null;
+        => _selected is not null && Depth == _selectedDepth ? _selected : TryPeek(out var top) ? top : null;
 
     /// <summary>
     /// Makes an activation the current one, for as long as the scope lives and until something is called: whatever runs meanwhile sees that activation's variables as if

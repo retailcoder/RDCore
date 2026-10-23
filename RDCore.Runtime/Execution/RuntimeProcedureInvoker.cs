@@ -48,7 +48,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 {
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult Invoke(VBTypeMemberSymbol procedure, ISymbolResolver resolver, IRuntimeValue[] arguments)
-        => Activate(procedure, arguments, (frame, body) => Executor.Run(Session, frame, body, new RuntimeEvaluationContext(procedure.Uri)));
+        => Activate(procedure, arguments, sweep: false);
 
     /// <summary>
     /// Evaluates every instruction of <paramref name="procedure"/> once, as the entry point of an analysis (<see cref="ProcedureExecutor.Sweep"/>).
@@ -61,10 +61,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     /// entered with a <c>Me</c> that is an instance of its class, made for the occasion and not initialized.
     /// </remarks>
     public bool Sweep(VBTypeMemberSymbol procedure)
-        => Activate(procedure, [.. GetParameters(procedure).Select(AssumedArgument(procedure))],
-            (frame, body) => Executor.Sweep(Session, frame, body, new RuntimeEvaluationContext(procedure.Uri))
-                ? RuntimeExecutionOutcome.ExitProcedure
-                : RuntimeExecutionOutcome.InternalError).IsSuccess;
+        => Activate(procedure, [.. GetParameters(procedure).Select(AssumedArgument(procedure))], sweep: true).IsSuccess;
 
     private Func<VBParameterSymbol, IRuntimeValue> AssumedArgument(VBTypeMemberSymbol procedure) => parameter =>
     {
@@ -80,8 +77,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         return SymbolAddressTable.BoxedValue(parameter.ResolvedType.DefaultValue.AsAssumed());
     };
 
-    private RuntimeSemanticsEvaluationResult Activate(
-        VBTypeMemberSymbol procedure, IRuntimeValue[] arguments, Func<CallStackFrame, InstructionList, RuntimeExecutionOutcome> run)
+    // an activation that runs the body (Invoke), or that evaluates every instruction of it once (Sweep).
+    private RuntimeSemanticsEvaluationResult Activate(VBTypeMemberSymbol procedure, IRuntimeValue[] arguments, bool sweep)
     {
         if (!Bodies.TryGetValue(procedure.SemanticId, out var body))
         {
@@ -99,12 +96,16 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        var activation = _activations.GetOrAdd(procedure, ActivationOf);
+        if (!_activations.TryGetValue(procedure, out var activation))
+        {
+            activation = _activations.GetOrAdd(procedure, ActivationOf);
+        }
+
         var frame = (CallStackFrame)Session.Symbols.CreateFrame(activation.NodeId, activation.Symbol, activation.Directives);
 
         // the first parameter of a member of a class is its Me, and the object the member is a call on is what its
         // fields are the storage of.
-        if (GetParameters(procedure) is [{ Name: "Me" }, ..] && arguments is [VBRuntimeValue<VBRuntimeObjectId> { StoredValue: var target }, ..])
+        if (parameters is [{ Name: "Me" }, ..] && arguments is [VBRuntimeValue<VBRuntimeObjectId> { StoredValue: var target }, ..])
         {
             frame.Target = target;
         }
@@ -147,7 +148,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
                 // ByVal, or ByRef with a non-addressable argument (a literal, an expression result) -
                 // MS-VBAL §5.3.1.11's own "otherwise" case: a fresh local, Let-assigned from the
                 // argument's value, never aliasing anything the caller can see again.
-                frame.Push(parameter, parameter.ResolvedType.CreateValue(new ValueBindingHandle(arguments[i])));
+                frame.PushArgument(parameter, parameter.ResolvedType, arguments[i]);
 
                 // the local holds what it was given for as long as the activation does, whatever the caller does with its own variable meanwhile -
                 // Me as much as any: a member that lets go of the last variable of its own object still runs on a live object. An object New is
@@ -163,7 +164,10 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
         HoistLocals(Session, frame, GetLocals(procedure));
 
-        var outcome = run(frame, body);
+        var context = new RuntimeEvaluationContext(procedure.Uri);
+        var outcome = !sweep
+            ? Executor.Run(Session, frame, body, context)
+            : Executor.Sweep(Session, frame, body, context) ? RuntimeExecutionOutcome.ExitProcedure : RuntimeExecutionOutcome.InternalError;
 
         // a program that was stopped does not unwind: the objects its locals held are not let go of, because that is where a Terminate would run, and an End
         // runs none. What it leaves is the session's to clear (ISessionSymbols.ResetStorage) when it is over, or to keep when it is only broken.

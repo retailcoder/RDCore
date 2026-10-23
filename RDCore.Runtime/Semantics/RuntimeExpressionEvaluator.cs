@@ -2,6 +2,8 @@ using RDCore.Runtime.Execution;
 using RDCore.Runtime.Execution.External;
 using RDCore.Runtime.Semantics.Expressions;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Literals;
 using RDCore.Runtime.Semantics.Operators;
@@ -1619,7 +1621,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        var borrowed = new List<MemoryAddress>();
+        // most calls borrow nothing: the list is the one the last call left, a call made while another binds its arguments has one of its own (S1.3).
+        var borrowed = Interlocked.Exchange(ref _spareBorrowed, null) ?? [];
         try
         {
             if (BindArguments(session, context, parameters, argumentNodes, out var arguments, out var argumentsKnown, borrowed,
@@ -1641,8 +1644,12 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         finally
         {
             GiveBack(session, borrowed);
+            borrowed.Clear();
+            Volatile.Write(ref _spareBorrowed, borrowed);
         }
     }
+
+    private List<MemoryAddress>? _spareBorrowed;
 
     /// <summary>
     /// What a call made with an argument that is not known returns: the value it returned, which is not known either
@@ -1782,7 +1789,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
-        var mapResult = MapArguments(parameters, argumentNodes);
+        var mapResult = MappedArguments(parameters, argumentNodes);
         if (mapResult.Error is { } mappingError)
         {
             return mappingError;
@@ -1827,6 +1834,13 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, out evaluatedInstead, external))
             {
                 bound[i] = reference;
+                continue;
+            }
+
+            // a scalar passed by value, evaluated on payloads and let-coerced to the parameter's type exactly, is passed as that (IR lowering S1.3).
+            if (!aliased && !external && TryEvaluateArgumentUnboxed(session, argumentNode, parameter.ResolvedType, context, out var payloadArgument))
+            {
+                bound[i] = payloadArgument;
                 continue;
             }
 
@@ -1970,6 +1984,40 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     }
 
     private readonly record struct ArgumentMapResult(ExpressionNode?[]? Mapped, ImmutableArray<ExpressionNode> ParamArrayArguments, RuntimeSemanticsEvaluationResult? Error);
+
+    // which argument goes to which parameter is the call site's and the procedure's alone, and is decided once for each (IR lowering S1.3): a site is its
+    // arguments as written, a procedure its first parameter - the parameters of a member called on an object are the ones after its Me, made again for each
+    // call. A site whose arguments are made again for each call is not one to remember: the table stops growing.
+    private ArgumentMapResult MappedArguments(ImmutableArray<VBParameterSymbol> parameters, ImmutableArray<ExpressionNode> argumentNodes)
+    {
+        var key = new ArgumentSite(ImmutableCollectionsMarshal.AsArray(argumentNodes), parameters.IsDefaultOrEmpty ? null : parameters[0], parameters.IsDefault ? 0 : parameters.Length);
+        if (_argumentMaps.TryGetValue(key, out var map))
+        {
+            return map;
+        }
+
+        map = MapArguments(parameters, argumentNodes);
+        if (_argumentMaps.Count < MaxArgumentSites)
+        {
+            _argumentMaps.TryAdd(key, map);
+        }
+
+        return map;
+    }
+
+    private const int MaxArgumentSites = 4096;
+
+    private readonly ConcurrentDictionary<ArgumentSite, ArgumentMapResult> _argumentMaps = new();
+
+    // compared by reference: a symbol is a record, which two procedures' parameters of the same name and type would be equal as.
+    private readonly record struct ArgumentSite(ExpressionNode[]? Arguments, VBParameterSymbol? First, int Count)
+    {
+        public bool Equals(ArgumentSite other)
+            => ReferenceEquals(Arguments, other.Arguments) && ReferenceEquals(First, other.First) && Count == other.Count;
+
+        public override int GetHashCode()
+            => HashCode.Combine(RuntimeHelpers.GetHashCode(Arguments), RuntimeHelpers.GetHashCode(First), Count);
+    }
 
     // the object a value is, or a Variant holds - however many Variants deep.
     private static VBObjectValue? HeldObject(VBTypedValue? value) => value switch

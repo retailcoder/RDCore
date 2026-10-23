@@ -23,6 +23,14 @@ public abstract class StackManager<TFrame>
     public IReadOnlyCollection<TFrame> Frames => _frameStack;
 
     /// <summary>
+    /// Gets the top-most frame of the managed stack, if there is one, without enumerating <see cref="Frames"/>: what the stack is asked for most often,
+    /// once for every name an activation resolves.
+    /// </summary>
+    /// <param name="frame">The top-most frame, when the stack is not empty.</param>
+    /// <returns><see langword="true"/> if the stack has a frame; <see langword="false"/> if it is empty.</returns>
+    protected bool TryPeek([MaybeNullWhen(false)] out TFrame frame) => _frameStack.TryPeek(out frame);
+
+    /// <summary>
     /// Whether a frame equal to <paramref name="frame"/> is on the managed stack.
     /// </summary>
     protected bool Contains(TFrame frame) => _frameStack.Contains(frame);
