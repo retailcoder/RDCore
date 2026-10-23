@@ -835,7 +835,12 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             return ToFailureOutcome(RuntimeSemanticsEvaluationResult.Error(operandError));
         }
 
-        var state = new ForLoopState(counterSymbol, forStatement.ControlExpression, counted.End, counted.Step) { CountsDown = ForLoopEvaluator.CountsDown(counted.Step) };
+        var state = new ForLoopState(counterSymbol, forStatement.ControlExpression, counted.End, counted.Step)
+        {
+            CountsDown = ForLoopEvaluator.CountsDown(counted.Step),
+            // what stepping on payloads keeps from one Next to the next (IR lowering S1): filled by the first.
+            RuntimeState = new ForLoopPayloads(),
+        };
 
         var assignResult = forLoop.AssignCounter(session, state, forStatement.StartExpression, counted.Start, context);
         if (!assignResult.IsSuccess)

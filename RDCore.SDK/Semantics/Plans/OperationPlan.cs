@@ -36,11 +36,13 @@ public sealed record class OperationPlan(string Operator, IReadOnlyList<VBType> 
     /// What a non-<c>Null</c> operand is let-coerced to before the operation is evaluated: the effective type, except that a <c>Date</c> operation is evaluated in
     /// <c>Double</c> (<strong>MS-VBAL §5.6.9.3</strong>). <see langword="null"/> when nothing is coerced - a <c>Null</c> effective type, whose result is
     /// <c>Null</c> whatever the other operand is, a plan with no effective type, and <c>Is</c>, which compares two object references as they are
-    /// (<strong>§5.6.9.7</strong>).
+    /// (<strong>§5.6.9.7</strong>). Worked out once, with the plan: it is asked for every time the plan is evaluated.
     /// </summary>
-    public VBType? OperandDestination => EffectiveType switch
+    public VBType? OperandDestination { get; } = DestinationOf(Operator, EffectiveType);
+
+    private static VBType? DestinationOf(string @operator, VBType? effectiveType) => effectiveType switch
     {
-        _ when Operator == Tokens.CompareIsOp => null,
+        _ when @operator == Tokens.CompareIsOp => null,
         VBDateType => VBDoubleType.TypeInfo,
         VBNullType or null => null,
         var effective => effective,

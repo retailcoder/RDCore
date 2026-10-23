@@ -38,4 +38,11 @@ public readonly record struct ForLoopState(Symbol Counter, ExpressionNode Contro
     /// </summary>
     public VBBinaryOperatorExpressionNode CounterAssignment { get; } = new(
         OperatorSymbolNames.BinaryAssignmentValueOp, ControlExpression.Identity, ControlExpression.Location, ControlExpression, ControlExpression);
+
+    /// <summary>
+    /// What the runtime that runs the loop keeps of it from one <c>Next</c> to the next - what it would otherwise work out again on every iteration, of
+    /// values that do not change while the loop runs (the end, the step, the counter's binding). Opaque here: the runtime that sets it is the one that
+    /// reads it, and <see langword="null"/> means it keeps nothing.
+    /// </summary>
+    public object? RuntimeState { get; init; }
 }

@@ -58,9 +58,14 @@ public sealed partial class RuntimeExpressionEvaluator
             return false;
         }
 
+        var (cell, referenced) = BindingOf(session, variable);
+        if (referenced is null && cell is ScalarCell or VariantCell)
+        {
+            return TryEvaluatePayload(session, BoundTreeOf(session, value, context), out var payload) && TryWritePayload(cell, payload);
+        }
+
         // a String variable - not a fixed-length one, which pads or truncates what it is assigned - is assigned the text as it is (S1.4b).
-        if (variable.Variable is ITypedSymbol { ResolvedType: VBStringType and not VBFixedStringType }
-            && BindingOf(session, variable) is (ValueBindingHandle text, null))
+        if (referenced is null && cell is ValueBindingHandle text && variable.Variable is ITypedSymbol { ResolvedType: VBStringType and not VBFixedStringType })
         {
             if (!TryEvaluateText(session, BoundTreeOf(session, value, context), out var assigned))
             {
@@ -71,9 +76,7 @@ public sealed partial class RuntimeExpressionEvaluator
             return true;
         }
 
-        return BindingOf(session, variable) is (ScalarCell or VariantCell, null) and var (cell, _)
-            && TryEvaluatePayload(session, BoundTreeOf(session, value, context), out var payload)
-            && TryWritePayload(cell, payload);
+        return false;
     }
 
     // MS-VBAL §5.6.9.4, §5.6.5: an expression of Strings evaluated to the runtime value of the String it is, with no value made of it (S1.4b): a String
@@ -196,45 +199,67 @@ public sealed partial class RuntimeExpressionEvaluator
     {
         isOutOfRange = false;
         if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables
+            || state.RuntimeState is not ForLoopPayloads loop || loop.IsDeclined
+            || !(loop.IsReady && ReferenceEquals(loop.Scopes, session.Symbols.Scopes)) && !TryPrepareFor(session, state, context, loop))
+        {
+            return false;
+        }
+
+        switch (BindingOf(session, loop.Counter!))
+        {
+            case (ScalarCell cell, null) when cell.TryRead(out var value) && ReferenceEquals(cell.Type, loop.Step.Type)
+                && TryOperate(Tokens.AdditionOp, cell.Type, value, loop.Step, out var sum):
+                cell.Write(sum);
+                isOutOfRange = sum.IsIntegral
+                    ? state.CountsDown ? sum.Integral < loop.End.Integral : sum.Integral > loop.End.Integral
+                    : state.CountsDown ? sum.Floating < loop.End.Floating : sum.Floating > loop.End.Floating;
+                return true;
+            case (VariantCell variant, null):
+                return TryStepVariantFor(variant, loop, state.CountsDown, out isOutOfRange);
+            default:
+                return false;
+        }
+    }
+
+    // what every Next of the loop steps with, worked out by the first (S1): the counter as it is bound, and the step and the end as payloads - of the type
+    // the loop counts in, which neither changes while the loop runs. A loop whose step or end is no payload is never stepped here.
+    private bool TryPrepareFor(IRuntimeSession session, ForLoopState state, RuntimeEvaluationContext context, ForLoopPayloads loop)
+    {
+        if (state.Step.IsIndeterminate || state.End.IsIndeterminate
+            || !ScalarPayload.IsScalar(state.Step.TypeInfo) || !ScalarPayload.IsScalar(state.End.TypeInfo)
+            || !ScalarPayload.TryOf(state.Step.TypeInfo, state.Step.RuntimeValue, out loop.Step)
+            || !ScalarPayload.TryOf(state.End.TypeInfo, state.End.RuntimeValue, out loop.End)
             || BoundVariableOf(session, state.ControlExpression, context) is not { } counter)
         {
+            loop.IsDeclined = true;
             return false;
         }
 
-        if (BindingOf(session, counter) is (VariantCell variant, null))
-        {
-            return TryStepVariantFor(variant, state, out isOutOfRange);
-        }
-
-        if (BindingOf(session, counter) is not (ScalarCell cell, null)
-            || !cell.TryRead(out var value)
-            || state.Step.IsIndeterminate || state.End.IsIndeterminate
-            || !ScalarPayload.TryOf(cell.Type, state.Step.RuntimeValue, out var step) || !ScalarPayload.TryOf(cell.Type, state.End.RuntimeValue, out var end)
-            || !TryOperate(Tokens.AdditionOp, cell.Type, value, step, out var sum))
-        {
-            return false;
-        }
-
-        cell.Write(sum);
-        isOutOfRange = sum.IsIntegral
-            ? state.CountsDown ? sum.Integral < end.Integral : sum.Integral > end.Integral
-            : state.CountsDown ? sum.Floating < end.Floating : sum.Floating > end.Floating;
+        (loop.Counter, loop.Scopes, loop.IsReady) = (counter, session.Symbols.Scopes, true);
         return true;
     }
 
     // a Variant counter (S1.4), which the loop gave a value of the type it counts in (ForLoopEvaluator.Operands): counter + step and the comparison with
     // the end are Variant operations, planned for what the counter holds - a sum that overflows declines, and the boxed loop widens the counter as MS-VBA
-    // does.
-    private static bool TryStepVariantFor(VariantCell cell, ForLoopState state, out bool isOutOfRange)
+    // does. The plans are made again only when the counter's subtype changes.
+    private static bool TryStepVariantFor(VariantCell cell, ForLoopPayloads loop, bool countsDown, out bool isOutOfRange)
     {
         isOutOfRange = false;
-        if (!cell.HoldsNoObject || !cell.TryRead(out var value) || state.Step.IsIndeterminate || state.End.IsIndeterminate
-            || !ScalarPayload.IsScalar(state.Step.TypeInfo) || !ScalarPayload.IsScalar(state.End.TypeInfo)
-            || !ScalarPayload.TryOf(state.Step.TypeInfo, state.Step.RuntimeValue, out var step)
-            || !ScalarPayload.TryOf(state.End.TypeInfo, state.End.RuntimeValue, out var end)
-            || !TryOperateBinary(OperationPlanner.ForValues(Tokens.AdditionOp, value.Type, step.Type), value, step, out var sum)
-            || !TryOperateBinary(OperationPlanner.ForValues(state.CountsDown ? Tokens.CompareLessThanOp : Tokens.CompareGreaterThanOp, sum.Type, end.Type),
-                sum, end, out var past))
+        if (!cell.HoldsNoObject || !cell.TryRead(out var value))
+        {
+            return false;
+        }
+
+        if (!ReferenceEquals(loop.PlannedFor, value.Type))
+        {
+            loop.Sum = OperationPlanner.ForValues(Tokens.AdditionOp, value.Type, loop.Step.Type);
+            loop.Comparison = loop.Sum.EffectiveType is { } summed
+                ? OperationPlanner.ForValues(countsDown ? Tokens.CompareLessThanOp : Tokens.CompareGreaterThanOp, summed, loop.End.Type)
+                : null;
+            loop.PlannedFor = value.Type;
+        }
+
+        if (loop.Comparison is null || !TryOperateBinary(loop.Sum!, value, loop.Step, out var sum) || !TryOperateBinary(loop.Comparison, sum, loop.End, out var past))
         {
             return false;
         }
