@@ -280,7 +280,16 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// <param name="symbol">The locally-scoped <see cref="Symbol"/> being declared — a parameter or a <c>Dim</c> local.</param>
     /// <param name="value">The symbol's initial value: the caller's argument for a parameter, the declared type's default value for a fresh <c>Dim</c>.</param>
     /// <exception cref="InvalidOperationException"><paramref name="symbol"/> is already declared on this frame — a compile-time <c>DuplicateDeclaration</c> that should never reach runtime.</exception>
-    public void Push(Symbol symbol, VBTypedValue value)
+    public void Push(Symbol symbol, VBTypedValue value) => Push(symbol, value, -1);
+
+    /// <inheritdoc cref="Push(Symbol, VBTypedValue)"/>
+    /// <param name="symbol">The locally-scoped <see cref="Symbol"/> being declared — a parameter or a <c>Dim</c> local.</param>
+    /// <param name="value">The symbol's initial value: the caller's argument for a parameter, the declared type's default value for a fresh <c>Dim</c>.</param>
+    /// <param name="slot">
+    /// The number of the symbol's slot in the activation's layout (<see cref="FrameLayout.ParameterSlots"/>, <see cref="FrameLayout.LocalSlots"/>), when the
+    /// caller knows it; <c>-1</c> to look it up by the symbol.
+    /// </param>
+    public void Push(Symbol symbol, VBTypedValue value, int slot)
     {
         // the variable is a cell of the activation, which takes no session memory until something asks for its address (IR lowering S1.1, Q1): most
         // locals are never passed by reference, and an activation of them reserves nothing. One the layout has a slot for is held in it (S1.1b).
@@ -289,7 +298,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
             && ScalarCell.TryCreate(value.TypeInfo, boxed.Value, out var scalar)
                 ? scalar!
                 : SymbolAddressTable.FreshBinding(value);
-        Hold(symbol, cell, value.Size);
+        Hold(symbol, cell, value.Size, slot);
     }
 
     /// <summary>
@@ -300,22 +309,28 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// The same as <see cref="Push"/> with a value of <paramref name="type"/> made of <paramref name="value"/>, which a parameter of a scalar type is not
     /// made of (IR lowering S1.3): its cell holds the argument as it is.
     /// </remarks>
+    /// <param name="slot">The number of the parameter's slot, when the caller knows it (<see cref="Push"/>); <c>-1</c> to look it up.</param>
     /// <exception cref="InvalidOperationException"><paramref name="symbol"/> is already declared on this frame.</exception>
-    public void PushArgument(Symbol symbol, VBType type, IRuntimeValue value)
+    public void PushArgument(Symbol symbol, VBType type, IRuntimeValue value, int slot = -1)
     {
         if (UnboxedEvaluation.IsEnabled && ScalarCell.TryCreate(type, value, out var scalar))
         {
-            Hold(symbol, scalar!, type.DefaultValue.Size);
+            Hold(symbol, scalar!, type.DefaultValue.Size, slot);
             return;
         }
 
-        Push(symbol, type.CreateValue(new ValueBindingHandle(value)));
+        Push(symbol, type.CreateValue(new ValueBindingHandle(value)), slot);
     }
 
-    private void Hold(Symbol symbol, IBindingHandle cell, int size)
+    /// <summary>The layout the activation was laid out as (<see cref="LayOut"/>), if it was.</summary>
+    internal FrameLayout? Layout => _layout;
+
+    // a slot the caller numbered is the one of this activation's layout, which is what the caller read the number from: no symbol is looked up (S1.3).
+    private void Hold(Symbol symbol, IBindingHandle cell, int size, int slot)
     {
-        if (TryGetOwnSlot(symbol, out var index))
+        if ((uint)slot < (uint)_slots.Length || TryGetOwnSlot(symbol, out slot))
         {
+            var index = slot;
             ref var held = ref _slots[index];
             if (held.IsFilled || IsByRefParameter(symbol))
             {

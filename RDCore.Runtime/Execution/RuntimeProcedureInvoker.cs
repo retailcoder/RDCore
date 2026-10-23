@@ -80,7 +80,12 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     // an activation that runs the body (Invoke), or that evaluates every instruction of it once (Sweep).
     private RuntimeSemanticsEvaluationResult Activate(VBTypeMemberSymbol procedure, IRuntimeValue[] arguments, bool sweep)
     {
-        if (!Bodies.TryGetValue(procedure.SemanticId, out var body))
+        if (!_activations.TryGetValue(procedure, out var activation))
+        {
+            activation = _activations.GetOrAdd(procedure, ActivationOf);
+        }
+
+        if (BodyOf(procedure, activation) is not { } body)
         {
             // a member with no body is a real gap in the platform. A member whose code is not the workspace's
             // never reaches here at all: ICallableBindingFactory binds it to an IExternalDispatcher instead,
@@ -94,11 +99,6 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             // arity mismatch: a real static-semantics gap (no call-site argument-count check exists yet
             // either), not something this slice invents error handling for.
             return RuntimeSemanticsEvaluationResult.InternalError();
-        }
-
-        if (!_activations.TryGetValue(procedure, out var activation))
-        {
-            activation = _activations.GetOrAdd(procedure, ActivationOf);
         }
 
         var frame = (CallStackFrame)Session.Symbols.CreateFrame(activation.NodeId, activation.Symbol, activation.Directives);
@@ -130,11 +130,10 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
                 : returning.ResolvedType.DefaultValue;
         }
 
-        List<VBParameterSymbol>? copied = null;
         for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
-            if (IsByRef(parameter.ParameterKind) && arguments[i] is VBRuntimeReference reference)
+            if (IsAliased(parameter, arguments[i]) && arguments[i] is VBRuntimeReference reference)
             {
                 // MS-VBAL §5.3.1.11: "a reference parameter binding is defined... referring to the
                 // variable referenced by the argument's expression" - true aliasing onto the caller's own
@@ -148,7 +147,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
                 // ByVal, or ByRef with a non-addressable argument (a literal, an expression result) -
                 // MS-VBAL §5.3.1.11's own "otherwise" case: a fresh local, Let-assigned from the
                 // argument's value, never aliasing anything the caller can see again.
-                frame.PushArgument(parameter, parameter.ResolvedType, arguments[i]);
+                frame.PushArgument(parameter, parameter.ResolvedType, arguments[i], activation.Layout.ParameterSlots[i]);
 
                 // the local holds what it was given for as long as the activation does, whatever the caller does with its own variable meanwhile -
                 // Me as much as any: a member that lets go of the last variable of its own object still runs on a live object. An object New is
@@ -157,7 +156,6 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
                 if (ObjectReferences.CanHoldAnObject(parameter.ResolvedType) && frame.TryResolve(parameter, out var cell))
                 {
                     ObjectReferences.Rebind(Session, cell, ObjectReferences.Held.None);
-                    (copied ??= []).Add(parameter);
                 }
             }
         }
@@ -173,7 +171,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         // runs none. What it leaves is the session's to clear (ISessionSymbols.ResetStorage) when it is over, or to keep when it is only broken.
         if (outcome.Kind is not (RuntimeExecutionOutcomeKind.Halt or RuntimeExecutionOutcomeKind.Break))
         {
-            ReleaseLocals(frame, GetLocals(procedure), copied);
+            ReleaseLocals(frame, GetLocals(procedure), parameters, arguments);
         }
 
         // A program that was stopped by a Stop, or by a break, is suspended and not over (MS-VBAL 5.4.2.11): "all variables maintain their state if execution resumes". Its
@@ -201,7 +199,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     // is taken by whoever called it: it is held as a temporary of the caller's statement first (ObjectReferences.HoldTemporarily),
     // and the function result variable, the locals, the ByVal parameters and the blocks still open let go of what they held
     // after it. A Static local outlives the activation and is not in the frame.
-    private void ReleaseLocals(CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals, List<VBParameterSymbol>? copiedParameters)
+    private void ReleaseLocals(CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals, ImmutableArray<VBParameterSymbol> parameters, IRuntimeValue[] arguments)
     {
         ObjectReferences.HoldTemporarily(Session, frame.ReturnValue);
         if (frame.HasResultCell)
@@ -219,10 +217,12 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             ObjectReferences.Release(Session, handle);
         }
 
-        // a ByVal parameter is a local of the activation as much as a Dim is (MS-VBAL §5.3.1.11): what it holds it lets go of with it.
-        foreach (var parameter in copiedParameters ?? [])
+        // a ByVal parameter is a local of the activation as much as a Dim is (MS-VBAL §5.3.1.11): what it holds it lets go of with it. Which parameters
+        // were given a copy is read again from the arguments, rather than remembered in a list made for each call (IR lowering S1.3).
+        for (var i = 0; i < parameters.Length; i++)
         {
-            if (frame.TryResolve(parameter, out var handle))
+            var parameter = parameters[i];
+            if (!IsAliased(parameter, arguments[i]) && ObjectReferences.CanHoldAnObject(parameter.ResolvedType) && frame.TryResolve(parameter, out var handle))
             {
                 ObjectReferences.Release(Session, handle);
             }
@@ -258,8 +258,11 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
     internal static void HoistLocals(IRuntimeSession session, CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals)
     {
-        foreach (var local in locals)
+        // the locals of the procedure the frame is laid out as are in its slots by number (S1.3).
+        var slots = frame.Layout is { LocalSlots: var numbered } && numbered.Length == locals.Length ? numbered : default;
+        for (var i = 0; i < locals.Length; i++)
         {
+            var local = locals[i];
             if (local is not VBLocalVariableSymbol variable)
             {
                 // VBLocalConstantSymbol (a local Const): MS-VBAL's own value is a compile-time
@@ -279,16 +282,40 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             }
             else
             {
-                frame.Push(variable, DefaultValueOf(session, variable));
+                frame.Push(variable, DefaultValueOf(session, variable), slots.IsDefault ? -1 : slots[i]);
             }
         }
     }
 
     // what an activation of a procedure is made of that the procedure alone decides, made once for each procedure the invoker activates (IR lowering S0.9):
-    // the invoker lives as long as one execution, and a procedure that is defined again is another symbol. Its body is not among them: a module loaded again
-    // while a program is broken replaces it for the calls made after.
-    // Its layout too (S1.3), which is the symbol's.
-    private sealed record class Activation(StaticSymbol Symbol, SyntaxNodeId NodeId, ModuleDirectives Directives, SDK.Semantics.Binding.FrameLayout Layout);
+    // the invoker lives as long as one execution, and a procedure that is defined again is another symbol. Its layout too (S1.3), which is the symbol's.
+    // Its body is not among them: a module loaded again while a program is broken replaces it for the calls made after - the activation remembers the body
+    // it found, with the program image it found it in (Body), which is the body as long as the image is the same.
+    private sealed record class Activation(StaticSymbol Symbol, SyntaxNodeId NodeId, ModuleDirectives Directives, SDK.Semantics.Binding.FrameLayout Layout)
+    {
+        public FoundBody? Body;
+    }
+
+    private sealed record class FoundBody(object Image, InstructionList List);
+
+    // the body of the procedure in the program image as it is now: looked up by the procedure's identity, a string hashed and a tree walked, once for
+    // each image a load leaves rather than once for each call.
+    private InstructionList? BodyOf(VBTypeMemberSymbol procedure, Activation activation)
+    {
+        object image = Bodies is ProgramImage program ? program.Procedures : Bodies;
+        if (activation.Body is { } found && ReferenceEquals(found.Image, image) && Bodies is ProgramImage)
+        {
+            return found.List;
+        }
+
+        if (!Bodies.TryGetValue(procedure.SemanticId, out var body))
+        {
+            return null;
+        }
+
+        activation.Body = new FoundBody(image, body);
+        return body;
+    }
 
     private readonly ConcurrentDictionary<VBTypeMemberSymbol, Activation> _activations = new(ReferenceEqualityComparer.Instance);
 
@@ -309,6 +336,10 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             : ModuleDirectives.None;
 
     internal static bool IsByRef(ParameterKind kind) => kind is ParameterKind.ImplicitByRef or ParameterKind.ExplicitByRef;
+
+    // a ByRef parameter whose argument is a variable is an alias of it (MS-VBAL §5.3.1.11); any other is a fresh local, given a copy of its argument.
+    private static bool IsAliased(VBParameterSymbol parameter, IRuntimeValue argument)
+        => IsByRef(parameter.ParameterKind) && argument is VBRuntimeReference;
 
     /// <summary>
     /// The value an optional parameter that declares no default takes when the call supplies no argument for it.
