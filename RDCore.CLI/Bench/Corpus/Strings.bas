@@ -17,4 +17,15 @@ Public Sub BenchStringConcatenation()
     For I = 1 To 10000
         S = S & "x"
     Next
+End Sub
+
+' short Strings joined and compared: what parsing and formatting code does.
+Public Sub BenchStringComparison()
+    Dim I As Long
+    Dim N As Long
+    Dim S As String
+    For I = 1 To 100000
+        S = "RD" & "-VBA"
+        If S = "RD-VBA" Then N = N + 1
+    Next
 End Sub

@@ -135,6 +135,28 @@ public sealed class UnboxedEvaluationTests
     public void AVariantHoldingAScalar_OnPayloads_IsWhatTheBoxedEvaluationEvaluates(string body, string printed)
         => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
 
+    // Strings evaluated to the String they are (S1.4b): joined, assigned, compared under the module's comparison mode (recorded in Excel).
+    [TestMethod]
+    [DataRow("Dim s As String ;; s = \"ab\" ;; s = s & \"cd\" ;; Debug.Print s", "abcd", DisplayName = "a String joined")]
+    [DataRow("Dim s As String, t As String ;; s = \"a\" ;; t = s ;; s = \"b\" ;; Debug.Print t", "a", DisplayName = "a String assigned is a copy")]
+    [DataRow("Dim s As String, n As Long ;; s = \"abc\" ;; If s = \"abc\" Then n = 1 ;; Debug.Print n", "1", DisplayName = "a String compared in a condition")]
+    [DataRow("Dim s As String ;; s = \"B\" ;; Debug.Print (s < \"a\") & \" \" & (s > \"a\")", "True False", DisplayName = "Strings compared by their data")]
+    [DataRow("Dim s As String ;; s = \"a\" + \"b\" ;; Debug.Print s", "ab", DisplayName = "two Strings added")]
+    [DataRow("Dim s As String * 3 ;; s = \"abcdef\" ;; s = \"a\" & \"b\" ;; Debug.Print s & \"|\"", "ab |", DisplayName = "a fixed-length String assigned (boxed)")]
+    [DataRow("Dim s As String, n As Long ;; For n = 1 To 3 ;; s = s & n ;; Next ;; Debug.Print s", "123", DisplayName = "a number joined to a String (boxed)")]
+    [DataRow("Dim s As String ;; s = \"x\" ;; Debug.Print s = \"X\"", "False", DisplayName = "Strings that differ in case")]
+    [DataRow("Dim s As String, v As Variant ;; v = \"q\" ;; s = v ;; Debug.Print s", "q", DisplayName = "a Variant String assigned to a String (boxed)")]    public void AString_OnItsText_IsWhatTheBoxedEvaluationEvaluates(string body, string printed)
+        => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
+
+    [TestMethod]
+    public async Task Strings_ComparedUnderOptionCompareText_IgnoreCase()
+    {
+        var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nOption Compare Text\r\n"
+            + "Public Sub Main()\r\nDim s As String, n As Long\r\ns = \"ABC\"\r\nIf s = \"abc\" Then n = 1\r\nDebug.Print n & \" \" & (s < \"abd\")\r\nEnd Sub\r\n";
+
+        Assert.AreEqual("1 True", (await RunAsync([], program)).Last());
+    }
+
     // the conditions of If, Do, While and Case on payloads; an error in a condition is the boxed evaluation's, and On Error Resume Next goes on into the
     // statement that follows it - the Then of an If (recorded in Excel).
     [TestMethod]

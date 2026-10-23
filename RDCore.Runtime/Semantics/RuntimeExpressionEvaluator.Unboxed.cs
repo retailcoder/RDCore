@@ -11,7 +11,9 @@ using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
+using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Runtime;
+using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Binding;
@@ -51,10 +53,90 @@ public sealed partial class RuntimeExpressionEvaluator
             return true;
         }
 
-        return bound is BoundVariable variable
-            && BindingOf(session, variable) is (ScalarCell or VariantCell, null) and var (cell, _)
+        if (bound is not BoundVariable variable)
+        {
+            return false;
+        }
+
+        // a String variable - not a fixed-length one, which pads or truncates what it is assigned - is assigned the text as it is (S1.4b).
+        if (variable.Variable is ITypedSymbol { ResolvedType: VBStringType and not VBFixedStringType }
+            && BindingOf(session, variable) is (ValueBindingHandle text, null))
+        {
+            if (!TryEvaluateText(session, BoundTreeOf(session, value, context), out var assigned))
+            {
+                return false;
+            }
+
+            text.Store(assigned, isKnown: true);
+            return true;
+        }
+
+        return BindingOf(session, variable) is (ScalarCell or VariantCell, null) and var (cell, _)
             && TryEvaluatePayload(session, BoundTreeOf(session, value, context), out var payload)
             && TryWritePayload(cell, payload);
+    }
+
+    // MS-VBAL §5.6.9.4, §5.6.5: an expression of Strings evaluated to the runtime value of the String it is, with no value made of it (S1.4b): a String
+    // literal, a String variable, parentheses, and two of them joined by & (or by +, of two Strings). A String that ends with a lone byte is the boxed
+    // evaluation's, which joins it byte by byte.
+    private bool TryEvaluateText(IRuntimeSession session, BoundNode node, out VBRuntimeValue<string> text)
+    {
+        text = default;
+        switch (node)
+        {
+            case BoundLiteral { Literal.StaticValue: VBStringValue { RuntimeValue: VBRuntimeValue<string> literal } }:
+                text = literal;
+                return true;
+            case BoundVariable variable:
+                if (BindingOf(session, variable) is (IKnowledgeBinding { IsKnown: true, Value: VBRuntimeValue<string> held }, null))
+                {
+                    text = held;
+                    return true;
+                }
+
+                return false;
+            case BoundUnary { Operation.Token: SDK.Model.Symbols.Operators.OperatorSymbolNames.UnaryArithmeticPrecedenceOp
+                or SDK.Model.Symbols.Operators.OperatorSymbolNames.UnaryLetCoerceOp, Operand: var enclosed }:
+                return TryEvaluateText(session, enclosed, out text);
+            case BoundBinary { Plan: { IsDeferred: false, EffectiveType: VBStringType } plan, Left: var left, Right: var right }
+                when plan.Operator is Tokens.ConcatOp or Tokens.AdditionOp:
+                if (!TryEvaluateText(session, left, out var lhs) || !TryEvaluateText(session, right, out var rhs))
+                {
+                    return false;
+                }
+
+                // vbNullString joins as the zero-length string it reads as: what is joined is never vbNullString (VBStringValue.Concat).
+                text = new VBRuntimeValue<string>(string.Concat(lhs.Value, rhs.Value));
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // MS-VBAL §5.6.9.5: two Strings compared under the comparison mode of the module, as the boxed relational operators compare them
+    // (StringComparisonRules), to a Boolean.
+    private bool TryCompareText(IRuntimeSession session, OperationPlan plan, BoundNode left, BoundNode right, out ScalarPayload result)
+    {
+        result = default;
+        if (!TryEvaluateText(session, left, out var lhs) || !TryEvaluateText(session, right, out var rhs))
+        {
+            return false;
+        }
+
+        var order = session.CurrentStringComparison().Compare(lhs.Value.AsSpan(), rhs.Value.AsSpan());
+        bool? isTrue = plan.Operator switch
+        {
+            Tokens.CompareEqualOp => order == 0,
+            Tokens.CompareNotEqualOp => order != 0,
+            Tokens.CompareLessThanOp => order < 0,
+            Tokens.CompareLessThanOrEqualOp => order <= 0,
+            Tokens.CompareGreaterThanOp => order > 0,
+            Tokens.CompareGreaterThanOrEqualOp => order >= 0,
+            _ => null,
+        };
+
+        result = isTrue is { } value ? ScalarPayload.OfBoolean(value) : default;
+        return isTrue is not null;
     }
 
     // a payload written to a cell that holds one: let-coerced exactly to the type of a scalar variable, and as it is to a Variant, which takes the value's
@@ -184,6 +266,9 @@ public sealed partial class RuntimeExpressionEvaluator
                 return TryEvaluatePayload(session, enclosed, out payload);
             case BoundUnary { Plan: { } plan, Operand: var operand } when plan.Operator is Tokens.NegationOp or Tokens.LogicalNotOp:
                 return TryEvaluatePayload(session, operand, out var value) && TryOperateUnary(PlanFor(plan, value), value, out payload);
+            // two Strings compared (S1.4b).
+            case BoundBinary { Plan: { IsDeferred: false, EffectiveType: VBStringType } plan, Left: var left, Right: var right }:
+                return TryCompareText(session, plan, left, right, out payload);
             case BoundBinary { Plan: { } plan, Left: var left, Right: var right }:
                 return TryEvaluatePayload(session, left, out var lhs) && TryEvaluatePayload(session, right, out var rhs)
                     && TryOperateBinary(PlanFor(plan, lhs, rhs), lhs, rhs, out payload);
