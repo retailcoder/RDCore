@@ -1514,7 +1514,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         }
 
         var parameters = RuntimeProcedureInvoker.GetParameters(member);
-        return (receiver is not null && parameters is [{ Name: "Me" }, ..] ? parameters.RemoveAt(0) : parameters).IsEmpty;
+        return parameters.Length == (receiver is not null && parameters is [{ Name: "Me" }, ..] ? 1 : 0);
     }
 
     /// <summary>
@@ -1614,8 +1614,10 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     {
         var allParameters = RuntimeProcedureInvoker.GetParameters(procedure);
         // a call made on an object supplies its own implicit Me (parameter 0), so the arguments written at the call
-        // site map onto the parameters after it.
-        var parameters = receiver is not null && allParameters is [{ Name: "Me" }, ..] ? allParameters.RemoveAt(0) : allParameters;
+        // site map onto the parameters after it - made once for each member (IR lowering S1.3).
+        var parameters = receiver is not null && allParameters is [{ Name: "Me" }, ..]
+            ? _parametersAfterMe.TryGetValue(procedure, out var afterMe) ? afterMe : _parametersAfterMe.GetOrAdd(procedure, allParameters.RemoveAt(0))
+            : allParameters;
         if (ProcedureInvoker is null)
         {
             return RuntimeSemanticsEvaluationResult.InternalError();
@@ -1650,6 +1652,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     }
 
     private List<MemoryAddress>? _spareBorrowed;
+
+    private readonly ConcurrentDictionary<VBTypeMemberSymbol, ImmutableArray<VBParameterSymbol>> _parametersAfterMe = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// What a call made with an argument that is not known returns: the value it returned, which is not known either

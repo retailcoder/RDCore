@@ -306,9 +306,7 @@ internal sealed class SessionObjects : ISessionObjects
             return 0;
         }
 
-        // a handle is a root by identity: handles are records, and two variables holding the same object compare
-        // equal by value while being two references.
-        var held = roots.FindIndex(root => ReferenceEquals(root, handle));
+        var held = IndexOfRoot(roots, handle);
         if (held >= 0)
         {
             roots.RemoveAt(held);
@@ -318,7 +316,22 @@ internal sealed class SessionObjects : ISessionObjects
     }
 
     public bool IsHeldBy(VBRuntimeObjectId instance, IBindingHandle handle)
-        => _roots.TryGetValue(instance, out var roots) && roots.Any(root => ReferenceEquals(root, handle));
+        => _roots.TryGetValue(instance, out var roots) && IndexOfRoot(roots, handle) >= 0;
+
+    // a handle is a root by identity: handles are records, and two variables holding the same object compare equal by value while being two references.
+    // Searched without a predicate, which would be made for each reference counted (IR lowering S1.3).
+    private static int IndexOfRoot(List<IBindingHandle> roots, IBindingHandle handle)
+    {
+        for (var i = 0; i < roots.Count; i++)
+        {
+            if (ReferenceEquals(roots[i], handle))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     public int RefCount(VBRuntimeObjectId instance) => _roots.TryGetValue(instance, out var roots) ? roots.Count : 0;
 

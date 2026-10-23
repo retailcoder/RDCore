@@ -111,7 +111,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         }
 
         (frame.Procedure, frame.Body) = (procedure, body);
-        frame.LayOut(SDK.Semantics.Binding.FrameLayout.For(procedure));
+        frame.LayOut(activation.Layout);
         if (!Session.CallStack.TryPush(frame))
         {
             return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.OutOfStackSpace,
@@ -287,7 +287,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     // what an activation of a procedure is made of that the procedure alone decides, made once for each procedure the invoker activates (IR lowering S0.9):
     // the invoker lives as long as one execution, and a procedure that is defined again is another symbol. Its body is not among them: a module loaded again
     // while a program is broken replaces it for the calls made after.
-    private sealed record class Activation(StaticSymbol Symbol, SyntaxNodeId NodeId, ModuleDirectives Directives);
+    // Its layout too (S1.3), which is the symbol's.
+    private sealed record class Activation(StaticSymbol Symbol, SyntaxNodeId NodeId, ModuleDirectives Directives, SDK.Semantics.Binding.FrameLayout Layout);
 
     private readonly ConcurrentDictionary<VBTypeMemberSymbol, Activation> _activations = new(ReferenceEqualityComparer.Instance);
 
@@ -296,7 +297,8 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     private Activation ActivationOf(VBTypeMemberSymbol procedure) => new(
         new StaticSymbol(procedure.Name, procedure.Kind, procedure.ResolvedType),
         new SyntaxNodeId(procedure.Uri.AbsolutePath, []),
-        DeclaringModuleDirectives(procedure));
+        DeclaringModuleDirectives(procedure),
+        SDK.Semantics.Binding.FrameLayout.For(procedure));
 
     // the module a procedure is declared in is its symbol's parent, a standard module or a class module,
     // whose name binds only as a type. A procedure whose parent is not a module symbol — one the session
