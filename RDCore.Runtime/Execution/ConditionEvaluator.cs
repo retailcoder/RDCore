@@ -2,6 +2,7 @@ using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Meta;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
@@ -28,6 +29,11 @@ public sealed class ConditionEvaluator(RuntimeExpressionEvaluator expressionEval
     /// </summary>
     public RuntimeSemanticsEvaluationResult EvaluateBoolean(IRuntimeSession session, ExpressionNode condition, RuntimeEvaluationContext context)
     {
+        if (expressionEvaluator.TryEvaluateConditionUnboxed(session, condition, context, out var isTrue))
+        {
+            return RuntimeSemanticsEvaluationResult.Success(isTrue ? VBBooleanValue.True : VBBooleanValue.False);
+        }
+
         var valueResult = expressionEvaluator.Evaluate(session, condition, context);
         if (!valueResult.IsSuccess)
         {

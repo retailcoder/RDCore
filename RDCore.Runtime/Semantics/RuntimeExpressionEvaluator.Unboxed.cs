@@ -4,6 +4,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Binding;
@@ -84,13 +85,57 @@ public sealed partial class RuntimeExpressionEvaluator
             case BoundUnary { Plan: { IsDeferred: false, EffectiveType: { } effective } plan, Operand: var operand } when plan.Operator == Tokens.NegationOp:
                 return TryEvaluatePayload(session, operand, out var negated) && TryConvertPayload(negated, effective, out var operandValue)
                     && TryNegate(operandValue, out payload);
+            case BoundUnary { Plan: { IsDeferred: false, EffectiveType: { } effective } plan, Operand: var operand } when plan.Operator == Tokens.LogicalNotOp:
+                return TryEvaluatePayload(session, operand, out var inverted) && TryConvertPayload(inverted, effective, out var bits)
+                    && TryNot(bits, out payload);
             case BoundBinary { Plan: { IsDeferred: false, OperandDestination: { } destination } plan, Left: var left, Right: var right }:
                 return TryEvaluatePayload(session, left, out var lhs) && TryEvaluatePayload(session, right, out var rhs)
                     && TryConvertPayload(lhs, destination, out var l) && TryConvertPayload(rhs, destination, out var r)
-                    && TryOperate(plan.Operator, plan.EffectiveType!, l, r, out payload);
+                    && (TryOperate(plan.Operator, plan.EffectiveType!, l, r, out payload) || TryCompare(plan.Operator, l, r, out payload)
+                        || TryLogical(plan.Operator, plan.EffectiveType!, l, r, out payload));
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Evaluates a condition on payloads - of <c>If</c>, a loop, <c>Debug.Assert</c> - when it is an expression evaluated on them: its value let-coerced to a
+    /// <c>Boolean</c> is whether it is not zero (MS-VBAL §5.5.1.2.2).
+    /// </summary>
+    /// <returns><see langword="false"/> when the condition is not evaluated here, and is to be evaluated the way it always is.</returns>
+    internal bool TryEvaluateConditionUnboxed(IRuntimeSession session, ExpressionNode condition, RuntimeEvaluationContext context, out bool isTrue)
+    {
+        isTrue = false;
+        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables
+            || !TryEvaluatePayload(session, BoundTreeOf(session, condition, context), out var payload))
+        {
+            return false;
+        }
+
+        isTrue = payload.IsTrue;
+        return true;
+    }
+
+    /// <summary>
+    /// Compares the selector of a <c>Select Case</c> with the value of a <c>Case</c> on payloads (MS-VBAL §5.4.2.10): <c>selector operator value</c>, when the
+    /// selector is a payload and the value an expression evaluated on them.
+    /// </summary>
+    /// <returns><see langword="false"/> when the comparison is not made here, and is to be made the way it always is.</returns>
+    internal bool TryCompareUnboxed(IRuntimeSession session, string comparisonOperator, VBTypedValue selector, ExpressionNode value, RuntimeEvaluationContext context, out bool isMatch)
+    {
+        isMatch = false;
+        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables || selector.IsIndeterminate
+            || !ScalarPayload.TryOf(selector.TypeInfo, selector.RuntimeValue, out var lhs)
+            || !TryEvaluatePayload(session, BoundTreeOf(session, value, context), out var rhs)
+            || OperationPlanner.ForValues(comparisonOperator, lhs.Type, rhs.Type) is not { OperandDestination: { } destination }
+            || !TryConvertPayload(lhs, destination, out var l) || !TryConvertPayload(rhs, destination, out var r)
+            || !TryCompare(comparisonOperator, l, r, out var result))
+        {
+            return false;
+        }
+
+        isMatch = result.IsTrue;
+        return true;
     }
 
     // the conversions that are exact - what a value of one numeric scalar type is in another, with no rounding to decide: an integer in the range of an
@@ -100,6 +145,14 @@ public sealed partial class RuntimeExpressionEvaluator
         converted = payload;
         if (ReferenceEquals(payload.Type, destination) || payload.Type.Equals(destination))
         {
+            return true;
+        }
+
+        // MS-VBAL §5.5.1.2.2: any number is True when it is not zero, and a Boolean is the -1 or 0 it holds - which a Byte does not hold, its True being
+        // 255: the boxed coercion's.
+        if (destination is VBBooleanType)
+        {
+            converted = ScalarPayload.OfBoolean(payload.IsTrue);
             return true;
         }
 
@@ -145,6 +198,58 @@ public sealed partial class RuntimeExpressionEvaluator
             return false;
         }
     }
+
+    // §5.6.9.8: the bits of the operands, in the effective type - a Boolean's -1 or 0 giving -1 or 0 - which no operation takes out of its range. Apart from
+    // the arithmetic operators, which would otherwise test these tokens too.
+    private static bool TryLogical(string token, VBType effective, ScalarPayload l, ScalarPayload r, out ScalarPayload result)
+    {
+        result = default;
+        if (!l.IsIntegral)
+        {
+            return false;
+        }
+
+        long? bits = token switch
+        {
+            Tokens.LogicalAndOp => l.Integral & r.Integral,
+            Tokens.LogicalOrOp => l.Integral | r.Integral,
+            Tokens.LogicalXOrOp => l.Integral ^ r.Integral,
+            Tokens.LogicalEqvOp => Invert(effective, l.Integral ^ r.Integral),
+            Tokens.LogicalImpOp => Invert(effective, l.Integral) | r.Integral,
+            _ => null,
+        };
+
+        return bits is { } value && ScalarPayload.TryIntegral(effective, value, out result);
+    }
+
+    // MS-VBAL §5.6.9.5: a comparison of two operands of its effective type, which they were let-coerced to, is a Boolean - the payloads are finite, so any
+    // two compare.
+    private static bool TryCompare(string token, ScalarPayload l, ScalarPayload r, out ScalarPayload result)
+    {
+        var order = l.IsIntegral ? l.Integral.CompareTo(r.Integral) : l.Floating.CompareTo(r.Floating);
+        bool? isTrue = token switch
+        {
+            Tokens.CompareEqualOp => order == 0,
+            Tokens.CompareNotEqualOp => order != 0,
+            Tokens.CompareLessThanOp => order < 0,
+            Tokens.CompareLessThanOrEqualOp => order <= 0,
+            Tokens.CompareGreaterThanOp => order > 0,
+            Tokens.CompareGreaterThanOrEqualOp => order >= 0,
+            _ => null,
+        };
+
+        result = isTrue is { } value ? ScalarPayload.OfBoolean(value) : default;
+        return isTrue is not null;
+    }
+
+    // §5.6.9.8.1: the bits of the operand inverted, in its type - the 8 bits of a Byte, a Boolean's -1 or 0 giving 0 or -1.
+    private static bool TryNot(ScalarPayload operand, out ScalarPayload result)
+    {
+        result = default;
+        return operand.IsIntegral && ScalarPayload.TryIntegral(operand.Type, Invert(operand.Type, operand.Integral), out result);
+    }
+
+    private static long Invert(VBType type, long value) => type is VBByteType ? ~value & byte.MaxValue : ~value;
 
     private static bool TryNegate(ScalarPayload operand, out ScalarPayload result)
     {

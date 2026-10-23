@@ -3,8 +3,8 @@ using static RDCore.Tests.Cli.ModuleWorkspace;
 namespace RDCore.Tests.Cli;
 
 /// <summary>
-/// A numeric scalar variable assigned an expression of them is assigned on payloads (IR lowering S1.2): the same values, and the same errors, as the
-/// boxed evaluation - which the suite is also run with (<c>RDCORE_UNBOXED=0</c>), for these to hold both ways.
+/// A scalar variable assigned an expression of them, and a condition of them, are evaluated on payloads (IR lowering S1.2): the same values, and the same
+/// errors, as the boxed evaluation - which the suite is also run with (<c>RDCORE_UNBOXED=0</c>), for these to hold both ways.
 /// </summary>
 [TestClass]
 public sealed class UnboxedEvaluationTests
@@ -49,6 +49,42 @@ public sealed class UnboxedEvaluationTests
     [DataRow("Dim i As Long, n As Long ;; For i = 1 To 10 ;; i = i + 1 ;; n = n + 1 ;; Next ;; Debug.Print n & \" \" & i", "5 11", DisplayName = "a counter its body assigns")]
     [DataRow("Dim i As Integer ;; For i = 32766 To 32767 ;; Next ;; Debug.Print Err.Number & \" \" & i", "6 32767", DisplayName = "an Integer counter stepped past its range")]
     public void AForLoop_SteppedOnPayloads_IsWhatTheBoxedEvaluationSteps(string body, string printed)
+        => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
+
+    // MS-VBAL §5.6.9.5 and §5.6.9.8 on payloads, a Boolean being -1 or 0 (recorded in Excel).
+    [TestMethod]
+    [DataRow("Dim b As Boolean, l As Long ;; l = 3 ;; b = l > 2 ;; Debug.Print b", "True", DisplayName = "a Long compared")]
+    [DataRow("Dim b As Boolean, i As Integer, d As Double ;; i = 2 ;; d = 2.5 ;; b = i >= d ;; Debug.Print b", "False", DisplayName = "an Integer compared with a Double, as Doubles")]
+    [DataRow("Dim b As Boolean, l As Long ;; l = 5 ;; b = Not (l = 5) ;; Debug.Print b", "False", DisplayName = "a comparison negated")]
+    [DataRow("Dim b As Boolean, l As Long ;; l = 5 ;; b = l > 1 And l < 10 ;; Debug.Print b", "True", DisplayName = "two comparisons And-ed")]
+    [DataRow("Dim l As Long ;; l = 12 ;; l = l And 10 ;; Debug.Print l", "8", DisplayName = "the bits of a Long And-ed")]
+    [DataRow("Dim y As Byte ;; y = 5 ;; y = Not y ;; Debug.Print y", "250", DisplayName = "the 8 bits of a Byte inverted")]
+    [DataRow("Dim l As Long, b As Boolean ;; b = True ;; l = b + 1 ;; Debug.Print l", "0", DisplayName = "a Boolean added, as an Integer")]
+    [DataRow("Dim b As Boolean, l As Long ;; l = 7 ;; b = l ;; Debug.Print b", "True", DisplayName = "a Long assigned to a Boolean")]
+    [DataRow("Dim b As Boolean, s As Single ;; s = 0.1 ;; b = s = 0.1 ;; Debug.Print b", "True", DisplayName = "a Single compared with a Double, as Singles (boxed)")]
+    [DataRow("Dim b As Boolean ;; b = True ;; b = b Eqv False ;; Debug.Print b ;; b = False Imp b ;; Debug.Print b", "True", DisplayName = "Eqv and Imp")]
+    [DataRow("Dim y As Byte, b As Boolean ;; b = True ;; y = b ;; Debug.Print Err.Number & \" \" & y", "0 255", DisplayName = "True assigned to a Byte (boxed)")]
+    [DataRow("Dim b As Boolean, l As Long ;; l = 2 ;; b = l ;; b = Not b ;; Debug.Print b & \" \" & CInt(b)", "False 0", DisplayName = "a Boolean inverted")]
+    [DataRow("Dim ll As LongLong, b As Boolean ;; ll = 9007199254740993^ ;; b = ll > 9007199254740992^ ;; Debug.Print b", "True", DisplayName = "two LongLongs no Double tells apart")]
+    [DataRow("Dim s As Single, l As Long, b As Boolean ;; s = 16777216 ;; l = 16777217 ;; b = s < l ;; Debug.Print b", "True", DisplayName = "a Single compared with a Long, as Doubles")]
+    public void AComparisonOrALogicalOperation_OnPayloads_IsWhatTheBoxedEvaluationEvaluates(string body, string printed)
+        => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
+
+    // the conditions of If, Do, While and Case on payloads; an error in a condition is the boxed evaluation's, and On Error Resume Next goes on into the
+    // statement that follows it - the Then of an If (recorded in Excel).
+    [TestMethod]
+    [DataRow("Dim l As Long, n As Long ;; l = 4 ;; If l Mod 2 = 0 Then n = 1 Else n = 2 ;; Debug.Print n", "1", DisplayName = "If")]
+    [DataRow("Dim d As Double, n As Long ;; d = 0.5 ;; If d Then n = 1 ;; Debug.Print n", "1", DisplayName = "If a Double that is not zero")]
+    [DataRow("Dim l As Long, n As Long ;; Do While l < 5 ;; l = l + 2 ;; n = n + 1 ;; Loop ;; Debug.Print n & \" \" & l", "3 6", DisplayName = "Do While")]
+    [DataRow("Dim l As Long ;; Do ;; l = l + 1 ;; Loop Until l >= 3 ;; Debug.Print l", "3", DisplayName = "Loop Until")]
+    [DataRow("Dim l As Long ;; While l < 4 ;; l = l + 1 ;; Wend ;; Debug.Print l", "4", DisplayName = "While")]
+    [DataRow("Dim l As Long, n As Long ;; l = 7 ;; Select Case l ;; Case 1 To 5 ;; n = 1 ;; Case Is > 6 ;; n = 2 ;; Case Else ;; n = 3 ;; End Select ;; Debug.Print n", "2", DisplayName = "Case To and Case Is")]
+    [DataRow("Dim d As Double, n As Long ;; d = 3 ;; Select Case d ;; Case 2, 3 ;; n = 1 ;; End Select ;; Debug.Print n", "1", DisplayName = "a Double selector, Integer cases")]
+    [DataRow("Dim l As Long, n As Long ;; l = 7 ;; Select Case True ;; Case l > 5 ;; n = 1 ;; End Select ;; Debug.Print n", "1", DisplayName = "Select Case True")]
+    [DataRow("Dim i As Integer, n As Long ;; i = 3 ;; Select Case i ;; Case 2.5 To 3.5 ;; n = 1 ;; End Select ;; Debug.Print n", "1", DisplayName = "an Integer selector, a range of Doubles")]
+    [DataRow("Dim d As Double, n As Long ;; d = 1 ;; If d / 0 > 1 Then n = 1 ;; Debug.Print Err.Number & \" \" & n", "11 1", DisplayName = "a condition divided by zero")]
+    [DataRow("Dim i As Integer, n As Long ;; i = 32767 ;; If i + 1 > 0 Then n = 1 ;; Debug.Print Err.Number & \" \" & n", "6 1", DisplayName = "a condition past the range of an Integer")]
+    public void ACondition_OnPayloads_IsWhatTheBoxedEvaluationDecides(string body, string printed)
         => Assert.AreEqual(printed, RunAsync([], Program(body.Split(" ;; "))).GetAwaiter().GetResult().Last());
 
     // a variable a ByRef parameter is an alias of is the caller's: assigned on payloads through the alias, the caller sees it.

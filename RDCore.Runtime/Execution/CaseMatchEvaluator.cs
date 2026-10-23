@@ -73,6 +73,11 @@ public sealed class CaseMatchEvaluator(RuntimeExpressionEvaluator expressionEval
     // a real, source-derived node - never a stand-in fabricated for the already-known selector value.
     private RuntimeSemanticsEvaluationResult EvaluateComparison(IRuntimeSession session, string comparisonOperator, VBTypedValue selector, ExpressionNode operand, RuntimeEvaluationContext context)
     {
+        if (expressionEvaluator.TryCompareUnboxed(session, comparisonOperator, selector, operand, context, out var isMatch))
+        {
+            return RuntimeSemanticsEvaluationResult.Success(isMatch ? VBBooleanValue.True : VBBooleanValue.False);
+        }
+
         var operandResult = expressionEvaluator.Evaluate(session, operand, context);
         if (!operandResult.IsSuccess)
         {

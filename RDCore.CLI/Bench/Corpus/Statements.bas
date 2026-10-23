@@ -49,6 +49,20 @@ Public Sub BenchSelectCase()
     Next
 End Sub
 
+' the conditions of If and of a loop: comparisons, And-ed.
+Public Sub BenchConditions()
+    Dim I As Long
+    Dim S As Long
+    Do While I < 100000
+        I = I + 1
+        If I Mod 3 = 0 And I > 10 Then
+            S = S + 1
+        ElseIf I Mod 5 = 0 Then
+            S = S - 1
+        End If
+    Loop
+End Sub
+
 Public Sub BenchMidStatement()
     Dim S As String
     S = "RD-VBA"
