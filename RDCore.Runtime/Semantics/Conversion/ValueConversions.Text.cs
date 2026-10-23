@@ -146,37 +146,16 @@ public static partial class ValueConversions
             : ToNormalNotation(numericValue, significantIntegerDigits, dot);
     }
 
-    // MS-VBAL 5.5.1.2.4, for a Currency or a Decimal: every digit of the integer part, then "as many digits as possible of the fractional part of the
-    // number such that a maximum of 15 integer and fractional digits are printed total with trailing zeros removed" - counted, for a number with no integer
-    // part, from its first digit that is not 0, as a Double's are. The last digit is rounded half away from zero, as a Double's is.
+    // a Currency or a Decimal is every digit it has, with trailing zeros removed: MS-VBA prints 922337203685477.5807 and 0.1234567890123456789 whole
+    // (recorded in Excel, through CStr, &, Str and Format alike), where MS-VBAL 5.5.1.2.4 caps any number at 15 digits - RD-VBA is MS-VBA (author's ruling).
     private static string FixedPointToText(decimal value, string decimalSeparator)
     {
-        const int maximumDigits = 15;
         if (value == 0)
         {
             return VBStringValue.Zero;
         }
 
-        var absoluteValue = Math.Abs(value);
-        var integerPart = decimal.Truncate(absoluteValue);
-        int fractionalDigits;
-        if (integerPart > 0)
-        {
-            fractionalDigits = Math.Max(0, maximumDigits - integerPart.ToString(CultureInfo.InvariantCulture).Length);
-        }
-        else
-        {
-            var leadingZeros = 0;
-            for (var scaled = absoluteValue * 10; scaled < 1; scaled *= 10)
-            {
-                leadingZeros++;
-            }
-
-            fractionalDigits = Math.Min(28, leadingZeros + maximumDigits);
-        }
-
-        var rounded = Math.Round(absoluteValue, fractionalDigits, MidpointRounding.AwayFromZero);
-        var digits = rounded.ToString(fractionalDigits == 0 ? "0" : $"0.{new string('#', fractionalDigits)}", CultureInfo.InvariantCulture);
+        var digits = Math.Abs(value).ToString("0.############################", CultureInfo.InvariantCulture);
         return $"{(value < 0 ? "-" : string.Empty)}{digits.Replace(".", decimalSeparator)}";
     }
 

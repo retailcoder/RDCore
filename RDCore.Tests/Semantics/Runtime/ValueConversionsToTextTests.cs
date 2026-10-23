@@ -58,6 +58,23 @@ public sealed class ValueConversionsToTextTests
         Assert.AreEqual("2,5", ((VBStringValue)conversion.Value!).Value);
     }
 
+    // MS-VBAL §5.5.1.2.4 prints at most 15 digits of any number; MS-VBA prints every digit of a Currency or a Decimal - CStr, &, Str and Format alike
+    // (recorded in Excel), and RD-VBA is MS-VBA.
+    [TestMethod]
+    [DataRow("922337203685477.5807")]
+    [DataRow("12345678901234.5678")]
+    [DataRow("-0.0001")]
+    [DataRow("1.5")]
+    public void ToText_OfACurrency_IsEveryDigitOfIt(string digits)
+        => Assert.AreEqual(digits, Text(new VBCurrencyValue(decimal.Parse(digits, CultureInfo.InvariantCulture))).Value);
+
+    [TestMethod]
+    [DataRow("12345678901234567.891")]
+    [DataRow("0.1234567890123456789")]
+    [DataRow("1234567890123456789012345678")]
+    public void ToText_OfADecimal_IsEveryDigitOfIt(string digits)
+        => Assert.AreEqual(digits, Text(new VBDecimalValue(decimal.Parse(digits, CultureInfo.InvariantCulture))).Value);
+
     [TestMethod]
     public void ToText_OfTheNullString_IsTheNullString()
         => Assert.IsTrue(Text(VBStringValue.VBNullString).IsNullString);

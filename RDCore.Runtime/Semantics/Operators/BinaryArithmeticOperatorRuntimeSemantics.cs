@@ -180,10 +180,14 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
     protected virtual RuntimeSemanticsEvaluationResult EvaluateBinaryExpressionResult(
         VBDateType effectiveType,
         VBNumericTypedValue lhs, VBNumericTypedValue rhs,
-        ExpressionNode expression) =>
-        RuntimeSemanticsEvaluationResult.Success(
-            new VBDateValue(
-                EvaluateManagedNumericOp(((VBDoubleValue)lhs).Value, ((VBDoubleValue)rhs).Value)));
+        ExpressionNode expression)
+    {
+        // a result that is not a date - #12/31/9999# + 1 - is an overflow (MS-VBA, recorded in Excel).
+        var serial = EvaluateManagedNumericOp(((VBDoubleValue)lhs).Value, ((VBDoubleValue)rhs).Value);
+        return VBDateType.IsValidSerial(serial)
+            ? RuntimeSemanticsEvaluationResult.Success(new VBDateValue(serial))
+            : OnOverflow(expression, Exceptions.VBRuntimeError_ArithmeticOverflow);
+    }
 
     /// <summary>
     /// 💥 Creates and returns a new <see cref="RuntimeSemanticsEvaluationResult"/> with a <see cref="VBRuntimeErrorId.InvalidProcedureCallOrArgument"/> error.

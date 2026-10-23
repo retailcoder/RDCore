@@ -121,7 +121,13 @@ public abstract record class UnaryArithmeticOperatorRuntimeSemantics(
     /// <param name="operand">The unary operand being evaluated.</param>
     /// <param name="expression">The unary operator expression, for error attribution.</param>
     protected virtual RuntimeSemanticsEvaluationResult EvaluateRuntimeSemantics(VBDateType effectiveType, VBNumericTypedValue operand, ExpressionNode expression)
-        => RuntimeSemanticsEvaluationResult.Success(new VBDateValue(EvaluateNumericOp(((VBDoubleValue)operand).Value)));
+    {
+        // a result that is not a date (the negation of a date past 1700) is an overflow (MS-VBA, recorded in Excel).
+        var serial = EvaluateNumericOp(((VBDoubleValue)operand).Value);
+        return VBDateType.IsValidSerial(serial)
+            ? RuntimeSemanticsEvaluationResult.Success(new VBDateValue(serial))
+            : RuntimeSemanticsEvaluationResult.Error(OnRuntimeError(VBRuntimeErrorId.Overflow, expression, Exceptions.VBRuntimeError_ArithmeticOverflow));
+    }
 
     /// <summary>
     /// Evaluates the numeric result of a unary arithmetic operation in the effective type's own representation.

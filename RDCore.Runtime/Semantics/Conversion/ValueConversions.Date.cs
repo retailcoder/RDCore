@@ -36,10 +36,13 @@ public static partial class ValueConversions
         _ => ValueConversionResult.NotApplicable,
     };
 
-    private static ValueConversionResult DoubleToDate(ValueConversionResult number)
-        => number.Value is VBDoubleValue converted
-            ? ValueConversionResult.Success(new VBDateValue(converted.Value))
-            : number;
+    // a number that is no date's serial is an overflow (MS-VBA, recorded in Excel).
+    private static ValueConversionResult DoubleToDate(ValueConversionResult number) => number.Value switch
+    {
+        VBDoubleValue converted when VBDateType.IsValidSerial(converted.Value) => ValueConversionResult.Success(new VBDateValue(converted.Value)),
+        VBDoubleValue => ValueConversionResult.Failure(VBRuntimeErrorId.Overflow),
+        _ => number,
+    };
 
     /// <summary>
     /// Interprets <paramref name="text"/> as a date, a time, or both - the first of the two ways a <c>String</c> Let-coerces to a

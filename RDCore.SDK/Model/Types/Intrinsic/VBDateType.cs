@@ -52,6 +52,15 @@ public sealed record class VBDateType() : VBIntrinsicType<DateTime>(VBTypeNames.
     /// </summary>
     public static VBDateValue MaxValue => _maxValue.Value;
 
+    /// <summary>
+    /// Whether a <c>Date</c> holds <paramref name="serial"/>: any serial strictly between -657435 and 2958466, a time of day from 100-01-01 to
+    /// 9999-12-31, which is wider than <see cref="MinSerial"/> and <see cref="MaxSerial"/> by the fractions of a second past them (MS-VBA, recorded in
+    /// Excel). A value past either end is not a <c>Date</c>: converting it to one, or a <c>Date</c> operation that yields it, is run-time error 6,
+    /// <em>Overflow</em>.
+    /// </summary>
+    /// <param name="serial">The serial (<c>Double</c>) representation of a date.</param>
+    public static bool IsValidSerial(double serial) => serial > -657435d && serial < 2958466d;
+
     private static readonly Lazy<VBDateValue> _zero = new(() 
         => new VBDateValue(new DateTime(1899, 12, 30).ToOADate()), LazyThreadSafetyMode.PublicationOnly);
 

@@ -165,6 +165,10 @@ in for an operator that is not present in source
 
 `VBDateLetCoercionRuntimeSemantics` runs only when `Date` is the destination type.
 
+A number is a `Date` when it is strictly between -657435 and 2958466: a time of day from 100-01-01 to 9999-12-31
+(`VBDateType.IsValidSerial`). A number past either end, and a `Date` operation whose result is past it
+(`#12/31/9999# + 1`), is run-time error 6, _Overflow_ (MS-VBA, recorded in Excel).
+
 > 👉 A `Date` source let-coerced to a numeric or `Boolean` destination is handled by the numeric or `Boolean`
 > strategy, which reports its `DateSerial` flag
 > ([**RD-VBAL §5.5.1.2.1** Let-coercion between numeric types](#55121-let-coercion-between-numeric-types),
@@ -192,6 +196,10 @@ A number with no integer part is written in scientific notation once its leading
 point, are more than its type's significant digits: `0.0123456` but `1.234567E-02` for a `Single`, and
 `0.001234567890123` but `1.2345678901234E-03` for a `Double`. The exponent is written with two digits at least:
 `1.234568E+07`, `1E+100` (MS-VBA, recorded in Excel).
+
+A `Currency` or a `Decimal` is written with every digit it has, trailing zeros removed: `922337203685477.5807`,
+`0.1234567890123456789`. MS-VBAL §5.5.1.2.4 caps any number at 15 digits; MS-VBA does not cap a fixed-point
+number - through `CStr`, `&`, `Str` and `Format` alike (recorded in Excel) - and RD-VBA does what MS-VBA does.
 
 A `String` source is let-coerced to "a copy of the source string": its runtime value, every byte of its data, a
 trailing byte included ([**RD-VBAL §2.4.1.2** VBStringType](rd-vbal.2.4.1.intrinsic-types.md#2412-vbstringtype)). A
