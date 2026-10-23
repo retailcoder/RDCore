@@ -141,6 +141,17 @@ public sealed class UnboxedEvaluationTests
     [DataRow("Function Fact(ByVal N As Long) As Double ;; If N <= 1 Then Fact = 1 Else Fact = N * Fact(N - 1) ;; End Function", "Debug.Print Fact(10)", "3628800", DisplayName = "a recursive function")]
     [DataRow("Sub Bump(ByVal N As Long) ;; N = N + 1 ;; End Sub", "Dim l As Long ;; l = 5 ;; Bump l ;; Debug.Print l", "5", DisplayName = "a parameter passed by value is a copy")]
     [DataRow("Function Flag(ByVal N As Long) As Boolean ;; Flag = N > 3 ;; End Function", "Debug.Print Flag(5) & \" \" & Flag(2)", "True False", DisplayName = "a Boolean function result")]
+    [DataRow("Sub Bump(ByRef N As Long) ;; N = N + 1 ;; End Sub", "Dim l As Long ;; l = 5 ;; Bump l ;; Bump l ;; Debug.Print l", "7", DisplayName = "a variable passed by reference")]
+    [DataRow("Sub Swap(ByRef A As Long, ByRef B As Long) ;; Dim t As Long ;; t = A ;; A = B ;; B = t ;; End Sub", "Dim x As Long, y As Long ;; x = 1 ;; y = 2 ;; Swap x, y ;; Debug.Print x & \" \" & y", "2 1", DisplayName = "two variables swapped by reference")]
+    [DataRow("Sub Both(ByRef A As Long, ByRef B As Long) ;; A = A + 1 ;; B = B * 10 ;; End Sub", "Dim x As Long ;; x = 1 ;; Both x, x ;; Debug.Print x", "20", DisplayName = "one variable passed to two parameters by reference")]
+    [DataRow("Sub Inner(ByRef N As Long) ;; N = N + 1 ;; End Sub ;; Sub Outer(ByRef N As Long) ;; Inner N ;; Inner N ;; End Sub", "Dim x As Long ;; Outer x ;; Debug.Print x", "2", DisplayName = "a parameter passed on by reference")]
+    [DataRow("Sub Bump(ByRef N As Long) ;; N = N + 1 ;; End Sub", "Dim l As Long ;; l = 5 ;; Bump (l) ;; Debug.Print l", "5", DisplayName = "a variable in parentheses is passed by value")]
+    [DataRow("Sub Grow(ByRef I As Integer) ;; I = I + 30000 ;; End Sub", "Dim i As Integer ;; i = 10000 ;; Grow i ;; Debug.Print Err.Number & \" \" & i", "6 10000", DisplayName = "an assignment past the range, by reference")]
+    [DataRow("Function Mix(ByVal A As Integer, ByVal B As Double) As Double ;; Mix = A + B ;; End Function", "Debug.Print Mix(2, 0.5) ;; Debug.Print Mix(40000, 1) ;; Debug.Print Err.Number", "6", DisplayName = "an argument past the range of its parameter")]
+    [DataRow("Function Opt(ByVal A As Long, Optional ByVal B As Long = 3) As Long ;; Opt = A + B ;; End Function", "Debug.Print Opt(1) & \" \" & Opt(1, 2)", "4 3", DisplayName = "an optional parameter, omitted and given")]
+    [DataRow("Function Quot(ByVal A As Long, ByVal B As Long) As Long ;; Quot = A \\ B ;; End Function", "Debug.Print Quot(7, 0) ;; Debug.Print Err.Number", "11", DisplayName = "an error in the callee")]
+    [DataRow("Sub Loop10(ByRef N As Long) ;; Dim i As Long ;; For i = 1 To 10 ;; N = N + i ;; Next ;; End Sub", "Dim s As Long ;; Loop10 s ;; Loop10 s ;; Debug.Print s", "110", DisplayName = "a sum accumulated by reference")]
+    [DataRow("Function Half2(ByVal A As Long) As Double ;; Half2 = A / 2 ;; End Function", "Debug.Print Half2(2.5) & \" \" & Half2(3.5)", "1 2", DisplayName = "an argument rounded to its parameter (boxed)")]
     public void ACall_OnPayloads_IsWhatTheBoxedEvaluationCalls(string procedures, string body, string printed)
     {
         var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\n"

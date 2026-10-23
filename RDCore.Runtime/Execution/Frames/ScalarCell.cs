@@ -49,6 +49,16 @@ internal sealed class ScalarCell : IKnowledgeBinding
         return true;
     }
 
+    /// <summary>
+    /// A cell holding <paramref name="payload"/>, of the payload's type: a known value, boxed when it is first read as one.
+    /// </summary>
+    public static ScalarCell Of(ScalarPayload payload)
+    {
+        var cell = new ScalarCell(payload.Type);
+        cell.Write(payload);
+        return cell;
+    }
+
     /// <summary>The declared type of the variable, which its payload is of.</summary>
     public VBType Type { get; }
 

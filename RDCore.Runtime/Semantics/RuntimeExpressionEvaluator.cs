@@ -1623,12 +1623,18 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return RuntimeSemanticsEvaluationResult.InternalError();
         }
 
+        // a procedure whose parameters are all scalars passed by value is given its arguments as payloads (IR lowering S1.3).
+        if (receiver is null && TryInvokeScalars(session, context, procedure, parameters, argumentNodes, out var direct))
+        {
+            return direct;
+        }
+
         // most calls borrow nothing: the list is the one the last call left, a call made while another binds its arguments has one of its own (S1.3).
         var borrowed = Interlocked.Exchange(ref _spareBorrowed, null) ?? [];
         try
         {
             if (BindArguments(session, context, parameters, argumentNodes, out var arguments, out var argumentsKnown, borrowed,
-                    external: procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol)
+                    external: procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol, cellReferences: InvokerOf(procedure) is not null)
                 is { } bindingError)
             {
                 return bindingError;
@@ -1784,7 +1790,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     /// <returns>The error that stopped the binding, or <see langword="null"/> when every argument was bound.</returns>
     private RuntimeSemanticsEvaluationResult? BindArguments(
         IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<VBParameterSymbol> parameters,
-        ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments, out bool isKnown, List<MemoryAddress> borrowed, bool external = false)
+        ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments, out bool isKnown, List<MemoryAddress> borrowed, bool external = false,
+        bool cellReferences = false)
     {
         arguments = [];
         isKnown = true;
@@ -1835,6 +1842,16 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
 
             var aliased =RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || external && parameter.ResolvedType is VBStringType;
             RuntimeSemanticsEvaluationResult? evaluatedInstead = null;
+
+            // a variable held in a cell of the caller's activation is passed as the cell, which the parameter's slot holds too (IR lowering S1.3) - to a
+            // procedure the workspace's invoker runs, which is what reads a cell reference: a library, a server and the handlers of an event are given
+            // an address.
+            if (aliased && cellReferences && TryReferenceCell(session, argumentNode, parameter, context, out var cellReference))
+            {
+                bound[i] = cellReference;
+                continue;
+            }
+
             if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, out evaluatedInstead, external))
             {
                 bound[i] = reference;

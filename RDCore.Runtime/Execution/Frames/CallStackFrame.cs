@@ -322,6 +322,26 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         Push(symbol, type.CreateValue(new ValueBindingHandle(value)), slot);
     }
 
+    /// <summary>
+    /// Declares the parameter <paramref name="symbol"/>, a scalar passed by value, holding <paramref name="payload"/>: its argument, of its type (IR
+    /// lowering S1.3).
+    /// </summary>
+    /// <param name="symbol">The parameter.</param>
+    /// <param name="payload">The argument, let-coerced to the parameter's type.</param>
+    /// <param name="slot">The number of the parameter's slot, when the caller knows it (<see cref="Push(Symbol, VBTypedValue, int)"/>); <c>-1</c> to look it up.</param>
+    internal void PushPayload(Symbol symbol, ScalarPayload payload, int slot)
+        => Hold(symbol, ScalarCell.Of(payload), payload.Type.DefaultValue.Size, slot);
+
+    /// <summary>
+    /// Declares the <c>ByRef</c> parameter <paramref name="symbol"/> as a second name for a variable of the caller held in <paramref name="cell"/>: the
+    /// parameter's slot holds that very cell (IR lowering S1.3, <see cref="CellReference"/>).
+    /// </summary>
+    /// <param name="symbol">The parameter.</param>
+    /// <param name="cell">The cell of the caller's variable.</param>
+    /// <param name="slot">The number of the parameter's slot, when the caller knows it; <c>-1</c> to look it up.</param>
+    internal void PushAlias(Symbol symbol, IBindingHandle cell, int slot)
+        => Hold(symbol, cell, cell is ScalarCell scalar ? scalar.Type.DefaultValue.Size : 0, slot);
+
     /// <summary>The layout the activation was laid out as (<see cref="LayOut"/>), if it was.</summary>
     internal FrameLayout? Layout => _layout;
 

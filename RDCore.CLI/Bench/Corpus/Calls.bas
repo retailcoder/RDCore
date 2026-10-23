@@ -14,6 +14,19 @@ Public Sub BenchProcedureCalls()
     Next
 End Sub
 
+Private Sub Increment(ByRef N As Long)
+    N = N + 1
+End Sub
+
+' a variable of the caller passed by reference, and assigned through the parameter.
+Public Sub BenchByRefCalls()
+    Dim I As Long
+    Dim S As Long
+    For I = 1 To 100000
+        Increment S
+    Next
+End Sub
+
 Public Sub BenchClassMemberCalls()
     Dim C As Counter
     Set C = New Counter

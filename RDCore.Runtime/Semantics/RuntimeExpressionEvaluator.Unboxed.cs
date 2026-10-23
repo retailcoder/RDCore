@@ -1,4 +1,7 @@
+using RDCore.Runtime.Execution;
 using RDCore.Runtime.Execution.Frames;
+using System.Buffers;
+using System.Collections.Immutable;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
@@ -148,6 +151,76 @@ public sealed partial class RuntimeExpressionEvaluator
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Calls <paramref name="procedure"/>, a procedure of the workspace every parameter of which is a scalar passed by value, with its arguments evaluated
+    /// on payloads and let-coerced to the parameters' types (IR lowering S1.3): each is what the parameter's cell is made of, and no value is made of any.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> when the call is not made here - before any argument is evaluated with an effect, so it is to be made the way it always is.
+    /// <see langword="true"/> when it was made: <paramref name="result"/> is what it returned, or the error it raised.
+    /// </returns>
+    internal bool TryInvokeScalars(IRuntimeSession session, RuntimeEvaluationContext context, VBTypeMemberSymbol procedure,
+        ImmutableArray<VBParameterSymbol> parameters, ImmutableArray<ExpressionNode> argumentNodes, out RuntimeSemanticsEvaluationResult result)
+    {
+        result = default;
+        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables
+            || parameters.IsDefaultOrEmpty || argumentNodes.IsDefault || argumentNodes.Length != parameters.Length
+            || InvokerOf(procedure) is not { } invoker)
+        {
+            return false;
+        }
+
+        var arguments = ArrayPool<ScalarPayload>.Shared.Rent(parameters.Length);
+        try
+        {
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var parameter = parameters[i];
+                if (RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind) || parameter is ParamArrayParameterSymbol || !ScalarPayload.IsScalar(parameter.ResolvedType)
+                    || argumentNodes[i] is NamedArgumentNode or MissingArgumentNode
+                    || !TryEvaluatePayload(session, BoundTreeOf(session, argumentNodes[i], context), out var payload)
+                    || !TryConvertPayload(payload, parameter.ResolvedType, out arguments[i]))
+                {
+                    return false;
+                }
+            }
+
+            result = invoker.InvokeScalars(procedure, arguments.AsSpan(0, parameters.Length));
+            return true;
+        }
+        finally
+        {
+            ArrayPool<ScalarPayload>.Shared.Return(arguments);
+        }
+    }
+
+    // the invoker that runs a procedure of the workspace, called on nothing: the one the binding factory binds it to (a member of anything else is bound
+    // to something else, which is the factory's decision), or the evaluator's own when there is no factory.
+    private RuntimeProcedureInvoker? InvokerOf(VBTypeMemberSymbol procedure)
+        => Bindings is { } bindings
+            ? bindings.ForMember(procedure) is CallableBindingHandle { Invoker: RuntimeProcedureInvoker invoker, Receiver: null } ? invoker : null
+            : ProcedureInvoker as RuntimeProcedureInvoker;
+
+    /// <summary>
+    /// The argument of a <c>ByRef</c> parameter of a scalar type that is a variable of the caller held in a cell of its activation, of the parameter's very
+    /// type: the cell, which the parameter's slot is to hold too (IR lowering S1.3, <see cref="CellReference"/>).
+    /// </summary>
+    /// <returns><see langword="false"/> when the argument is not passed this way, and is to be passed the way it always is.</returns>
+    internal bool TryReferenceCell(IRuntimeSession session, ExpressionNode argument, VBParameterSymbol parameter, RuntimeEvaluationContext context, out IRuntimeValue reference)
+    {
+        reference = null!;
+        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables || parameter is ParamArrayParameterSymbol
+            || BoundVariableOf(session, argument, context) is not { } variable
+            || BindingOf(session, variable) is not (ScalarCell cell, null)
+            || !cell.Type.Equals(parameter.ResolvedType))
+        {
+            return false;
+        }
+
+        reference = new CellReference(cell);
+        return true;
     }
 
     /// <summary>

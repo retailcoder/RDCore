@@ -48,7 +48,14 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 {
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult Invoke(VBTypeMemberSymbol procedure, ISymbolResolver resolver, IRuntimeValue[] arguments)
-        => Activate(procedure, arguments, sweep: false);
+        => Activate(procedure, arguments, [], sweep: false);
+
+    /// <summary>
+    /// Invokes <paramref name="procedure"/>, every parameter of which is a scalar passed by value, with <paramref name="arguments"/> - payloads of the
+    /// parameters' types, in order: each is what the parameter's cell is made of (IR lowering S1.3), and no value is made of it.
+    /// </summary>
+    internal RuntimeSemanticsEvaluationResult InvokeScalars(VBTypeMemberSymbol procedure, ReadOnlySpan<ScalarPayload> arguments)
+        => Activate(procedure, null, arguments, sweep: false);
 
     /// <summary>
     /// Evaluates every instruction of <paramref name="procedure"/> once, as the entry point of an analysis (<see cref="ProcedureExecutor.Sweep"/>).
@@ -61,7 +68,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     /// entered with a <c>Me</c> that is an instance of its class, made for the occasion and not initialized.
     /// </remarks>
     public bool Sweep(VBTypeMemberSymbol procedure)
-        => Activate(procedure, [.. GetParameters(procedure).Select(AssumedArgument(procedure))], sweep: true).IsSuccess;
+        => Activate(procedure, [.. GetParameters(procedure).Select(AssumedArgument(procedure))], [], sweep: true).IsSuccess;
 
     private Func<VBParameterSymbol, IRuntimeValue> AssumedArgument(VBTypeMemberSymbol procedure) => parameter =>
     {
@@ -77,8 +84,9 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         return SymbolAddressTable.BoxedValue(parameter.ResolvedType.DefaultValue.AsAssumed());
     };
 
-    // an activation that runs the body (Invoke), or that evaluates every instruction of it once (Sweep).
-    private RuntimeSemanticsEvaluationResult Activate(VBTypeMemberSymbol procedure, IRuntimeValue[] arguments, bool sweep)
+    // an activation that runs the body (Invoke), or that evaluates every instruction of it once (Sweep). Its arguments are runtime values, or - when
+    // there are none of those - payloads, for a procedure whose parameters are all scalars passed by value (InvokeScalars).
+    private RuntimeSemanticsEvaluationResult Activate(VBTypeMemberSymbol procedure, IRuntimeValue[]? arguments, ReadOnlySpan<ScalarPayload> payloads, bool sweep)
     {
         if (!_activations.TryGetValue(procedure, out var activation))
         {
@@ -94,7 +102,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         }
 
         var parameters = GetParameters(procedure);
-        if (parameters.Length != arguments.Length)
+        if (parameters.Length != (arguments?.Length ?? payloads.Length))
         {
             // arity mismatch: a real static-semantics gap (no call-site argument-count check exists yet
             // either), not something this slice invents error handling for.
@@ -133,7 +141,17 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
-            if (IsAliased(parameter, arguments[i]) && arguments[i] is VBRuntimeReference reference)
+            if (arguments is null)
+            {
+                frame.PushPayload(parameter, payloads[i], activation.Layout.ParameterSlots[i]);
+            }
+            else if (IsAliased(parameter, arguments[i]) && arguments[i] is CellReference shared)
+            {
+                // a variable of the caller held in a cell, which the parameter is a second name for: the parameter's slot holds the very cell (S1.3), so
+                // what one writes the other reads, as through an address - with no address made, and none looked up.
+                frame.PushAlias(parameter, shared.Cell, activation.Layout.ParameterSlots[i]);
+            }
+            else if (IsAliased(parameter, arguments[i]) && arguments[i] is VBRuntimeReference reference)
             {
                 // MS-VBAL §5.3.1.11: "a reference parameter binding is defined... referring to the
                 // variable referenced by the argument's expression" - true aliasing onto the caller's own
@@ -199,7 +217,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     // is taken by whoever called it: it is held as a temporary of the caller's statement first (ObjectReferences.HoldTemporarily),
     // and the function result variable, the locals, the ByVal parameters and the blocks still open let go of what they held
     // after it. A Static local outlives the activation and is not in the frame.
-    private void ReleaseLocals(CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals, ImmutableArray<VBParameterSymbol> parameters, IRuntimeValue[] arguments)
+    private void ReleaseLocals(CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals, ImmutableArray<VBParameterSymbol> parameters, IRuntimeValue[]? arguments)
     {
         ObjectReferences.HoldTemporarily(Session, frame.ReturnValue);
         if (frame.HasResultCell)
@@ -209,7 +227,9 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
         foreach (var local in locals)
         {
-            if (local is not VBLocalVariableSymbol { IsStatic: false } variable || !frame.TryResolve(variable, out var handle))
+            // a variable of a type that holds no object (a number, a String) has nothing to let go of, and is not looked up (S1.3).
+            if (local is not VBLocalVariableSymbol { IsStatic: false } variable || !ObjectReferences.CanHoldAnObject(variable.ResolvedType)
+                || !frame.TryResolve(variable, out var handle))
             {
                 continue;
             }
@@ -218,8 +238,9 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         }
 
         // a ByVal parameter is a local of the activation as much as a Dim is (MS-VBAL §5.3.1.11): what it holds it lets go of with it. Which parameters
-        // were given a copy is read again from the arguments, rather than remembered in a list made for each call (IR lowering S1.3).
-        for (var i = 0; i < parameters.Length; i++)
+        // were given a copy is read again from the arguments, rather than remembered in a list made for each call (IR lowering S1.3). Payloads are
+        // scalars, which hold none.
+        for (var i = 0; arguments is not null && i < parameters.Length; i++)
         {
             var parameter = parameters[i];
             if (!IsAliased(parameter, arguments[i]) && ObjectReferences.CanHoldAnObject(parameter.ResolvedType) && frame.TryResolve(parameter, out var handle))
@@ -339,7 +360,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
     // a ByRef parameter whose argument is a variable is an alias of it (MS-VBAL §5.3.1.11); any other is a fresh local, given a copy of its argument.
     private static bool IsAliased(VBParameterSymbol parameter, IRuntimeValue argument)
-        => IsByRef(parameter.ParameterKind) && argument is VBRuntimeReference;
+        => IsByRef(parameter.ParameterKind) && argument is VBRuntimeReference or CellReference;
 
     /// <summary>
     /// The value an optional parameter that declares no default takes when the call supplies no argument for it.
