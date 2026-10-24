@@ -83,6 +83,12 @@ public sealed record class ModuleSemanticModel(
     public string? Language { get; init; }
 
     /// <summary>
+    /// What the objects of the class are, for a class module (<see cref="Flags.ClassModuleSemanticFlags"/>): whether the class has a default instance, and
+    /// whether its objects hold state. <see langword="null"/> for a module that is not a class module.
+    /// </summary>
+    public Flags.ClassModuleSemanticFlags? Class { get; init; }
+
+    /// <summary>
     /// How each declaration of the module is used by the module's own code (<see cref="Static.DeclarationUsage"/>): its variables, constants, parameters,
     /// procedures, properties and events, and the variables that were never declared. Empty when the pass had no workspace to resolve names in.
     /// </summary>

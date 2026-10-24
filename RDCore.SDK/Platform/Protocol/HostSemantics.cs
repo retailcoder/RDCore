@@ -326,13 +326,15 @@ public record class DeclarationFactDto(
 /// <param name="Procedures">The model of each procedure of the module.</param>
 /// <param name="Declarations">What is known of how the module's declarations are used.</param>
 /// <param name="Language">The identifier of the language the module is loaded as, when the host says.</param>
+/// <param name="Class">What the objects of the class are, for a class module (<see cref="ClassModuleSemanticFlags"/>); <see langword="null"/> for any other module.</param>
 public record class ModuleSemanticsDto(
     Uri Module,
     bool? OptionExplicit,
     ImmutableArray<CompileErrorDto> DeclarationErrors,
     ImmutableArray<ProcedureSemanticsDto> Procedures,
     ImmutableArray<DeclarationFactDto> Declarations,
-    string? Language = null)
+    string? Language = null,
+    ClassModuleSemanticFlags? Class = null)
 {
     /// <summary>
     /// Describes a model for the wire.
@@ -352,7 +354,8 @@ public record class ModuleSemanticsDto(
             procedure.Runtime is null ? null : RuntimeFactsDto.From(procedure.Runtime)))],
         [.. model.Declarations.Select(declaration => new DeclarationFactDto(
             declaration.Symbol.Uri, declaration.Name, declaration.Kind, declaration.Access, declaration.IsImplicit, declaration.Location, declaration.References, declaration.Role))],
-        model.Language);
+        model.Language,
+        model.Class);
 
     private static CompileErrorDto ErrorOf(VBCompileErrorInfo error) => new(error.VBCompileErrorId, error.Location, error.Verbose);
 }

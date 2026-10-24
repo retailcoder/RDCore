@@ -12,6 +12,7 @@ using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Semantics.Flow;
 using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Semantics.Static;
@@ -125,6 +126,7 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
             Declarations = DeclarationUsage.Of(
                 DeclarationUsage.DeclaredBy(members), procedureModels, module is VBClassModuleSymbol classModule ? MemberRoles.Of(classModule, session.Symbols.Resolver) : null),
             Language = session.Environment.Language?.Id,
+            Class = module is VBClassModuleSymbol declaredClass ? ClassFlagsOf(declaredClass, members) : null,
         };
 
         // kept whether or not the module loads: what is wrong with a module is what is asked after. What the language core states about the code is found out by
@@ -182,6 +184,16 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
             }
         }
     }
+
+    // MS-VBAL §5.2.4.1.2, §5.2.3.1: whether the class has a default instance, and whether its objects - the default instance among them - hold state: a variable
+    // the class declares at module level, of which each object has a distinct one, or a Static local of one of its members, which MS-VBA gives each object
+    // its own of too (Excel-verified, oracle\s19 N37), where MS-VBAL gives a static local module extent.
+    private static ClassModuleSemanticFlags ClassFlagsOf(VBClassModuleSymbol classModule, IReadOnlyList<VBTypeMemberSymbol> members)
+        => (classModule.GetProperty(SymbolProperties.PredeclaredId) ? ClassModuleSemanticFlags.DefaultInstance : ClassModuleSemanticFlags.None)
+            | (members.Any(member => member is VBModuleFieldVariableMemberSymbol
+                || RuntimeProcedureInvoker.GetLocals(member).Any(local => local is VBLocalVariableSymbol { IsStatic: true }))
+                ? ClassModuleSemanticFlags.Stateful
+                : ClassModuleSemanticFlags.None);
 
     // directly, or in a record that is a field of it. A type that holds itself is not one MS-VBA compiles, and is looked into once.
     private static bool HasFixedSizeArrayField(VBUserDefinedType record, HashSet<VBUserDefinedType> seen)
