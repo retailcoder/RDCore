@@ -84,6 +84,14 @@ parser cannot tell what is invoked, so this is a compile error where the callee 
 argument list of a `RaiseEvent` is the exception, being known not to be that of an external procedure: there it is a syntax
 error ([**RD-VBAL §5.4.2.20**](rd-vbal.5.4.2.20.raiseevent-statement.md)).
 
+A member of the library whose parameter is `As Any` takes a `ByVal` argument for it, as a `Declare`'s does: `VarPtr(ByVal n)` is valid, and passes
+the bytes `n` is stored in where the address goes ([**RD-VBAL §6.1.2.13** Hidden Module](rd-vbal.6.1.2.13.hidden-module.md#varptr)).
+
+> [!NOTE]
+> **MS-VBA** is more permissive than **MS-VBAL §5.6.13.1** (recorded in Excel): it also compiles `ByVal` before an argument of a function of the
+> workspace (`Twice(ByVal 2)`), of `StrPtr` and of `ObjPtr`, and reports a _Syntax error_ for `Abs(ByVal -3)`, `Len(ByVal "abc")` or
+> `CLng(ByVal "7")`. **RD-VBA** reports [VBC09327](../diagnostics/vbc09327.md) for all of these but `VarPtr`'s for now.
+
 See [**RD-VBAL §5.3.1.11** Procedure Invocation Argument Processing](rd-vbal.5.3.1.11.procedure-invocation-argument-processing.md#argument-mapping).
 
 

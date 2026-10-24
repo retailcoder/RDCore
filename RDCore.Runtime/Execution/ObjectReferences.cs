@@ -147,6 +147,12 @@ internal static class ObjectReferences
     {
         while (session.Objects.TemporaryCount > mark && session.Objects.PopTemporary() is { } cell)
         {
+            if (cell is ArgumentTemporary temporary)
+            {
+                session.Storage.TryDeallocate(temporary.Address);
+                continue;
+            }
+
             Release(session, cell);
         }
     }

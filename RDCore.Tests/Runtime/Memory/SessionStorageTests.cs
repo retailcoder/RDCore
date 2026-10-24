@@ -36,22 +36,22 @@ public class SessionStorageTests
     }
 
     [TestMethod]
-    // a value whose declared Size is 0 (Nothing, Null, Empty, an uninitialized array, a UDT with no
-    // resolvable fields) still needs a resolvable-by-name binding, but has nothing to write byte-for-byte -
-    // the allocator correctly refuses a 0-byte reservation (SessionMemory/SessionMemorySegment's own
-    // guard, asserted directly in their own tests), so SessionStorage mints its own address instead of
-    // ever asking the allocator for one.
-    public void TryAllocate_ZeroSize_BindsTheHandleWithoutConsultingTheAllocator()
+    // a value whose Size is 0 (vbNullString, Null, an array with no elements yet) is held by a variable all the same, and a variable has an address a
+    // program can take (VarPtr): it is given a block of a pointer's size, what MS-VBA's String or dynamic array that points nowhere is - the allocator
+    // refusing a 0-byte reservation (SessionMemory/SessionMemorySegment's own guard, asserted in their own tests).
+    public void TryAllocate_ZeroSize_ReservesAPointersSize()
     {
         var allocator = Substitute.For<ISessionMemoryAllocator>();
-        var sut = new SessionStorage(allocator);
+        allocator.TryAllocate(Arg.Any<int>(), out Arg.Any<MemoryAddress>())
+            .Returns(call => { call[1] = new MemoryAddress(0x10000); return true; });
+        var sut = new SessionStorage(allocator, pointerSize: 8);
         var handle = Handle(1);
 
         Assert.IsTrue(sut.TryAllocate(0, handle, out var address));
 
         Assert.IsTrue(sut.TryRead(address, out var bound));
         Assert.AreSame(handle, bound);
-        allocator.DidNotReceive().TryAllocate(Arg.Any<int>(), out Arg.Any<MemoryAddress>());
+        allocator.Received(1).TryAllocate(8, out Arg.Any<MemoryAddress>());
     }
 
     [TestMethod]
@@ -79,16 +79,16 @@ public class SessionStorageTests
     }
 
     [TestMethod]
-    public void TryDeallocate_AZeroSizeAddress_RemovesTheBinding_WithoutTouchingTheAllocator()
+    public void TryDeallocate_AZeroSizeAddress_RemovesTheBinding_AndFreesItsBlock()
     {
-        var allocator = Substitute.For<ISessionMemoryAllocator>();
-        var sut = new SessionStorage(allocator);
+        var sut = new SessionStorage(new SessionMemory(new(), PointerSize.x86), pointerSize: 4);
         sut.TryAllocate(0, Handle(1), out var address);
 
         Assert.IsTrue(sut.TryDeallocate(address));
 
         Assert.IsFalse(sut.TryRead(address, out _));
-        allocator.DidNotReceive().TryDeallocate(Arg.Any<MemoryAddress>(), out Arg.Any<SessionMemoryBlock>());
+        Assert.IsTrue(sut.TryAllocate(4, Handle(2), out var reused));
+        Assert.AreEqual(address, reused);
     }
 
     [TestMethod]

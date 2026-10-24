@@ -96,15 +96,27 @@ public interface IStdHiddenModule
     RuntimeSemanticsEvaluationResult<VBLongPtrValue> StrPtr(VBStringValue @string);
 
     /// <summary>
-    /// <strong>VarPtr</strong> Gets the address of a variable.
+    /// <strong>VarPtr</strong> Gets the address of a variable in the session's memory.
     /// </summary>
     /// <remarks>
-    /// 🚧 Not implemented: it takes its argument by reference, which a standard-library member cannot yet declare.
+    /// Declared as the <c>VBA</c> type library declares it, <c>VarPtr(Ptr As Any) As LongPtr</c> (<see cref="StdLibAsAnyAttribute"/>): it takes a variable of
+    /// any type but an array, and is given its address. As in <strong>MS-VBA</strong> (recorded in Excel):
+    /// <list type="bullet">
+    /// <item>the address is never <c>0</c>, and is the same for a variable for as long as it exists, whatever is assigned to it - the same for a module's
+    /// variable named bare or qualified, and for a <c>Static</c> local across calls;</item>
+    /// <item>a <c>ByRef</c> parameter's is the address of the variable it was given, and a <c>ByVal</c> parameter's its own; a <c>Variant</c> one given a
+    /// variable of another type is a <c>VARIANT</c> of its own, at one address for the call;</item>
+    /// <item>what is no variable - <c>VarPtr(1)</c>, <c>VarPtr(x + 0)</c>, <c>VarPtr((x))</c>, a public variable of an object named through it - is passed
+    /// as a temporary, which has an address of its own until the statement is over;</item>
+    /// <item><c>VarPtr(ByVal n)</c> is the bytes <c>n</c> is stored in, read as a whole number.</item>
+    /// </list>
+    /// 🚧 An element of an array, and a field of a user-defined type, have an address of their own only for as long as the call runs: they are not laid
+    /// out in the session's memory as <strong>MS-VBA</strong> lays them out, side by side.
     /// </remarks>
-    /// <param name="variable">The variable.</param>
+    /// <param name="ptr">The address of the variable.</param>
     /// <returns>A <see cref="RuntimeSemanticsEvaluationResult"/> object encapsulating the result of the successful operation, or the error metadata otherwise.</returns>
     [StdLibMember(IsHidden = true)]
-    RuntimeSemanticsEvaluationResult<VBLongPtrValue> VarPtr(VBVariantValue variable);
+    RuntimeSemanticsEvaluationResult<VBLongPtrValue> VarPtr([StdLibAsAny] VBLongLongValue ptr);
 
     /// <summary>
     /// <strong>Width</strong> Sets the line width of a file opened for output: the number of characters a line holds before

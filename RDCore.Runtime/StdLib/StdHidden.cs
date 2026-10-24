@@ -11,7 +11,7 @@ namespace RDCore.Runtime.StdLib;
 
 /// <inheritdoc cref="IStdHiddenModule"/>
 /// <remarks>
-/// 🚧 <see cref="StrPtr"/>, <see cref="VarPtr"/>, <see cref="InputB"/> and <see cref="InputBString"/> are declared and not written:
+/// 🚧 <see cref="StrPtr"/>, <see cref="InputB"/> and <see cref="InputBString"/> are declared and not written:
 /// each says why, in the declaration.
 /// </remarks>
 /// <param name="session">The session whose file channels, call stack and environment these members read.</param>
@@ -110,8 +110,9 @@ public sealed class StdHidden(IRuntimeSession session) : IStdHiddenModule
         => NotImplemented<VBLongPtrValue>(nameof(StrPtr), "the characters of a string live in its value, not at an address of the session's memory");
 
     /// <inheritdoc/>
-    public RuntimeSemanticsEvaluationResult<VBLongPtrValue> VarPtr(VBVariantValue variable)
-        => NotImplemented<VBLongPtrValue>(nameof(VarPtr), "it takes its argument by reference, which a standard-library member cannot yet declare");
+    public RuntimeSemanticsEvaluationResult<VBLongPtrValue> VarPtr(VBLongLongValue ptr)
+        => RuntimeSemanticsEvaluationResult<VBLongPtrValue>.Success(
+            session.Environment.Is64Bit ? new VBLongPtrValue(ptr.Value) : new VBLongPtrValue(unchecked((int)ptr.Value)));
 
     /// <inheritdoc/>
     public RuntimeSemanticsEvaluationResult Width(VBIntegerValue fileNumber, VBIntegerValue width)

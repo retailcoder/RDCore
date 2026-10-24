@@ -199,7 +199,8 @@ public static class ExpressionStaticSemanticsEvaluator
 
         // MS-VBAL §5.6.13.1: "It is invalid for an argument list to contain a ByVal argument unless it is the argument
         // list for an invocation of an external procedure." Only the callee says which it is.
-        if (ByValArgumentIn(indexExpression.Arguments) is { } byValArgument && !IsExternalProcedure(context, indexExpression.Callee))
+        if (ByValArgumentIn(indexExpression.Arguments) is { } byValArgument && !IsExternalProcedure(context, indexExpression.Callee)
+            && !TakesByValAsAny(context, indexExpression.Callee, indexExpression.Arguments))
         {
             return StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.ByValArgumentNotAllowed, byValArgument.Location,
                 "ByVal can only be written before an argument of an external procedure's invocation (MS-VBAL §5.6.13.1)."));
@@ -319,6 +320,36 @@ public static class ExpressionStaticSemanticsEvaluator
     private static ExpressionNode? ByValArgumentIn(ImmutableArray<ExpressionNode> arguments)
         => arguments.FirstOrDefault(argument => argument is ByValArgumentExpressionNode
             || argument is NamedArgumentNode { Value: ByValArgumentExpressionNode });
+
+    // a member of the library whose `As Any` parameters take the ByVal arguments written for them: VarPtr(ByVal n) is n, the value given where an address
+    // goes, as a Declare's `As Any` takes it (MS-VBA, recorded in Excel: oracle\s21 R28, B05).
+    private static bool TakesByValAsAny(StaticEvaluationContext context, ExpressionNode callee, ImmutableArray<ExpressionNode> arguments)
+    {
+        if (ObjectValueStaticSemantics.MemberOfCallee(context, callee) is not { } member || member.GetProperty(SymbolProperties.ExternalTarget) is null
+            || ObjectValueStaticSemantics.ParametersOfCallee(context, callee) is not { } parameters)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            var parameter = arguments[index] switch
+            {
+                ByValArgumentExpressionNode => index < parameters.Length ? parameters[index] : null,
+                NamedArgumentNode { Value: ByValArgumentExpressionNode } named
+                    => parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, named.Name, StringComparison.OrdinalIgnoreCase)),
+                _ => null,
+            };
+
+            var isByVal = arguments[index] is ByValArgumentExpressionNode or NamedArgumentNode { Value: ByValArgumentExpressionNode };
+            if (isByVal && parameter is not { ResolvedType: VBUnknownType })
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     // whether the expression a call is written on names an external procedure, a Declare: by its bare name, or qualified
     // by the project or module that declares it (MS-VBAL §5.6.12).

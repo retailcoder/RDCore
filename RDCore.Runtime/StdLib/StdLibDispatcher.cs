@@ -172,6 +172,9 @@ public sealed class StdLibDispatcher : IExternalCallProvider
     // for it when the call leaves it out - when that is the same every time.
     private sealed record class StdLibParameter(ParameterInfo Info, Type Type, bool IsParamArray, bool IsOptional, VBParameterSymbol? Symbol)
     {
+        // `ByRef … As Any` (StdLibAsAnyAttribute): given an address.
+        public bool IsAsAny { get; } = Info.GetCustomAttribute<StdLibAsAnyAttribute>() is not null;
+
         // a ParamArray told nothing is an empty array of its elements, which nothing can change.
         public Array? EmptyParamArray { get; } = IsParamArray ? System.Array.CreateInstance(Type.GetElementType()!, 0) : null;
     }
@@ -267,6 +270,26 @@ public sealed class StdLibDispatcher : IExternalCallProvider
             }
 
             var argument = supplied[index];
+
+            // `As Any` is given the address of what it was passed - a variable, or the temporary a value is passed in - or what a ByVal argument passes in
+            // its place, a whole number (RuntimeExpressionEvaluator, StdLibAsAnyAttribute).
+            if (parameter.IsAsAny)
+            {
+                if (argument is VBRuntimeReference { Value: var address })
+                {
+                    arguments[index] = new VBLongLongValue(address.Value);
+                    continue;
+                }
+
+                if (argument.BoxedValue is not long pointer)
+                {
+                    return false;
+                }
+
+                arguments[index] = new VBLongLongValue(pointer);
+                continue;
+            }
+
             if (argument is VBRuntimeReference)
             {
                 if (!TryDereference(argument, parameter.Info, parameter.Symbol, resolver, out arguments[index]))

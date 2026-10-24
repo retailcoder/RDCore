@@ -100,9 +100,9 @@ public static class RuntimeSessionComposer
         IRuntimeOutput? output,
         IFileSystem? fileSystem)
     {
-        var memory = new SessionMemory(new FreeListManager(), environment.Is64Bit ? PointerSize.x64 : PointerSize.x86);
+        var memory = new SessionMemory(new FreeListManager(), environment.Is64Bit ? PointerSize.x64 : PointerSize.x86, SessionMemory.FirstAddress);
         var callStack = new RuntimeCallStack();
-        var storage = new SessionStorage(memory);
+        var storage = new SessionStorage(memory, (int)memory.PointerSize);
         var symbols = new SessionSymbols(storage, callStack, declared);
         var objects = new SessionObjects();
         var errors = new SessionErrorState(callStack);

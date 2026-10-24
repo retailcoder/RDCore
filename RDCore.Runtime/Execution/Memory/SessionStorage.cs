@@ -10,19 +10,11 @@ namespace RDCore.Runtime.Execution.Memory;
 /// reserved for it through an <see cref="ISessionMemoryAllocator"/>.
 /// </summary>
 /// <param name="allocator">The session's memory allocator; reserves address space only, never values.</param>
-internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessionStorage
+/// <param name="pointerSize">The size of an address in the session's memory, in bytes: what a variable that holds nothing is given.</param>
+internal sealed class SessionStorage(ISessionMemoryAllocator allocator, int pointerSize = sizeof(long)) : ISessionStorage
 {
     private readonly Dictionary<MemoryAddress, IBindingHandle> _handleByAddress = [];
     private readonly Dictionary<MemoryAddress, byte[]> _bytesByAddress = [];
-
-    // A value whose declared Size is 0 (Nothing, Null, Empty, an uninitialized array, a UDT with no
-    // resolvable fields, an empty ParamArray) still needs a resolvable-by-name binding, but genuinely
-    // has nothing to write byte-for-byte - the allocator correctly refuses it (SessionMemorySegment's
-    // own guard: a 0-byte bump-pointer/free-list "allocation" would hand the same address to the next
-    // real caller). It never needs real memory, only a dictionary key distinct from every other one -
-    // minted from this counter instead, walking negative so it can never collide with an allocator
-    // address (those only ever grow from a non-negative offset).
-    private int _nextInertAddress = -1;
 
     /// <summary>
     /// How many times what is bound at an address has changed: an allocation, a deallocation, a rebinding (a <c>POKE</c>). A binding read through an
@@ -32,22 +24,35 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
 
     public bool TryAllocate(int size, IBindingHandle handle, out MemoryAddress address)
     {
-        if (size <= 0)
-        {
-            address = new MemoryAddress(_nextInertAddress--);
-            _handleByAddress[address] = handle;
-            Generation++;
-            return true;
-        }
-
-        if (!allocator.TryAllocate(size, out address))
+        // a value whose Size is 0 (vbNullString, Null, an array with no elements yet, an empty ParamArray) is held by a variable all the same, and a
+        // variable has an address a program can take (VarPtr): MS-VBA's String or dynamic array is a pointer that is 0, which is a pointer's size.
+        if (!allocator.TryAllocate(size <= 0 ? pointerSize : size, out address))
         {
             return false;
         }
 
         _handleByAddress[address] = handle;
+        Bind(handle, address);
         Generation++;
         return true;
+    }
+
+    // a cell knows the address it is bound at, so that a second name for its variable - a ByRef parameter given the cell (Frames.CellReference) - finds the
+    // address the variable has, whichever of them was asked for it first.
+    private static void Bind(IBindingHandle handle, MemoryAddress address)
+    {
+        if (handle is Frames.ScalarCell cell)
+        {
+            cell.Address = address;
+        }
+    }
+
+    private void Unbind(MemoryAddress address)
+    {
+        if (_handleByAddress.TryGetValue(address, out var handle) && handle is Frames.ScalarCell { Address: { } bound } cell && bound == address)
+        {
+            cell.Address = null;
+        }
     }
 
     public bool TryRead(MemoryAddress address, [NotNullWhen(true)][MaybeNullWhen(false)] out IBindingHandle? handle)
@@ -56,11 +61,7 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
     public bool TryDeallocate(MemoryAddress address)
     {
         Generation++;
-        if (address.Value < 0)
-        {
-            return _handleByAddress.Remove(address);
-        }
-
+        Unbind(address);
         return (_handleByAddress.Remove(address) || _bytesByAddress.Remove(address)) && allocator.TryDeallocate(address, out _);
     }
 
@@ -71,7 +72,9 @@ internal sealed class SessionStorage(ISessionMemoryAllocator allocator) : ISessi
             return false;
         }
 
+        Unbind(address);
         _handleByAddress[address] = handle;
+        Bind(handle, address);
         Generation++;
         return true;
     }

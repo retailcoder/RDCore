@@ -85,7 +85,8 @@ internal static class ArgumentListStaticSemantics
                     return VBCompileErrorInfo.For(VBCompileErrorId.NamedArgumentAlreadySpecified, named.Location, named.Name);
                 }
 
-                if ((ByRefError(context, procedure, parameter, named.Value) ?? ValueError(context, procedure, parameter, named.Value)) is { } namedByRef)
+                if ((AnyError(context, procedure, parameter, named.Value) ?? ByRefError(context, procedure, parameter, named.Value)
+                    ?? ValueError(context, procedure, parameter, named.Value)) is { } namedByRef)
                 {
                     return namedByRef;
                 }
@@ -108,7 +109,8 @@ internal static class ArgumentListStaticSemantics
             if (argument is not MissingArgumentNode)
             {
                 given.Add(own[position].Name);
-                if ((ByRefError(context, procedure, own[position], argument) ?? ValueError(context, procedure, own[position], argument)) is { } byRef)
+                if ((AnyError(context, procedure, own[position], argument) ?? ByRefError(context, procedure, own[position], argument)
+                    ?? ValueError(context, procedure, own[position], argument)) is { } byRef)
                 {
                     return byRef;
                 }
@@ -120,6 +122,24 @@ internal static class ArgumentListStaticSemantics
         return own.FirstOrDefault(parameter => !parameter.IsOptional && parameter is not ParamArrayParameterSymbol && !given.Contains(parameter.Name)) is { } missing
             ? VBCompileErrorInfo.For(VBCompileErrorId.ArgumentNotOptional, call.Location, missing.Name)
             : null;
+    }
+
+    // an `As Any` parameter - of a Declare, or of a library member (VarPtr) - takes a variable of any type but an array, which MS-VBA refuses there by its
+    // name (Excel-verified, oracle\s21 R01, R02, R25: "Type mismatch"); an element of one it takes. A parameter of another procedure that has no declared
+    // type is one whose type is not resolved, and is not this.
+    private static VBCompileErrorInfo? AnyError(StaticEvaluationContext context, VBTypeMemberSymbol procedure, VBParameterSymbol parameter, ExpressionNode argument)
+    {
+        if (parameter.ResolvedType is not VBUnknownType || parameter is ParamArrayParameterSymbol
+            || procedure is not (VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol) && procedure.GetProperty(SymbolProperties.ExternalTarget) is null
+            || argument is not SimpleNameExpressionNode name
+            || context.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope.Uri).Symbol is not ITypedSymbol { ResolvedType: VBArrayType } variable
+            || variable is VBReturningMemberSymbol or VBProcedureMemberSymbol)
+        {
+            return null;
+        }
+
+        return VBCompileErrorInfo.For(VBCompileErrorId.TypeMismatch, argument.Location,
+            string.Format(Exceptions.VBArgument_ArrayToAsAny_Verbose, name.IdentifierName));
     }
 
     // MS-VBAL §5.3.1.11: a variable given to a ByRef parameter is aliased to it, and is of its declared type - an array, of its element type. MS-VBA refuses

@@ -48,6 +48,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         public Stack<int>? GoSubReturns;
         public Dictionary<int, (int? End, ValueBindingHandle Cell)>? BlockHolders;
         public List<Symbol>? DeclaredAtAStop;
+        public Dictionary<SemanticId, MemoryAddress>? ReferenceVariants;
     }
 
     private Occasional? _occasional;
@@ -442,13 +443,14 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// <param name="cell">The cell of the caller's variable.</param>
     /// <param name="slot">The number of the parameter's slot, when the caller knows it; <c>-1</c> to look it up.</param>
     internal void PushAlias(Symbol symbol, IBindingHandle cell, int slot)
-        => Hold(symbol, cell, cell is ScalarCell scalar ? scalar.Type.DefaultValue.Size : 0, slot);
+        => Hold(symbol, cell, cell is ScalarCell scalar ? scalar.Type.DefaultValue.Size : 0, slot, isAlias: true);
 
     /// <summary>The layout the activation was laid out as (<see cref="LayOut"/>), if it was.</summary>
     internal FrameLayout? Layout => _layout;
 
     // a slot the caller numbered is the one of this activation's layout, which is what the caller read the number from: no symbol is looked up (S1.3).
-    private IBindingHandle Hold(Symbol symbol, IBindingHandle cell, int size, int slot)
+    // isAlias: the cell is a variable of the caller's (PushAlias), which this activation has a second name for and does not free.
+    private IBindingHandle Hold(Symbol symbol, IBindingHandle cell, int size, int slot, bool isAlias = false)
     {
         if ((uint)slot < (uint)_slots.Length || TryGetOwnSlot(symbol, out slot))
         {
@@ -459,7 +461,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
                 throw new InvalidOperationException($"'{symbol.Uri}' is already declared on this frame.");
             }
 
-            held = new Slot(true, default, cell, null, size);
+            held = new Slot(true, default, cell, null, size, isAlias);
             return cell;
         }
 
@@ -468,7 +470,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
             throw new InvalidOperationException($"'{symbol.Uri}' is already declared on this frame.");
         }
 
-        (_cells ??= [])[symbol.SemanticId] = (cell, size);
+        (_cells ??= [])[symbol.SemanticId] = (cell, size, isAlias);
         return cell;
     }
 
@@ -498,7 +500,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
 
     // the cells of the activation's variables that no slot holds and that have no address yet (TryGetAddress gives one, and the cell moves to the address
     // table).
-    private Dictionary<SemanticId, (IBindingHandle Cell, int Size)>? _cells;
+    private Dictionary<SemanticId, (IBindingHandle Cell, int Size, bool IsAlias)>? _cells;
 
     private bool TryGetCell(Symbol symbol, [NotNullWhen(true)] out IBindingHandle? cell)
     {
@@ -527,7 +529,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         address = default;
         if (TryGetOwnSlot(symbol, out var index) && _slots[index] is { Cell: { } slotCell } held)
         {
-            if (!(_addresses ??= new(Storage)).TryAllocate(symbol, held.Size, slotCell, out address))
+            if (!TryGiveAddress(symbol, slotCell, held.Size, held.IsAlias, out address))
             {
                 return false;
             }
@@ -537,12 +539,47 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
             return true;
         }
 
-        if (_cells is null || !_cells.TryGetValue(symbol.SemanticId, out var cell) || !(_addresses ??= new(Storage)).TryAllocate(symbol, cell.Size, cell.Cell, out address))
+        if (_cells is null || !_cells.TryGetValue(symbol.SemanticId, out var cell) || !TryGiveAddress(symbol, cell.Cell, cell.Size, cell.IsAlias, out address))
         {
             return false;
         }
 
         _cells.Remove(symbol.SemanticId);
+        return true;
+    }
+
+    // a variable has one address, whichever of its names is asked for it first (MS-VBA: VarPtr of a ByRef parameter is the caller's variable's): the one
+    // its cell is bound at, if it is, and a new one otherwise. The activation that declared the variable frees it - a parameter that is a second name for
+    // a variable of the caller's (PushAlias) is then the reference parameter it is (PushByRef), and the address is the caller's to free, as is one that the
+    // caller's variable was given by a parameter of a call it made (ReleaseAll).
+    private bool TryGiveAddress(Symbol symbol, IBindingHandle cell, int size, bool isAlias, out MemoryAddress address)
+    {
+        if (cell is ScalarCell { Address: { } bound })
+        {
+            address = bound;
+            if (isAlias)
+            {
+                (Occasionally.ByRefAliases ??= [])[symbol.SemanticId] = address;
+            }
+            else
+            {
+                (_addresses ??= new(Storage)).Adopt(symbol, address);
+            }
+
+            return true;
+        }
+
+        if (!isAlias)
+        {
+            return (_addresses ??= new(Storage)).TryAllocate(symbol, size, cell, out address);
+        }
+
+        if (!Storage.TryAllocate(size, cell, out address))
+        {
+            return false;
+        }
+
+        (Occasionally.ByRefAliases ??= [])[symbol.SemanticId] = address;
         return true;
     }
 
@@ -600,6 +637,38 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         return _occasional?.ReferencedTypes is { } referencedTypes && referencedTypes.TryGetValue(symbol.SemanticId, out declaredType);
     }
 
+    /// <summary>
+    /// The address of the <c>VARIANT</c> a <c>Variant</c> reference parameter given a variable of another type is (<see cref="TryGetReferencedType"/>):
+    /// <strong>MS-VBA</strong> passes it a <c>VARIANT</c> of its own that refers to the variable, at one address for as long as the activation runs
+    /// (recorded in Excel, oracle\s21 R19, R27). It is what <c>VarPtr</c> of the parameter is; the parameter reads and writes the variable it was given.
+    /// </summary>
+    /// <param name="symbol">The parameter.</param>
+    /// <param name="size">The size of a <c>VARIANT</c> in the session's memory.</param>
+    /// <param name="address">The address.</param>
+    /// <returns><see langword="false"/> when the parameter is not one bound to a variable of another type.</returns>
+    internal bool TryGetReferenceVariantAddress(Symbol symbol, int size, out MemoryAddress address)
+    {
+        address = default;
+        if (!TryGetReferencedType(symbol, out _))
+        {
+            return false;
+        }
+
+        var variants = Occasionally.ReferenceVariants ??= [];
+        if (variants.TryGetValue(symbol.SemanticId, out address))
+        {
+            return true;
+        }
+
+        if (!Storage.TryAllocateBytes(size, out address))
+        {
+            return false;
+        }
+
+        variants[symbol.SemanticId] = address;
+        return true;
+    }
+
     // the address a ByRef parameter is an alias of, if the symbol is one.
     private bool TryGetAlias(Symbol symbol, out MemoryAddress address)
     {
@@ -625,7 +694,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     // that has - this activation's own, or the one a ByRef parameter is an alias of - and the type a Variant reference parameter reads its variable as. A
     // variable's address does not change while the activation runs (Push and PushByRef declare each variable once); the binding at the address does (a POKE
     // rebinds it), which is why it is read there every time rather than kept.
-    private readonly record struct Slot(bool IsFilled, MemoryAddress Address, IBindingHandle? Cell, VBType? ReferencedType, int Size);
+    private readonly record struct Slot(bool IsFilled, MemoryAddress Address, IBindingHandle? Cell, VBType? ReferencedType, int Size, bool IsAlias = false);
 
     private FrameLayout? _layout;
     private Slot[] _slots = [];
@@ -747,6 +816,29 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     public void ReleaseAll()
     {
         _addresses?.ReleaseAll();
+        foreach (var (_, variant) in _occasional?.ReferenceVariants ?? [])
+        {
+            Storage.TryDeallocate(variant);
+        }
+
+        // a variable of this activation that a parameter of a call it made was asked the address of, and that was not asked for it itself since: the
+        // address is this activation's (TryGiveAddress).
+        foreach (var slot in _slots)
+        {
+            if (slot is { IsAlias: false, Cell: ScalarCell { Address: { } given } })
+            {
+                Storage.TryDeallocate(given);
+            }
+        }
+
+        foreach (var (_, held) in _cells ?? [])
+        {
+            if (held is { IsAlias: false, Cell: ScalarCell { Address: { } given } })
+            {
+                Storage.TryDeallocate(given);
+            }
+        }
+
         _cells = null;
     }
 }

@@ -12,6 +12,12 @@ internal sealed class SessionMemory : ISessionMemoryAllocator
 
     private readonly int _segmentSize;
 
+    /// <summary>
+    /// Where a session's address space begins: above the first 64 KiB, which Windows never maps either, so that no variable's address is 0 - what a
+    /// program compares a pointer with to say it points nowhere (<c>StrPtr(vbNullString)</c>, <c>ObjPtr(Nothing)</c>) - nor a small number.
+    /// </summary>
+    public const int FirstAddress = 0x10000;
+
     public SessionMemory(FreeListManager freeLists, PointerSize pointerSize, int offset = 0)
     {
         PointerSize = pointerSize;

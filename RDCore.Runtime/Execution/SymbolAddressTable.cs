@@ -74,6 +74,12 @@ internal sealed class SymbolAddressTable(ISessionStorage storage)
     }
 
     /// <summary>
+    /// Binds <paramref name="symbol"/> to an address that is already allocated, which this table frees from then on: a variable's cell that a second name
+    /// for it was given an address for first (<see cref="Frames.CallStackFrame"/>, a <c>ByRef</c> parameter of a call the activation made).
+    /// </summary>
+    public void Adopt(Symbol symbol, MemoryAddress address) => _addressBySymbol[symbol.SemanticId] = address;
+
+    /// <summary>
     /// A caller's <see cref="VBTypedValue.Handle"/> may be a cached, shared instance — a type's
     /// <c>DefaultValue</c> chiefly, reused by every caller that hasn't assigned that variable yet.
     /// Binding it here directly would let a write through THIS address mutate every other allocation

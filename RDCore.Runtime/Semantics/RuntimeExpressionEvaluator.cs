@@ -1746,9 +1746,10 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         var borrowed = Interlocked.Exchange(ref _spareBorrowed, null) ?? [];
         try
         {
+            var external = procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol;
             if (BindArguments(session, context, parameters, argumentNodes, out var arguments, out var argumentsKnown, borrowed,
-                    external: procedure is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol, cellReferences: InvokerOf(procedure) is not null,
-                    boundArguments: boundArguments)
+                    external: external, cellReferences: InvokerOf(procedure) is not null, boundArguments: boundArguments,
+                    anyByAddress: !external && procedure.GetProperty(SymbolProperties.ExternalTarget) is not null)
                 is { } bindingError)
             {
                 return bindingError;
@@ -1909,7 +1910,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     private RuntimeSemanticsEvaluationResult? BindArguments(
         IRuntimeSession session, RuntimeEvaluationContext context, ImmutableArray<VBParameterSymbol> parameters,
         ImmutableArray<ExpressionNode> argumentNodes, out IRuntimeValue[] arguments, out bool isKnown, List<MemoryAddress> borrowed, bool external = false,
-        bool cellReferences = false, ImmutableArray<BoundArgument>? boundArguments = null)
+        bool cellReferences = false, ImmutableArray<BoundArgument>? boundArguments = null, bool anyByAddress = false)
     {
         arguments = [];
         isKnown = true;
@@ -1977,7 +1978,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
                 continue;
             }
 
-            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, out evaluatedInstead, external))
+            if (aliased && TryResolveByRefArgument(session, context, argumentNode, parameter, borrowed, out var reference, out evaluatedInstead, external,
+                    anyByAddress))
             {
                 bound[i] = reference;
                 continue;
@@ -2035,6 +2037,30 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             if (external && parameter.ResolvedType is VBUnknownType)
             {
                 bound[i] = argumentResult.Value.Result!.RuntimeValue;
+                continue;
+            }
+
+            // a library member's `As Any` is given an address (VarPtr): what is no variable is passed in a temporary of the statement, which has one until
+            // the statement is over (MS-VBA: VarPtr(1) is not 0, and two of one statement differ - ArgumentTemporary).
+            if (anyByAddress && parameter.ResolvedType is VBUnknownType)
+            {
+                var passed = argumentResult.Value.Result!;
+
+                // `ByVal` passes the bytes the value is stored in where an address goes (StdLibAsAnyAttribute): VarPtr(ByVal 1234) is 1234.
+                if (argumentNode is ByValArgumentExpressionNode && PassedByValAsAny(passed) is { } pointer)
+                {
+                    bound[i] = new VBRuntimeValue<long>(pointer);
+                    continue;
+                }
+
+                if (!session.Storage.TryAllocate(passed.Size, SymbolAddressTable.FreshBinding(passed), out var temporary))
+                {
+                    return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.OutOfMemory, argumentNode.Location,
+                        Exceptions.VBProcedureCall_OutOfMemory_Temporary_Verbose));
+                }
+
+                session.Objects.PushTemporary(new ArgumentTemporary(temporary));
+                bound[i] = new VBRuntimeReference(temporary, passed.TypeInfo);
                 continue;
             }
 
@@ -2217,7 +2243,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     // already gets - MS-VBAL's own "otherwise" case, never an error.
     private bool TryResolveByRefArgument(
         IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode argument, VBParameterSymbol parameter, List<MemoryAddress> borrowed,
-        out VBRuntimeReference reference, out RuntimeSemanticsEvaluationResult? evaluated, bool external = false)
+        out VBRuntimeReference reference, out RuntimeSemanticsEvaluationResult? evaluated, bool external = false, bool anyByAddress = false)
     {
         reference = VBRuntimeReference.NullRef;
         evaluated = null;
@@ -2227,23 +2253,37 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         // says which one, and the marshaller passes the array's data from there (a String a Declare takes ByVal is a buffer, not this).
         if (argument is IndexExpressionNode element && (!external || RuntimeProcedureInvoker.IsByRef(parameter.ParameterKind)))
         {
-            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference, out evaluated, external);
+            return TryResolveElementByRefArgument(session, context, element, parameter, borrowed, out reference, out evaluated, external || anyByAddress);
         }
 
-        // `As Any` is a parameter of a Declare that takes whatever it is given, a variable of any type by reference - and passes it as the type it is.
-        if (external && parameter.ResolvedType is VBUnknownType && argument is SimpleNameExpressionNode anyName
-            && session.Symbols.Resolver.ResolveValue(anyName, ScopeKind.Local, context.Scope).Symbol is { } anySymbol and ITypedSymbol anyTyped
-            && session.Symbols.Resolver.TryGetAddress(anySymbol, out var anyAddress))
+        // `As Any` is a parameter of a Declare, or of a library member (VarPtr), that takes whatever it is given, a variable of any type by reference - and
+        // passes it as the type it is.
+        var takesAny = (external || anyByAddress) && parameter.ResolvedType is VBUnknownType;
+        if (takesAny && argument is SimpleNameExpressionNode anyName
+            && session.Symbols.Resolver.ResolveValue(anyName, ScopeKind.Local, context.Scope).Symbol is { } anySymbol and ITypedSymbol anyTyped)
         {
-            reference = new VBRuntimeReference(anyAddress, DeclaredTypeOf(session, anySymbol, anyTyped.ResolvedType));
-            return true;
+            // a Variant reference parameter given a variable of another type is a VARIANT of its own that refers to the variable: that is its address.
+            if (anyByAddress && session.CallStack.Current is Execution.Frames.CallStackFrame frame
+                && frame.TryGetReferenceVariantAddress(anySymbol, session.Environment.Is64Bit ? VariantSize64 : VariantSize32, out var variant))
+            {
+                reference = new VBRuntimeReference(variant, VBVariantType.TypeInfo);
+                return true;
+            }
+
+            if (session.Symbols.Resolver.TryGetAddress(anySymbol, out var anyAddress))
+            {
+                reference = new VBRuntimeReference(anyAddress, DeclaredTypeOf(session, anySymbol, anyTyped.ResolvedType));
+                return true;
+            }
         }
 
         // `Module1.Items` is the variable its bare name is, named through its module (MS-VBAL §5.6.12): bound as the name is, not as a member of a value.
         var qualified = argument is MemberAccessExpressionNode qualifiedAccess ? ResolveNamespaceQualified(session, context, qualifiedAccess) : null;
         if (qualified is null && argument is MemberAccessExpressionNode memberAccess)
         {
-            return TryResolveFieldByRefArgument(session, context, memberAccess, parameter, out reference);
+            // a public variable of an object is a property of its interface to `As Any`, which is given a temporary (MS-VBA: VarPtr(h.Value) is a new
+            // address each time, VarPtr(Me.Value) too - recorded in Excel, oracle\s21 R07).
+            return !takesAny && TryResolveFieldByRefArgument(session, context, memberAccess, parameter, out reference);
         }
 
         if (qualified is null && argument is not SimpleNameExpressionNode)
@@ -2255,7 +2295,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         // a ParamArray is never passed by reference: MS-VBA refuses it as an argument of a ByRef parameter ("Invalid ParamArray use"), and passes it to the
         // library as a value - IsMissing of one that collected nothing is True (recorded in Excel).
         if (named is not { } argumentSymbol || argumentSymbol is ParamArrayParameterSymbol || argumentSymbol is not ITypedSymbol typed
-            || (!IsOfDeclaredType(parameter, typed.ResolvedType) && parameter.ResolvedType is not VBVariantType))
+            || (!takesAny && !IsOfDeclaredType(parameter, typed.ResolvedType) && parameter.ResolvedType is not VBVariantType))
         {
             return false;
         }
@@ -2266,9 +2306,32 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return false;
         }
 
-        reference = new VBRuntimeReference(address, ReferencedType(parameter, DeclaredTypeOf(session, argumentSymbol, typed.ResolvedType)));
+        var declared = DeclaredTypeOf(session, argumentSymbol, typed.ResolvedType);
+        reference = new VBRuntimeReference(address, takesAny ? declared : ReferencedType(parameter, declared));
         return true;
     }
+
+    // what MS-VBA passes for a value given ByVal to `As Any`: the first bytes it is stored in, read as a whole number (recorded in Excel, oracle\s21 R28,
+    // B08-B20) - a whole number or a Boolean is itself (a Byte unsigned), a Double, a Date or a Currency its 8 bytes, a Variant its VARIANT's type (the
+    // word the VARIANT begins with; Empty and Null are Variants). A Single's upper bytes are whatever was there before (MS-VBA gives garbage), and are 0
+    // here; a String, an object or any other value has no bytes of the kind, and is passed in a temporary like a value written without ByVal.
+    private static long? PassedByValAsAny(VBTypedValue value) => value switch
+    {
+        VBEmptyValue => (long)VBVarType.VBEmpty,
+        VBNullValue => (long)VBVarType.VBNull,
+        VBVariantValue { TypedValue: var held } => (long)held.TypeInfo.VarType(),
+        VBBooleanValue boolean => boolean.Value.StoredValue != 0 ? -1 : 0,
+        VBLongPtrValue pointer => Convert.ToInt64(pointer.RuntimeValue.BoxedValue),
+        VBDoubleValue @double => BitConverter.DoubleToInt64Bits(@double.Value),
+        VBDateValue date => BitConverter.DoubleToInt64Bits(((VBRuntimeValue<double>)date.RuntimeValue).StoredValue),
+        VBCurrencyValue currency => decimal.ToInt64(currency.Value.Value * 10000m),
+        VBSingleValue single => (uint)BitConverter.SingleToInt32Bits(single.Value),
+        _ => Conversion.ValueConversions.WholeValueOf(value),
+    };
+
+    // the size of a VARIANT, in a 32-bit and a 64-bit environment.
+    private const int VariantSize32 = 16;
+    private const int VariantSize64 = 24;
 
     // the element's own cell, given an address of its own for as long as the call that is made with it runs - which the caller gives back (borrowed). An
     // element whose cell cannot be written yet (the inert one an element of an object or a Variant array starts with) is given one that can, holding its

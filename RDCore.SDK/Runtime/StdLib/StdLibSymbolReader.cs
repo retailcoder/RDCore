@@ -372,7 +372,15 @@ public sealed class StdLibSymbolReader
         {
             var name = StdLibNames.ParameterName(parameter.Name);
             var declared = parameter.ParameterType.IsByRef ? parameter.ParameterType.GetElementType()! : parameter.ParameterType;
-            var byRef = parameter.ParameterType.IsByRef || parameter.GetCustomAttribute<StdLibByRefAttribute>() is not null;
+            // `ByRef … As Any`: what the member is given is the address of the variable passed to it (VarPtr).
+            var asAny = parameter.GetCustomAttribute<StdLibAsAnyAttribute>() is not null;
+            if (asAny && (declared != typeof(VBLongLongValue) || parameter.IsOptional || parameter.GetCustomAttribute<ParamArrayAttribute>() is not null))
+            {
+                throw new InvalidOperationException(
+                    $"'{name}' in '{method.DeclaringType?.Name}.{method.Name}' is As Any, which only a required parameter declared as a {nameof(VBLongLongValue)} is.");
+            }
+
+            var byRef = parameter.ParameterType.IsByRef || parameter.GetCustomAttribute<StdLibByRefAttribute>() is not null || asAny;
             var array = parameter.GetCustomAttribute<StdLibArrayAttribute>();
             var paramArray = parameter.GetCustomAttribute<ParamArrayAttribute>() is not null;
 
@@ -413,7 +421,9 @@ public sealed class StdLibSymbolReader
                 continue;
             }
 
-            var declaredType = array is not null
+            // `As Any` has no declared type, as a Declare's parameter has none: it takes whatever it is given.
+            var declaredType = asAny ? VBUnknownType.TypeInfo
+                : array is not null
                 ? ArrayTypeOf(DeclaredTypeOf(array.ElementType, method, enumTypes, classTypes))
                 : DeclaredTypeOf(declared, method, enumTypes, classTypes);
             var symbol = new VBParameterSymbol(

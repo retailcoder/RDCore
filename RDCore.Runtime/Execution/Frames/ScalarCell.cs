@@ -66,6 +66,12 @@ internal sealed class ScalarCell : ICopyableBinding
     /// <summary>The declared type of the variable, which its payload is of.</summary>
     public VBType Type { get; }
 
+    /// <summary>
+    /// The address the cell is bound at in the session's memory (<see cref="Memory.SessionStorage"/>), if it is: what a second name for its variable -
+    /// a <c>ByRef</c> parameter given the cell (<see cref="CellReference"/>) - finds the variable's address by. A copy is bound nowhere.
+    /// </summary>
+    public RDCore.SDK.Runtime.Shared.MemoryAddress? Address { get; set; }
+
     /// <inheritdoc/>
     public bool IsKnown { get; private set; } = true;
 
