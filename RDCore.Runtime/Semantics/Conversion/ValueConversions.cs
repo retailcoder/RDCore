@@ -99,6 +99,11 @@ public static partial class ValueConversions
                 ? ValueConversionResult.Success(destination.CreateValue(VBNumericType.BankersRounding((VBNumericTypedValue)source)))
                 : ValueConversionResult.Failure(VBRuntimeErrorId.Overflow),
 
+        // MS-VBAL §2.4: an infinity and a NaN are values of a Single and of a Double, and one is the other's as it is (Single inf -> Double, no error;
+        // recorded in Excel, grid oracle\s16 F20). Of any other type it is no value: an overflow, below.
+        IFloatingPointNumericType when destination is VBSingleType or VBDoubleType && !double.IsFinite(((VBNumericTypedValue)source).AsDouble)
+            => ValueConversionResult.Success(destination.CreateValue(((VBNumericTypedValue)source).AsDouble)),
+
         // Double -> Single, Single -> Currency, and so on.
         IFloatingPointNumericType
             => Ranged(((VBNumericTypedValue)source).AsDouble, destination)

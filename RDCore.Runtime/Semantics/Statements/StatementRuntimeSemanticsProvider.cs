@@ -11,6 +11,8 @@ using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
+using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Values.Abstract;
 using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract;
@@ -206,6 +208,11 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         var valueResult = _expressionEvaluator.Evaluate(session, assignment.Value, context);
         if (!valueResult.IsSuccess)
         {
+            if (valueResult is { IsError: true, Result: VBSingleValue or VBDoubleValue } overflowed)
+            {
+                AssignFloatingPointValue(session, context, assignment, (VBNumericTypedValue)overflowed.Result!);
+            }
+
             return valueResult.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(valueResult.ErrorInfo!);
         }
 
@@ -215,7 +222,35 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
             return RuntimeExecutionOutcome.Next;
         }
 
-        return _assignments.Assign(session, context, assignment, assignment.Target, assignment.Value, valueResult.Result!);
+        var outcome = _assignments.Assign(session, context, assignment, assignment.Target, assignment.Value, valueResult.Result!);
+
+        // a Double past the range of a Single, assigned to one, overflows - and leaves the Single infinite (MS-VBA, grid oracle\s16 D02, F07).
+        if (outcome is { Kind: RuntimeExecutionOutcomeKind.Error, ErrorInfo.ErrorId: (int)VBRuntimeErrorId.Overflow } && valueResult.Result is VBDoubleValue { Value: var wide }
+            && double.IsFinite(wide))
+        {
+            AssignFloatingPointValue(session, context, assignment, new VBDoubleValue(wide));
+        }
+
+        return outcome;
+    }
+
+    // MS-VBA assigns what IEEE 754 arithmetic made of an operation that raised an error - an infinity, a NaN - to the Single or Double variable the
+    // operation is assigned to, then raises it: `s = s * 10` leaves s infinite, `d = 0 / 0` a NaN. MS-VBAL §5.6.9.3.5 says so of a division of operands
+    // declared Double; MS-VBA does it for any Single or Double arithmetic, and for a Double let-coerced to a Single. A variable of any other type - a
+    // Variant, a Long, a Currency - is left as it was (recorded in Excel, grid oracle\s16 D01-D09, F01-F15). The error is raised either way.
+    private void AssignFloatingPointValue(IRuntimeSession session, RuntimeEvaluationContext context, AssignmentStatementNode assignment, VBNumericTypedValue ieee)
+    {
+        VBTypedValue? assigned = _expressionEvaluator.DeclaredTypeOf(session, assignment.Target, context) switch
+        {
+            VBSingleType => new VBSingleValue((float)ieee.AsDouble),
+            VBDoubleType => new VBDoubleValue(ieee.AsDouble),
+            _ => null,
+        };
+
+        if (assigned is not null)
+        {
+            _ = _assignments.Assign(session, context, assignment, assignment.Target, assignment.Value, assigned);
+        }
     }
 
     // MS-VBAL §5.4.3.9. The target is a variable, or a member of an object: a public variable of its class, or a property,

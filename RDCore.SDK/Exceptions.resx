@@ -198,6 +198,9 @@
   <data name="VBExponentOp_NoRealPower_Verbose" xml:space="preserve">
     <value>A negative number raised to a fractional power has no real result.</value>
   </data>
+  <data name="VBSgn_NaN_Verbose" xml:space="preserve">
+    <value>A value that is no number (NaN) has no sign.</value>
+  </data>
   <data name="VBRuntimeInternalError_LetCoercionStrategyWasNotApplicable" xml:space="preserve">
     <value>Let-coercion evaluation strategy unexpectedly returned a 'NotApplicable' result.</value>
   </data>

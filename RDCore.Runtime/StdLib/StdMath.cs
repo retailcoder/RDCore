@@ -1,5 +1,6 @@
 using RDCore.Runtime.Execution;
 using RDCore.Runtime.Semantics.Conversion;
+using RDCore.SDK;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
 using RDCore.SDK.Model.Types;
@@ -312,6 +313,10 @@ public sealed class StdMath(IRuntimeSession session) : IStdMathModule
             case VBDecimalValue @decimal:
                 sign = Math.Sign(@decimal.Value);
                 break;
+
+            // a NaN has no sign: an overflow, as MS-VBA has it (recorded in Excel, grid oracle\s16 G10); an infinity's is its own (H05).
+            case VBNumericTypedValue numeric when double.IsNaN(numeric.AsDouble):
+                return Fail<VBVariantValue>(VBRuntimeErrorId.Overflow, Exceptions.VBSgn_NaN_Verbose);
 
             case VBNumericTypedValue numeric:
                 sign = Math.Sign(numeric.AsDouble);

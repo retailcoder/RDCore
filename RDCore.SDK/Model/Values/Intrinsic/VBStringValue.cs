@@ -26,29 +26,32 @@ public record class VBStringValue : VBTypedValue, IVBTypedValue<VBStringValue, s
 
     public const string Zero = "0";
     /// <summary>
-    /// Defined in MS-VBAL 5.5.1.2.4 Let-coercion to and from String.
+    /// The text of positive infinity, let-coerced to a <c>String</c> (<strong>MS-VBAL §5.5.1.2.4</strong>): <c>inf</c>, as MS-VBA has it.
     /// </summary>
     /// <remarks>
-    /// Does not appear to be actually implemented in MS-VBA.
+    /// MS-VBAL specifies <c>1.#INF</c>, the text of older C runtimes; MS-VBA gives <c>inf</c> (<c>CStr</c>, <c>Format</c>; recorded in Excel).
     /// </remarks>
-    public const string PositiveInfinity = "1.#INF";
+    public const string PositiveInfinity = "inf";
     /// <summary>
-    /// Defined in MS-VBAL 5.5.1.2.4 Let-coercion to and from String.
+    /// The text of negative infinity, let-coerced to a <c>String</c> (<strong>MS-VBAL §5.5.1.2.4</strong>): <c>-inf</c>, as MS-VBA has it.
     /// </summary>
     /// <remarks>
-    /// Does not appear to be actually implemented in MS-VBA, but is explicitly specified as having the literal same string value as <c>PositiveInfinity</c>.
-    /// Given the presence of transcription errors elsewhere and that this looks like one, the token is defined here with a negation prefix 
-    /// that distinguishes the two infinity types, as was probably intended - inferred from the presence of separate specifications for positive and negative infinity.
+    /// MS-VBAL specifies the same <c>1.#INF</c> as for positive infinity, which looks like a transcription error; MS-VBA gives <c>-inf</c> (recorded in Excel).
     /// </remarks>
-    public const string NegativeInfinity = "-1.#INF";
+    public const string NegativeInfinity = "-inf";
     /// <summary>
-    /// Defined in MS-VBAL 5.5.1.2.4 Let-coercion to and from String.
+    /// The text of NaN, let-coerced to a <c>String</c> (<strong>MS-VBAL §5.5.1.2.4</strong>): <c>-nan(ind)</c>, as MS-VBA has it.
     /// </summary>
     /// <remarks>
-    /// Does not appear to be actually implemented in MS-VBA. This token is actually specified as "-1.#IND", but given the apparent typographical error in the negative infinity specification,
-    /// the specified negation prefix present in this token is deemed to have been intended for the negative infinity token instead.
+    /// MS-VBAL specifies <c>-1.#IND</c>; MS-VBA gives <c>-nan(ind)</c> for the NaN an invalid operation yields - <c>0 / 0</c>, infinity less infinity
+    /// (recorded in Excel), whose sign bit is set.
     /// </remarks>
-    public const string NaN = "1.#IND";
+    public const string NaN = "-nan(ind)";
+    /// <summary>
+    /// The text of a NaN whose sign bit is clear, let-coerced to a <c>String</c>: <c>nan</c>, as MS-VBA has it - what <c>Abs</c> makes of the NaN of
+    /// an invalid operation (recorded in Excel).
+    /// </summary>
+    public const string PositiveNaN = "nan";
 
     /// <summary>
     /// Creates a <c>VBStringValue</c> from the source text of a MS-VBAL 3.3.4 <c>&lt;STRING&gt;</c> token —

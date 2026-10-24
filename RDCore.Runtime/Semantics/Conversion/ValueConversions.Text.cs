@@ -122,9 +122,10 @@ public static partial class ValueConversions
             return VBStringValue.NegativeInfinity;
         }
 
+        // MS-VBA shows the sign of a NaN: the one an invalid operation makes is negative, and Abs clears it (recorded in Excel, grid oracle\s16 H06).
         if (double.IsNaN(numericValue))
         {
-            return VBStringValue.NaN;
+            return double.IsNegative(numericValue) ? VBStringValue.NaN : VBStringValue.PositiveNaN;
         }
 
         var absoluteValue = Math.Abs(numericValue);

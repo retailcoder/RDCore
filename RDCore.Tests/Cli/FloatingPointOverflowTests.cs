@@ -43,10 +43,68 @@ public sealed class FloatingPointOverflowTests
     public void APowerThatIsNoFiniteNumber_RaisesAnError(string body, string printed)
         => Assert.AreEqual(printed, Run(body));
 
-    // MS-VBA assigns the IEEE result of +, -, * and / (and of a Double let-coerced to a Single) to the variable before it raises the error: s reads inf
-    // after `s = s * 10` (D01-D09; ^ leaves it unchanged, E01-E03). RD-VBA raises the same errors and leaves the variable as it was.
+    // MS-VBA assigns the IEEE result of +, -, * and / - and of a Double let-coerced to a Single - to the Single or Double variable it is assigned to,
+    // before it raises the error; ^ leaves it unchanged (E01-E03), and so does an assignment to a variable of any other type (F01-F15).
     [TestMethod]
-    [Ignore("Undecided (author): MS-VBA stores the ±infinity an overflowing floating-point assignment computed before raising 6; RD-VBA keeps the old value.")]
-    public void AnOverflowingFloatingPointAssignment_StoresTheInfinity()
-        => Assert.AreEqual("6|True", Run("Dim s As Single ;; s = 3E+38 ;; s = s * 10 ;; Debug.Print Err.Number & \"|\" & (s > 3.4E+38)"));
+    [DataRow("Dim s As Single ;; s = 3E+38 ;; s = s * 10 ;; Debug.Print Err.Number & \"|\" & s", "6|inf", DisplayName = "D01 a Single product")]
+    [DataRow("Dim s As Single, d As Double ;; d = 1E+39 ;; s = d ;; Debug.Print Err.Number & \"|\" & s", "6|inf", DisplayName = "D02 a Double past a Single, assigned to one")]
+    [DataRow("Dim d As Double ;; d = 1E+308 ;; d = d * 10 ;; Debug.Print Err.Number & \"|\" & d", "6|inf", DisplayName = "D03 a Double product")]
+    [DataRow("Dim s As Single, t As Single ;; s = 3E+38 ;; t = s * 10 ;; Debug.Print Err.Number & \"|\" & t", "6|inf", DisplayName = "D06 another variable")]
+    [DataRow("Dim s As Single ;; s = -3E+38 ;; s = s * 10 ;; Debug.Print Err.Number & \"|\" & s", "6|-inf", DisplayName = "D07 a negative Single product")]
+    [DataRow("Dim s As Single ;; s = 1 ;; s = s / 0 ;; Debug.Print Err.Number & \"|\" & s", "11|inf", DisplayName = "D08 a Single divided by zero")]
+    [DataRow("Dim s As Single, t As Single ;; s = 3E+38 ;; t = s * 10 + 1 ;; Debug.Print Err.Number & \"|\" & t", "6|inf", DisplayName = "F01 an operation of the overflow")]
+    [DataRow("Dim d As Double ;; d = 0 ;; d = d / 0 ;; Debug.Print Err.Number & \"|\" & d", "6|-nan(ind)", DisplayName = "F05 zero divided by zero")]
+    [DataRow("Dim d As Double ;; d = -1 ;; d = d / 0 ;; Debug.Print Err.Number & \"|\" & d", "11|-inf", DisplayName = "F06 a negative number divided by zero")]
+    [DataRow("Dim s As Single, d As Double ;; d = -1E+39 ;; s = d ;; Debug.Print Err.Number & \"|\" & s", "6|-inf", DisplayName = "F07 a negative Double past a Single")]
+    [DataRow("Dim a(1 To 2) As Single, s As Single ;; s = 3E+38 ;; a(1) = s * 10 ;; Debug.Print Err.Number & \"|\" & a(1)", "6|inf", DisplayName = "F08 an element of an array")]
+    [DataRow("Dim s As Single, d As Double ;; d = 1E+308 ;; s = d * 10 ;; Debug.Print Err.Number & \"|\" & s", "6|inf", DisplayName = "F15 a Double product, assigned to a Single")]
+    public void AnOverflowingFloatingPointAssignment_StoresWhatIeeeArithmeticGave(string body, string printed)
+        => Assert.AreEqual(printed, Run(body));
+
+    [TestMethod]
+    [DataRow("Dim d As Double, l As Long ;; d = 1E+308 ;; l = 5 ;; l = d * 10 ;; Debug.Print Err.Number & \"|\" & l", "6|5", DisplayName = "F03 a Long")]
+    [DataRow("Dim d As Double, v As Variant ;; d = 1E+308 ;; v = 5 ;; v = d * 10 ;; Debug.Print Err.Number & \"|\" & TypeName(v) & \"|\" & v", "6|Integer|5", DisplayName = "F04 a Variant")]
+    [DataRow("Dim c As Currency, d As Double ;; d = 1E+308 ;; c = 3 ;; c = d * 10 ;; Debug.Print Err.Number & \"|\" & c", "6|3", DisplayName = "F10 a Currency")]
+    public void AnOverflowingFloatingPointAssignment_ToAnotherType_LeavesTheVariable(string body, string printed)
+        => Assert.AreEqual(printed, Run(body));
+
+    // an operation of an infinity is IEEE 754's, with no error - unless it is no number: infinity less infinity is an overflow (F11, F12, F19, F20).
+    [TestMethod]
+    [DataRow("Dim s As Single ;; s = 3E+38 ;; s = s * 10 ;; Err.Clear ;; s = s + 1 ;; Debug.Print Err.Number & \"|\" & s", "0|inf", DisplayName = "F11 infinity plus one")]
+    [DataRow("Dim s As Single ;; s = 3E+38 ;; s = s * 10 ;; Err.Clear ;; s = s - s ;; Debug.Print Err.Number & \"|\" & s", "6|-nan(ind)", DisplayName = "F12 infinity less infinity")]
+    [DataRow("Dim s As Single ;; s = 3E+38 ;; s = s * 10 ;; Debug.Print (s > 0) & \"|\" & (s = s) & \"|\" & Sgn(s)", "True|True|1", DisplayName = "F19 compared")]
+    [DataRow("Dim s As Single, d As Double ;; s = 3E+38 ;; s = s * 10 ;; Err.Clear ;; d = s ;; Debug.Print Err.Number & \"|\" & d", "0|inf", DisplayName = "F20 a Single infinity, assigned to a Double")]
+    [DataRow("Dim s As Single, l As Long ;; s = 3E+38 ;; s = s * 10 ;; Err.Clear ;; l = CLng(s) ;; Debug.Print Err.Number", "6", DisplayName = "F20 a Single infinity, converted to a Long")]
+    [DataRow("Dim s As Single ;; s = 3E+38 ;; s = s * 10 ;; Debug.Print CStr(s) & \"|\" & CStr(-s) & \"|\" & Format(s)", "inf|-inf|inf", DisplayName = "F13 the text of an infinity")]
+    public void AnInfinity_IsAValueOfItsType(string body, string printed)
+        => Assert.AreEqual(printed, Run(body));
+
+    // a NaN is a value of a Single, a Double and a Variant, copied and operated on with no error; compared, given a sign or made a Long, it is 6. Its text
+    // shows its sign, which Abs clears (G01-G10, H06).
+    private const string NaN = "Dim d As Double ;; d = 0 ;; d = d / 0 ;; Err.Clear ;; ";
+
+    [TestMethod]
+    [DataRow(NaN + "Dim e As Double ;; e = 7 ;; e = d ;; Debug.Print Err.Number & \"|\" & e", "0|-nan(ind)", DisplayName = "G01 assigned to a Double")]
+    [DataRow(NaN + "Dim s As Single ;; s = 7 ;; s = d ;; Debug.Print Err.Number & \"|\" & s", "0|-nan(ind)", DisplayName = "G02 assigned to a Single")]
+    [DataRow(NaN + "Dim v As Variant ;; v = 7 ;; v = d ;; Debug.Print Err.Number & \"|\" & TypeName(v) & \"|\" & v", "0|Double|-nan(ind)", DisplayName = "G03 assigned to a Variant")]
+    [DataRow(NaN + "Dim e As Double ;; e = 7 ;; e = d + 1 ;; Debug.Print Err.Number & \"|\" & e", "0|-nan(ind)", DisplayName = "G04 plus one")]
+    [DataRow(NaN + "Debug.Print (d = d) ;; Debug.Print Err.Number", "6", DisplayName = "G05 compared")]
+    [DataRow(NaN + "Dim l As Long ;; l = 7 ;; l = d ;; Debug.Print Err.Number & \"|\" & l", "6|7", DisplayName = "G06 assigned to a Long")]
+    [DataRow(NaN + "Debug.Print CStr(d) & \"|\" & Format(d)", "-nan(ind)|-nan(ind)", DisplayName = "G07 its text")]
+    [DataRow(NaN + "Debug.Print Sgn(d) ;; Debug.Print Err.Number", "6", DisplayName = "G10 its sign")]
+    [DataRow(NaN + "Debug.Print Abs(d) & \"|\" & Int(d) & \"|\" & Err.Number", "nan|-nan(ind)|0", DisplayName = "H06 Abs and Int")]
+    public void ANaN_IsAValueOfItsType(string body, string printed)
+        => Assert.AreEqual(printed, Run(body));
+
+    // MS-VBA's Variant arithmetic: a Double that is not finite is an overflow, an infinity's included, and assigns nothing; a Single that is not finite is a
+    // Double, with no error (H01-H04).
+    [TestMethod]
+    [DataRow("Dim s As Single, v As Variant ;; s = 3E+38 ;; s = s * 10 ;; Err.Clear ;; v = s ;; v = v + 1 ;; Debug.Print Err.Number & \"|\" & TypeName(v) & \"|\" & v", "0|Double|inf",
+        DisplayName = "H01 a Single infinity plus one")]
+    [DataRow("Dim d As Double, v As Variant ;; d = 1E+308 ;; d = d * 10 ;; Err.Clear ;; v = d ;; v = v * 2 ;; Debug.Print Err.Number & \"|\" & v", "6|inf",
+        DisplayName = "H02 a Double infinity times two")]
+    [DataRow(NaN + "Dim v As Variant, e As Double ;; v = d ;; e = v + 1 ;; Debug.Print Err.Number & \"|\" & e", "6|0", DisplayName = "H03 a NaN plus one, assigned to a Double")]
+    [DataRow(NaN + "Dim v As Variant ;; v = d ;; v = -v ;; Debug.Print Err.Number", "0", DisplayName = "H04 a NaN negated")]
+    public void TheVariantArithmeticOfAnInfinityOrANaN_IsMsVbas(string body, string printed)
+        => Assert.AreEqual(printed, Run(body));
 }

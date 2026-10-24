@@ -123,6 +123,28 @@ assigns one. See [**RD-VBAL §5.6.12** Member Access Expressions](rd-vbal.5.6.12
 VBA copies a UDT on assignment. A copy of a UDT value gets a field store of its own, deep through a nested UDT;
 see [**RD-VBAL §2.5.2.1.3** User-Defined Type (UDT) Values](rd-vbal.2.5.2.1.3.udt-values.md).
 
+### A floating-point value that overflowed
+
+A `Single` or `Double` operation that raises 6 or 11 still has the value IEEE-754 arithmetic gave it: an infinity,
+or a NaN ([**RD-VBAL §5.6.9.3**](rd-vbal.5.6.9.3.arithmetic-operators.md)). A `Let` statement whose expression is such
+an operation assigns that value to its target, then raises the error, when the target is declared `Single` or
+`Double`. So does a `Double` past the range of a `Single`, assigned to one: the `Single` is infinite. A target of any
+other type, a `Variant` included, is left as it was. `^` raises before anything is assigned.
+
+```vb
+Dim s As Single, z As Single, v As Variant
+s = 3E+38
+On Error Resume Next
+s = s * 10        ' error 6; s is inf
+v = 5: v = s * 10 ' error 6; v is still 5
+s = 1 / z         ' error 11; s is inf
+s = z / z         ' error 6; s is -nan(ind)
+```
+
+MS-VBAL §5.6.9.3.5 states this for a division of two operands declared `Double` only. MS-VBA does it for every
+floating-point operation, and RD-VBA follows MS-VBA. As text, an infinity is `inf` or `-inf`, and a NaN is
+`-nan(ind)`: MS-VBAL §5.5.1.2.4 has `1.#INF` and `-1.#IND`, which MS-VBA doesn't show.
+
 ### Other statements that Let-assign
 
 |Statement|Shares|

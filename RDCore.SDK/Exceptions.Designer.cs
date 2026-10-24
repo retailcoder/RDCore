@@ -1257,6 +1257,15 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to A value that is no number (NaN) has no sign..
+        /// </summary>
+        public static string VBSgn_NaN_Verbose {
+            get {
+                return ResourceManager.GetString("VBSgn_NaN_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to This operation results in a division by zero, possibly due to Banker&apos;s Rounding losing enough precision to bring the operand value to integer value 0..
         /// </summary>
         public static string VBIntegerDivisionOp_DivisionByZero {

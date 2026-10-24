@@ -14,16 +14,33 @@ Arithmetic operators are simple data operators
 
 Arithmetic runs in a _checked_ context. An integral or fixed-point result that does not fit the effective type raises
 `Overflow` rather than wrapping or silently narrowing. A `Single` or `Double` operation of finite operands whose
-result is not finite (an IEEE-754 infinity) is an overflow too: `3E+38 * 10` in `Single` raises 6, it does not
-evaluate to an infinity.
+result is not finite (an IEEE-754 infinity) is an overflow too: `3E+38 * 10` in `Single` raises 6. So is a result
+that is no number (NaN) of operands that are numbers: infinity less infinity. An operation of an infinity is
+otherwise IEEE-754's, with no error: infinity plus one is infinity, and an infinity compares as one.
 
 |Condition|Run-time error|
 |---|---|
 |An integral or fixed-point result does not fit the effective type.|6 — Overflow|
 |A floating-point result of finite operands is not finite.|6 — Overflow|
+|A floating-point result of operands that are numbers is NaN.|6 — Overflow|
+
+The error carries the value IEEE-754 arithmetic gave the operation, and a `Let` assignment of it to a `Single` or
+`Double` variable assigns it before raising the error: after `s = s * 10`, `s` is infinite
+([**RD-VBAL §5.4.3.8**](rd-vbal.5.4.3.8.let-statement.md#a-floating-point-value-that-overflowed)). MS-VBAL
+§5.6.9.3.5 says this of a division of operands declared `Double`; MS-VBA does it for every floating-point
+operation, and RD-VBA follows MS-VBA.
 
 When an operand is declared `Variant`, an overflowing result is evaluated again in a wider type instead
-([**RD-VBAL §5.0** Semantics](rd-vbal.5.0.semantics.md)); a result no `Double` holds is still 6.
+([**RD-VBAL §5.0** Semantics](rd-vbal.5.0.semantics.md)); a result no `Double` holds is still 6. For an infinity and a
+NaN, MS-VBA's `Variant` arithmetic differs from typed arithmetic, and RD-VBA follows it:
+
+|`Variant` operation|Typed operation|
+|---|---|
+|A `Single` result that is not finite is a `Double`, with no error: a `Variant` holding a `Single` infinity, plus one, is a `Double` infinity.|A `Single` result of finite operands that is not finite is 6.|
+|A `Double` result that is not finite is 6, an infinity's or a NaN's included, and assigns nothing.|A `Double` of an infinity is IEEE-754's, with no error: infinity plus one is infinity.|
+
+An infinity and a NaN are values of `Single`, `Double` and `Variant`: they are copied between them, and assigned,
+with no error. Converted to any other type, compared (a NaN), or given a sign by `Sgn` (a NaN), they are 6.
 
 Run-time error 6 is [VBRuntimeErrorId](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html)`.Overflow`. For division
 by zero, see [**RD-VBAL §5.6.9.3.6** \ Operator and Mod Operator](#56936--operator-and-mod-operator).

@@ -32,15 +32,23 @@ internal static class VariantArithmeticOverflow
         => frame.HasVariantOperand && effectiveType is VBByteType or VBIntegerType or VBLongType;
 
     /// <summary>
-    /// Whether a Single operation of finite operands whose value is not finite - outside the range of a Single - is evaluated again, in a wider type: with a
-    /// Variant operand, a Double (<c>3E+38 * 10</c> = Double 3.00000000549776E+39, recorded in Excel).
+    /// Whether a Single operation whose value is not finite - outside the range of a Single - is evaluated again, in a wider type: with a Variant operand, a
+    /// Double (<c>3E+38 * 10</c> = Double 3.00000000549776E+39), with no error even when that is not finite either (an infinity plus one is a Double
+    /// infinity; recorded in Excel, grid oracle\s16 H01).
     /// </summary>
     /// <param name="frame">The frame of the operation.</param>
     /// <param name="value">The value of the operation, as a Single.</param>
-    /// <param name="lhs">The left operand.</param>
-    /// <param name="rhs">The right operand.</param>
-    public static bool WidensSingle(OperatorEvaluationFrame frame, float value, float lhs, float rhs)
-        => frame.HasVariantOperand && !float.IsFinite(value) && float.IsFinite(lhs) && float.IsFinite(rhs);
+    public static bool WidensSingle(OperatorEvaluationFrame frame, float value)
+        => frame.HasVariantOperand && !float.IsFinite(value);
+
+    /// <summary>
+    /// Whether a Double operation whose value is not finite is an overflow because an operand is a Variant: MS-VBA's Variant arithmetic raises 6 for any
+    /// such Double - of an infinity, of a NaN - where a typed one is IEEE 754's, and assigns nothing (recorded in Excel, grid oracle\s16 G09, H02-H03).
+    /// </summary>
+    /// <param name="frame">The frame of the operation.</param>
+    /// <param name="value">The value of the operation.</param>
+    public static bool OverflowsDouble(OperatorEvaluationFrame frame, double value)
+        => frame.HasVariantOperand && !double.IsFinite(value);
 
     /// <summary>
     /// The value of an operation that overflowed its effective type, computed as a Double, in the narrowest of Integer, Long and Double that holds it; or

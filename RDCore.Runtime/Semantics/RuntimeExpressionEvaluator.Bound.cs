@@ -65,17 +65,28 @@ public sealed partial class RuntimeExpressionEvaluator
             ? FrameLayout.For(procedure)
             : null;
 
-        // a member written with no object before the dot is a member of the target of the enclosing With block, typed as the static pass types it: by the
-        // declared type of the block's expression.
-        var staticContext = new StaticEvaluationContext(session.Symbols.Resolver, scope, Environment: new StaticEnvironment(session.Environment.Is64Bit));
-        if (context.EnclosingWithTargetExpression is { } withTarget)
-        {
-            staticContext = staticContext with { EnclosingWithTargetType = ExpressionStaticSemanticsEvaluator.Evaluate(staticContext with { Facts = null, Bindings = null }, withTarget).Result };
-        }
-
-        return ExpressionBinder.Bind(staticContext, expression, frame).NodeOf(expression)
+        return ExpressionBinder.Bind(StaticContextOf(session, scope, context), expression, frame).NodeOf(expression)
             ?? new BoundLate(expression);
     }
+
+    // a member written with no object before the dot is a member of the target of the enclosing With block, typed as the static pass types it: by the
+    // declared type of the block's expression.
+    private static StaticEvaluationContext StaticContextOf(IRuntimeSession session, LexicalScope scope, RuntimeEvaluationContext context)
+    {
+        var staticContext = new StaticEvaluationContext(session.Symbols.Resolver, scope, Environment: new StaticEnvironment(session.Environment.Is64Bit));
+        return context.EnclosingWithTargetExpression is { } withTarget
+            ? staticContext with { EnclosingWithTargetType = ExpressionStaticSemanticsEvaluator.Evaluate(staticContext with { Facts = null, Bindings = null }, withTarget).Result }
+            : staticContext;
+    }
+
+    /// <summary>
+    /// The declared type of an expression, as the static pass types it in the scope it is written in: what an assignment to it let-coerces to.
+    /// </summary>
+    /// <returns><see langword="null"/> when the session defines no scope there, or the expression has no declared type.</returns>
+    internal VBType? DeclaredTypeOf(IRuntimeSession session, ExpressionNode expression, RuntimeEvaluationContext context)
+        => session.Symbols.Scopes.TryGetScope(context.Scope, out var scope)
+            ? ExpressionStaticSemanticsEvaluator.Evaluate(StaticContextOf(session, scope, context) with { Facts = null, Bindings = null }, expression).Result
+            : null;
 
     // a variable of the current activation is read through its slot; any other - a Static variable, a field, a variable of an activation the slot is not
     // of - is looked up, as a name that is not bound is.
