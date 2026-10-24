@@ -127,11 +127,24 @@ default instance then, before the code of any module is loaded, so that the code
 The module of a predeclared class can be defined again, as a shell does for every line it reads; the default instance
 keeps the object it holds.
 
+#### Semantic Flags
+
+The semantic model of a class module (`ModuleSemanticModel.Class`) carries
+[ClassModuleSemanticFlags](../api/RDCore.SDK.Semantics.Flags.ClassModuleSemanticFlags.html), the facts an analyzer
+needs to tell a stateless default instance - the factory - from one that holds state
+([**RD-VBAL §1.1.3** Core Semantic Flags](rd-vbal.1.1.3.core-semantic-flags.md)). A standard module has none.
+
+|Flag|The class module|
+|---|---|
+|`DefaultInstance`|Is predeclared (`VB_PredeclaredId = True`).|
+|`Stateful`|Declares a module-level variable, or a member with a `Static` local: each object of the class holds state of its own.|
+
+A predeclared class with `DefaultInstance` and not `Stateful` has a stateless default instance: a call on it can't
+leave anything behind for the next one.
+
 > [!NOTE]
-> 🚧 **TODO** _Semantic flags_ identifying whether a predeclared class module is _stateful_ or not
-> ([**RD-VBAL §1.1.3** Core Semantic Flags](rd-vbal.1.1.3.core-semantic-flags.md)), and an `Is Nothing` check on a
-> default instance reported as _statically constant_ (`False`,
-> [**RD-VBAL §5.6.9.7** Is Operator](rd-vbal.5.6.9.7.is-operator.md)), are not implemented.
+> 🚧 **TODO** An `Is Nothing` check on a default instance reported as _statically constant_ (`False`,
+> [**RD-VBAL §5.6.9.7** Is Operator](rd-vbal.5.6.9.7.is-operator.md)) is not implemented.
 
 
 ## 5.2.4.2 Implements Directive

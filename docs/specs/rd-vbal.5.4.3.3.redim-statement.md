@@ -43,6 +43,29 @@ For an implicit `ReDim` declaration:
 - A later analysis pass raises a semantic flag at the site of the implicit declaration; see
   [**RD-VBAL §1.1.3** Core Semantic Flags](rd-vbal.1.1.3.core-semantic-flags.md).
 
+### The `As` clause
+
+A `ReDim` that re-dimensions a declared resizable array may restate its element type in an `As` clause. The type it
+states must be the element type the array is declared with, `As New` included: a `ReDim … As New` of an array that is
+not declared `As New`, or a plain `As` of one that is, changes the type of its elements too. A `ReDim` that changes
+the element type is compile error [`VBC09369`](../diagnostics/vbc09369.md) _Can't change data types of array
+elements_, as it is in **MS-VBA**:
+
+|Declaration|`ReDim`|Outcome|
+|---|---|---|
+|`Dim a() As Long`|`ReDim a(1) As Long`|Valid.|
+|`Dim a() As Long`|`ReDim a(1) As String`|`VBC09369`.|
+|`Dim a() As Collection`|`ReDim a(1) As New Collection`|`VBC09369`.|
+|`Dim a() As New Collection`|`ReDim a(1) As Collection`|`VBC09369`.|
+|`Dim a() As Collection`|`ReDim a(1) As Collection`|Valid.|
+|`Dim a() As New Collection`|`ReDim a(1) As New Collection`|Valid.|
+
+> [!IMPORTANT]
+> **MS-VBAL §5.4.3.3** says the `As` clause of a `ReDim` MUST NOT be an `As New` clause. **MS-VBA** compiles
+> `ReDim … As New` of an array declared `As New` of the same class, and runs it (recorded in Excel); so does
+> **RD-VBA**. Its elements are automatic instantiation variables, as the declaration's are
+> ([**RD-VBAL §5.2.3** Module Declarations](rd-vbal.5.2.3.module-declarations.md), §5.2.3.1.4).
+
 `ReDim` bounds are ordinary run-time expressions, not constant expressions. A `ReDim` bound is therefore an
 expression node, and not the verbatim text a declared array bound keeps
 ([**RD-VBAL §5.4.3.1** Local Variable Declarations](rd-vbal.5.4.3.1.local-variable-declarations.md)). `ReDim

@@ -82,10 +82,35 @@ declaration is [VBC09311](../diagnostics/vbc09311.md) _User-defined type not def
 ahead of a library's procedural module of the same name ([**RD-VBAL §2.3.1.3** Name Resolution](rd-vbal.2.3.1.3.name-resolution.md#lookup-order)).
 
 **MS-VBAL §5.2.3.1.4**: the type specified in an `As New` clause must be a named class, and must be creatable unless
-it is declared in the same project.
+it is declared in the same project. `DeclarationStaticSemanticsEvaluator` checks every declaration that has an
+`As New` clause - a variable, a field, an array (its element type), a field of a `Type` - as **MS-VBA** does
+(recorded in Excel):
 
-> [!NOTE]
-> **Not implemented.** The declaration-level validity of `As New` (**MS-VBAL §5.2.3.1.4**) is not modeled.
+|`As New` of|Outcome|
+|---|---|
+|A class of the project, creatable or not (`VB_Creatable = False`)|Valid.|
+|A creatable class of a library (`As New Collection`)|Valid.|
+|A class of a library that cannot be created (`As New ErrObject`, `As New Workbook`)|Compile error [`VBC09368`](../diagnostics/vbc09368.md) _Invalid use of New keyword_.|
+|A user-defined type, or an `Enum` (of the project or of a library)|`VBC09368`.|
+|A `WithEvents` variable (`Private WithEvents w As New Widget`, **MS-VBAL §5.2.3.1.2**)|`VBC09368`.|
+|An intrinsic type (`As New Long`, `As New String`, `As New Variant`, `As New Object`)|Compile error [`VBC00001`](../diagnostics/vbc00001.md) _Syntax error_: `New` is followed by a type name no class can have.|
+
+> [!IMPORTANT]
+> **MS-VBA** compiles `As New` of a library's class that cannot be created, and raises run-time error -2147221164
+> _Class not registered_ when the variable is first referred to. **RD-VBA** reports it when the module is compiled, as
+> **MS-VBAL §5.2.3.1.4** has it; the verbose message says what MS-VBA does.
+
+An automatic instantiation variable that is _dependent_ on another (**MS-VBAL §2.5.1**) is created on its first
+reference too:
+
+|Variable|Example|First reference|
+|---|---|---|
+|An element of an array declared `As New`|`Dim a(1 To 3) As New Collection`, then `a(2).Add 1`|Creates the object of that element, and only that one.|
+|A field of a `Type` declared `As New`|`Dim r As TRecord`, then `r.Items.Add 1`|Creates the object of that field. A copy of the record (`r2 = r`) holds the same object.|
+|A field of a class module declared `As New`|`Public Items As New Collection`, then `obj.Items.Count`|Creates the object of that field, of that object.|
+
+Each is never `Nothing` when it is referred to: after `Set a(2) = Nothing`, the next reference to `a(2)` creates another
+object.
 
 ### 5.2.3.1.5 Implicit Type Determination
 

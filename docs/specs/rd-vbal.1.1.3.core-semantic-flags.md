@@ -28,7 +28,7 @@ Semantic flags aim to expose all the facts of the application's semantic reality
 |A project reference shadows a `VBA` library definition.|The shadowing should be detected in the semantic layer and reported through semantic flags, so that RDCore.Diagnostics can issue *shadowed declaration* diagnostics.|[**RD-VBAL §2.3.1.3** Name Resolution](rd-vbal.2.3.1.3.name-resolution.md)|
 |An implicit `ReDim` declaration.|A later analysis pass raises a semantic flag at the site.|[**RD-VBAL §5.4.3.3** ReDim Statement](rd-vbal.5.4.3.3.redim-statement.md)|
 |A deferred parameter inferred as `Variant`, from array or heterogeneous arguments.|Should issue semantic flags as appropriate, to signal the case to any listening language-level extensions.|[**RD-VBAL §2.4.4** Deferred Types](rd-vbal.2.4.4.deferred-types.md)|
-|A predeclared class module.|Semantic flags should identify whether the module is stateful or not.|[**RD-VBAL §3.1.1** Attributes](rd-vbal.3.1.1.attributes.md)|
+|A class module, predeclared or not, with or without state of its own.|[ClassModuleSemanticFlags](../api/RDCore.SDK.Semantics.Flags.ClassModuleSemanticFlags.html) (`DefaultInstance`, `Stateful`), on the module's semantic model.|[**RD-VBAL §5.2.4** Class Module Declarations](rd-vbal.5.2.4.class-module-declarations.md#52412-default-instance-variables-static-semantics)|
 
 ---
 > ⏮️ [**RD-VBAL §1.1.2** Language Core Extensions](rd-vbal.1.1.2.language-core-extensions.md) | ⏭️ [**RD-VBAL §1.1.4** Core Diagnostics](rd-vbal.1.1.4.core-diagnostics.md)

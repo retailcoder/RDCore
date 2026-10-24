@@ -100,6 +100,12 @@ mechanism for `Static` locals.
 A local variable also has module extent when its procedure is declared `Static`
 ([**RD-VBAL §5.3.1.2** Static Procedures](rd-vbal.5.3.1.2.static-procedures.md)): it is marked `Static` as if the keyword were written.
 
+> [!NOTE]
+> **Not implemented.** In a member of a class module, **MS-VBA** gives each object its own `Static` local (recorded in
+> Excel): two objects of a class whose method counts calls in a `Static` local count apart. **MS-VBAL §5.4.3.1** gives
+> a `Static` local module extent, and **RD-VBA** follows the spec today: every object of the class shares one `Static`
+> local.
+
 ## Implementation
 
 |Type or member|Role|
