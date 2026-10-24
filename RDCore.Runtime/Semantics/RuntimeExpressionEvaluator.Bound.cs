@@ -124,7 +124,7 @@ public sealed partial class RuntimeExpressionEvaluator
 
         // a variable of the session - of a module, global, or a Static local - is the same cell from wherever it is read, for as long as nothing is
         // allocated, freed or rebound in storage: resolved once for each place it is named, rather than looked up by its symbol each time (S1.5).
-        if (IsSessionVariable(variable.Variable) && session.Storage is SessionStorage storage)
+        if (IsSessionVariable(variable.Variable, session.CallStack.Current) && session.Storage is SessionStorage storage)
         {
             if (_sessionCells.TryGetValue(variable, out var known) && ReferenceEquals(known.Storage, storage) && known.Generation == storage.Generation)
             {
@@ -140,9 +140,10 @@ public sealed partial class RuntimeExpressionEvaluator
             session.CallStack.Current is { } current && current.TryGetReferencedType(variable.Variable, out var type) ? type : null);
     }
 
-    // a variable whose storage is the session's, which no activation and no object holds: one of a module, a global, a Static local.
-    private static bool IsSessionVariable(Symbol variable)
-        => variable.ScopeKind is ScopeKind.Module or ScopeKind.Global || variable is VBLocalVariableSymbol { IsStatic: true };
+    // a variable whose storage is the session's, which no activation and no object holds: one of a module, a global, a Static local of a procedure that
+    // is a call on no object - one of a member of a class is the object's, a cell for each object.
+    private static bool IsSessionVariable(Symbol variable, ICallStackFrame? frame)
+        => variable.ScopeKind is ScopeKind.Module or ScopeKind.Global || variable is VBLocalVariableSymbol { IsStatic: true } && frame?.Target is null;
 
     private sealed record class SessionCell(SessionStorage Storage, int Generation, IBindingHandle Cell);
 

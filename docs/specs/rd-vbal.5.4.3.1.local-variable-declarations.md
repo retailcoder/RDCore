@@ -73,7 +73,7 @@ When a procedure is invoked
 |Local|Extent|Storage|On each call|When the call returns|
 |---|---|---|---|---|
 |`Dim`|Procedure extent.|A fresh `CallStackFrame.Push` on every call.|Seeded to its declared type's default value on every call. A `Dim` local never sees a previous call's value.|Freed with the rest of the frame.|
-|`Static`|Module extent: it needs storage that outlives the call.|Reserved once by `ISymbolResolver.TryAllocate`, in the session's module-level heap.|Sees whatever the previous call's body last wrote to it.|Kept.|
+|`Static`|Module extent: it needs storage that outlives the call. A member of a class's is the object's (below).|Reserved once by `ISymbolResolver.TryAllocate`, in the session's module-level heap; or on the object.|Sees whatever the previous call's body last wrote to it.|Kept.|
 
 ### Static locals
 
@@ -100,11 +100,29 @@ mechanism for `Static` locals.
 A local variable also has module extent when its procedure is declared `Static`
 ([**RD-VBAL §5.3.1.2** Static Procedures](rd-vbal.5.3.1.2.static-procedures.md)): it is marked `Static` as if the keyword were written.
 
-> [!NOTE]
-> **Not implemented.** In a member of a class module, **MS-VBA** gives each object its own `Static` local (recorded in
-> Excel): two objects of a class whose method counts calls in a `Static` local count apart. **MS-VBAL §5.4.3.1** gives
-> a `Static` local module extent, and **RD-VBA** follows the spec today: every object of the class shares one `Static`
-> local.
+### Static locals of a class module's members
+
+> [!IMPORTANT]
+> **MS-VBAL §5.4.3.1** gives a `Static` local module extent: one for the module, whichever object a member of a class
+> is called on. **MS-VBA** gives each object of the class its own (recorded in Excel), and so does **RD-VBA**.
+
+A `Static` local of a member of a class module has the extent of the object the member is called on, as the
+object's fields do:
+
+|What the code does|What happens|
+|---|---|
+|Calls the member on two objects of the class|Each object has its own `Static` local: two objects whose method counts its calls in one count apart.|
+|Calls the member on the same object again|The object's `Static` local holds what the previous call left in it, whether the member is called by its name, through an interface the class implements, or from another member.|
+|Two members declare a `Static` local of the same name|Two variables.|
+|Lets go of the object|Its `Static` locals go with it: an object one of them holds is let go of, and its `Class_Terminate` runs if nothing else holds it. Another object of the class starts its own from its type's default.|
+
+A `Static` local of a standard module's procedure is one for the module, whoever calls the procedure. Every local of
+a `Static` procedure of a class is the object's, as an explicit `Static` local is.
+
+The object holds a member's `Static` locals beside its fields
+([IObjectInstance](../api/RDCore.SDK.Runtime.Abstract.Execution.IObjectInstance.html)`.StaticLocals`): the first
+call of the member on the object declares them, and `CallStackAwareSymbolResolver` finds them on the object the
+activation is a call on before it looks at the session.
 
 ## Implementation
 

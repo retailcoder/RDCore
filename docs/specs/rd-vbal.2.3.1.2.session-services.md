@@ -103,7 +103,8 @@ structures:
 A `Symbol`'s scope kind determines how, and whether, the symbol is allocated in memory: a
 `ScopeKind.Global` symbol lives in the globals heap, a `ScopeKind.Module` symbol in the workspace statics heap, and
 a `ScopeKind.Instance` symbol in the object heap. A `Static` local's storage lives in the same heap tier a module
-field uses ([**RD-VBAL §5.4.3.1** Local Variable Declarations](rd-vbal.5.4.3.1.local-variable-declarations.md)).
+field uses; one of a member of a class lives in the object heap, with the fields of the object the member is called on
+([**RD-VBAL §5.4.3.1** Local Variable Declarations](rd-vbal.5.4.3.1.local-variable-declarations.md)).
 
 See [**RD-VBAL §2.5.1** Runtime Entities](rd-vbal.2.5.1.runtime-entities.md) for `ScopeKind` and the allocation scopes.
 

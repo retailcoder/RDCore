@@ -126,6 +126,12 @@ internal sealed class RuntimeSession(
             ObjectReferences.Release(this, live.GetValue(field));
         }
 
+        // the Static locals of its members are the object's too (MS-VBA).
+        foreach (var local in live.StaticLocals)
+        {
+            ObjectReferences.Release(this, live.GetValue(local));
+        }
+
         // what the object holds that is no variable of its class: the members of a collection.
         Objects.NotifyDestroying(instance);
     }

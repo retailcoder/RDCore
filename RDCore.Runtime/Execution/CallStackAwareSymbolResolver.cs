@@ -29,11 +29,13 @@ namespace RDCore.Runtime.Execution;
 /// </param>
 public sealed class CallStackAwareSymbolResolver(ICallStack callStack, ISymbolResolver inner, ISessionSymbols? instances = null) : ISymbolResolver
 {
-    // a field of a class is not the session's: it is the storage of the object the current activation is a call on.
+    // a field of a class is not the session's: it is the storage of the object the current activation is a call on. So is a Static local of a member of
+    // the class, which each object has its own of (MS-VBA); a Static local of a standard module's procedure is the session's, for its activation is a
+    // call on no object.
     private bool TryInstanceOf(Symbol symbol, [NotNullWhen(true)] out IObjectInstance? instance)
     {
         instance = null;
-        return symbol.ScopeKind is ScopeKind.Instance
+        return (symbol.ScopeKind is ScopeKind.Instance || symbol is VBLocalVariableSymbol { IsStatic: true })
             && callStack.Current?.Target is { } target
             && instances is not null
             && instances.TryGetInstance(target, out instance);

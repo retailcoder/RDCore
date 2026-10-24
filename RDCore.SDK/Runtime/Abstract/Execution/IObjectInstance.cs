@@ -37,8 +37,19 @@ public interface IObjectInstance
     /// <paramref name="value"/>, its initial value — the class's declared type default for a freshly
     /// created instance.
     /// </summary>
+    /// <param name="field">
+    /// A field of the class; or a <c>Static</c> local of one of its members, which the first call of the member on this instance declares: as in
+    /// <strong>MS-VBA</strong>, each object has its own, where <strong>MS-VBAL §5.4.3.1</strong> gives a <c>Static</c> local module extent.
+    /// </param>
+    /// <param name="value">The initial value.</param>
     /// <exception cref="InvalidOperationException"><paramref name="field"/> is already declared on this instance.</exception>
     void Push(Symbol field, VBTypedValue value);
+
+    /// <summary>
+    /// The <c>Static</c> locals of the members of the class that this instance holds: the ones of the members called on it so far, which go with it, and
+    /// let go of the objects they hold when it does.
+    /// </summary>
+    IReadOnlyCollection<Symbol> StaticLocals { get; }
 
     /// <summary>
     /// Gets the <see cref="IBindingHandle"/> currently held on this instance for the specified

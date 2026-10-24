@@ -299,7 +299,16 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
 
             if (variable.IsStatic)
             {
-                if (!session.Symbols.Resolver.TryGetAddress(variable, out _))
+                // a member of a class called on an object: MS-VBA gives each object its own Static local (Excel-verified, oracle\s19 N37), which the
+                // object holds beside its fields, where MS-VBAL §5.4.3.1 gives it module extent.
+                if (frame.Target is { } target && session.Symbols.TryGetInstance(target, out var instance))
+                {
+                    if (!instance.TryResolve(variable, out _))
+                    {
+                        instance.Push(variable, DefaultValueOf(session, variable));
+                    }
+                }
+                else if (!session.Symbols.Resolver.TryGetAddress(variable, out _))
                 {
                     session.Symbols.Resolver.TryAllocate(variable, DefaultValueOf(session, variable), out _);
                 }
