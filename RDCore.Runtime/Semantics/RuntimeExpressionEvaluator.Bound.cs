@@ -325,7 +325,7 @@ public sealed partial class RuntimeExpressionEvaluator
             // a public variable of the object is read, as EvaluateInstanceField reads it - and what follows it in parentheses indexes it.
             if (member.Kind is SymbolKindExt.Field or SymbolKindExt.Variable)
             {
-                result = Assumed(RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member).ForReading())));
+                result = ReadVariable(session, member, instance.GetValue(member), referenced: null, member.GetProperty(SymbolProperties.AutoInstantiated));
                 isCall = false;
             }
             else

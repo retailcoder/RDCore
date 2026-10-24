@@ -663,6 +663,24 @@
   <data name="VBCompileError_InvalidUseOfAddressOf" xml:space="preserve">
     <value>Utilisation incorrecte de l&apos;opérateur AddressOf</value>
   </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword" xml:space="preserve">
+    <value>Utilisation incorrecte du mot clé New</value>
+  </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword_NotAClass_Verbose" xml:space="preserve">
+    <value>'{0}' est déclaré As New {1}, qui n&apos;est pas une classe : New crée un objet d&apos;une classe.</value>
+  </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword_WithEvents_Verbose" xml:space="preserve">
+    <value>'{0}' est déclaré WithEvents : on lui affecte l&apos;objet dont il gère les événements, et il n&apos;en crée aucun.</value>
+  </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword_NotCreatable_Verbose" xml:space="preserve">
+    <value>'{0}' est déclaré As New {1}, une classe de la bibliothèque {2} qui ne peut pas être créée. MS-VBA le compile, et lève « Classe non enregistrée » à la première référence à la variable.</value>
+  </data>
+  <data name="VBCompileError_CantChangeDataTypesOfArrayElements" xml:space="preserve">
+    <value>Impossible de modifier les types de données des éléments de tableau</value>
+  </data>
+  <data name="VBCompileError_CantChangeDataTypesOfArrayElements_Verbose" xml:space="preserve">
+    <value>'{0}' est un tableau de {1} : un ReDim ne peut pas en faire des éléments {2}.</value>
+  </data>
   <data name="VBCompileError_TypeOfParenthesizedOperand_Verbose" xml:space="preserve">
     <value>Ce que {0} teste est un objet, écrit sans parenthèses : entre parenthèses, ce serait la valeur de son membre par défaut.</value>
   </data>

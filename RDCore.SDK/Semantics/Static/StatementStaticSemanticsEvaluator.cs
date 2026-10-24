@@ -394,6 +394,19 @@ public static class StatementStaticSemanticsEvaluator
                         walk.Errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.ExpectedArray, redim.Target.Location,
                             redim.Target is SimpleNameExpressionNode scalar ? scalar.IdentifierName : string.Empty));
                     }
+                    else if (redimensioned.Result is VBResizableArrayType { ItemType: var itemType } && redim.AsType is { } asType
+                        && StatedTypeOf(context, asType) is { } stated
+                        && itemType is not (VBUnknownType or VBFixedStringType)
+                        && (!IsSameType(itemType, stated) || asType.AsAutoObject != IsAutoInstantiated(context, redim.Target)))
+                    {
+                        // MS-VBAL §5.4.3.3: a ReDim of an array declared as one gives it its dimensions, not another element type - and an array declared As New
+                        // is one of automatic instantiation variables, which one that is not declared so is not (MS-VBA: "Can't change data types of array
+                        // elements", Excel-verified, oracle\s19 N18, N33, N35). Its As clause may be As New, as MS-VBA has it, where the specification says it
+                        // MUST NOT (RD-VBAL §5.4.3.3).
+                        walk.Errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.CantChangeDataTypesOfArrayElements, redim.Target.Location,
+                            string.Format(Exceptions.VBCompileError_CantChangeDataTypesOfArrayElements_Verbose, redim.Name, itemType.Name,
+                                asType.AsAutoObject ? $"{Tokens.New} {stated.Name}" : stated.Name)));
+                    }
 
                     MarkWritten(context, redim.Target);
                     break;
@@ -854,6 +867,32 @@ public static class StatementStaticSemanticsEvaluator
     }
 
     // what the declared type of an assignment's target, or the member it is, cannot be for the kind of assignment, as MS-VBA has it (Excel-verified):
+    // the type an As clause states, resolved as seen from the scope it is written in; null for one this pass cannot tell for certain: a name that resolves
+    // to no type, a LongPtr, which is what the environment's pointers are and which a static pass does not know, and a fixed-length String, whose length
+    // is an expression.
+    private static VBType? StatedTypeOf(StaticEvaluationContext context, AsTypeExpressionNode asType)
+    {
+        if (asType.FixedLength is not null || string.Equals(asType.TypeName, Tokens.LongPtr, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var name = asType.QualifierName is { Length: > 0 } qualifier ? $"{qualifier}.{asType.TypeName}" : asType.TypeName;
+        return DeclaredTypes.Resolve(context.Resolver, name, context.Scope.Uri, is64Bit: true) is { } type and not VBUnknownType ? type : null;
+    }
+
+    // whether the variable a bare name refers to is declared As New (MS-VBAL §2.5.1).
+    private static bool IsAutoInstantiated(StaticEvaluationContext context, ExpressionNode target)
+        => target is SimpleNameExpressionNode name
+            && context.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope.Uri).Symbol is { } variable
+            && variable.GetProperty(SymbolProperties.AutoInstantiated);
+
+    // the same type, as a declaration states it: a class is its declaration, whichever snapshot of it a type was built from.
+    private static bool IsSameType(VBType declared, VBType stated)
+        => declared is VBClassType { Symbol: var declaredClass } && stated is VBClassType { Symbol: var statedClass }
+            ? declaredClass.Uri.AbsoluteUri == statedClass.Uri.AbsoluteUri
+            : declared.GetType() == stated.GetType() && string.Equals(declared.Name, stated.Name, StringComparison.OrdinalIgnoreCase);
+
     // the default instance a bare name refers to; a local or field of the same name hides it, and is what the name refers to instead.
     private static VBPredeclaredInstanceSymbol? DefaultInstanceNamedBy(StaticEvaluationContext context, ExpressionNode target)
         => target is SimpleNameExpressionNode simpleName

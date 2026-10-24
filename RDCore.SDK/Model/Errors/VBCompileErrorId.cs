@@ -555,6 +555,16 @@ public enum VBCompileErrorId
     /// <strong>MS-VBAL §5.6.16.8</strong> AddressOf Expressions.
     /// </summary>
     InvalidUseOfAddressOf = 9367,
+    /// <summary>
+    /// A variable is declared <c>As New</c> of a type that is no class, or of a class it cannot create, or is declared <c>WithEvents</c> as well.<br/>
+    /// <strong>MS-VBAL §5.2.3.1.4</strong> Variable Type Declarations, <strong>§5.2.3.1.2</strong> WithEvents Variable Declarations.
+    /// </summary>
+    InvalidUseOfNewKeyword = 9368,
+    /// <summary>
+    /// A <c>ReDim</c> statement states an element type other than the one the array is declared with.<br/>
+    /// <strong>MS-VBAL §5.4.3.3</strong> ReDim Statement.
+    /// </summary>
+    CantChangeDataTypesOfArrayElements = 9369,
 
 
     /***********************************************************************************************

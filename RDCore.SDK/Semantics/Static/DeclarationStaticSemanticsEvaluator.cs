@@ -6,6 +6,7 @@ using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using System.Collections.Immutable;
 
@@ -178,13 +179,48 @@ public static class DeclarationStaticSemanticsEvaluator
         _ => [],
     };
 
-    // MS-VBAL §5.2.3.1.4: New creates an object of a class; a variable declared As New of a type that is a value - a number, a String, a Boolean, a Date - has
-    // none to create (MS-VBA: "Syntax error", Excel-verified).
+    // MS-VBAL §5.2.3.1.4: "The specified type of an <as-auto-object> element MUST be a named class", of which an object is created - of an array's, each
+    // element's. MS-VBA reads the name of a type that is no class at all - a number, a String, a Boolean, a Date, Variant, Object - as a syntax error, and
+    // calls one that is no class - a user-defined type, an enumeration - an invalid use of New (Excel-verified, oracle\s19 N01-N07, N30).
     private static void CheckAutoInstantiation(Symbol declared, SourceRange range, Uri document, ImmutableArray<VBCompileErrorInfo>.Builder errors)
     {
-        if (declared.GetProperty(SymbolProperties.AutoInstantiated) && declared is ITypedSymbol { ResolvedType: var type } && type is VBNumericType or VBStringType or VBBooleanType or VBDateType)
+        if (!declared.GetProperty(SymbolProperties.AutoInstantiated) || declared is not ITypedSymbol { ResolvedType: var declaredType })
         {
-            errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.SyntaxError, new SourceLocation(document, range), $"New {type.Name}"));
+            return;
+        }
+
+        var location = new SourceLocation(document, range);
+        var type = declaredType is VBArrayType array ? array.ItemType : declaredType;
+        if (type is VBNumericType or VBStringType or VBBooleanType or VBDateType or VBVariantType or VBObjectType)
+        {
+            errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.SyntaxError, location, $"New {type.Name}"));
+            return;
+        }
+
+        if (type is VBUserDefinedType or VBEnumType)
+        {
+            errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.InvalidUseOfNewKeyword, location,
+                string.Format(Exceptions.VBCompileError_InvalidUseOfNewKeyword_NotAClass_Verbose, declared.Name, type.Name)));
+            return;
+        }
+
+        // MS-VBAL §5.2.3.1.2: a WithEvents variable is assigned the object whose events it handles; it is not one that makes an object of its own (MS-VBA, Excel-
+        // verified, oracle\s19 N28).
+        if (declared.GetProperty(SymbolProperties.WithEvents))
+        {
+            errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.InvalidUseOfNewKeyword, location,
+                string.Format(Exceptions.VBCompileError_InvalidUseOfNewKeyword_WithEvents_Verbose, declared.Name)));
+            return;
+        }
+
+        // MS-VBAL §5.2.3.1.4: "The instancing mode of the specified type of an <as-auto-object> MUST NOT be Public Not Creatable unless that type is defined in
+        // the same project" - a class of a library that cannot be created. MS-VBA reports it when the variable is first referred to, as "Class not registered"
+        // (Excel-verified, oracle\s19 N26-N27); the specification says it is invalid, and so does RD-VBA, before the code runs.
+        if (type is VBClassType { Symbol: var classModule } && classModule.GetProperty(SymbolProperties.Library) is { } library
+            && !classModule.GetProperty(SymbolProperties.Creatable))
+        {
+            errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.InvalidUseOfNewKeyword, location,
+                string.Format(Exceptions.VBCompileError_InvalidUseOfNewKeyword_NotCreatable_Verbose, declared.Name, classModule.Name, library)));
         }
     }
 

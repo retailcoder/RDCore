@@ -995,6 +995,60 @@ namespace RDCore.SDK {
                 return ResourceManager.GetString("VBCompileError_InvalidUseOfAddressOf", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid use of New keyword.
+        /// </summary>
+        public static string VBCompileError_InvalidUseOfNewKeyword {
+            get {
+                return ResourceManager.GetString("VBCompileError_InvalidUseOfNewKeyword", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is declared As New {1}, which is no class: New creates an object of a class..
+        /// </summary>
+        public static string VBCompileError_InvalidUseOfNewKeyword_NotAClass_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_InvalidUseOfNewKeyword_NotAClass_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is declared WithEvents: it is assigned the object whose events it handles, and creates none of its own..
+        /// </summary>
+        public static string VBCompileError_InvalidUseOfNewKeyword_WithEvents_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_InvalidUseOfNewKeyword_WithEvents_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is declared As New {1}, a class of the {2} library that cannot be created. MS-VBA compiles it, and raises &apos;Class not registered&apos; when the variable is first referred to..
+        /// </summary>
+        public static string VBCompileError_InvalidUseOfNewKeyword_NotCreatable_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_InvalidUseOfNewKeyword_NotCreatable_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Can&apos;t change data types of array elements.
+        /// </summary>
+        public static string VBCompileError_CantChangeDataTypesOfArrayElements {
+            get {
+                return ResourceManager.GetString("VBCompileError_CantChangeDataTypesOfArrayElements", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is an array of {1}: a ReDim can&apos;t make its elements {2}..
+        /// </summary>
+        public static string VBCompileError_CantChangeDataTypesOfArrayElements_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_CantChangeDataTypesOfArrayElements_Verbose", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to What {0} tests is an object, written without parentheses: in parentheses, it would be its default member&apos;s value..

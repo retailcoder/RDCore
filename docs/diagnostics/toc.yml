@@ -162,6 +162,10 @@
   href: vbc09366.md
 - name: VBC09367 — Invalid use of AddressOf operator
   href: vbc09367.md
+- name: VBC09368 — Invalid use of New keyword
+  href: vbc09368.md
+- name: "VBC09369 — Can't change data types of array elements"
+  href: vbc09369.md
 - name: VBR-0001 — Application-defined or object-defined error
   href: vbr-0001.md
 - name: VBR00003 — Return without GoSub

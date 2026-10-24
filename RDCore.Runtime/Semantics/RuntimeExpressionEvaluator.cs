@@ -1335,6 +1335,14 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         // needed to read one, whether it arrived declared or wrapped in a Variant.
         if (UnwrappedOwner(owner) is VBUserDefinedTypeValue udt)
         {
+            // MS-VBAL §2.5.1: a field declared As New is an automatic instantiation variable of the record: never Nothing when it is referred to (MS-VBA,
+            // Excel-verified, oracle\s19 N31).
+            if (udt.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase)) is { } declared
+                && declared.GetProperty(SymbolProperties.AutoInstantiated) && udt.GetFieldHandle(memberName) is { } fieldHandle)
+            {
+                return ReadVariable(session, declared, fieldHandle, referenced: null, isAutoInstantiated: true);
+            }
+
             return udt[memberName] is { } field
                 ? RuntimeSemanticsEvaluationResult.Success(field)
                 : RuntimeSemanticsEvaluationResult.InternalError();
@@ -1351,8 +1359,9 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             .FirstOrDefault(candidate => string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase));
 
         // an object whose class has no member of the name - late-bound, or reached through a Variant - does not support it: error 438 (MS-VBA).
+        // a public variable of the object is read as any variable is: one declared As New is never Nothing when it is referred to (MS-VBAL §2.5.1).
         return member is { Kind: SymbolKindExt.Field or SymbolKindExt.Variable }
-            ? Assumed(RuntimeSemanticsEvaluationResult.Success(member.ResolvedType.CreateValue(instance.GetValue(member).ForReading())))
+            ? ReadVariable(session, member, instance.GetValue(member), referenced: null, member.GetProperty(SymbolProperties.AutoInstantiated))
             : member is null
                 ? RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, memberAccess.Member.Location,
                     string.Format(Exceptions.VBMemberAccess_NoSuchMember_Verbose, memberName)))
@@ -1522,6 +1531,15 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         }
 
         var element = array[subscripts];
+
+        // MS-VBAL §2.5.1: each element of an array declared As New is an automatic instantiation variable, which is never Nothing when it is referred to: the
+        // reference creates the object, in the element (MS-VBA, Excel-verified, oracle\s19 N16-N17).
+        if (element is VBObjectValue { } held && held.IsNothing() && !array.IsIndeterminate && array.ItemType is VBClassType { Symbol: { } classModule }
+            && IsDeclaredAsNew(session, context, indexExpression.Callee) && array.IndexOf(subscripts) is >= 0 and var flat && array.CellAt(flat) is { } cell)
+        {
+            return Assumed(AutoInstantiate(session, cell, classModule));
+        }
+
         return element is not null
             ? RuntimeSemanticsEvaluationResult.Success(element)
             : array.IsIndeterminate
@@ -1529,6 +1547,13 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
                 : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
                     string.Join(", ", subscripts)));
     }
+
+    // whether what an index expression indexes is a variable declared As New - an array of automatic instantiation variables - named bare: a local, a field of
+    // the module, or of the object whose code this is.
+    private static bool IsDeclaredAsNew(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode callee)
+        => callee is SimpleNameExpressionNode name
+            && session.Symbols.Resolver.ResolveValue(name, ScopeKind.Local, context.Scope).Symbol is { } variable
+            && variable.GetProperty(SymbolProperties.AutoInstantiated);
 
     // a Function or Property Get that declares no parameters, called with arguments: they are not its own, and index what it returns.
     private static bool ReturnsToBeIndexed(VBTypeMemberSymbol member, IRuntimeValue? receiver, ImmutableArray<ExpressionNode> arguments)

@@ -663,6 +663,24 @@
   <data name="VBCompileError_InvalidUseOfAddressOf" xml:space="preserve">
     <value>Invalid use of AddressOf operator</value>
   </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword" xml:space="preserve">
+    <value>Invalid use of New keyword</value>
+  </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword_NotAClass_Verbose" xml:space="preserve">
+    <value>'{0}' is declared As New {1}, which is no class: New creates an object of a class.</value>
+  </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword_WithEvents_Verbose" xml:space="preserve">
+    <value>'{0}' is declared WithEvents: it is assigned the object whose events it handles, and creates none of its own.</value>
+  </data>
+  <data name="VBCompileError_InvalidUseOfNewKeyword_NotCreatable_Verbose" xml:space="preserve">
+    <value>'{0}' is declared As New {1}, a class of the {2} library that cannot be created. MS-VBA compiles it, and raises 'Class not registered' when the variable is first referred to.</value>
+  </data>
+  <data name="VBCompileError_CantChangeDataTypesOfArrayElements" xml:space="preserve">
+    <value>Can't change data types of array elements</value>
+  </data>
+  <data name="VBCompileError_CantChangeDataTypesOfArrayElements_Verbose" xml:space="preserve">
+    <value>'{0}' is an array of {1}: a ReDim can't make its elements {2}.</value>
+  </data>
   <data name="VBCompileError_TypeOfParenthesizedOperand_Verbose" xml:space="preserve">
     <value>What {0} tests is an object, written without parentheses: in parentheses, it would be its default member&apos;s value.</value>
   </data>

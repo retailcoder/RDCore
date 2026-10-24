@@ -260,8 +260,10 @@ public static class SymbolDescriptorReader
     {
         var type = DeclaredType(field.DeclaredTypeName, field.Array, resolveType, field.FixedLength);
 
-        return WithArrayBounds(new VBUserDefinedTypeFieldSymbol(
+        // a field declared As New is an automatic instantiation variable of each record of the type (MS-VBAL §2.5.1), as a module's field is.
+        var symbol = WithArrayBounds(new VBUserDefinedTypeFieldSymbol(
             workspaceRoot, userDefinedTypeUri, field.Name, type, field.Range, field.SelectionRange, field.AccessModifier), field.Array);
+        return field.IsAutoInstantiated ? symbol.With(SymbolProperties.AutoInstantiated, true) : symbol;
     }
 
     /// <summary>
