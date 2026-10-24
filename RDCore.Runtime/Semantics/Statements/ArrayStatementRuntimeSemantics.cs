@@ -73,6 +73,13 @@ public sealed record class ArrayStatementRuntimeSemantics(
             return Failed(redim, VBRuntimeErrorId.ThisArrayIsFixedOrTemporarilyLocked, $"{redim.Name} is locked");
         }
 
+        // a resizable array parameter bound to a fixed-size array (a ReDim of the array itself is a compile error) can't resize it: MS-VBA raises 10, the
+        // array keeping its bounds - with Preserve too (recorded in Excel, grid oracle\s16 B02, B08). A Variant that holds a copy of one is resized.
+        if (target.Current is VBFixedSizeArrayValue)
+        {
+            return Failed(redim, VBRuntimeErrorId.ThisArrayIsFixedOrTemporarilyLocked, $"{redim.Name} is fixed");
+        }
+
         if (!TryEvaluateBounds(session, context, redim, out var bounds, out var boundsKnown, out var failure))
         {
             return failure;
