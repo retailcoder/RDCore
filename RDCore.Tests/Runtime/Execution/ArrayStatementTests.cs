@@ -186,6 +186,20 @@ public sealed class ArrayStatementTests
         Assert.AreEqual(20, Convert.ToInt32(ElementAt(array("Buffer")!, 2)));
     }
 
+    // an array that was never dimensioned has nothing to preserve: MS-VBA dimensions it (recorded in Excel, oracle\s20 S05).
+    [TestMethod]
+    public void Redim_Preserve_OfAnArrayNeverDimensioned_DimensionsIt()
+    {
+        var (outcome, array) = Run(
+            [("Buffer", VBResizableArrayType.TypeInfo)], ModuleDirectives.None,
+            (_, _) => { },
+            "ReDim Preserve Buffer(1 To 3)");
+
+        Assert.AreEqual(RuntimeExecutionOutcomeKind.ExitProcedure, outcome.Kind, outcome.ErrorInfo?.Verbose);
+        Assert.AreEqual(3, array("Buffer")!.Length);
+        AssertIsDefault(array("Buffer")!, 3, "an element of an array that had none");
+    }
+
     [TestMethod]
     public void Redim_Preserve_ChangingTheRank_IsSubscriptOutOfRange()
     {

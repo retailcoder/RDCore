@@ -104,7 +104,9 @@ public sealed record class ArrayStatementRuntimeSemantics(
                 : Failed(redim, VBRuntimeErrorId.TypeMismatch, $"{redim.Name} is not an array");
         }
 
-        return redim.IsPreserve
+        // an array that was never dimensioned has no bounds for Preserve to keep, nor an element: MS-VBA dimensions it (recorded in Excel, oracle\s20 S05),
+        // the first ReDim Preserve of a list that grows as it is added to.
+        return redim.IsPreserve && array.IsInitialized
             ? Preserved(session, context, redim, target, array, bounds, boundsKnown)
             : Store(session, context, redim, target, Redimensioned(
                 Resized(session, bounds, stated ?? (array.IsInitialized ? array.ItemType : DeclaredItemType(target, array.ItemType)))));

@@ -98,6 +98,7 @@ else:
 
 |Change|Result|
 |---|---|
+|Any, of an array that was never dimensioned|Allowed: there is nothing to preserve, and the array is dimensioned, as by a `ReDim` without `Preserve` (**MS-VBA**, recorded in Excel).|
 |The upper bound of the last dimension|Allowed.|
 |The upper bound of any other dimension|Runtime error 9, `Subscript out of range`.|
 |The lower bound of any dimension|Runtime error 9, `Subscript out of range`.|
