@@ -63,8 +63,8 @@ dial rather than something the statement wrote.
 |A `Variant` holding nothing yet|Becomes an array. The static rule admits a `Variant` target so that it can become an array, so the `Empty` a `Variant` starts as is not the error below.|
 |A `Variant` holding anything else|Runtime error 13, `Type mismatch`.|
 
-Each bound is Let-coerced to `Integer`, as any other subscript is. An upper bound below its lower bound is
-runtime error 9, `Subscript out of range`.
+Each bound is Let-coerced to `Long`, as any other subscript is ([**RD-VBAL §5.6.13**](rd-vbal.5.6.13.index-expressions.md#subscripts)). An upper bound below its
+lower bound is runtime error 9, `Subscript out of range`.
 
 Without `Preserve`, every element of the re-dimensioned array is its element type's default value.
 

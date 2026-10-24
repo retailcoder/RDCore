@@ -38,6 +38,27 @@ from within `Foo`'s own body). A bare `Foo`, from within `Foo`'s own body, reads
 array the same as a declared array. See
 [**RD-VBAL §5.5.1.2.12** Let-coercion to Variant](rd-vbal.5.5.1.2.runtime-semantics.md#551212-let-coercion-to-variant).
 
+### Subscripts
+
+An index expression whose `Callee` is an array selects an element: one subscript per dimension, each Let-coerced to
+`Long`, as a bound is. **MS-VBAL §5.6.13** only says that each argument must be "within its respective array
+dimension"; MS-VBA coerces it as any value is coerced to a `Long`
+([**RD-VBAL §5.5.1.2**](rd-vbal.5.5.1.2.runtime-semantics.md)):
+
+|Subscript|Selects|
+|---|---|
+|`2.5`, `1.5`|`2`, rounded to even.|
+|`"2"`|`2`.|
+|`True`, `Empty`|`-1`, `0`.|
+|A `Byte`, a `Currency`, a `Date`, a `Variant` holding a number|Its value as a `Long`.|
+
+|Condition|Run-time error|
+|---|---|
+|A subscript past the range of a `Long`.|6 — Overflow|
+|A subscript of text that is no number.|13 — Type mismatch|
+|A `Null` subscript.|94 — Invalid use of Null|
+|A subscript outside its dimension, or a number of subscripts other than the array's rank.|9 — Subscript out of range|
+
 ### Object Callee
 
 An index expression whose `Callee` is an object - or a `Variant` holding one - calls the object's **default member**, the one its class marks with `VB_UserMemId = 0`: `c(1)` is
