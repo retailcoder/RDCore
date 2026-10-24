@@ -433,13 +433,9 @@ public static class StatementStaticSemanticsEvaluator
             // the keyword is how the statement is written, which the expression it calls is not: a fact of the callee, for whoever finds it obsolete.
             if (statement is CallStatementNode callStatement)
             {
-                // MS-VBAL §5.4.2.1: what a Call statement calls is a procedure; a variable or a constant is none (MS-VBA: "Expected Sub, Function, or
-                // Property", Excel-verified).
-                if (callStatement.IsExplicitCall && callStatement.Callee is SimpleNameExpressionNode calledName
-                    && context.Resolver.ResolveValue(calledName, ScopeKind.Local, context.Scope.Uri).Symbol is ITypedSymbol and not (VBProcedureMemberSymbol
-                        or VBFunctionMemberSymbol or VBPropertyGetMemberSymbol or VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol))
+                if (NotAProcedureError(context, callStatement) is { } notAProcedure)
                 {
-                    walk.Errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.ExpectedSubFunctionOrProperty, calledName.Location, calledName.IdentifierName));
+                    walk.Errors.Add(notAProcedure);
                 }
 
                 // the arguments of the statement may be taken by reference like those of a call written as an expression, unless the callee is an array.
@@ -538,6 +534,33 @@ public static class StatementStaticSemanticsEvaluator
                 EvaluateBlock(context, caseElseClauseStatement.Body, walk);
                 break;
         }
+    }
+
+    // MS-VBAL §5.4.2.1: what a call statement calls is a procedure; a variable or a constant is none. MS-VBA says which by where it is declared (Excel-
+    // verified, oracle\s12 J12, oracle\s21 E01-E21), with Call or without: "Expected Sub, Function, or Property" for one of the procedure - a parameter
+    // too - and "Expected procedure, not variable" for one of a module, bare or qualified. Without Call, a variable of an object is called on its default
+    // member, which is valid; a Variant is no object, and is the error too.
+    private static VBCompileErrorInfo? NotAProcedureError(StaticEvaluationContext context, CallStatementNode call)
+    {
+        var (named, name) = call.Callee switch
+        {
+            SimpleNameExpressionNode simple => (context.Resolver.ResolveValue(simple, ScopeKind.Local, context.Scope.Uri).Symbol, simple.IdentifierName),
+            MemberAccessExpressionNode { Owner: { } owner } access when context.Resolver.NamespaceOf(owner, context.Scope.Uri) is { } qualifier
+                => (context.Resolver.ResolveMember(qualifier, access.Member, context.Scope.Uri).Symbol, access.Member.IdentifierName),
+            _ => (null, string.Empty),
+        };
+
+        if (named is not ITypedSymbol { ResolvedType: var type }
+            || named is VBProcedureMemberSymbol or VBFunctionMemberSymbol or VBPropertyGetMemberSymbol or VBPropertyLetMemberSymbol or VBPropertySetMemberSymbol
+                or VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol
+            || !call.IsExplicitCall && type is VBClassType or VBObjectType or VBUnknownType)
+        {
+            return null;
+        }
+
+        return named.ScopeKind is ScopeKind.Local
+            ? VBCompileErrorInfo.For(VBCompileErrorId.ExpectedSubFunctionOrProperty, call.Callee.Location, name)
+            : VBCompileErrorInfo.For(VBCompileErrorId.ExpectedProcedureNotVariable, call.Callee.Location, name);
     }
 
     // an expression a statement writes to is a fact of it: the element of an array is written through the array it is an element of.

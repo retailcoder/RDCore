@@ -12,6 +12,20 @@
 See [**RD-VBAL §3.4.2** Simple Statements](rd-vbal.3.4.2.simple-statements.md) and
 [**RD-VBAL §3.5.2** Instruction](rd-vbal.3.5.2.instruction.md).
 
+## Static Semantics
+
+What a call statement calls is a procedure: a `Sub`, a `Function` or a `Property`, of the workspace, of a library or a `Declare`. A variable or a
+constant is none, and a call statement written on one is a compile error, with `Call` or without, as it is in **MS-VBA** (recorded in Excel):
+
+|What the statement names|Example|Outcome|
+|---|---|---|
+|A variable or a constant of the procedure, a parameter included|`Dim x As Long` … `x (1)`, `x`, `Call x`|[`VBC09364`](../diagnostics/vbc09364.md) _Expected Sub, Function, or Property_|
+|A variable or a constant of a module, bare or qualified|`Count (1)`, `Globals.Count (1)`, `Call Count`|[`VBC09370`](../diagnostics/vbc09370.md) _Expected procedure, not variable_|
+|A variable of an object, without `Call`|`Dim c As New Collection` … `c (1)`|Valid: the statement calls the object's default member.|
+
+A `Variant` is no object: a call statement on one is the error, whatever it holds. A variable hides a procedure of the same name in the procedure that
+declares it, so `P (1)` in a procedure that declares `Dim p As Long` is `VBC09364`, though the module has a `Sub P`.
+
 ## Runtime Semantics
 
 A `Call` statement or a bare-call statement whose callee is a bare name (`Foo`, `Foo(...)`, `Call Foo(...)`) invokes

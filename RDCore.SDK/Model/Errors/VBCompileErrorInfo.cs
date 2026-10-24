@@ -142,5 +142,6 @@ public record class VBCompileErrorInfo : VBErrorInfo
         [VBCompileErrorId.InvalidUseOfAddressOf] = Exceptions.VBCompileError_InvalidUseOfAddressOf,
         [VBCompileErrorId.InvalidUseOfNewKeyword] = Exceptions.VBCompileError_InvalidUseOfNewKeyword,
         [VBCompileErrorId.CantChangeDataTypesOfArrayElements] = Exceptions.VBCompileError_CantChangeDataTypesOfArrayElements,
+        [VBCompileErrorId.ExpectedProcedureNotVariable] = Exceptions.VBCompileError_ExpectedProcedureNotVariable,
     };
 }

@@ -565,6 +565,11 @@ public enum VBCompileErrorId
     /// <strong>MS-VBAL §5.4.3.3</strong> ReDim Statement.
     /// </summary>
     CantChangeDataTypesOfArrayElements = 9369,
+    /// <summary>
+    /// A call statement is written on a variable of a module, which is no procedure to call.<br/>
+    /// <strong>MS-VBAL §5.4.2.1</strong> Call Statement.
+    /// </summary>
+    ExpectedProcedureNotVariable = 9370,
 
 
     /***********************************************************************************************

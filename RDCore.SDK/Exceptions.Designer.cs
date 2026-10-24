@@ -1049,6 +1049,15 @@ namespace RDCore.SDK {
                 return ResourceManager.GetString("VBCompileError_CantChangeDataTypesOfArrayElements_Verbose", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Expected procedure, not variable.
+        /// </summary>
+        public static string VBCompileError_ExpectedProcedureNotVariable {
+            get {
+                return ResourceManager.GetString("VBCompileError_ExpectedProcedureNotVariable", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to What {0} tests is an object, written without parentheses: in parentheses, it would be its default member&apos;s value..
@@ -1505,6 +1514,24 @@ namespace RDCore.SDK {
         public static string VBProcedureCall_OutOfStackSpace_Verbose {
             get {
                 return ResourceManager.GetString("VBProcedureCall_OutOfStackSpace_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The session&apos;s memory has no room left for the temporary this argument is passed in..
+        /// </summary>
+        public static string VBProcedureCall_OutOfMemory_Temporary_Verbose {
+            get {
+                return ResourceManager.GetString("VBProcedureCall_OutOfMemory_Temporary_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is an array, which an As Any parameter does not take: it takes a variable of any other type, or an element of the array..
+        /// </summary>
+        public static string VBArgument_ArrayToAsAny_Verbose {
+            get {
+                return ResourceManager.GetString("VBArgument_ArrayToAsAny_Verbose", resourceCulture);
             }
         }
 

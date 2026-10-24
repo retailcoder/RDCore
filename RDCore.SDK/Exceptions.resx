@@ -282,6 +282,12 @@
   <data name="VBProcedureCall_OutOfStackSpace_Verbose" xml:space="preserve">
     <value>This call would push the session's call stack past its own maximum depth - most likely unbounded recursion.</value>
   </data>
+  <data name="VBProcedureCall_OutOfMemory_Temporary_Verbose" xml:space="preserve">
+    <value>The session's memory has no room left for the temporary this argument is passed in.</value>
+  </data>
+  <data name="VBArgument_ArrayToAsAny_Verbose" xml:space="preserve">
+    <value>'{0}' is an array, which an As Any parameter does not take: it takes a variable of any other type, or an element of the array.</value>
+  </data>
   <data name="LanguageServerProtocolSdkException_ClientNotInitialized" xml:space="preserve">
     <value>Language client was not initialized.</value>
   </data>
@@ -680,6 +686,9 @@
   </data>
   <data name="VBCompileError_CantChangeDataTypesOfArrayElements_Verbose" xml:space="preserve">
     <value>'{0}' is an array of {1}: a ReDim can't make its elements {2}.</value>
+  </data>
+  <data name="VBCompileError_ExpectedProcedureNotVariable" xml:space="preserve">
+    <value>Expected procedure, not variable</value>
   </data>
   <data name="VBCompileError_TypeOfParenthesizedOperand_Verbose" xml:space="preserve">
     <value>What {0} tests is an object, written without parentheses: in parentheses, it would be its default member&apos;s value.</value>

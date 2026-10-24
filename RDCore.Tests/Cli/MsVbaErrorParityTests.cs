@@ -28,6 +28,8 @@ public sealed class MsVbaErrorParityTests
     [
         ("Globals", StandardModule("Globals",
             "Public Count As Long",
+            "Public Const K As Long = 1",
+            "Public GA(2) As Long",
             "Public Enum Color", "    Red = 1", "    Green = 2", "End Enum",
             "Public Function NoArgs() As Variant", "    NoArgs = Array(10, 20, 30)", "End Function",
             "Public Function LongFn() As Long", "    LongFn = 7", "End Function",
@@ -130,6 +132,22 @@ public sealed class MsVbaErrorParityTests
     [DataRow("Dim c As Collection ;; Set c = 5", "Type mismatch", DisplayName = "a Set of a Collection variable to a number")]
     [DataRow("Dim o As Object ;; Set o = 5", "Type mismatch", DisplayName = "a Set of an Object variable to a number")]
     [DataRow("Dim x As Long ;; Call x", "Expected Sub, Function, or Property", DisplayName = "a variable called")]
+    [DataRow("Dim x As Long ;; x (1)", "Expected Sub, Function, or Property", DisplayName = "E01 a Long called without Call")]
+    [DataRow("Dim x As Long ;; x", "Expected Sub, Function, or Property", DisplayName = "E02 a Long, bare")]
+    [DataRow("Dim x As Long ;; x 1, 2", "Expected Sub, Function, or Property", DisplayName = "E03 a Long given arguments")]
+    [DataRow("Dim v As Variant ;; v (1)", "Expected Sub, Function, or Property", DisplayName = "E04 a Variant called")]
+    [DataRow("Dim v As Variant ;; v", "Expected Sub, Function, or Property", DisplayName = "E05 a Variant, bare")]
+    [DataRow("Dim a(1) As Long ;; a (1)", "Expected Sub, Function, or Property", DisplayName = "E08 an array called")]
+    [DataRow("Const c As Long = 1 ;; c (1)", "Expected Sub, Function, or Property", DisplayName = "E09 a constant of the procedure called")]
+    [DataRow("Dim s As String ;; s", "Expected Sub, Function, or Property", DisplayName = "E12 a String, bare")]
+    [DataRow("Dim r As Pair ;; r (1)", "Expected Sub, Function, or Property", DisplayName = "E17 a record called")]
+    [DataRow("Dim r As Pair ;; r", "Expected Sub, Function, or Property", DisplayName = "E18 a record, bare")]
+    [DataRow("Dim e As VbCompareMethod ;; e (1)", "Expected Sub, Function, or Property", DisplayName = "E19 an Enum called")]
+    [DataRow("Count (1)", "Expected procedure, not variable", DisplayName = "E10 a variable of a module called")]
+    [DataRow("Globals.Count (1)", "Expected procedure, not variable", DisplayName = "E11 a variable of a module called, qualified")]
+    [DataRow("K (1)", "Expected procedure, not variable", DisplayName = "E16 a constant of a module called")]
+    [DataRow("GA (1)", "Expected procedure, not variable", DisplayName = "E20 an array of a module called")]
+    [DataRow("Call Count", "Expected procedure, not variable", DisplayName = "E21 a variable of a module called with Call")]
     [DataRow("Call Globals", "Expected variable or procedure, not module", DisplayName = "a module called")]
     [DataRow("Dim x As Variant ;; x = Globals", "Expected variable or procedure, not module", DisplayName = "a module assigned")]
     [DataRow("Dim x As Globals", "A module is not a valid type", DisplayName = "a variable typed as a module")]
@@ -159,6 +177,24 @@ public sealed class MsVbaErrorParityTests
     [DataRow("Globals.TakesObject AddressOf Globals.SomeSub", "Type mismatch", DisplayName = "AddressOf to an Object")]
     public async Task WhatMsVbaRejectsAtCompileTime_IsACompileError(string body, string message)
         => StringAssert.Contains(string.Join(" / ", await LoadErrorsAsync(Classes, Modules, Program(body))), message);
+
+    // E15: a parameter is a variable of the procedure.
+    [TestMethod]
+    public async Task AParameterCalled_IsExpectedSubFunctionOrProperty()
+    {
+        var errors = await LoadErrorsAsync(Classes, [.. Modules, ("Callers", StandardModule("Callers", "Public Sub TakesQ(ByVal q As Long)", "    q (1)", "End Sub"))],
+            Program("Globals.SomeSub"));
+
+        StringAssert.Contains(string.Join(" / ", errors), "Expected Sub, Function, or Property");
+    }
+
+    // E06, E13, E14: a variable of an object is called on its default member.
+    [TestMethod]
+    [DataRow("Dim c As New Collection ;; c.Add 1 ;; c (1)", DisplayName = "E06 a Collection")]
+    [DataRow("Dim o As Object ;; o (1)", DisplayName = "E13 an Object")]
+    [DataRow("Dim c As New Collection ;; c.Add 1 ;; c.Count", DisplayName = "E14 a member of an object")]
+    public async Task AnObjectCalled_IsNoCompileError(string body)
+        => Assert.IsEmpty(await LoadErrorsAsync(Classes, Modules, Program(body)));
 
     // what MS-VBA compiles: the address of a procedure of a standard module, given to what can hold a LongPtr. It does not run yet - an address is a value
     // RD-VBA does not make - so only that it compiles is told here.

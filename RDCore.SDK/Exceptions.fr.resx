@@ -276,6 +276,12 @@
   <data name="VBProcedureCall_OutOfStackSpace_Verbose" xml:space="preserve">
     <value>Cet appel dépasserait la profondeur maximale de la pile d'appels de la session - probablement une récursion non bornée.</value>
   </data>
+  <data name="VBProcedureCall_OutOfMemory_Temporary_Verbose" xml:space="preserve">
+    <value>La mémoire de la session n'a plus de place pour la variable temporaire dans laquelle cet argument est passé.</value>
+  </data>
+  <data name="VBArgument_ArrayToAsAny_Verbose" xml:space="preserve">
+    <value>'{0}' est un tableau, qu'un paramètre As Any ne prend pas : il prend une variable de tout autre type, ou un élément du tableau.</value>
+  </data>
   <data name="VBIntegerDivisionOp_DivisionByZero" xml:space="preserve">
     <value>Cette opération résulte en une division par rézo, possiblement causée par l'arrondissement par la Méthode du Banquier (Banker's Rounding), qui aurait pu perdre suffisament de précision pour arrondir à un entier zéro.</value>
   </data>
@@ -680,6 +686,9 @@
   </data>
   <data name="VBCompileError_CantChangeDataTypesOfArrayElements_Verbose" xml:space="preserve">
     <value>'{0}' est un tableau de {1} : un ReDim ne peut pas en faire des éléments {2}.</value>
+  </data>
+  <data name="VBCompileError_ExpectedProcedureNotVariable" xml:space="preserve">
+    <value>Procédure attendue, et non une variable</value>
   </data>
   <data name="VBCompileError_TypeOfParenthesizedOperand_Verbose" xml:space="preserve">
     <value>Ce que {0} teste est un objet, écrit sans parenthèses : entre parenthèses, ce serait la valeur de son membre par défaut.</value>
