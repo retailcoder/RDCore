@@ -13,11 +13,17 @@ Arithmetic operators are simple data operators
   `Long` in a 32-bit `int`, `Currency` and `Decimal` in `decimal`, `Single` in `float`.
 
 Arithmetic runs in a _checked_ context. An integral or fixed-point result that does not fit the effective type raises
-`Overflow` rather than wrapping or silently narrowing.
+`Overflow` rather than wrapping or silently narrowing. A `Single` or `Double` operation of finite operands whose
+result is not finite (an IEEE-754 infinity) is an overflow too: `3E+38 * 10` in `Single` raises 6, it does not
+evaluate to an infinity.
 
 |Condition|Run-time error|
 |---|---|
 |An integral or fixed-point result does not fit the effective type.|6 — Overflow|
+|A floating-point result of finite operands is not finite.|6 — Overflow|
+
+When an operand is declared `Variant`, an overflowing result is evaluated again in a wider type instead
+([**RD-VBAL §5.0** Semantics](rd-vbal.5.0.semantics.md)); a result no `Double` holds is still 6.
 
 Run-time error 6 is [VBRuntimeErrorId](../api/RDCore.SDK.Model.Errors.VBRuntimeErrorId.html)`.Overflow`. For division
 by zero, see [**RD-VBAL §5.6.9.3.6** \ Operator and Mod Operator](#56936--operator-and-mod-operator).
@@ -90,7 +96,16 @@ Run-time error 11 is `VBRuntimeErrorId.DivisionByZero`.
 
 The `^` operator is the sole exception to computation in the effective type
 ([**RD-VBAL §5.6.9.2** Simple Data Operators](rd-vbal.5.6.9.2.simple-data-operators.md#computation-in-the-effective-type)):
-its effective type is always `Double`. The `^` operator is evaluated as IEEE-754 exponentiation.
+its effective type is always `Double`. The `^` operator is evaluated as IEEE-754 exponentiation, except where that
+gives no finite number:
+
+|Condition|Run-time error|
+|---|---|
+|`0` to a negative power.|5 — Invalid procedure call or argument|
+|A negative number to a fractional power (`(-8) ^ (1 / 3)`), which has no real result.|5 — Invalid procedure call or argument|
+|A result past the range of a `Double` (`10 ^ 400`).|6 — Overflow|
+
+A `Variant` operand doesn't change this: `Double` has nothing wider. `0 ^ 0` is `1`.
 
 ---
 > ⏮️ [**RD-VBAL §5.6.9.2** Simple Data Operators](rd-vbal.5.6.9.2.simple-data-operators.md) | ⏭️ [**RD-VBAL §5.6.9.4** & Operator](rd-vbal.5.6.9.4.ampersand-operator.md)

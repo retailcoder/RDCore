@@ -71,7 +71,7 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
                 VBLongType => new VBLongValue(EvaluateManagedNumericOp(((VBLongValue)lhs).Value, ((VBLongValue)rhs).Value)),
                 VBLongLongType => new VBLongLongValue(EvaluateManagedNumericOp(((VBLongLongValue)lhs).Value, ((VBLongLongValue)rhs).Value)),
                 VBSingleType => SingleResult(frame, (VBSingleValue)lhs, (VBSingleValue)rhs),
-                VBDoubleType => new VBDoubleValue(EvaluateManagedNumericOp(((VBDoubleValue)lhs).Value, ((VBDoubleValue)rhs).Value)),
+                VBDoubleType => DoubleResult((VBDoubleValue)lhs, (VBDoubleValue)rhs),
                 VBCurrencyType => new VBCurrencyValue(EvaluateManagedNumericOp(((VBCurrencyValue)lhs).Value.Value, ((VBCurrencyValue)rhs).Value.Value)),
                 VBDecimalType => new VBDecimalValue(EvaluateManagedNumericOp(((VBDecimalValue)lhs).Value, ((VBDecimalValue)rhs).Value)),
                 _ => throw new NotSupportedException($"Effective type '{effectiveType.Name}' is not a supported arithmetic numeric type."),
@@ -94,16 +94,27 @@ public abstract record class BinaryArithmeticOperatorRuntimeSemantics(
     }
 
     // a Variant Single result outside the range of a Single is computed again as a Double (VariantArithmeticOverflow.WidensSingle); one no Double holds is an
-    // overflow.
+    // overflow, and so is a typed one: MS-VBAL §5.6.9.3, finite operands whose result is not finite (recorded in Excel, grid oracle\s16 D01-D10).
     private VBTypedValue SingleResult(OperatorEvaluationFrame frame, VBSingleValue lhs, VBSingleValue rhs)
     {
         var value = EvaluateManagedNumericOp(lhs.Value, rhs.Value);
-        if (!VariantArithmeticOverflow.WidensSingle(frame, value, lhs.Value, rhs.Value))
+        if (VariantArithmeticOverflow.WidensSingle(frame, value, lhs.Value, rhs.Value))
         {
-            return new VBSingleValue(value);
+            return VariantArithmeticOverflow.Widened(EvaluateManagedNumericOp((double)lhs.Value, rhs.Value)) ?? throw new OverflowException();
         }
 
-        return VariantArithmeticOverflow.Widened(EvaluateManagedNumericOp((double)lhs.Value, rhs.Value)) ?? throw new OverflowException();
+        return !float.IsFinite(value) && float.IsFinite(lhs.Value) && float.IsFinite(rhs.Value)
+            ? throw new OverflowException()
+            : new VBSingleValue(value);
+    }
+
+    // MS-VBAL §5.6.9.3: a Double operation of finite operands whose result is not finite overflows.
+    private VBTypedValue DoubleResult(VBDoubleValue lhs, VBDoubleValue rhs)
+    {
+        var value = EvaluateManagedNumericOp(lhs.Value, rhs.Value);
+        return !double.IsFinite(value) && double.IsFinite(lhs.Value) && double.IsFinite(rhs.Value)
+            ? throw new OverflowException()
+            : new VBDoubleValue(value);
     }
 
     protected sealed override OperatorAnalysisContext<ArithmeticOperatorSemanticFlags> CreateAnalysisContext(

@@ -1237,7 +1237,16 @@ namespace RDCore.SDK {
                 return ResourceManager.GetString("VBExponentOp_InvalidProcedureCallOrArgument_Verbose", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to A negative number raised to a fractional power has no real result..
+        /// </summary>
+        public static string VBExponentOp_NoRealPower_Verbose {
+            get {
+                return ResourceManager.GetString("VBExponentOp_NoRealPower_Verbose", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to This operation results in a division by zero, possibly due to Banker&apos;s Rounding losing enough precision to bring the operand value to integer value 0..
         /// </summary>

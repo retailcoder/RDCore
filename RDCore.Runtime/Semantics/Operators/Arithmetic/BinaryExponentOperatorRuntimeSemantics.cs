@@ -55,9 +55,17 @@ public record class BinaryExponentOperatorRuntimeSemantics(
                 return OnInvalidProcedureCallOrArgument(expression, Exceptions.VBExponentOp_InvalidProcedureCallOrArgument_Verbose);
             }
 
-            return RuntimeSemanticsEvaluationResult.Success(
-                ((VBNumericType)frame.EffectiveType).CreateValue(
-                EvaluateManagedNumericOp(lhsValue.AsDouble, rhsValue.AsDouble)));
+            // of finite operands, a power that is no number - a negative number to a fraction - is error 5, and one past the range of a Double is an
+            // overflow, Variant or not: the Double effective type has nothing wider (MS-VBAL §5.6.9.3; recorded in Excel, grid oracle\s16 E01-E04).
+            var power = EvaluateManagedNumericOp(lhsValue.AsDouble, rhsValue.AsDouble);
+            if (!double.IsFinite(power) && double.IsFinite(lhsValue.AsDouble) && double.IsFinite(rhsValue.AsDouble))
+            {
+                return double.IsNaN(power)
+                    ? OnInvalidProcedureCallOrArgument(expression, Exceptions.VBExponentOp_NoRealPower_Verbose)
+                    : OnOverflow(expression, Exceptions.VBRuntimeError_ArithmeticOverflow);
+            }
+
+            return RuntimeSemanticsEvaluationResult.Success(((VBNumericType)frame.EffectiveType).CreateValue(power));
         }
         else if (frame.EffectiveType is VBNullType)
         {

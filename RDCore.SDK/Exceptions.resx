@@ -192,6 +192,9 @@
   <data name="VBExponentOp_InvalidProcedureCallOrArgument_Verbose" xml:space="preserve">
     <value>The result of a negative exponent value cannot be represented with base 0.</value>
   </data>
+  <data name="VBExponentOp_NoRealPower_Verbose" xml:space="preserve">
+    <value>A negative number raised to a fractional power has no real result.</value>
+  </data>
   <data name="VBRuntimeInternalError_LetCoercionStrategyWasNotApplicable" xml:space="preserve">
     <value>Let-coercion evaluation strategy unexpectedly returned a 'NotApplicable' result.</value>
   </data>
