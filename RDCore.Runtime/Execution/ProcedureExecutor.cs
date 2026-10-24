@@ -1394,7 +1394,12 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 instruction.Node?.SourceLocation ?? default, Exceptions.VBResume_WithoutError_Verbose));
         }
 
-        activation.ErrorHandler = activation.ErrorHandler with { ActiveError = null, FaultStatementOffset = null, HandlerEntry = null };
+        // MS-VBAL §5.4.4.1: the policy an On Error GoTo set is still to go to its label - catching an error only made it the handler's to run, which an
+        // error inside it does not re-enter. The Resume ends the handler: the next error goes to the label again (MS-VBA, grid oracle\s16 W03).
+        var resumed = activation.ErrorHandler;
+        activation.ErrorHandler = resumed is { Mode: ErrorHandlingMode.Disabled, HandlerEntry: { } handler }
+            ? new ErrorHandlerState(ErrorHandlingMode.GoTo, handler, null, null)
+            : resumed with { ActiveError = null, FaultStatementOffset = null, HandlerEntry = null };
         activation.Pc = instruction.Kind switch
         {
             InstructionKind.ResumeCurrentStatement => faultOffset,

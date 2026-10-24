@@ -39,10 +39,11 @@ An `On Error` statement sets the error-handling policy of the current activation
 |---|---|---|
 |`Disabled` (the policy [**MS-VBAL §5.4.4** Error Handling Statements](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/47b18690-3175-44d9-9de1-31629f0aacc7) calls *Default*)|`On Error GoTo 0`, `On Error GoTo -1`; an error caught under `GoTo`|The error is not caught: it propagates out of the activation (see [Propagation](#propagation)).|
 |`ResumeNext`|`On Error Resume Next`|The error is caught silently. Execution continues at the statement that follows the one that raised the error. The policy is not reset: every later error in the same activation is caught the same way.|
-|`GoTo`|`On Error GoTo <label>`|The error branches to the label. The policy is reset to disabled: a second, unhandled error inside the handler body propagates rather than re-entering the handler.|
+|`GoTo`|`On Error GoTo <label>`; a `Resume` that ends the handler|The error branches to the label. The policy is reset to disabled while the handler runs: a second, unhandled error inside the handler body propagates rather than re-entering the handler. A `Resume` ends the handler and sets the policy back to `GoTo` the same label: the next error goes to it again.|
 
-The asymmetry between `On Error Resume Next` (policy kept) and `On Error GoTo <label>` (policy reset to disabled)
-follows MS-VBAL.
+The asymmetry between `On Error Resume Next` (policy kept) and `On Error GoTo <label>` (policy reset to disabled
+while the handler runs) follows MS-VBAL: the policy is still to go to the label, and an error inside the handler is
+not one it handles.
 
 A `Select Case` is one statement, up to its `End Select`: an error in its selector goes on at the statement past
 `End Select`, and no `Case` runs, `Case Else` included (MS-VBA). The same holds for `Resume Next`

@@ -37,7 +37,8 @@ fault statement are held on the activation's
 [**RD-VBAL §5.4.4.1** On Error Statement](rd-vbal.5.4.4.1.on-error-statement.md).
 
 1. If the activation has no active error, run-time error 20, "Resume without error", is raised.
-2. Otherwise, the active error is cleared.
+2. Otherwise, the active error is cleared. A `Resume` in the handler an `On Error GoTo` branched to ends it: the
+   policy is to go to that label again, and the next error does.
 3. Execution continues where the `Resume` form says:
 
 |Form|Instruction kind|Execution continues at|

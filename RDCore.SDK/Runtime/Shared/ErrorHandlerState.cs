@@ -24,8 +24,9 @@ public enum ErrorHandlingMode
 
     /// <summary>
     /// <c>On Error GoTo</c> &lt;label&gt;: an error branches to <see cref="ErrorHandlerState.HandlerTarget"/>.
-    /// Catching one resets the policy to <see cref="Disabled"/> — a second, unhandled error inside the
-    /// handler body itself propagates rather than re-entering the same handler.
+    /// Catching one resets the policy to <see cref="Disabled"/> while the handler runs — a second, unhandled error inside the
+    /// handler body itself propagates rather than re-entering the same handler — and a <c>Resume</c> that ends the handler
+    /// sets it back to <see cref="GoTo"/> the same label (<see cref="ErrorHandlerState.HandlerEntry"/>): the next error goes to it again.
     /// </summary>
     GoTo,
 }
