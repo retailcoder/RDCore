@@ -89,6 +89,10 @@ while a `For Each` over it runs; the lock is gone once the call returns, or the 
 ([ICallStackFrame](../api/RDCore.SDK.Runtime.Abstract.Execution.ICallStackFrame.html)`.LocksArray`). A locked array is not erased either, nor assigned another
 array (`arr = other`): error 10 too.
 
+A fixed-size array can't be re-dimensioned either. A `ReDim` of one is a compile error where it is declared, but a
+resizable array parameter can be bound to one ([**RD-VBAL §5.3.1.11**](rd-vbal.5.3.1.11.procedure-invocation-argument-processing.md)):
+a `ReDim` of that parameter, with `Preserve` or without, is runtime error 10, and the array keeps its bounds.
+
 > [!IMPORTANT]
 > The whole array passed by reference does **not** lock it, which is what MS-VBA does (recorded in Excel) and not how §5.4.3.3 reads: the parameter is another
 > name for the variable, a `ReDim` of either is a `ReDim` of both, and each sees the dimensions the other gives it. RD-VBA does what MS-VBA does. The new array is

@@ -167,6 +167,12 @@ array of an `Enum` does not match an array parameter of `Long`, nor an array of 
 type is not mapped, so the array falls to the copy, and an array let-coerced to an array of another element type
 raises error 13, Type mismatch.
 
+An array's declared type is an array of its element type, whether it was declared with fixed bounds or none: a
+fixed-size array (`Dim V(1 To 3) As Long`) passed to a parameter `A() As Long` is bound by reference, as a resizable
+one is, and what the callee assigns to its elements is the caller's. The callee can't resize it: a `ReDim` of it is
+runtime error 10 ([**RD-VBAL §5.4.3.3**](rd-vbal.5.4.3.3.redim-statement.md)). An `Erase` of it resets its elements,
+its bounds kept.
+
 |Parameter|Argument|Binding|
 |---|---|---|
 |`ByVal`|Any|A fresh, Let-coerced [ValueBindingHandle](../api/RDCore.SDK.Model.Values.Bindings.ValueBindingHandle.html), which never aliases the caller's storage.|
