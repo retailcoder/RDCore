@@ -474,6 +474,9 @@ public static class InstructionListLowering
     {
         var opener = Emit(state, scope, withStatement, InstructionKind.With);
         LowerBlock(withStatement.Body, state, scope with { EnclosingWith = opener });
+
+        // End With is run through, not jumped to: the opener's End is past it, which is where a jump out of the block lands.
+        Emit(state, scope, null, InstructionKind.EndWith, matching: opener);
         PatchEnd(state, opener, state.Items.Count);
     }
 

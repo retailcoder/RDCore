@@ -800,10 +800,16 @@ public sealed class InstructionListLoweringTests
         var withOpener = items[0];
         Assert.AreEqual(InstructionKind.With, withOpener.Kind);
         Assert.IsNull(withOpener.EnclosingWith);
-        for (var offset = 1; offset < items.Length - 1; offset++)
+        for (var offset = 1; offset < items.Length - 2; offset++)
         {
             Assert.AreEqual(withOpener.Offset, items[offset].EnclosingWith, $"offset {offset}");
         }
+
+        // End With is run through, outside the block it ends; a jump out of the block lands past it, at the opener's End.
+        Assert.AreEqual(InstructionKind.EndWith, items[^2].Kind);
+        Assert.AreEqual(withOpener.Offset, items[^2].Matching);
+        Assert.IsNull(items[^2].EnclosingWith);
+        Assert.AreEqual(items[^1].Offset, withOpener.End);
         Assert.IsNull(items[^1].EnclosingWith); // "after" is back outside the With block
     }
 

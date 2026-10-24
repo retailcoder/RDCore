@@ -181,4 +181,11 @@ public enum InstructionKind
     /// run-time error, "as if the <c>Err.Raise</c> method were invoked" with it.
     /// </summary>
     RaiseError,
+
+    /// <summary>
+    /// <c>End With</c> (<strong>MS-VBAL §5.4.2.21</strong>): the end of the <c>With</c> block opened at <see cref="Instruction.Matching"/>, reached by
+    /// running through the block, after which the block has no target: <c>Nothing</c> is assigned to its anonymous block variable. A jump out of the block
+    /// goes past it - to <see cref="Instruction.End"/> of the opener or beyond - and leaves the target in place, which a jump back in finds (MS-VBA).
+    /// </summary>
+    EndWith,
 }

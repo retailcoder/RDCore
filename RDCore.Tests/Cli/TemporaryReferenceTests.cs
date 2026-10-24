@@ -118,11 +118,11 @@ public sealed class TemporaryReferenceTests
             "End With",
             "Debug.Print \"after\""));
 
-    // MS-VBAL §5.4.2.21: "If <expression> is classified as a variable, that variable is the With block variable" - the block does not hold the
-    // object: the variable does, and what it is assigned is what the block reads.
+    // MS-VBAL §5.4.2.21 says "If <expression> is classified as a variable, that variable is the With block variable"; MS-VBA holds the object the
+    // variable held when the block began, until End With, whatever the block assigns to the variable (recorded in Excel, grid oracle\s16 T01-T05).
     [TestMethod]
-    public async Task AWithBlockOnAVariable_IsTheVariable_AndHoldsNothingOfItsOwn()
-        => CollectionAssert.AreEqual(new[] { "terminated k", "91", "after" }, await RunWith(string.Empty,
+    public async Task AWithBlockOnAVariable_HoldsItsObject_UntilEndWith()
+        => CollectionAssert.AreEqual(new[] { "hello k", "0", "terminated k", "after" }, await RunWith(string.Empty,
             "On Error Resume Next",
             "Set Kept = New Widget",
             "Kept.Name = \"k\"",
@@ -134,10 +134,10 @@ public sealed class TemporaryReferenceTests
             "Debug.Print \"after\""));
 
     // a field of an object whose class is declared, an element of an array, a field of a record, a variable named through its module: each is a
-    // variable, and so the block variable itself.
+    // variable, and the block holds its object all the same.
     [TestMethod]
-    public async Task AWithBlockOnAFieldOfAnObject_IsTheField_AndHoldsNothingOfItsOwn()
-        => CollectionAssert.AreEqual(new[] { "terminated f", "91", "after" }, await RunWith(string.Empty,
+    public async Task AWithBlockOnAFieldOfAnObject_HoldsItsObject_UntilEndWith()
+        => CollectionAssert.AreEqual(new[] { "hello f", "0", "terminated f", "after" }, await RunWith(string.Empty,
             "On Error Resume Next",
             "Dim h As Holder",
             "Set h = New Holder",
@@ -151,8 +151,8 @@ public sealed class TemporaryReferenceTests
             "Debug.Print \"after\""));
 
     [TestMethod]
-    public async Task AWithBlockOnAnElementOfAnArray_IsTheElement_AndHoldsNothingOfItsOwn()
-        => CollectionAssert.AreEqual(new[] { "terminated e", "91", "after" }, await RunWith(string.Empty,
+    public async Task AWithBlockOnAnElementOfAnArray_HoldsItsObject_UntilEndWith()
+        => CollectionAssert.AreEqual(new[] { "hello e", "0", "terminated e", "after" }, await RunWith(string.Empty,
             "On Error Resume Next",
             "Dim a(0) As Widget",
             "Set a(0) = New Widget",
@@ -165,8 +165,8 @@ public sealed class TemporaryReferenceTests
             "Debug.Print \"after\""));
 
     [TestMethod]
-    public async Task AWithBlockOnAFieldOfARecord_IsTheField_AndHoldsNothingOfItsOwn()
-        => CollectionAssert.AreEqual(new[] { "terminated r", "91", "after" }, await RunWith(
+    public async Task AWithBlockOnAFieldOfARecord_HoldsItsObject_UntilEndWith()
+        => CollectionAssert.AreEqual(new[] { "hello r", "0", "terminated r", "after" }, await RunWith(
             "Private Type Pair\r\n    Item As Widget\r\nEnd Type",
             "On Error Resume Next",
             "Dim r As Pair",
@@ -180,8 +180,8 @@ public sealed class TemporaryReferenceTests
             "Debug.Print \"after\""));
 
     [TestMethod]
-    public async Task AWithBlockOnAVariableNamedThroughItsModule_IsTheVariable_AndHoldsNothingOfItsOwn()
-        => CollectionAssert.AreEqual(new[] { "terminated k", "91", "after" }, await RunWith(string.Empty,
+    public async Task AWithBlockOnAVariableNamedThroughItsModule_HoldsItsObject_UntilEndWith()
+        => CollectionAssert.AreEqual(new[] { "hello k", "0", "terminated k", "after" }, await RunWith(string.Empty,
             "On Error Resume Next",
             "Set Kept = New Widget",
             "Kept.Name = \"k\"",

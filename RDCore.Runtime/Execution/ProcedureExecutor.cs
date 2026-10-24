@@ -244,6 +244,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             InstructionKind.ConditionalBranch => ExecuteConditionalBranch(session, context, instruction, activation),
             InstructionKind.LoopBack => ExecuteLoopBack(session, context, instruction, activation),
             InstructionKind.With => ExecuteWith(session, context, instruction, activation),
+            InstructionKind.EndWith => EndWithInSweep(session, instruction, activation),
             InstructionKind.Select => ExecuteSelect(session, context, instruction, activation),
             InstructionKind.ForOpener => ExecuteForOpener(session, context, instruction, activation),
             InstructionKind.ForNext => ExecuteForNext(session, context, instruction, activation),
@@ -417,6 +418,11 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                     }
                     break;
 
+                case InstructionKind.EndWith:
+                    ExecuteEndWith(session, instruction, activation);
+                    activation.Pc = instruction.Offset + 1;
+                    break;
+
                 case InstructionKind.Select:
                     var selectOutcome = ExecuteSelect(session, instructionContext, instruction, activation);
                     if (selectOutcome is { } stopSelect && InterceptError(session, activation, list, instruction.Offset, stopSelect) is { } unhandledSelect)
@@ -576,12 +582,14 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     // A purely lexical property of the instruction about to run, not something that should persist from
     // whatever the previous instruction's own context happened to carry - a GoTo into or out of a With
     // block leaves no stale stack, so this is recomputed fresh every fetch rather than pushed/popped.
+    // An instruction of a block whose With statement did not set a target - jumped into, its target in error and resumed past, or past its End With and
+    // jumped back into - has Nothing for one: a member with no object before the dot is error 91 (MS-VBA, grid oracle\s16 W02-W07).
     private static RuntimeEvaluationContext ResolveContext(
         RuntimeEvaluationContext outer, CallStackFrame activation, InstructionList list, Instruction instruction)
-        => instruction.EnclosingWith is { } openerOffset && activation.TryGetBlockState(openerOffset, out var target)
+        => instruction.EnclosingWith is { } openerOffset
             ? outer with
             {
-                EnclosingWithTarget = target,
+                EnclosingWithTarget = activation.TryGetBlockState(openerOffset, out var target) ? target : VBObjectValue.Nothing,
                 EnclosingWithTargetExpression = (list.Items[openerOffset].Node as WithStatementNode)?.WithExpression,
             }
             : outer with { EnclosingWithTarget = null, EnclosingWithTargetExpression = null };
@@ -771,10 +779,11 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             return targetResult.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Error(targetResult.ErrorInfo!);
         }
 
-        // MS-VBAL §5.4.2.21: "If <expression> is classified as a variable, that variable is the With block variable" - the block reads the variable,
-        // whatever a statement of it assigns to it. Otherwise the value "is Set-assigned to an anonymous With block variable", which holds it until
-        // "Nothing is assigned to the anonymous With block variable" after the block: a copy of the reference, held by the block.
-        if (withTargets.DenotesAVariable(session, context, withStatement.WithExpression))
+        // MS-VBAL §5.4.2.21: "If <expression> is classified as a variable, that variable is the With block variable" - which MS-VBA holds to for a
+        // record, whose fields the block writes where they are. An object it holds as a value is held: the reference the variable held when the block
+        // began, which a Set of the variable in the block does not change (recorded in Excel, grid oracle\s16 W09-W10), and which the block holds until
+        // its End With - "Nothing is assigned to the anonymous With block variable".
+        if (IsRecord(targetResult.Result!) && withTargets.DenotesAVariable(session, context, withStatement.WithExpression))
         {
             activation.SetBlockState(instruction.Offset, targetResult.Result!);
         }
@@ -789,10 +798,35 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         return null;
     }
 
-    // MS-VBAL §5.4.2.21: the object of a With block is held by the block, "the With block variable", for as long as the block runs - whatever the
-    // statements in it do to the variable it was read from. A For Each holds what it enumerates the same way: its enumerator, or the array whose
-    // elements it reads, which may be a value nothing else holds (For Each w In MakeWidgets()). It is let go of when the program is past the
-    // block (RunInstructions), and when the activation is (RuntimeProcedureInvoker).
+    private static bool IsRecord(VBTypedValue value) => value is VBUserDefinedTypeValue or VBVariantValue { TypedValue: VBUserDefinedTypeValue };
+
+    private static RuntimeExecutionOutcome? EndWithInSweep(IRuntimeSession session, Instruction instruction, CallStackFrame activation)
+    {
+        ExecuteEndWith(session, instruction, activation);
+        return null;
+    }
+
+    // MS-VBAL §5.4.2.21: End With assigns Nothing to the block variable. The block has no target from here on - a jump back into it finds none, and a
+    // member read with no object before the dot is error 91 (MS-VBA, grid oracle\s16 W06-W07) - and lets go of what it held.
+    private static void ExecuteEndWith(IRuntimeSession session, Instruction instruction, CallStackFrame activation)
+    {
+        if (instruction.Matching is not { } opener)
+        {
+            return;
+        }
+
+        activation.ClearBlockState(opener);
+        if (activation.TakeBlockHolder(opener) is { } held)
+        {
+            ObjectReferences.Release(session, held);
+        }
+    }
+
+    // MS-VBAL §5.4.2.21: the object of a With block is held by the block, "the With block variable", until its End With - whatever the statements in
+    // it do to the variable it was read from, and wherever the program jumps meanwhile: a jump out of the block and back in finds it (MS-VBA, grid
+    // oracle\s16 W05, W08). A For Each holds what it enumerates the same way: its enumerator, or the array whose elements it reads, which may be a value
+    // nothing else holds (For Each w In MakeWidgets()); it is let go of when the program is past the block (RunInstructions). Both are let go of when the
+    // activation is (RuntimeProcedureInvoker).
     private static void HoldForBlock(IRuntimeSession session, CallStackFrame activation, Instruction opener, VBTypedValue value)
     {
         if (opener.End is not { } end || value is not (VBObjectValue or VBVariantValue or VBArrayValue))
@@ -800,7 +834,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             return;
         }
 
-        var cell = activation.BlockHolder(opener.Offset, end);
+        var cell = activation.BlockHolder(opener.Offset, opener.Kind is InstructionKind.With ? null : end);
         var before = ObjectReferences.HeldIn(session, cell);
         cell.Store(value is VBArrayValue ? SymbolAddressTable.BoxedValue(value) : value.RuntimeValue, !value.IsIndeterminate);
         ObjectReferences.Rebind(session, cell, before);
