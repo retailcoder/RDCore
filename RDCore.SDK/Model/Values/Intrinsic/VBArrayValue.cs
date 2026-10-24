@@ -30,12 +30,15 @@ public abstract record class VBArrayValue : VBTypedValue
     /// <param name="itemType">The element type. Use <see cref="VBVariantType"/> when unspecified.</param>
     /// <param name="elementDefault">What each element starts as, when it is more than the element type's own default value can say
     /// (<see cref="IVariableDefaults.ElementDefaultOf"/>); <see langword="null"/> for that default.</param>
-    protected VBArrayValue((int lBound, int uBound)[] dimensions, VBType itemType, Func<VBTypedValue>? elementDefault = null)
+    /// <param name="elementCell">Makes the cell each element is stored in, holding the element type's default value, when the runtime stores elements of
+    /// <paramref name="itemType"/> in cells of its own (<see cref="IVariableDefaults.ElementCellOf"/>); <see langword="null"/> for a cell that holds the
+    /// default value as it is. Not used for an element that is a record, which <paramref name="elementDefault"/> makes.</param>
+    protected VBArrayValue((int lBound, int uBound)[] dimensions, VBType itemType, Func<VBTypedValue>? elementDefault = null, Func<IBindingHandle>? elementCell = null)
         : base(VBArrayType.TypeInfo)
     {
         ItemType = itemType;
         Dimensions = [.. dimensions.Select(d => new VBArrayDimension(d.lBound, d.uBound))];
-        _cells = CreateCells(Dimensions, itemType, elementDefault);
+        _cells = CreateCells(Dimensions, itemType, elementDefault, elementCell);
     }
 
     /// <summary>
@@ -230,6 +233,18 @@ public abstract record class VBArrayValue : VBTypedValue
         return true;
     }
 
+    /// <summary>
+    /// The flat index of the element at the given subscripts, in the order <see cref="ElementAt"/> and <see cref="CellAt"/> read them; <c>-1</c> when any
+    /// subscript is out of bounds or the subscript count does not match the array rank (<strong>MS-VBAL §5.6.13</strong>'s error 9, for the caller to
+    /// raise).
+    /// </summary>
+    /// <remarks>
+    /// For a caller that already has the subscripts as integers and reads or writes the element's cell itself, without the array of subscripts the
+    /// <c>params</c> members are given.
+    /// </remarks>
+    /// <param name="subscripts">One subscript per dimension, outermost first.</param>
+    public int IndexOf(ReadOnlySpan<int> subscripts) => LinearIndex(subscripts);
+
     private int LinearIndex(ReadOnlySpan<int> subscripts)
     {
         if (_cells.Length == 0 || subscripts.Length != Dimensions.Length)
@@ -255,7 +270,8 @@ public abstract record class VBArrayValue : VBTypedValue
         return index;
     }
 
-    private static IBindingHandle[] CreateCells(ImmutableArray<VBArrayDimension> dimensions, VBType itemType, Func<VBTypedValue>? elementDefault)
+    private static IBindingHandle[] CreateCells(
+        ImmutableArray<VBArrayDimension> dimensions, VBType itemType, Func<VBTypedValue>? elementDefault, Func<IBindingHandle>? elementCell)
     {
         if (dimensions.Length == 0)
         {
@@ -274,9 +290,10 @@ public abstract record class VBArrayValue : VBTypedValue
         }
 
         var cells = new IBindingHandle[total];
+        var makeCell = itemType is VBUserDefinedType ? null : elementCell;
         for (var i = 0; i < total; i++)
         {
-            cells[i] = CreateDefaultCell(itemType, elementDefault);
+            cells[i] = makeCell?.Invoke() ?? CreateDefaultCell(itemType, elementDefault);
         }
 
         return cells;

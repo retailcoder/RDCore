@@ -34,7 +34,7 @@ public sealed partial class RuntimeExpressionEvaluator
     /// <returns><see langword="false"/> when the assignment is not done here, and is to be done the way it always is.</returns>
     internal bool TryAssignUnboxed(IRuntimeSession session, ExpressionNode target, ExpressionNode value, RuntimeEvaluationContext context)
     {
-        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables || target is not SimpleNameExpressionNode)
+        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables || target is not (SimpleNameExpressionNode or IndexExpressionNode))
         {
             return false;
         }
@@ -51,6 +51,13 @@ public sealed partial class RuntimeExpressionEvaluator
 
             frame.AssignResult(assigned);
             return true;
+        }
+
+        // an element of an array of a scalar type, written in the cell it is kept in (S1.6).
+        if (bound is BoundIndex index)
+        {
+            return ElementCellOf(session, index) is { } element
+                && TryEvaluatePayload(session, BoundTreeOf(session, value, context), out var written) && TryWritePayload(element, written);
         }
 
         if (bound is not BoundVariable variable)
@@ -297,10 +304,43 @@ public sealed partial class RuntimeExpressionEvaluator
             case BoundBinary { Plan: { } plan, Left: var left, Right: var right }:
                 return TryEvaluatePayload(session, left, out var lhs) && TryEvaluatePayload(session, right, out var rhs)
                     && TryOperateBinary(PlanFor(plan, lhs, rhs), lhs, rhs, out payload);
+            // an element of an array of a scalar type, read in the cell it is kept in (S1.6).
+            case BoundIndex index:
+                return ElementCellOf(session, index) is { } element && element.TryRead(out payload);
             default:
                 return false;
         }
     }
+
+    // the cell of an element of an array of a scalar type a variable holds - a(i, j) - when each subscript is evaluated on payloads and selects an element
+    // (S1.6). A subscript is let-coerced to a Long, as the boxed evaluation coerces it (EvaluateSubscripts): one that would raise an error - past the range
+    // of a Long, outside its dimension - is that evaluation's to raise, and so is an array that is not known, or one whose elements are kept as values.
+    private ScalarCell? ElementCellOf(IRuntimeSession session, BoundIndex index)
+    {
+        if (index.Callee is not BoundVariable variable
+            || BindingOf(session, variable).Handle is not ValueBindingHandle { Value: VBRuntimeValue<VBRuntimeArrayValue> { Value.Array: { IsIndeterminate: false } array } }
+            || index.Arguments.Length != array.Rank || array.Rank > MaxPayloadRank)
+        {
+            return null;
+        }
+
+        Span<int> subscripts = stackalloc int[MaxPayloadRank];
+        for (var k = 0; k < index.Arguments.Length; k++)
+        {
+            if (!TryEvaluatePayload(session, index.Arguments[k], out var subscript) || !TryConvertPayload(subscript, VBLongType.TypeInfo, out var integral))
+            {
+                return null;
+            }
+
+            subscripts[k] = (int)integral.Integral;
+        }
+
+        var flat = array.IndexOf(subscripts[..index.Arguments.Length]);
+        return flat < 0 ? null : array.CellAt(flat) as ScalarCell;
+    }
+
+    // MS-VBAL §5.6.13 sets no limit on the rank of an array; MS-VBA's is 60. An element of more dimensions than this is read boxed.
+    private const int MaxPayloadRank = 8;
 
     // MS-VBAL §5.6.9: a plan that depends on what a Variant operand holds is made again for the types of the payloads (S1.4) - the value types the
     // boxed evaluation makes it for (PlanExecutor); any other plan is final.

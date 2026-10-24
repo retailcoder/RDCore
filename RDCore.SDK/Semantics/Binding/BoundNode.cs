@@ -165,11 +165,14 @@ public sealed record class BoundNew(NewExpressionNode New, VBClassModuleSymbol C
 /// </summary>
 /// <remarks>
 /// The binding is the callee's: the value is evaluated through its bound node. What the arguments do to the value - select an element, call a
-/// default member - is decided by the value, each time.
+/// default member - is decided by the value, each time. Each argument is an expression of its own, bound in its turn: the subscripts of an element are
+/// evaluated through their nodes.
 /// </remarks>
 /// <param name="Index">The index expression.</param>
 /// <param name="Callee">The callee, bound.</param>
-public sealed record class BoundIndex(IndexExpressionNode Index, BoundNode Callee) : BoundNode(Index);
+/// <param name="Arguments">The arguments as they are written, in order, each bound; a named or an omitted argument, which no element is selected by, is a
+/// <see cref="BoundLate"/> of itself.</param>
+public sealed record class BoundIndex(IndexExpressionNode Index, BoundNode Callee, ImmutableArray<BoundNode> Arguments) : BoundNode(Index);
 
 /// <summary>
 /// A <c>TypeOf … Is</c> expression (<strong>MS-VBAL §5.6.9.9</strong>), its operand, and the class it tests the operand's object against.

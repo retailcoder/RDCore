@@ -22,7 +22,7 @@ namespace RDCore.Runtime.Execution.Frames;
 /// is written again: <see cref="TryRead"/> says so.
 /// </para>
 /// </remarks>
-internal sealed class ScalarCell : IKnowledgeBinding
+internal sealed class ScalarCell : ICopyableBinding
 {
     private IRuntimeValue? _boxed;
     private ScalarPayload _payload;
@@ -58,6 +58,10 @@ internal sealed class ScalarCell : IKnowledgeBinding
         cell.Write(payload);
         return cell;
     }
+
+    // a copy of an element of an array that is assigned (S1.6) is a payload cell too: a scalar is immutable, so the boxed value, if any, is shared.
+    public IBindingHandle Copy()
+        => new ScalarCell(Type) { _boxed = _boxed, _payload = _payload, _hasPayload = _hasPayload, IsKnown = IsKnown };
 
     /// <summary>The declared type of the variable, which its payload is of.</summary>
     public VBType Type { get; }

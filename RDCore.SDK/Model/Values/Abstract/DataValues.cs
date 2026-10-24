@@ -48,11 +48,14 @@ public static class DataValues
     /// A new cell that holds a copy of what <paramref name="cell"/> holds, and knows of it what <paramref name="cell"/> does.
     /// </summary>
     /// <param name="cell">An element's cell, or a field's.</param>
-    /// <returns>The new cell; <paramref name="cell"/> itself when it holds nothing that can be read, which a write replaces rather than writes to.</returns>
+    /// <returns>The new cell - the cell's own copy, when it makes one (<see cref="ICopyableBinding"/>); <paramref name="cell"/> itself when it holds nothing
+    /// that can be read, which a write replaces rather than writes to.</returns>
     public static IBindingHandle CopyCell(IBindingHandle cell)
-        => cell.BindingCapabilities.HasFlag(BindingCapabilities.GetValue) && cell is IKnowledgeBinding knowledge
-            ? BindingKnowledge.NewCell(CopyRuntimeValue(cell.Value), knowledge.IsKnown)
-            : cell;
+        => cell is ICopyableBinding copyable
+            ? copyable.Copy()
+            : cell.BindingCapabilities.HasFlag(BindingCapabilities.GetValue) && cell is IKnowledgeBinding knowledge
+                ? BindingKnowledge.NewCell(CopyRuntimeValue(cell.Value), knowledge.IsKnown)
+                : cell;
 
     /// <summary>
     /// A copy of a value as a cell stores it: an array, a user-defined type and a <c>Variant</c> are boxed (<c>SymbolAddressTable.BoxedValue</c>),

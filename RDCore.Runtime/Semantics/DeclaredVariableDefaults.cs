@@ -1,10 +1,13 @@
+using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics.Statements;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 
@@ -67,9 +70,19 @@ public sealed class DeclaredVariableDefaults(IRuntimeSession session, ArrayBound
         return variable.TryGetProperty(SymbolProperties.ArrayBounds, out var declared)
             && !declared.IsDefaultOrEmpty
             && TryReduce(variable, declared) is { } dimensions
-                ? new VBFixedSizeArrayValue(dimensions, array.ItemType, ((IVariableDefaults)this).ElementDefaultOf(array.ItemType))
+                ? new VBFixedSizeArrayValue(dimensions, array.ItemType, ((IVariableDefaults)this).ElementDefaultOf(array.ItemType), ElementCellOf(array.ItemType))
                 : new VBFixedSizeArrayValue([], array.ItemType);
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// An element of a scalar type is kept in a cell that holds it as a payload (IR lowering S1.6), as a scalar variable is: an expression of it is
+    /// evaluated on the payload, and an assignment to it writes one, with no value made of it either way.
+    /// </remarks>
+    public Func<IBindingHandle>? ElementCellOf(VBType itemType)
+        => UnboxedEvaluation.IsEnabled && ScalarPayload.TryOf(itemType, itemType.DefaultValue.RuntimeValue, out var initial)
+            ? () => ScalarCell.Of(initial)
+            : null;
 
     private (int, int)[]? TryReduce(Symbol variable, IReadOnlyList<ArrayDimensionBound> declared)
     {

@@ -134,7 +134,7 @@ public sealed class ExpressionBindings
                 when context.Resolver.NamespaceOf(owner, context.Scope.Uri) is { } qualifier && NamespaceMemberOf(context, qualifier, access) is { } member
                 => member is VBTypeMemberSymbol procedure and (VBProcedureMemberSymbol or VBFunctionMemberSymbol or VBPropertyGetMemberSymbol)
                     ? new BoundCall(index, procedure)
-                    : new BoundIndex(index, new BoundQualifiedName(access, member)),
+                    : new BoundIndex(index, new BoundQualifiedName(access, member), ArgumentNodes(index)),
 
             // a member of an object declared as a class, read or called: resolved in the class, as the evaluation resolves it. A function that takes no
             // argument is not given what follows it in parentheses, which indexes what it returns: that is evaluated late-bound.
@@ -162,10 +162,10 @@ public sealed class ExpressionBindings
             // an element of an array, or a default member of an object, a variable holds: the variable is read through its node (a procedure, which the name
             // calls, is a BoundCall above).
             IndexExpressionNode { Callee: SimpleNameExpressionNode callee } index when NodeOf(callee) is BoundVariable variable
-                => new BoundIndex(index, variable),
+                => new BoundIndex(index, variable, ArgumentNodes(index)),
 
             // what any other value - a call's result, `F()(1)`, an element, `a(1)(2)` - is indexed by: the callee is evaluated as it is, then indexed.
-            IndexExpressionNode { Callee: not (SimpleNameExpressionNode or MemberAccessExpressionNode) } index => new BoundIndex(index, ChildNode(index.Callee)),
+            IndexExpressionNode { Callee: not (SimpleNameExpressionNode or MemberAccessExpressionNode) } index => new BoundIndex(index, ChildNode(index.Callee), ArgumentNodes(index)),
 
             // a member of any other value - an object declared Object or Variant (late-bound), a field of a record, what an element, a call or another member
             // is: the owner bound, the member found from the value each time. A name of a namespace or of an enumeration is
@@ -245,6 +245,9 @@ public sealed class ExpressionBindings
 
     // the node of an operand a structural node evaluates as it is: one that is not bound is bound late, on its own.
     private BoundNode ChildNode(ExpressionNode operand) => NodeOf(operand) ?? new BoundLate(operand);
+
+    // the arguments of an index expression, each the node of its expression; a named or an omitted one has no value of its own to be bound, and is late.
+    private ImmutableArray<BoundNode> ArgumentNodes(IndexExpressionNode index) => [.. index.Arguments.Select(ChildNode)];
 
     // the bound node of the expression an object is reached through, and the class it is declared as, when it is declared as one: the class's declaration as
     // it is now, which a type built before it was complete only has a snapshot of (MemberAccessExpressionStaticSemantics reads its members the same way).
