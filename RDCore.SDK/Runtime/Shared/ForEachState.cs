@@ -20,4 +20,12 @@ namespace RDCore.SDK.Runtime.Shared;
 /// asked for; <see langword="null"/> when the collection is an array. It is positioned at the member currently assigned to <see cref="Control"/>.
 /// </param>
 public readonly record struct ForEachState(
-    ITypedSymbol Control, ExpressionNode ControlExpression, VBArrayValue? Array, int Index, VBObjectValue? Enumerator = null);
+    ITypedSymbol Control, ExpressionNode ControlExpression, VBArrayValue? Array, int Index, VBObjectValue? Enumerator = null)
+{
+    /// <summary>
+    /// What the runtime that runs the loop keeps of it from one <c>Next</c> to the next - what it would otherwise work out again on every iteration, of
+    /// what does not change while the loop runs (where the control variable is kept). Opaque here: the runtime that sets it is the one that reads it, and
+    /// <see langword="null"/> means it keeps nothing.
+    /// </summary>
+    public object? RuntimeState { get; init; }
+}

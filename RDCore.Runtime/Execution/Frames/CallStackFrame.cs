@@ -37,6 +37,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     private Dictionary<SemanticId, MemoryAddress>? _byRefAliases;
     private Dictionary<SemanticId, VBType>? _referencedTypes;
     private Dictionary<int, VBTypedValue>? _blockState;
+    private Dictionary<int, ScalarPayload>? _selectorPayloads;
     private Dictionary<int, ForLoopState>? _forLoopState;
     private Dictionary<int, ForEachState>? _forEachState;
     private Stack<int>? _goSubReturns;
@@ -198,13 +199,33 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// instruction at <paramref name="openerOffset"/> — a <c>With</c>'s target, a <c>Select Case</c>'s
     /// selector.
     /// </summary>
-    public void SetBlockState(int openerOffset, VBTypedValue value) => (_blockState ??= [])[openerOffset] = value;
+    public void SetBlockState(int openerOffset, VBTypedValue value)
+    {
+        (_blockState ??= [])[openerOffset] = value;
+        _ = _selectorPayloads?.Remove(openerOffset);
+    }
 
     /// <inheritdoc/>
     public bool TryGetBlockState(int openerOffset, [NotNullWhen(true)][MaybeNullWhen(false)] out VBTypedValue? value)
     {
         value = null;
         return _blockState is not null && _blockState.TryGetValue(openerOffset, out value);
+    }
+
+    /// <summary>
+    /// Stashes a <c>Select Case</c>'s selector evaluated on payloads (IR lowering S1.6), in place of the value <see cref="SetBlockState"/> would stash: the
+    /// <c>Case</c> headers compare it as it is, and make a value of it only for a clause compared boxed.
+    /// </summary>
+    internal void SetSelectorPayload(int openerOffset, ScalarPayload selector)
+    {
+        (_selectorPayloads ??= [])[openerOffset] = selector;
+        _ = _blockState?.Remove(openerOffset);
+    }
+
+    internal bool TryGetSelectorPayload(int openerOffset, out ScalarPayload selector)
+    {
+        selector = default;
+        return _selectorPayloads is not null && _selectorPayloads.TryGetValue(openerOffset, out selector);
     }
 
     /// <summary>

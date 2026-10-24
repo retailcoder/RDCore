@@ -1,10 +1,12 @@
 using RDCore.Runtime.Execution;
 using RDCore.Runtime.Execution.Frames;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
+using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
@@ -291,6 +293,11 @@ public sealed partial class RuntimeExpressionEvaluator
                     (VariantCell cell, null) => cell.TryRead(out payload),
                     _ => false,
                 };
+            // a constant - a Const, a member of an enumeration - bare or qualified, folded once: the same value wherever it is read.
+            case BoundName { Symbol: var symbol } when IsConstant(symbol):
+                return TryReadConstant(session, node, symbol, out payload);
+            case BoundQualifiedName { Member: var member } when IsConstant(member):
+                return TryReadConstant(session, node, member, out payload);
             // MS-VBAL §5.6.6: what is in parentheses is a value - of a payload, the payload, whether the parentheses group an operand (the precedence
             // operator) or coerce what they enclose (the let-coercion operator, which converts nothing of a scalar).
             case BoundUnary { Operation.Token: SDK.Model.Symbols.Operators.OperatorSymbolNames.UnaryArithmeticPrecedenceOp
@@ -311,6 +318,31 @@ public sealed partial class RuntimeExpressionEvaluator
                 return false;
         }
     }
+
+    private static bool IsConstant(Symbol symbol) => symbol is VBConstantMemberSymbol or VBLocalConstantSymbol or VBEnumConstMemberSymbol;
+
+    // MS-VBAL §5.2.3.2, §5.2.3.4: a constant's value is its expression folded, which does not change for as long as the declaration does - and a name
+    // bound to it is bound again when it changes. So it is read as the boxed evaluation reads it, once for each place it is named, and kept as a payload.
+    // A constant that is not of a scalar type, or whose value could not be folded, is the boxed evaluation's every time.
+    private bool TryReadConstant(IRuntimeSession session, BoundNode node, Symbol constant, out ScalarPayload payload)
+    {
+        if (!_constantPayloads.TryGetValue(node, out var known))
+        {
+            var read = ReadSymbol(session, new RuntimeEvaluationContext(constant.ParentUri), constant, nameOfEnclosingFunctionIsItsResult: false);
+            known = read is { IsSuccess: true, Result: { IsIndeterminate: false } value }
+                && ScalarPayload.TryOf(value.TypeInfo, value.RuntimeValue, out var folded)
+                    ? new ConstantPayload(true, folded)
+                    : default;
+            _constantPayloads[node] = known;
+        }
+
+        payload = known.Payload;
+        return known.IsScalar;
+    }
+
+    private readonly record struct ConstantPayload(bool IsScalar, ScalarPayload Payload);
+
+    private readonly ConcurrentDictionary<BoundNode, ConstantPayload> _constantPayloads = new(ReferenceEqualityComparer.Instance);
 
     // the cell of an element of an array of a scalar type a variable holds - a(i, j) - when each subscript is evaluated on payloads and selects an element
     // (S1.6). A subscript is let-coerced to a Long, as the boxed evaluation coerces it (EvaluateSubscripts): one that would raise an error - past the range
@@ -474,6 +506,18 @@ public sealed partial class RuntimeExpressionEvaluator
     }
 
     /// <summary>
+    /// Evaluates the selector of a <c>Select Case</c> on payloads (MS-VBAL §5.4.2.10's select-expression, evaluated once), when it is an expression
+    /// evaluated on them: what each <c>Case</c> compares, with no value made of it (IR lowering S1.6).
+    /// </summary>
+    /// <returns><see langword="false"/> when the selector is not evaluated here, and is to be evaluated the way it always is.</returns>
+    internal bool TryEvaluateSelectorUnboxed(IRuntimeSession session, ExpressionNode selector, RuntimeEvaluationContext context, out ScalarPayload payload)
+    {
+        payload = default;
+        return UnboxedEvaluation.IsEnabled && Observation is null && !AssumesVariables
+            && TryEvaluatePayload(session, BoundTreeOf(session, selector, context), out payload);
+    }
+
+    /// <summary>
     /// Compares the selector of a <c>Select Case</c> with the value of a <c>Case</c> on payloads (MS-VBAL §5.4.2.10): <c>selector operator value</c>, when the
     /// selector is a payload and the value an expression evaluated on them.
     /// </summary>
@@ -481,8 +525,16 @@ public sealed partial class RuntimeExpressionEvaluator
     internal bool TryCompareUnboxed(IRuntimeSession session, string comparisonOperator, VBTypedValue selector, ExpressionNode value, RuntimeEvaluationContext context, out bool isMatch)
     {
         isMatch = false;
-        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables || selector.IsIndeterminate
-            || !ScalarPayload.TryOf(selector.TypeInfo, selector.RuntimeValue, out var lhs)
+        return !selector.IsIndeterminate && ScalarPayload.TryOf(selector.TypeInfo, selector.RuntimeValue, out var lhs)
+            && TryCompareUnboxed(session, comparisonOperator, lhs, value, context, out isMatch);
+    }
+
+    /// <inheritdoc cref="TryCompareUnboxed(IRuntimeSession, string, VBTypedValue, ExpressionNode, RuntimeEvaluationContext, out bool)"/>
+    /// <remarks>The selector evaluated on payloads itself (<see cref="TryEvaluateSelectorUnboxed"/>).</remarks>
+    internal bool TryCompareUnboxed(IRuntimeSession session, string comparisonOperator, ScalarPayload lhs, ExpressionNode value, RuntimeEvaluationContext context, out bool isMatch)
+    {
+        isMatch = false;
+        if (!UnboxedEvaluation.IsEnabled || Observation is not null || AssumesVariables
             || !TryEvaluatePayload(session, BoundTreeOf(session, value, context), out var rhs)
             || OperationPlanner.ForValues(comparisonOperator, lhs.Type, rhs.Type) is not { OperandDestination: { } destination }
             || !TryConvertPayload(lhs, destination, out var l) || !TryConvertPayload(rhs, destination, out var r)

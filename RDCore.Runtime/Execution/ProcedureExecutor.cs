@@ -12,9 +12,11 @@ using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values.Abstract;
+using RDCore.SDK.Model.Values.Bindings;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Semantics.Binding;
 using RDCore.SDK.Semantics.Instructions;
 
 namespace RDCore.Runtime.Execution;
@@ -663,7 +665,14 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         }
 
         // MS-VBAL §5.4.2.10: "the select-expression is immediately evaluated" - once, ahead of every
-        // Case header's own range-clause matching against it.
+        // Case header's own range-clause matching against it. A selector evaluated on payloads is kept as one (S1.6).
+        if (cases.TryEvaluateSelectorUnboxed(session, selectCase.ControlExpression, context, out var payload))
+        {
+            activation.SetSelectorPayload(instruction.Offset, payload);
+            activation.Pc = instruction.Offset + 1;
+            return null;
+        }
+
         var selectorResult = cases.EvaluateSelector(session, selectCase.ControlExpression, context);
         if (!selectorResult.IsSuccess)
         {
@@ -679,7 +688,19 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     // outcome only when execution must stop.
     private RuntimeExecutionOutcome? ExecuteCaseHeader(IRuntimeSession session, RuntimeEvaluationContext context, Instruction instruction, CallStackFrame activation, int selectOffset)
     {
-        if (instruction.Node is not CaseExpressionStatementNode caseBlock || !activation.TryGetBlockState(selectOffset, out var selector))
+        // a selector kept as a payload (S1.6) is compared as one; a Case it is not is compared boxed, with the selector made a value of it.
+        VBTypedValue? selector = null;
+        if (instruction.Node is CaseExpressionStatementNode payloadCase && activation.TryGetSelectorPayload(selectOffset, out var payload))
+        {
+            if (cases.TryMatchUnboxed(session, payloadCase, payload, context, out var isMatch))
+            {
+                return Branch(activation, instruction, RuntimeSemanticsEvaluationResult.Success(isMatch ? VBBooleanValue.True : VBBooleanValue.False));
+            }
+
+            selector = payload.Type.CreateValue(new ValueBindingHandle(payload.Box()));
+        }
+
+        if (instruction.Node is not CaseExpressionStatementNode caseBlock || (selector is null && !activation.TryGetBlockState(selectOffset, out selector)))
         {
             // TryGetBlockState failing here means the enclosing Select's own opener never ran - a
             // lowering/executor desync, not a reachable program state.
@@ -1181,15 +1202,28 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             return null;
         }
 
-        var element = state.Array.ElementAt(nextIndex)!;
-        var assignResult = forEach.AssignControl(session, state.Control, state.ControlExpression,
-            ForEachEvaluator.IsSetAssigned(state.Array.ItemType, element), element);
-        if (!assignResult.IsSuccess)
+        // an element of an array of a scalar type is let-assigned to a Variant control variable as the payload it is (S1.6): the Variant holds a value of
+        // the element's type, as the assignment makes it hold. A control variable that holds an object is assigned boxed, which lets go of it.
+        var payloads = state.RuntimeState as ForEachPayloads ?? NewForEachPayloads(activation, state);
+        if (observation is null && UnboxedEvaluation.IsEnabled && !state.Array.IsIndeterminate && payloads.Control is { } slot
+            && state.Array.CellAt(nextIndex) is ScalarCell elementCell && elementCell.TryRead(out var payload)
+            && activation.TryReadSlot(slot, (Symbol)state.Control, out var controlCell, out var referenced) && referenced is null
+            && controlCell is VariantCell { HoldsNoObject: true } control)
         {
-            return ToFailureOutcome(assignResult);
+            control.Write(payload);
+        }
+        else
+        {
+            var element = state.Array.ElementAt(nextIndex)!;
+            var assignResult = forEach.AssignControl(session, state.Control, state.ControlExpression,
+                ForEachEvaluator.IsSetAssigned(state.Array.ItemType, element), element);
+            if (!assignResult.IsSuccess)
+            {
+                return ToFailureOutcome(assignResult);
+            }
         }
 
-        activation.SetForEachState(openerOffset, state with { Index = nextIndex });
+        activation.SetForEachState(openerOffset, state with { Index = nextIndex, RuntimeState = payloads });
 
         if (instruction.Target is not { } target)
         {
@@ -1199,6 +1233,13 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         activation.Pc = target;
         return null;
     }
+
+    // where the control variable of a For Each is kept, found once for the loop: its slot, when it is a local of the activation.
+    private static ForEachPayloads NewForEachPayloads(CallStackFrame activation, ForEachState state)
+        => new()
+        {
+            Control = activation.Procedure is { } procedure && FrameLayout.For(procedure).TryGetSlot((Symbol)state.Control, out var slot) ? slot : null,
+        };
 
     // Shared by On...GoTo (JumpTable, pushReturn: false) and On...GoSub (GoSubTable, pushReturn: true) -
     // MS-VBAL §5.4.2.13/.16 describe the exact same selector algorithm for both, differing only in

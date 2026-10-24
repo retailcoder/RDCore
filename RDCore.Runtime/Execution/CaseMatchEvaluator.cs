@@ -1,3 +1,4 @@
+using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics;
 using RDCore.Runtime.Semantics.Operators;
 using RDCore.SDK.Model;
@@ -31,6 +32,61 @@ public sealed class CaseMatchEvaluator(RuntimeExpressionEvaluator expressionEval
     /// </summary>
     public RuntimeSemanticsEvaluationResult EvaluateSelector(IRuntimeSession session, ExpressionNode controlExpression, RuntimeEvaluationContext context)
         => expressionEvaluator.Evaluate(session, controlExpression, context);
+
+    /// <summary>
+    /// <see cref="EvaluateSelector"/> on payloads (IR lowering S1.6), when the selector is an expression evaluated on them.
+    /// </summary>
+    /// <returns><see langword="false"/> when the selector is to be evaluated the way it always is.</returns>
+    internal bool TryEvaluateSelectorUnboxed(IRuntimeSession session, ExpressionNode controlExpression, RuntimeEvaluationContext context, out ScalarPayload selector)
+        => expressionEvaluator.TryEvaluateSelectorUnboxed(session, controlExpression, context, out selector);
+
+    /// <summary>
+    /// <see cref="Evaluate"/> on payloads, for a selector evaluated on them: each clause's comparison made as <see cref="Evaluate"/> makes it, in the same
+    /// order, short-circuiting the same way.
+    /// </summary>
+    /// <returns><see langword="false"/> when a clause is not compared on payloads: the whole <c>Case</c> is then matched the way it always is, which
+    /// evaluates again only clauses that have no other effect.</returns>
+    internal bool TryMatchUnboxed(IRuntimeSession session, CaseExpressionStatementNode caseBlock, ScalarPayload selector, RuntimeEvaluationContext context, out bool isMatch)
+    {
+        isMatch = false;
+        foreach (var clause in caseBlock.RangeClauses)
+        {
+            var compared = clause switch
+            {
+                CaseValueRangeClauseNode value => expressionEvaluator.TryCompareUnboxed(session, Tokens.CompareEqualOp, selector, value.Value, context, out isMatch),
+                CaseComparisonRangeClauseNode comparison
+                    => expressionEvaluator.TryCompareUnboxed(session, comparison.ComparisonOperator, selector, comparison.Value, context, out isMatch),
+                CaseToRangeClauseNode range => TryMatchRangeUnboxed(session, range, selector, context, out isMatch),
+                _ => false,
+            };
+
+            if (!compared)
+            {
+                return false;
+            }
+
+            if (isMatch)
+            {
+                return true;
+            }
+        }
+
+        return true;
+    }
+
+    // both ends are compared, as the And of the two comparisons (EvaluateRange) evaluates both.
+    private bool TryMatchRangeUnboxed(IRuntimeSession session, CaseToRangeClauseNode range, ScalarPayload selector, RuntimeEvaluationContext context, out bool isMatch)
+    {
+        isMatch = false;
+        if (!expressionEvaluator.TryCompareUnboxed(session, Tokens.CompareGreaterThanOrEqualOp, selector, range.Start, context, out var above)
+            || !expressionEvaluator.TryCompareUnboxed(session, Tokens.CompareLessThanOrEqualOp, selector, range.End, context, out var below))
+        {
+            return false;
+        }
+
+        isMatch = above && below;
+        return true;
+    }
 
     /// <summary>
     /// Evaluates <paramref name="caseBlock"/>'s range clauses, in source order, against
