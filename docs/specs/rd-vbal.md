@@ -159,33 +159,10 @@ The publisher of the **RDCore** platform project and of _this present documentat
 ✅ **Challenge: Accepted**.
 
 ---
-## Revisions
+## Section map
 
-|Date|Version|Description|
-|---|---|---|
-|2026-06-25|1.0|Initial public version|
-|2026-09-06|1.1|[§2.3.1.2](rd-vbal.2.3.1.2.session-services.md) session services; [§2.5.2.1.2](rd-vbal.2.5.2.1.2.array-values.md) array values; [§3.2.0.1](rd-vbal.3.2.0.literals.md) numeric literal types; [§5.6.9.2](rd-vbal.5.6.9.2.simple-data-operators.md) effective type; [§5.5.1.2](rd-vbal.5.5.1.2.runtime-semantics.md) let-coercion dispatch and the MS-VBAL divergence principle; [§2.5.2.1.3](rd-vbal.2.5.2.1.3.udt-values.md) UDT values|
-|2026-09-09|1.2|[§2.6](rd-vbal.2.6.diagnostics.md) diagnostic code families and help URLs; [§2.6.5](rd-vbal.2.6.5.diagnostics-pipeline.md) diagnostics pipeline|
-|2026-09-13|1.3|[§3.4.0](rd-vbal.3.4.0.statements.md) statement node families: [§3.4.1](rd-vbal.3.4.1.block-statements.md) block, [§3.4.2](rd-vbal.3.4.2.simple-statements.md) simple and [§3.4.3](rd-vbal.3.4.3.file-statements.md) file statements|
-|2026-09-23|1.4|[§3.5.0](rd-vbal.3.5.0.instructions.md) instructions: [§3.5.1](rd-vbal.3.5.1.instructionlist.md) `InstructionList`, [§3.5.2](rd-vbal.3.5.2.instruction.md) `Instruction`, [§3.5.3](rd-vbal.3.5.3.lowering-block-statements.md) lowering, [§3.5.4](rd-vbal.3.5.4.execution.md) execution; [§5.4.3.8](rd-vbal.5.4.3.8.let-statement.md)–[9](rd-vbal.5.4.3.9.set-statement.md) Let and Set statements|
-|2026-09-24|1.5|[§5.3.1.11](rd-vbal.5.3.1.11.procedure-invocation-argument-processing.md) procedure invocation and arguments; [§5.4.3.1](rd-vbal.5.4.3.1.local-variable-declarations.md) hoisted locals|
-|2026-09-25|1.6|`ParamArray`; [§2.5.2.1.5](rd-vbal.2.5.2.1.5.variant-values.md) Variant values and operands; [§6.1.1.16](rd-vbal.6.1.1.predefined-enums.md) `VbVarType`|
-|2026-09-26|1.7|[§6.0.1](rd-vbal.6.0.standard-library.md) symbol injection; [§6.1.1](rd-vbal.6.1.1.predefined-enums.md) predefined enums; Information, Err, Math, Conversion and [§6.1.2.11](rd-vbal.6.1.2.11.strings.md) Strings modules; [§2.3.1.3](rd-vbal.2.3.1.3.name-resolution.md) name resolution|
-|2026-09-27|1.8|[§5.4.5](rd-vbal.5.4.5.file-statements.md) file statements; UDT sizes and `Len`/`LenB`; `LSet`/`RSet`|
-|2026-09-27|1.9|Sections split into pages of their own, chapters 5 and 6 aligned with MS-VBAL numbering. See the section map below.|
-|2026-09-30|1.10|[§6.1.2.6](rd-vbal.6.1.2.6.financial.md) Financial; `ReDim` and `Erase`; class lifecycle, events and `WithEvents`|
-|2026-10-01|1.11|Events and handlers; [§5.3.1.9](rd-vbal.5.3.1.9.implemented-name-declarations.md) `Implements`; member and array-element assignment; [§6.1.2.13](rd-vbal.6.1.2.13.hidden-module.md) hidden module|
-|2026-10-11|1.12|[§2.4.1.2](rd-vbal.2.4.1.intrinsic-types.md) `String` trailing byte; [§5.5.1.2](rd-vbal.5.5.1.2.runtime-semantics.md) let-coercion gaps; name resolution and type expressions; `Mid`, `Print`, `Write #`; [§6.1.2.2](rd-vbal.6.1.2.2.constants-module.md) Constants|
-|2026-10-16|1.13|[§6.1.2.11](rd-vbal.6.1.2.11.strings.md) Strings members and `$` functions; omitted `Optional` arguments and Missing|
-|2026-10-17|1.14|[§5.5.1.2](rd-vbal.5.5.1.2.runtime-semantics.md) regional settings for reading a `String`; [§2.6.2](rd-vbal.2.6.2.semantic-compilation-errors.md) `VBC09336`–`VBC09338`; `ReDim` locks|
-|2026-10-17|1.15|[§6.1.2.11](rd-vbal.6.1.2.11.strings.md) the `Format` family, `MonthName`, `WeekdayName`; `StrConv` East Asian conversions; objects' default members; [§5.6.9.2](rd-vbal.5.6.9.2.simple-data-operators.md) object operands; [§5.5.1.1](rd-vbal.5.5.1.1.static-semantics.md) let-coercion static semantics, `VBC09339`; [§5.4.2.3](rd-vbal.5.4.2.3.for-statement.md) `For` loop bounds|
-|2026-10-21|1.16|[§6.1.2.11](rd-vbal.6.1.2.11.strings.md) `Len` and `LenB` of records, `StrConv` code page and casing; [§2.5.2.1.3](rd-vbal.2.5.2.1.3.udt-values.md) 64-bit record sizes;[§2.6.4](rd-vbal.2.6.4.rubberduck-core-diagnostics.md) `RDC11011`; [§2.6.2](rd-vbal.2.6.2.semantic-compilation-errors.md) `VBC09305`; [§5.5.1.1](rd-vbal.5.5.1.1.static-semantics.md) `Len` operand; [§5.0.3](rd-vbal.5.0.semantics.md) `Variant` subtype knowledge|
-|2026-10-22|1.17|[§2.6.1](rd-vbal.2.6.1.syntax-errors.md), [§2.6.2](rd-vbal.2.6.2.semantic-compilation-errors.md) added missing compilation errors; [§5.5.1.1](rd-vbal.5.5.1.1.static-semantics.md) LongLong as MS-VBA|
-|2026-10-23|1.18|[§5.6.6](rd-vbal.5.6.6.parenthesized-expressions.md), [§3.3.1](rd-vbal.3.3.1.unary-operators.md) precedence and let-coercion parentheses; [§5.5.1.2](rd-vbal.5.5.1.2.runtime-semantics.md) `Date` range, fixed-point digits; [§5.0](rd-vbal.5.0.semantics.md) `Variant` `Byte` overflow; [§5.6.13](rd-vbal.5.6.13.index-expressions.md) subscripts; [§5.3.1.11](rd-vbal.5.3.1.11.procedure-invocation-argument-processing.md), [§5.4.3.3](rd-vbal.5.4.3.3.redim-statement.md) fixed-size arrays by reference; [§5.4.4.1](rd-vbal.5.4.4.1.on-error-statement.md), [§5.4.4.2](rd-vbal.5.4.4.2.resume-statement.md) `Select Case` resumed past; [§5.6.9.3](rd-vbal.5.6.9.3.arithmetic-operators.md) floating-point overflow, `^`|
-
-### Section map (1.9)
-
-Sections not listed keep their number. Pages that existed keep their file name.
+When the sections were split into pages of their own, chapters 5 and 6 were renumbered after MS-VBAL. Sections
+not listed keep their number. Pages that existed keep their file name.
 
 |Old RD-VBAL §|New RD-VBAL §|
 |---|---|
