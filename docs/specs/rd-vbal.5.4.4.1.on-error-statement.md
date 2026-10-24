@@ -44,6 +44,10 @@ An `On Error` statement sets the error-handling policy of the current activation
 The asymmetry between `On Error Resume Next` (policy kept) and `On Error GoTo <label>` (policy reset to disabled)
 follows MS-VBAL.
 
+A `Select Case` is one statement, up to its `End Select`: an error in its selector goes on at the statement past
+`End Select`, and no `Case` runs, `Case Else` included (MS-VBA). The same holds for `Resume Next`
+([**RD-VBAL §5.4.4.2**](rd-vbal.5.4.4.2.resume-statement.md)).
+
 In MS-VBA, `On Error GoTo 0` turns error handling off, and `On Error GoTo -1` clears the active error. RD-VBA treats
 the two identically: both lower as `OnErrorDisable`, which turns the activation's error handling off and clears any
 active error. MS-VBAL does not document `On Error GoTo -1`, so treating it as `On Error GoTo 0` does not diverge from

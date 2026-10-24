@@ -44,7 +44,7 @@ fault statement are held on the activation's
 |---|---|---|
 |Bare `Resume`|`ResumeCurrentStatement`|The fault statement, which is re-executed.|
 |`Resume 0`|`ResumeCurrentStatement`|The fault statement, which is re-executed: `Resume 0` behaves as a bare `Resume`.|
-|`Resume Next`|`ResumeNext`|The statement past the fault statement.|
+|`Resume Next`|`ResumeNext`|The statement past the fault statement: past `End Select`, when the error is in a `Select Case`'s selector.|
 |`Resume <label>`|`ResumeLabel`|The label.|
 
 |Condition|Run-time error|

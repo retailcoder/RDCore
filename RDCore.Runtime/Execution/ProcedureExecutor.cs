@@ -485,7 +485,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 case InstructionKind.ResumeCurrentStatement:
                 case InstructionKind.ResumeNext:
                 case InstructionKind.ResumeLabel:
-                    var resumeOutcome = ExecuteResume(instruction, activation);
+                    var resumeOutcome = ExecuteResume(list, instruction, activation);
                     if (resumeOutcome is null)
                     {
                         // a Resume that actually resumed; §6.1.3.2.1 clears Err with it.
@@ -1368,7 +1368,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                 // "Resume Next" does not reset the activation's own policy - it keeps silently catching
                 // every later error in the same activation, not just the first one.
                 activation.ErrorHandler = handler with { ActiveError = outcome.ErrorInfo, FaultStatementOffset = faultOffset };
-                activation.Pc = faultOffset + 1;
+                activation.Pc = NextStatementAfter(list, faultOffset);
                 return null;
 
             case ErrorHandlingMode.GoTo:
@@ -1386,7 +1386,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     // Returns null when the Resume succeeded (activation.Pc/ErrorHandler already updated - the loop
     // keeps running); returns a non-null outcome only when there was no active error to resume from
     // (error 20), itself routed back through InterceptError by the caller like any other Error outcome.
-    private static RuntimeExecutionOutcome? ExecuteResume(Instruction instruction, CallStackFrame activation)
+    private static RuntimeExecutionOutcome? ExecuteResume(InstructionList list, Instruction instruction, CallStackFrame activation)
     {
         if (activation.ErrorHandler.ActiveError is null || activation.ErrorHandler.FaultStatementOffset is not { } faultOffset)
         {
@@ -1398,12 +1398,18 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         activation.Pc = instruction.Kind switch
         {
             InstructionKind.ResumeCurrentStatement => faultOffset,
-            InstructionKind.ResumeNext => faultOffset + 1,
+            InstructionKind.ResumeNext => NextStatementAfter(list, faultOffset),
             InstructionKind.ResumeLabel => instruction.Target!.Value,
             _ => activation.Pc,
         };
         return null;
     }
+
+    // MS-VBAL §5.4.4.1, §5.4.4.2: execution goes on at the statement "immediately following the <statement> which caused the error". A Select Case is
+    // one statement up to its End Select: an error in its selector goes on past the whole construct, no Case matched (MS-VBA, Excel grid oracle\s16
+    // C01-C03).
+    private static int NextStatementAfter(InstructionList list, int faultOffset)
+        => list.Items[faultOffset] is { Kind: InstructionKind.Select, End: { } end } ? end : faultOffset + 1;
 
     // MS-VBAL §5.4.4.3: "the effect is as if the Err.Raise method were invoked" - always produces an
     // Error outcome (or InternalError on a lowering bug/a number expression that fails to evaluate), for
