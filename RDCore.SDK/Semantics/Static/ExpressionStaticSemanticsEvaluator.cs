@@ -212,6 +212,14 @@ public static class ExpressionStaticSemanticsEvaluator
             {
                 return argumentResult.Value;
             }
+
+            // a subscript of an element is let-coerced to a Long (RD-VBAL §5.6.13), which MS-VBA refuses a LongLong to at compile time, whatever its value
+            // (Excel-verified): not for a call, whose parameters say what they take.
+            if (argumentResult is { Result: VBLongLongType } && calleeResult.Result is VBArrayType && ProcedureNamedBy(context, indexExpression.Callee) is null)
+            {
+                return StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.TypeMismatch, argument.Location,
+                    Exceptions.VBIndex_LongLongSubscript_Verbose));
+            }
         }
 
         // an index of an array is no argument: any other callee may take what is written in its argument list by reference.

@@ -1239,6 +1239,15 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to A subscript of an array is a Long: a LongLong is not let-coerced to one..
+        /// </summary>
+        public static string VBIndex_LongLongSubscript_Verbose {
+            get {
+                return ResourceManager.GetString("VBIndex_LongLongSubscript_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to A negative number raised to a fractional power has no real result..
         /// </summary>
         public static string VBExponentOp_NoRealPower_Verbose {

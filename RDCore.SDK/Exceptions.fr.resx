@@ -192,6 +192,9 @@
   <data name="VBExponentOp_InvalidProcedureCallOrArgument_Verbose" xml:space="preserve">
     <value>Le résultat d'un exposant négatif ne peut être représenté avec une base à 0.</value>
   </data>
+  <data name="VBIndex_LongLongSubscript_Verbose" xml:space="preserve">
+    <value>L'indice d'un tableau est un Long : un LongLong n'y est pas converti.</value>
+  </data>
   <data name="VBExponentOp_NoRealPower_Verbose" xml:space="preserve">
     <value>Un nombre négatif élevé à une puissance fractionnaire n'a pas de résultat réel.</value>
   </data>

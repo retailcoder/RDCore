@@ -111,6 +111,8 @@ public sealed class MsVbaErrorParityTests
     [DataRow("Dim a(2) As Integer ;; Globals.TakesLongArray a", "Type mismatch: array or user-defined type expected", DisplayName = "an Integer array to a Long() parameter")]
     [DataRow("Dim n As Long ;; Debug.Print n.X", "Invalid qualifier", DisplayName = "a member of a Long")]
     [DataRow("Dim n As Long ;; Debug.Print n(1)", "Expected array", DisplayName = "an index of a Long")]
+    [DataRow("Dim a(1 To 3) As Long, ll As LongLong ;; ll = 2 ;; a(ll) = 7", "Type mismatch", DisplayName = "a LongLong subscript of an element assigned")]
+    [DataRow("Dim a(1 To 3) As Long, ll As LongLong ;; ll = 2 ;; Debug.Print a(ll)", "Type mismatch", DisplayName = "a LongLong subscript of an element read")]
     [DataRow("Dim n As Long ;; Erase n", "Expected array", DisplayName = "an Erase of a Long")]
     [DataRow("Dim a(2) As Long ;; Debug.Print a(1, 2)", "Wrong number of dimensions", DisplayName = "two subscripts of a one-dimension array")]
     [DataRow("Dim a(2) As Long ;; ReDim a(5)", "Array already dimensioned", DisplayName = "a ReDim of a fixed-size array")]
