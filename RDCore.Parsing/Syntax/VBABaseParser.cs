@@ -149,6 +149,20 @@ public abstract class VBABaseParser : Parser
         }
         return false;
     }
+
+    // MS-VBAL §5.4.1.1: a statement label is defined at the LINE-START of a logical line - and whitespace is no token of the syntactic grammar (§3.3), so
+    // a label indented by it is at the start of its line all the same, as MS-VBA has it (Excel-verified). The VBE moves a label to the first column; a
+    // module written anywhere else may not.
+    protected bool IsAtLineStart()
+    {
+        var offset = -1;
+        while (TokenTypeAtRelativePosition(offset) == VBALexer.WS)
+        {
+            offset--;
+        }
+
+        return IsTokenType(TokenTypeAtRelativePosition(offset), VBALexer.NEWLINE, VBALexer.LINE_CONTINUATION);
+    }
     #endregion
 
     #region Grammar-level recovery helpers

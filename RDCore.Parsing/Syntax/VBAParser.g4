@@ -643,7 +643,7 @@ complexType :
 fieldLength : MULT whiteSpace? (numberLiteral | identifierValue);
 
 //Statement labels can only appear at the start of a line.
-statementLabelDefinition : {IsTokenType(TokenTypeAtRelativePosition(-1),NEWLINE,LINE_CONTINUATION)}? (combinedLabels | identifierStatementLabel | standaloneLineNumberLabel);
+statementLabelDefinition : {IsAtLineStart()}? (combinedLabels | identifierStatementLabel | standaloneLineNumberLabel);
 identifierStatementLabel : legalLabelIdentifier whiteSpace? COLON;
 standaloneLineNumberLabel : 
     lineNumberLabel whiteSpace? COLON

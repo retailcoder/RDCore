@@ -14,6 +14,11 @@ Statement labels and line numbers are captured as separate nodes. A jump stateme
 or numbering a label, with no static link to the label node
 ([**RD-VBAL §3.4.2** Simple Statements](rd-vbal.3.4.2.simple-statements.md)).
 
+A label is defined at the start of a logical line (**MS-VBAL §5.4.1.1**'s `LINE-START`), and may be indented:
+whitespace is no token of the syntactic grammar (**MS-VBAL §3.3**), and MS-VBA accepts an indented label. The VBE
+moves a label to the first column; a module written in any other editor, or code typed at the BASIC prompt, may
+not, and `    Retry:` is the label `Retry` all the same.
+
 ## Static Semantics
 
 A procedure declaration must contain exactly one definition of each label value it declares
