@@ -135,6 +135,9 @@
   <data name="LanguageServerConnected" xml:space="preserve">
     <value>✅ Le serveur de langage est connecté et prêt.</value>
   </data>
+  <data name="LanguageServerStoppedBeforeInitialize" xml:space="preserve">
+    <value>🛑 Le processus qui a démarré ce serveur n'existe plus avant de l'avoir initialisé ; le serveur s'arrête.</value>
+  </data>
   <data name="LanguageServerInitialize_HandlerCompleted" xml:space="preserve">
     <value>✅ OnLanguageServerInitializeAsync complété.</value>
   </data>

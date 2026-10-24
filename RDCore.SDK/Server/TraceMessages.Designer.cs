@@ -140,6 +140,15 @@ internal class TraceMessages {
             return ResourceManager.GetString("LanguageServerConnected", resourceCulture);
         }
     }
+
+    /// <summary>
+    ///   Looks up a localized string similar to 🛑 The process that started this server is gone before it initialized it; the server stops..
+    /// </summary>
+    internal static string LanguageServerStoppedBeforeInitialize {
+        get {
+            return ResourceManager.GetString("LanguageServerStoppedBeforeInitialize", resourceCulture);
+        }
+    }
     
     /// <summary>
     ///   Looks up a localized string similar to ✅ OnLanguageServerInitializeAsync handler completed..

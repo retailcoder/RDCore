@@ -133,13 +133,27 @@ public abstract class RDCoreServerApp(
     {
         ExternalServices = externalServiceProvider;
         LogIfEnabled(LogLevel.Information, TraceMessages.LanguageServerStarting);
+
+        // the process that started this one (-p) is watched from the start, and not only once it is named again by the initialize request: a server
+        // whose owner is gone before it is initialized - a test host stopped mid-run - would wait for a client that never comes, holding what it
+        // inherited from its owner, the console a test run's output is read from among it.
+        WatchOwner(options.Value.Server.ClientProcessId);
+        var token = ServerStateProvider.ProcessTokenSource.Token;
         await BeforeRunAsync(args);
 
-        _namedPipe = await CreateServerPipeAsync();
-        await _namedPipe.WaitForConnectionAsync();
-        LogIfEnabled(LogLevel.Information, TraceMessages.LanguageServerConnected);
+        try
+        {
+            _namedPipe = await CreateServerPipeAsync();
+            await _namedPipe.WaitForConnectionAsync(token);
+            LogIfEnabled(LogLevel.Information, TraceMessages.LanguageServerConnected);
 
-        Server = await OmniSharpLanguageServer.From(ConfigureServer, externalServiceProvider, ServerStateProvider.ProcessTokenSource.Token);
+            Server = await OmniSharpLanguageServer.From(ConfigureServer, externalServiceProvider, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            LogIfEnabled(LogLevel.Warning, TraceMessages.LanguageServerStoppedBeforeInitialize);
+            return;
+        }
 
         var shutdownTimeout = TimeSpan.FromSeconds(Math.Max(1, options.Value.Server.ShutdownTimeoutSeconds));
         Task? stopping = null;
@@ -198,6 +212,24 @@ public abstract class RDCoreServerApp(
     protected virtual Task OnServerStoppingAsync() => Task.CompletedTask;
 
     private void HandleUnhealthyClient() => ServerStateProvider.ProcessTokenSource.Cancel();
+
+    // an owner that is already gone is one this server has nothing to wait for.
+    private void WatchOwner(int processId)
+    {
+        if (processId <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            healthCheckService.Start(processId, HandleUnhealthyClient);
+        }
+        catch (ArgumentException)
+        {
+            HandleUnhealthyClient();
+        }
+    }
 
     // a just-killed predecessor can leave the named pipe instance briefly reserved (MaximumInstances=1).
     private async Task<NamedPipeServerStream> CreateServerPipeAsync()

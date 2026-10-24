@@ -125,6 +125,9 @@ public class RDCoreServerProcess(
         // a Task is not disposed — that throws while it is still running and buys nothing.
         _waitForExit = default;
 
+        // a child that is still running when its owner lets go of it is stopped: one that was never shut down (its connection failed, or was abandoned before
+        // the handshake) would otherwise outlive its owner, holding what it inherited from it - the console a test run's output is read from among it.
+        StopIfRunning(_serverProcess);
         _serverProcess?.Dispose();
         _serverProcess = default;
 
@@ -133,6 +136,27 @@ public class RDCoreServerProcess(
     }
 
     protected virtual void Dispose(bool disposing) { }
+
+    private void StopIfRunning(Process? process)
+    {
+        if (process is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            // it exited meanwhile, or is not ours to stop: either way there is nothing left to do.
+            Logger.LogDebug("The server process could not be stopped: {message}", exception.Message);
+        }
+    }
 
     public void Shutdown() => _serverProcess?.Kill();
 
