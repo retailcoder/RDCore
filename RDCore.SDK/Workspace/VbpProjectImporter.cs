@@ -20,8 +20,8 @@ public enum VbpImportNoteKind
     Control,
 
     /// <summary>
-    /// A file outside of the folder of the project (<c>..\Shared\Utils.bas</c>): it belongs to another project, whose folder is a workspace folder of its own
-    /// - the platform never takes in a folder outside the workspace folders it is given. Referencing that project is not implemented yet.
+    /// A file outside of the folder of the project (<c>..\Shared\Utils.bas</c>): a module of this project, as in VB6, whose folder is a source folder the client
+    /// adds to the workspace - the platform never takes in a folder outside the workspace folders it is given. Not carried over until source folders are taken in.
     /// </summary>
     OutsideProjectFolder,
 
@@ -39,6 +39,12 @@ public enum VbpImportNoteKind
     /// (<c>DEBUG = 1 : TRACE = -1</c>), and none of them is carried over.
     /// </summary>
     InvalidConditionalCompilation,
+
+    /// <summary>
+    /// The type of the project (<c>Type=Exe</c>, <c>OleDll</c>, <c>OleExe</c>, <c>Control</c>), which a <c>.rdproj</c> does not say yet: whether the project is
+    /// run, or used by being referenced.
+    /// </summary>
+    ProjectType,
 }
 
 /// <summary>
@@ -119,8 +125,8 @@ public sealed record class VbpImport(RDCoreProject Project, IReadOnlyList<VbpImp
     /// What only the platform says of the project is kept: the settings files of the project file (<see cref="ProjectFile.Configuration"/>), the document
     /// class a module is (<see cref="RDCoreModule.Super"/>), and the type library information of a reference
     /// (<see cref="RDCoreReference.TypeLibInfoPath"/>) - of a module by its path, of a reference by its name. A client that keeps a <c>.vbp</c> and a
-    /// <c>.rdproj</c> in step imports the <c>.vbp</c> again after each change, and loses none of it. Its <see cref="ProjectFile.Version"/> is the running
-    /// platform's, as it is of every project file the platform writes.
+    /// <c>.rdproj</c> in step imports the <c>.vbp</c> again after each change, and loses none of it. Its <see cref="ProjectFile.Version"/> is the one that
+    /// wrote it, until the platform writes it (<see cref="ProjectFile.WithCurrentVersion"/>).
     /// </para>
     /// </remarks>
     /// <param name="existing">The project file of the folder; <see langword="null"/> when it has none, or one that cannot be read.</param>
@@ -173,8 +179,8 @@ public sealed record class VbpImport(RDCoreProject Project, IReadOnlyList<VbpImp
 /// </remarks>
 public static class VbpProjectImporter
 {
-    // the type library of VBA itself, which VB6 writes in no .vbp and an exported project may: every project references it.
-    private static readonly Guid VBA = RDCoreReference.VBStandardLibrary.Guid!.Value;
+    // the type library of VBA itself, which VB6 writes in no .vbp and an exported project may: the standard library, which every project has, unlisted.
+    private static readonly Guid VBA = RDCoreReference.StandardLibraryGuid;
 
     /// <summary>
     /// The text of a <c>.vbp</c>, as VB6 writes it: in the ANSI code page of the machine, unless it starts with a byte order mark.
@@ -202,7 +208,7 @@ public static class VbpProjectImporter
         var notes = new List<VbpImportNote>();
         var modules = new List<RDCoreModule>();
         var others = new List<RDCoreFile>();
-        var references = new List<RDCoreReference> { RDCoreReference.VBStandardLibrary };
+        var references = new List<RDCoreReference>();
         var constants = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var name = Path.GetFileNameWithoutExtension(fileName);
 
@@ -246,6 +252,12 @@ public static class VbpProjectImporter
                     foreach (var (constant, number) in arguments)
                     {
                         constants[constant] = number;
+                    }
+                    break;
+                case "TYPE":
+                    if (Unquoted(value) is { Length: > 0 } type)
+                    {
+                        notes.Add(new VbpImportNote(VbpImportNoteKind.ProjectType, type));
                     }
                     break;
                 case "STARTUP":

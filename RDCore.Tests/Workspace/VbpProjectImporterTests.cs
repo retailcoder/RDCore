@@ -110,12 +110,17 @@ public sealed class VbpProjectImporterTests
     {
         var references = Import().Project.References;
 
-        CollectionAssert.AreEqual(new[] { "VBA", "stdole", "Scripting" }, references.Select(reference => reference.Name).ToArray());
+        CollectionAssert.AreEqual(new[] { "stdole", "Scripting" }, references.Select(reference => reference.Name).ToArray());
         var scripting = references.Single(reference => reference.Name == "Scripting");
         Assert.AreEqual(new Guid("420B2830-E718-11CF-893D-00A0C9054228"), scripting.Guid);
         Assert.AreEqual((1, 0), (scripting.Major, scripting.Minor));
         Assert.AreEqual(@"C:\Windows\System32\scrrun.dll", scripting.AbsolutePath);
     }
+
+    // the standard library is every project's own (author, 2026-10-27): no project file lists it, and a .vbp line that references VBA's type library adds none.
+    [TestMethod]
+    public void TheStandardLibrary_IsNoReference_EvenOfAVbpThatReferencesIt()
+        => Assert.IsEmpty(Import(@"Reference=*\G{000204EF-0000-0000-C000-000000000046}#4.2#0#C:\Program Files\Microsoft Office\VBE7.DLL#Visual Basic For Applications").Project.References);
 
     // a .vbp writes a type library's version in hexadecimal.
     [TestMethod]
@@ -186,7 +191,7 @@ public sealed class VbpProjectImporterTests
             Name = "Old",
             References =
             [
-                RDCoreReference.VBStandardLibrary,
+                new RDCoreReference { Name = "VBA", Guid = RDCoreReference.StandardLibraryGuid, Major = 4, Minor = 2 },
                 new RDCoreReference { Name = "Scripting", TypeLibInfoPath = "scrrun.json" },
                 new RDCoreReference { Name = "ADODB" },
             ],
@@ -202,14 +207,15 @@ public sealed class VbpProjectImporterTests
         var project = Import().Into(existing, @"C:\ws");
 
         Assert.AreEqual(@"C:\ws", project.Uri);
-        Assert.AreEqual(new ProjectFile(@"C:\ws").Version, project.Version, "the running platform's, as of every project file it writes");
+        Assert.AreEqual("0.0.9", project.Version, "the version that wrote it, until the platform writes it");
         CollectionAssert.AreEqual(new[] { "rdcore.settings.json" }, project.Configuration, "the platform's own settings");
 
         var info = project.ProjectInfo;
         Assert.AreEqual("Battleship", info.Name);
         CollectionAssert.AreEqual(new[] { "frmMain.frm", "modMain.bas", "Classes/clsThing.cls" }, info.Modules.Select(module => module.RelativeUri).ToArray());
         Assert.AreEqual(DocClassType.ExcelWorkbook, info.Modules.Single(module => module.RelativeUri == "modMain.bas").Super, "kept by its path, in any case");
-        CollectionAssert.AreEqual(new[] { "VBA", "stdole", "Scripting" }, info.References.Select(reference => reference.Name).ToArray(), "ADODB is no longer referenced");
+        CollectionAssert.AreEqual(new[] { "stdole", "Scripting" }, info.References.Select(reference => reference.Name).ToArray(),
+            "ADODB is no longer referenced, and VBA is no reference: every project has it");
         Assert.AreEqual("scrrun.json", info.References.Single(reference => reference.Name == "Scripting").TypeLibInfoPath);
         Assert.AreEqual(new Guid("420B2830-E718-11CF-893D-00A0C9054228"), info.References.Single(reference => reference.Name == "Scripting").Guid, "the .vbp's");
         CollectionAssert.AreEqual(new[] { "ctlGauge.ctl", "README.txt", "Battleship.RES" }, info.OtherFiles.Select(file => file.RelativeUri).ToArray());
@@ -233,6 +239,7 @@ public sealed class VbpProjectImporterTests
 
         CollectionAssert.AreEqual(new[]
         {
+            (VbpImportNoteKind.ProjectType, "Exe"),
             (VbpImportNoteKind.UnresolvedReference, "Custom Library"),
             (VbpImportNoteKind.ProjectReference, @"..\Shared\Shared.vbp"),
             (VbpImportNoteKind.Control, "MSCOMCTL.OCX"),
@@ -258,15 +265,17 @@ public sealed class VbpProjectImporterTests
         Assert.AreEqual("Le contrôle « MSCOMCTL.OCX » n'est pas repris : la plateforme n'héberge pas de contrôles ActiveX.", note.ToMessage(CultureInfo.GetCultureInfo("fr-CA")));
     }
 
-    // a ..\ folder is a project of its own, a workspace folder: the platform never takes in a folder outside the ones it is given (author, 2026-10-27).
+    // a ..\ file is a module of this project, as in VB6, in a source folder the client adds to the workspace; not carried over until the platform takes such
+    // folders in (author, 2026-10-27, reversing the morning's "a project of its own"; HexIDE's desk #30 and #31).
     [TestMethod]
-    public void AFileOutsideTheProjectsFolder_IsSaidToBelongToAnotherProject()
+    public void AFileOutsideTheProjectsFolder_IsSaidToBeAModuleOfThisProjectInASourceFolder()
     {
         var note = new VbpImportNote(VbpImportNoteKind.OutsideProjectFolder, @"..\Shared\Utils.bas");
 
-        Assert.AreEqual(@"'..\Shared\Utils.bas' is not carried over: it belongs to another project, in a folder outside this one. Open that folder as a workspace folder of its own; this project cannot reference it yet.",
+        Assert.AreEqual(@"'..\Shared\Utils.bas' is not carried over yet: it is in a folder outside the project's. It will be a module of this project once its folder is part of the workspace, as a source folder; the platform does not take in such a folder yet.",
             note.ToMessage(CultureInfo.InvariantCulture));
-        StringAssert.Contains(note.ToMessage(CultureInfo.GetCultureInfo("fr-CA")), "appartient à un autre projet");
+        StringAssert.Contains(note.ToMessage(CultureInfo.GetCultureInfo("fr-CA")), "un module de ce projet");
+        StringAssert.DoesNotMatch(note.ToMessage(CultureInfo.GetCultureInfo("fr-CA")), new System.Text.RegularExpressions.Regex("autre projet"));
     }
 
     // VB6 writes its project files in the ANSI code page of the machine.

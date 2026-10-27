@@ -23,20 +23,36 @@ public sealed record class ProjectFile : IEquatable<ProjectFile>
 
         Uri = uri;
         ProjectInfo = project;
-        Version = AppHost<RDCoreServerApp>.Info.Version!.ToString(3);
+        Version = CurrentVersion;
         IsDirty = false;
         Configuration = [];
     }
+
+    // a copy is of the same project file: made by the same version - only a write stamps the version of the platform that writes it (WithCurrentVersion) - and
+    // as synthesized as it was, until it is written.
     public ProjectFile(ProjectFile source)
     {
         ArgumentNullException.ThrowIfNull(source, nameof(source));
 
         Uri = source.Uri;
         ProjectInfo = source.ProjectInfo;
-        Version = AppHost<RDCoreServerApp>.Info.Version!.ToString(3);
+        Version = source.Version;
+        IsSynthesized = source.IsSynthesized;
+        // deliberate: a copy is a new, clean value, and a change says it is dirty (the With* methods, ProjectFileService.Update).
         IsDirty = false;
         Configuration = source.Configuration;
     }
+
+    /// <summary>
+    /// The version of the running platform, which a project file it writes is stamped with (<see cref="WithCurrentVersion"/>).
+    /// </summary>
+    public static string CurrentVersion => AppHost<RDCoreServerApp>.Info.Version!.ToString(3);
+
+    /// <summary>
+    /// The project file as the running platform writes it: stamped with its version (<see cref="CurrentVersion"/>). A project file that is read, or copied,
+    /// keeps the version that wrote it, so that a platform can refuse a project a later version wrote.
+    /// </summary>
+    public ProjectFile WithCurrentVersion() => this with { Version = CurrentVersion };
 
     /// <summary>
     /// <c>true</c> if the project file has unsaved changes.
@@ -64,7 +80,8 @@ public sealed record class ProjectFile : IEquatable<ProjectFile>
     [JsonIgnore]
     public string Uri { get; init; } = string.Empty;
     /// <summary>
-    /// The <c>RDCore.ServerApp</c> version that this project was created with.
+    /// The <c>RDCore.ServerApp</c> version that last wrote this project file: kept as it is read and copied, and stamped when it is written
+    /// (<see cref="WithCurrentVersion"/>).
     /// </summary>
     public string Version { get; init; }
     /// <summary>
@@ -100,7 +117,17 @@ public sealed record class ProjectFile : IEquatable<ProjectFile>
 public record class RDCoreProject
 {
     public string Name { get; init; } = string.Empty;
-    public RDCoreReference[] References { get; init; } = [RDCoreReference.VBStandardLibrary];
+
+    /// <summary>
+    /// The libraries and projects the project references, in their priority order (<strong>RD-VBAL §2.2.3.2</strong>).
+    /// </summary>
+    /// <remarks>
+    /// The standard library (<c>VBA</c>) is none of them: every project has it, in every dialect (<strong>RD-VBAL §6.0</strong>), and a project file does not
+    /// list it. A project file written before lists it - with the path of Office's <c>VBE7.DLL</c> - and is read without it
+    /// (<see cref="ProjectFileLoader"/>), so that it is written without it the next time (<see cref="RDCoreReference.IsStandardLibrary"/>).
+    /// </remarks>
+    public RDCoreReference[] References { get; init; } = [];
+
     public RDCoreModule[] Modules { get; init; } = [];
     public RDCoreFile[] OtherFiles { get; init; } = [];
     public string[] Folders { get; set; } = [];
@@ -143,15 +170,18 @@ public record class RDCoreProject
 
 public sealed record class RDCoreReference : IEquatable<RDCoreReference>
 {
-    public static RDCoreReference VBStandardLibrary { get; } = new RDCoreReference
-    {
-        Name = "VBA",
-        Guid = new Guid("000204ef-0000-0000-c000-000000000046"),
-        AbsolutePath = "C:\\Program Files\\Microsoft Office\\root\\vfs\\ProgramFilesCommonX64\\Microsoft Shared\\VBA\\VBA7.1\\VBE7.DLL",
-        Major = 4,
-        Minor = 2,
-        IsUnremovable = true,
-    };
+    /// <summary>
+    /// The identifier of the type library of <c>VBA</c>, the standard library, by which a VB6 project or a project file written before references it.
+    /// </summary>
+    public static readonly Guid StandardLibraryGuid = new("000204ef-0000-0000-c000-000000000046");
+
+    /// <summary>
+    /// Whether the reference is to the standard library (<c>VBA</c>), by its name or the identifier of its type library: the platform's own library, which
+    /// every project has and no project file lists (<see cref="RDCoreProject.References"/>).
+    /// </summary>
+    [JsonIgnore]
+    public bool IsStandardLibrary
+        => string.Equals(Name, Runtime.StdLib.StdLibSymbolProvider.LibraryName, StringComparison.OrdinalIgnoreCase) || Guid == StandardLibraryGuid;
 
     public string Name { get; init; } = string.Empty;
     public string? AbsolutePath { get; init; }

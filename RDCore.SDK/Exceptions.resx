@@ -768,6 +768,12 @@
   <data name="VBCompileError_ForEachMayOnlyIterateOverACollectionObjectOrAnArray" xml:space="preserve">
     <value>For Each may only iterate over a collection object or an array</value>
   </data>
+  <data name="VBCompileError_OutOfMemory" xml:space="preserve">
+    <value>Out of memory</value>
+  </data>
+  <data name="VBCompileError_OutOfMemory_ModuleNames_Verbose" xml:space="preserve">
+    <value>The module declares more than {0:N0} names at module level: variables, constants, procedures, properties, Declare statements, enumerations and types, all together. Move some of them to another module.</value>
+  </data>
   <data name="VBCompileError_NameIsAProject_Verbose" xml:space="preserve">
     <value>'{0}' is a project: it qualifies the names of what it declares, as in '{0}.Len', and is no value of its own.</value>
   </data>
@@ -806,6 +812,9 @@
   </data>
   <data name="VBCompileError_TrailingOmittedArgument_Verbose" xml:space="preserve">
     <value>An argument list does not end with an omitted argument: remove the last comma.</value>
+  </data>
+  <data name="VBCompileError_TooManyLineContinuations_Verbose" xml:space="preserve">
+    <value>Too many line continuations: a logical line joins at most 25 physical lines, with 24 line-continuations.</value>
   </data>
   <data name="VBCompileError_NameIsNoVariable_Verbose" xml:space="preserve">
     <value>'{0}' is no variable whose size can be measured: {1}</value>

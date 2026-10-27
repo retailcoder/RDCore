@@ -58,7 +58,7 @@ The synthesized project is written to `.rdproj` on its first change, a file the 
 
 The rule is worded "should not" because whether a _source project_ can reference a _different project_ that has the same name is explicitly specified as _host-dependent_ behavior. An RD-VBA _host environment_ **should** explicitly deny the addition of any such ambiguous project reference.
 
-The _standard library_ symbols are present in a project whether or not its `.rdproj` mentions the library at all (see [**RD-VBAL §6.0** Standard Library](rd-vbal.6.0.standard-library.md)).
+The _standard library_ symbols are present in a project whether or not its `.rdproj` mentions the library at all (see [**RD-VBAL §6.0** Standard Library](rd-vbal.6.0.standard-library.md)). It is RDCore's own, in every dialect, and is no reference: RDCore writes none to it in a `.rdproj` - a new project, one a folder makes up, or one imported from a VB6 project. A `.rdproj` written before lists it first, with the path of Office's `VBE7.DLL`: it is read without it, and written without it the next time RDCore writes the file.
 
 ## 2.2.3.2 RDCoreReference
 
@@ -173,7 +173,7 @@ A VB6 project (`.vbp`) is imported as the `RDCoreProject` of its folder ([`VbpPr
 |`Form`|A module.|
 |`UserControl`, `PropertyPage`, `UserDocument`, `Designer`|A file of the project (`OtherFiles`), which is not compiled; the import says so.|
 |`RelatedDoc`, `ResFile32`|A file of the project.|
-|`Reference` (`*\G{GUID}#version#lcid#path#description`)|A reference to the library the platform ships with that GUID, at the version (written in hexadecimal: `2.a` is 2.10). The reference to `VBA` is implicit, and skipped.|
+|`Reference` (`*\G{GUID}#version#lcid#path#description`)|A reference to the library the platform ships with that GUID, at the version (written in hexadecimal: `2.a` is 2.10). `VBA`, the standard library, is no reference ([§2.2.3.1](#2231-rdcoreproject)): a `.vbp` line that references VBA's type library adds none.|
 |`CondComp`|The project's `PrecompilerConstants` (`"DEBUG = 1 : TRACE = 0"`): `name = n` arguments separated by colons, spaces optional, each a name and a whole number from -32768 to 32767 with an optional sign. As vb6.exe does, a line with any other argument - a string, `&H10`, `True`, `1.5`, a name without a value, a colon at the end - is refused whole, and the import says so.|
 
 A path is resolved against the `.vbp`'s folder first: `..\MyProj\Util.bas`, from `MyProj\MyProj.vbp`, is the project's own `Util.bas`, and `Sub\..\Util.bas` is too. The project's folders are those of the files it lists. What cannot be carried over is skipped, and the import says what and why, in the language of the user interface:
@@ -183,9 +183,10 @@ A path is resolved against the `.vbp`'s folder first: `..\MyProj\Util.bas`, from
 |A reference to a library the platform has no description of|It cannot be resolved.|
 |A reference to another project (`*\A`)|A project cannot reference another one yet.|
 |A control (`Object`)|The platform hosts no ActiveX controls.|
-|A file outside the project's folder (`..\Shared\Utils.bas`)|It belongs to another project: its folder is a workspace folder of its own, as a shared library loaded from a sibling folder is. The platform never takes in a folder outside the workspace folders it is given, and a project cannot reference another one yet.|
+|A file outside the project's folder (`..\Shared\Utils.bas`)|It is a module of this project, as in VB6: qualified by the project's name, and a copy of its own in each project that lists it. Its folder is a _source folder_ the client adds to the workspace, not a project, and a `.rdproj` in it is ignored. The platform never takes in a folder outside the workspace folders it is given. Not carried over yet: the import notes it until the platform takes in source folders.|
 |A file at an absolute path|A project lists the files of its own folder.|
 |The startup object (`Startup`)|A project file does not say it yet.|
+|The project's type (`Type=Exe`, `OleDll`, `OleExe`, `Control`)|A project file does not say it yet: whether the project is run, or used by being referenced.|
 |Conditional compilation arguments VB6 refuses|VB6 refuses the whole line.|
 
 A folder that has a `.rdproj` already keeps what the `.vbp` does not describe ([`VbpImport.Into`](../api/RDCore.SDK.Workspace.VbpImport.html)). The `.vbp` describes the project's name, references, modules and other files, their folders, and its conditional compilation arguments, which replace what the `.rdproj` says of them: a file the `.vbp` no longer lists is no longer the project's. The project file's settings files (`Configuration`), the document class of a module (`Super`, by its path), and the type library information of a reference (`TypeLibInfoPath`, by its name) are kept, so a client that keeps a `.vbp` and a `.rdproj` in step can import the `.vbp` again after each change. A `.rdproj` that cannot be read is replaced whole.

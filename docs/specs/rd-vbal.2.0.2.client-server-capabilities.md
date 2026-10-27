@@ -127,6 +127,24 @@ Diagnostics use the LSP 3.17 pull model (`textDocument/diagnostic`). The languag
 
 The request carries the parse result as a [`PlatformJson`](../api/RDCore.SDK.Platform.Protocol.PlatformJson.html) string, because the syntax tree is polymorphic. See [**RD-VBAL §2.6.5** Diagnostics Pipeline](rd-vbal.2.6.5.diagnostics-pipeline.md).
 
+### `PlatformJson` payloads
+
+A payload the platform's components exchange as a `PlatformJson` string - a parse result, a semantic model, symbols - is the model it carries, written so that
+what every node repeats is written once. The model each end has is the same: a reader gets every location and identity back with its document.
+
+|What|How it is written|
+|---|---|
+|A range|Four numbers: `[startLine, startCharacter, endLine, endCharacter]`.|
+|A location|`{"Uri": …, "Range": […]}`, where the `Uri` is written only when it is not the one written last in the payload; a location with none has the last one read.|
+|A node's identity|`{"DocumentUri": …, "Lineage": […]}`, where the `DocumentUri` is written only when it is not the one written last in the payload, the same way.|
+|A node's `SourceLocation`|Not written where it is the node's own `Location`, which it is read back from.|
+|A `null`|Not written: a property that is not there reads back as `null`, or as its declared default.|
+
+A payload is written and read start to end in one call, so the document a location or an identity is read with is the one written before it. The payload of
+one module writes its path once or twice, rather than three times a node: for a module of 2,400 lines, the parse result is 1.4 MB of JSON rather than 5 MB,
+and its semantic model 1.5 MB rather than 3.6 MB. Anything serialized with the same options outside a payload
+([`SyntaxNodeJson.Options`](../api/RDCore.SDK.Model.AST.Abstract.SyntaxNodeJson.html), directly) writes every document.
+
 ### `rdcore/session/execute`
 
 The `rdcore/session/execute` result ([`ExecuteSessionResult`](../api/RDCore.SDK.Platform.Protocol.ExecuteSessionResult.html)) carries a run-time error's code, title, source, position, line number and a structured stack trace.
@@ -138,6 +156,20 @@ The interactive shell renders a run-time error from this result, as:
 - the diagnostic code and description (see [**RD-VBAL §2.6.3** Runtime Errors](rd-vbal.2.6.3.runtime-errors.md));
 - `Err.Source`;
 - the stack trace.
+
+### Requests while the client edits
+
+An RDCore server answers every request it receives, and runs a notification that changes a document (`textDocument/didOpen`, `didChange`, `didClose`) in order, after the requests already running ([`ServerRequestScheduling.WithEveryRequestAnswered`](../api/RDCore.SDK.Server.ServerRequestScheduling.html)).
+
+A request that is made of what a document was would make a keystroke wait for it, and the completion a client sends after the keystroke too. So `textDocument/diagnostic` and `textDocument/semanticTokens/full` give way to a change ([`IncomingDocumentChanges`](../api/RDCore.SDK.Server.IncomingDocumentChanges.html)):
+
+- **The change is known as it arrives.** The server reads which document a change is to as the message arrives, long before its turn comes.
+- **A request about that document stops.** It is answered `ContentModified` (-32801), which **LSP 3.17** §Response Message has a server answer "if it detects a content change in its unprocessed messages". The client asks again for the document as it is now.
+  - This holds for a request that is running when the change arrives, and for one that starts before the change is applied.
+  - A change to another document changes nothing for it.
+- **A request the client cancels ends at once,** answered `RequestCancelled` (-32800), whatever the work under it is still doing.
+
+👉 HexIDE's client sent a keystroke and a completion while the diagnostics and the semantic tokens of a 2,100-line module were being found. The completion waited for both, about five seconds; with the request giving way, it waits for neither.
 
 ### `textDocument/inlayHint`
 
@@ -374,7 +406,7 @@ The language server runs the commands it advertises (`executeCommandProvider.com
 |---|---|---|
 |`rdcore.importProject`|None, a URI, or `{ "uri", "text", "overwrite" }`|Imports a VB6 project ([**RD-VBAL §2.2.3.5**](rd-vbal.2.2.3.projectfile.md#2235-importing-a-vb6-project)).|
 
-`rdcore.importProject` imports the `.vbp` its URI names. A URI of a folder, or none, is that folder, or the workspace's: a folder with one `.vbp` imports it, a folder with several asks the user which one, and a folder with none is refused. `text` is the `.vbp` as the client holds it, which the server reads instead of the file. A folder that has a `.rdproj` already asks the user to replace it (`window/showMessageRequest`), and is refused unless the user chooses to; `overwrite: true` replaces it without asking anything - what a client that imports its `.vbp` again after each change sends. Either way, what the `.vbp` does not describe is kept ([**RD-VBAL §2.2.3.5**](rd-vbal.2.2.3.projectfile.md#2235-importing-a-vb6-project)). The project of the workspace's folder is written by the server, the only writer of its project file, and the workspace is reloaded with it; a project of another folder is written there.
+`rdcore.importProject` imports the `.vbp` its URI names. A URI of a folder, or none, is that folder, or the workspace's: a folder with one `.vbp` imports it, a folder with several asks the user which one, and a folder with none is refused. `text` is the `.vbp` as the client holds it, which the server reads instead of the file. A folder that has a `.rdproj` already asks the user to replace it (`window/showMessageRequest`), and is refused unless the user chooses to; `overwrite: true` replaces it without asking anything - what a client that imports its `.vbp` again after each change sends. Either way, what the `.vbp` does not describe is kept ([**RD-VBAL §2.2.3.5**](rd-vbal.2.2.3.projectfile.md#2235-importing-a-vb6-project)). The project of the workspace's folder is written by the server, the only writer of its project file, and the workspace is reloaded with it: when that changes the workspace, a client that refreshes its pulled diagnostics is asked to pull them again (`workspace/diagnostic/refresh`), as for any change of the project. A project of another folder is written there, and the workspace is left as it is.
 
 It answers what it wrote: the URI of the `.rdproj` (`projectFile`), the project's `name`, its number of `modules`, and what was skipped (`notes`), each with its `kind`, its `subject` as the `.vbp` writes it, and a `message`.
 
@@ -440,8 +472,8 @@ The branches of a block (`ElseIf`, `Else`, `Case`) fold with it, not apart; a si
 For a `.rdc` program, ranges are in its lines, and the procedure its lines are the body of has none.
 
 The interactive shell folds blocks only. `FOLD <line>` folds the block that starts at that line, or unfolds it; a line that starts none is the error
-`NO FOLDING EXISTS AT <line>`. `LIST` has a lane in its margin for the mark of a block (🔽 open, 🔼 folded; `-` and `+` on a console that draws no emoji),
-before the lane of a breakpoint, which is next to the line. A folded block is listed as its first line, faint as ghost text and cut with `…` to the console's
+`NO FOLDING EXISTS AT <line>`. `LIST` has two lanes in its margin: a breakpoint's mark at the edge, then the mark of a block
+(🔽 open, 🔼 folded; `-` and `+` on a console that draws no emoji), next to the line. A folded block is listed as its first line, faint as ghost text and cut with `…` to the console's
 width. A fold is on a line number, as a breakpoint is, and `NEW` and `LOAD` clear them.
 
 ### `workspace/didChangeWatchedFiles`

@@ -65,10 +65,17 @@ public partial class ModuleParser(
                 return ModuleParseResult.Success(EmptyModule(uri, anchorOffset));
             }
 
-            precompilerTrivia = ParsePrecompilerNodes(content, errorListener, [new PrecompilerDirectiveListener(uri, errorListener)], anchorOffset);
+            // a module with no directive has nothing for the directive pass to find, which reads the whole module (a third of a parse, measured on a
+            // 2,400-line module): it is not run, and the main pass reads the module as it is.
+            var hasDirectives = PrecompilerNodePattern().IsMatch(content);
+            if (hasDirectives)
+            {
+                precompilerTrivia = ParsePrecompilerNodes(content, errorListener, [new PrecompilerDirectiveListener(uri, errorListener)], anchorOffset);
+            }
+
             var node = new ModuleNode(new SyntaxNodeId(uri.AbsolutePath, []), new(uri, new SourceRange(anchorOffset, anchorOffset)), precompilerTrivia);
 
-            var sanitized = PrecompilerNodePattern().Replace(content, match => Blanked(match.Value));
+            var sanitized = hasDirectives ? PrecompilerNodePattern().Replace(content, match => Blanked(match.Value)) : content;
             var listener = ParseWithFallback(sanitized, errorListener, () => declarations = new DeclarationsParseTreeListener(uri, node, errorListener), anchorOffset);
             var ast = listener.BuildModuleNode();
 
@@ -78,6 +85,8 @@ public partial class ModuleParser(
             {
                 errorListener.ReplaceGrammarErrorsWith(BlockStructureScanner.Scan(uri, sanitized, anchorOffset));
             }
+
+            ReportTooManyLineContinuations(content, uri, anchorOffset, errorListener);
 
             // a partial tree is still useful to the symbol pass — IsSuccess is governed by whether
             // any syntax error was recorded, not by the child count (a valid module can declare nothing).
@@ -268,6 +277,33 @@ public partial class ModuleParser(
     // a #If directive, whose branches are both in the source the grammar reads.
     [GeneratedRegex(@"^[ \t]*#If\b", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
     private static partial Regex ConditionalBlockPattern();
+
+    // MS-VBA joins at most 25 physical lines into one logical line: 24 line-continuations in a row, and the 25th is a syntax error, "Too many line continuations"
+    // (MS Learn; recorded in Excel: oracle\size-limits B01-B03). MS-VBAL leaves the length of a line to the implementation (3.2.1).
+    private const int MaxLineContinuations = 24;
+
+    // reports the line-continuation after the 24th of a logical line, once for that line.
+    private static void ReportTooManyLineContinuations(string content, Uri uri, SourcePosition anchorOffset, ErrorListener errors)
+    {
+        var run = 0;
+        var line = 0;
+        foreach (var physical in content.AsSpan().EnumerateLines())
+        {
+            // a line-continuation is an underscore at the end of the line, after a space or a tab.
+            var trimmed = physical.TrimEnd(" \t");
+            var continuation = trimmed.Length >= 2 && trimmed[^1] == '_' && trimmed[^2] is ' ' or '\t';
+            run = continuation ? run + 1 : 0;
+            if (run == MaxLineContinuations + 1)
+            {
+                var at = trimmed.Length - 1;
+                var start = new SourcePosition(line, at).AnchoredAt(anchorOffset);
+                var end = new SourcePosition(line, at + 1).AnchoredAt(anchorOffset);
+                errors.Report(new SourceLocation(uri, new(start, end)), VBCompileErrorId.SyntaxError, SDK.Exceptions.VBCompileError_TooManyLineContinuations_Verbose);
+            }
+
+            line++;
+        }
+    }
 }
 
 // Registered via AddParseListener (fires live, interleaved with the parser's own recursive descent) —
