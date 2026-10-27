@@ -44,6 +44,8 @@ using System.Runtime.CompilerServices;
 
 // platform capabilities provided by rdc.exe in environment-host mode:
 [assembly: ProvidesCorePlatformClientCapability<DefineSymbols>]
+// it composes its session from the project file, and does so again when the project file changes:
+[assembly: ProvidesCorePlatformClientCapability<ProjectReload>]
 // the environment host owns the runtime session, so it answers for its state:
 [assembly: ProvidesCorePlatformClientCapability<SessionStatus>]
 [assembly: ProvidesCorePlatformClientCapability<SessionExecute>]
@@ -545,6 +547,7 @@ internal class RDCoreConsoleEnvironmentHostApp(
             .WithHandler<HostSessionStatusHandler>()
             .WithHandler<HostExecuteHandler>()
             .WithHandler<HostDiscardHandler>()
+            .WithHandler<HostProjectReloadHandler>()
             .WithHandler<HostDebugResumeHandler>()
             .WithHandler<HostDebugPauseHandler>()
             .WithHandler<HostDebugGotoHandler>()
@@ -564,6 +567,8 @@ internal class RDCoreConsoleEnvironmentHostApp(
     protected override void ConfigureServices(IServiceCollection services)
         => services
             .AddSingleton(sessionProvider)
+            .AddSingleton(projectFileLoader)
+            .AddSingleton(_ => ExternalServices.GetRequiredService<IOptions<SdkAppOptions>>())
             .AddSingleton(_ => ExternalServices.GetRequiredService<IVerboseMessageBuilder>());
 
     protected override void RegisterServerCapabilities(ILanguageServer server, ClientCapabilities clientCapabilities) { }
@@ -595,7 +600,9 @@ internal class RDCoreConsoleEnvironmentHostApp(
 
         try
         {
-            var project = await projectFileLoader.LoadAsync(request.RootUri.GetFileSystemPath());
+            // a folder with no project file is the project it holds, as the language server makes it up.
+            var language = ExternalServices.GetRequiredService<IOptions<SdkAppOptions>>().Value.Workspace.SupportedLanguage;
+            var project = await projectFileLoader.LoadOrSynthesizeAsync(request.RootUri.GetFileSystemPath(), language);
             sessionProvider.Compose(project.ProjectInfo, new Uri(project.Uri));
             LogIfEnabled(LogLevel.Information, "✅ Runtime session composed from the workspace project");
         }

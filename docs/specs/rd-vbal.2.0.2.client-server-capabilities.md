@@ -69,6 +69,16 @@ A language the platform does not serve is logged and ignored.
 > The language was once two settings: BASIC's one difference, the scope of an implicit declaration, was a setting of its own, made when BASIC was not a dialect the
 > platform defined. It is now the language's, and the setting is gone.
 
+## 2.0.2.1.2 The language of the user interface
+
+What a server says - the messages of its diagnostics, why a rename is refused, the titles of its code actions, its hovers - is said in the language the
+client's user interface is in: the `locale` of the `initialize` request (**LSP 3.17**), such as `fr-CA` or `en`
+([`ClientLocale`](../api/RDCore.SDK.Server.ClientLocale.html)). Every server of the platform applies it before it builds anything from the request,
+and a language server tells the servers it starts the same `locale`, so that the diagnostics an extension finds are in the client's language too. A culture
+reads its own language's messages, or its parent's: `fr-FR` and `fr-CA` read the French ones, and every other culture - `en-GB`, the invariant culture -
+the English ones. Only the language of the user interface is the client's: how numbers and dates are written and read does not depend on it. A `locale`
+the platform does not know is logged and ignored; a client that sends none is answered in the language the server's process starts in.
+
 ## 2.0.2.2 Platform components
 
 |`CoreServerComponent`|Process|Role|
@@ -91,6 +101,7 @@ This catalogue is intended to document every platform capability the SDK defines
 |---|---|---|---|
 |[`ParseFullDocument`](../api/RDCore.SDK.Client.ParseFullDocument.html)|`rdcore/parser/document`|`ParsingServer`|Lets the language server request a parse result for a source fragment it supplies directly. The parser never reads source from the filesystem. A request may optionally be anchored at a position within a larger document, so that the locations reported for a sub-range fragment are in that document's coordinates.|
 |[`DefineSymbols`](../api/RDCore.SDK.Client.DefineSymbols.html)|`rdcore/host/symbols/define`|`EnvironmentHost`|Lets the language server send a module's member symbol descriptors to the environment host for definition in its runtime session (see [below](#rdcorehostsymbolsdefine)).|
+|[`ProjectReload`](../api/RDCore.SDK.Client.ProjectReload.html)|`rdcore/host/project/reload`|`EnvironmentHost`|Lets the language server ask the environment host to compose its runtime session again from the project file as it is now, once a client said the `.rdproj` changed (see [below](#workspacedidchangewatchedfiles)).|
 |[`CliCommand`](../api/RDCore.SDK.Client.CliCommand.html)|_(none: in-process CLI dispatch)_|`ClientApp`, `Extension`|Advertises that the declaring component contributes `rdc.exe` command-mode verbs. The CLI (`rdc.exe`) declares it for its native verbs. An extension declares it so that `rdc.exe describe-ext` records the capability in the extension's manifest (see [**RD-VBAL §1.1.5** Extension Manifest](rd-vbal.1.1.5.extension-manifest.md)).|
 |[`DiagnoseDocument`](../api/RDCore.SDK.Client.DiagnoseDocument.html)|`rdcore/diagnostics/document`|`Extension`|Advertised by a _diagnostics provider_: a platform extension whose manifest advertises this capability. A provider declares it with `[assembly: ProvidesCorePlatformClientCapability<DiagnoseDocument>]` (see [below](#rdcorediagnosticsdocument)).|
 |[`SessionInteraction`](../api/RDCore.SDK.Client.SessionInteraction.html)|`rdcore/session/interaction/msgBox`, `.../inputBox`|`LanguageServer`|Relays the dialogs a program opens (`MsgBox`, `InputBox`) to a client that expects this capability, which answers them. The interactive shell expects it, and asks at its console (see [below](#rdcoresessioninteraction)).|
@@ -375,6 +386,53 @@ The language server answers `textDocument/selectionRange` (**LSP 3.17** §Select
 step: each node of the syntax tree written around the position, from a name through its expression, its statement, the block of a structured statement and
 the procedure, to everything the module declares ([`SyntaxSelection`](../api/RDCore.SDK.Model.AST.Abstract.SyntaxSelection.html)). Each step is in the next.
 A position that no node is written around is answered with the empty range at it. For a `.rdc` program, ranges are in its lines.
+
+### `workspace/didChangeWatchedFiles`
+
+The language server reads the project file (`.rdproj`) when it initializes. The server is the project file's only writer: a client tells it which files it created,
+renamed or deleted (see [`workspace/didCreateFiles`, `didRenameFiles` and `didDeleteFiles`](#workspacedidcreatefiles-didrenamefiles-and-diddeletefiles)), and does
+not write the project file itself. A project file changed outside the editor (a `git checkout`, a hand edit) is what a client says changed, as **LSP 3.17** has it
+(§DidChangeWatchedFiles Notification): the client owns the file system, and the server watches nothing itself.
+
+|Message|Direction|Does|
+|---|---|---|
+|`client/registerCapability`|Server to client|Asks a client that registers capabilities dynamically (`workspace.didChangeWatchedFiles.dynamicRegistration`) to watch `**/.rdproj`, created or changed. A client that does not is not asked.|
+|`workspace/didChangeWatchedFiles`|Client to server|Says the workspace's `.rdproj` was created or changed. The server serves it whether or not it asked for it: a client that registers nothing sends it all the same. A change to another folder's `.rdproj`, and a deletion, are left alone; so is a project file that lists what the workspace is, as the one the server wrote does when a client that watches it says it changed.|
+|`rdcore/host/project/reload`|Language server to environment host|Asks the host to compose its runtime session again from the project file as it is now ([`ProjectReload`](../api/RDCore.SDK.Client.ProjectReload.html)). A class module's symbol is the project's, so a class the project gained is a type only once the session is composed again. A program that is running or waits keeps the session it runs in.|
+|`workspace/diagnostic/refresh`|Server to client|Asks a client that pulls its diagnostics to pull them again, once the workspace is defined again. Sent to a client whose `workspace.diagnostics.refreshSupport` is `true`.|
+|`window/showMessage`|Server to client|Says why the workspace is as it was (the project file could not be read), or that a running program keeps its modules.|
+
+On the notification, the language server (`WorkspaceReloadService`):
+
+1. reads the project file again; one that cannot be read leaves the workspace as it was, and one that lists what the workspace is changes nothing;
+2. loads and parses each file it lists that was not loaded, and takes out each one it no longer lists (a document the client has open stays: its text is the client's);
+3. asks the environment host to compose its session again;
+4. defines the whole workspace again in its three phases - its types declared, its declarations bound, its code loaded - each module replacing what the host held of it. When the host kept its session, a module the project lost is discarded from it (`rdcore/host/discard`) first;
+5. asks the client to pull its diagnostics again.
+
+### `workspace/didCreateFiles`, `didRenameFiles` and `didDeleteFiles`
+
+A client that creates, renames or deletes files of the workspace says so as **LSP 3.17** has it (§Workspace, DidCreateFiles, DidRenameFiles and DidDeleteFiles
+Notifications), and the server makes the project what the folder holds now: it writes the `.rdproj`, of which it is the only writer, and the workspace is made what the
+project lists, as on [`workspace/didChangeWatchedFiles`](#workspacedidchangewatchedfiles) (steps 2 to 5). The server says it handles the three in its `initialize`
+result (`workspace.fileOperations`), with filters for the source files of every language the platform serves (`**/*.bas`, `**/*.cls`, `**/*.frm`, `**/*.doccls`,
+`**/*.rdc`) and for folders.
+
+|Notification|The project|
+|---|---|
+|`workspace/didCreateFiles`|A source file of the workspace's language (**RD-VBAL §2.0.2.1.1**) is a module of the project, and each folder it is in a folder of the project. A created folder is added with the source files it holds. Another file is nothing of the project.|
+|`workspace/didRenameFiles`|What the project lists is listed under its new path, a folder with what it holds; a document module keeps its document class. A module renamed to what is not a source file is no longer a module; a file renamed to a source file is one.|
+|`workspace/didDeleteFiles`|What the project listed is no longer listed, a folder with what it held.|
+
+What is outside the workspace root, and what a folder whose name starts with a dot holds (`.git`, `.vscode`), is nothing of the project. A module name is unique in a
+project (**RD-VBAL §2.2.3.3**): a file created with the `VB_Name` of a module the project has is not added, and `window/showMessage` says so. The operations are made
+in the order the client sent them.
+
+> [!NOTE]
+> OmniSharp 0.19.9 reads `workspace/didRenameFiles` with a `FileRename` that has only a `uri`, and neither the `oldUri` nor the `newUri` a client sends. RDCore reads it
+> with a type of its own ([`DidRenameWorkspaceFilesParams`](../api/RDCore.SDK.Platform.Protocol.DidRenameWorkspaceFilesParams.html)), as the protocol states it.
+
+A folder with no `.rdproj` is the project it holds (**RD-VBAL §2.2.3**): the first file operation writes it, and opening the folder does not.
 
 ### `window/workDoneProgress`
 

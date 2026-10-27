@@ -293,6 +293,8 @@ public abstract class RDCoreServerApp(
             .OnStarted(HandleLanguageServerStartedAsync)
             .OnInitialize(HandleLanguageServerInitializeAsync)
             .OnInitialized(HandleLanguageServerInitializedAsync)
+            // what OmniSharp would otherwise swallow - a handler that throws as the server answers initialize leaves it unanswered, and says nothing - is logged.
+            .WithUnhandledExceptionHandler(exception => LogIfEnabled(LogLevel.Error, $"❌ Unhandled exception in the language server: {exception}"))
             // the client's live settings, which the server asks for (workspace/configuration) when it is initialized and whenever they change:
             .WithConfigurationSection(LiveSettingsProtocol.Section)
             // core SDK handlers:
@@ -435,8 +437,16 @@ public abstract class RDCoreServerApp(
         ServerStateProvider.OnInitialize();
 
         // what the client says of itself comes before everything that is built from it: the capabilities below, and whatever an
-        // application brings up in its own handler.
+        // application brings up in its own handler - the children a language server starts are told the same locale.
         ApplyInitializationOptions(request);
+        if (ClientLocale.Apply(request.Locale) is { } culture)
+        {
+            LogIfEnabled(LogLevel.Information, $"🌐 The client's user interface is in '{culture.Name}'.");
+        }
+        else if (!string.IsNullOrWhiteSpace(request.Locale))
+        {
+            LogIfEnabled(LogLevel.Warning, $"The client's locale '{request.Locale}' is not a culture the platform knows; '{System.Globalization.CultureInfo.CurrentUICulture.Name}' stands.");
+        }
 
         var clientProcessId = ResolveClientProcessId(request);
         if (clientProcessId != 0)

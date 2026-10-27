@@ -15,7 +15,9 @@ using RDCore.LanguageServer.Parsing;
 using RDCore.LanguageServer.Progress;
 using RDCore.LanguageServer.Runtime;
 using RDCore.LanguageServer.SemanticTokens;
+using RDCore.LanguageServer.Server;
 using RDCore.LanguageServer.Server.Handlers.Document;
+using RDCore.LanguageServer.Server.Handlers.Workspace;
 using RDCore.LanguageServer.Symbols;
 using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Workspace;
@@ -144,6 +146,14 @@ internal sealed class CoreLanguageServerApp(
         builder.WithHandler<WillSaveWaitUntilTextDocumentHandler>();
         builder.WithHandler<DidSaveTextDocumentHandler>();
         builder.WithHandler<DidCloseTextDocumentHandler>();
+
+        // and the project file, which the client says it rewrote: the workspace is made what it lists now.
+        builder.WithHandler<ProjectFileWatchHandler>();
+
+        // and the files it created, renamed or deleted: the server writes the project file, of which it is the only writer.
+        builder.WithHandler<DidCreateWorkspaceFilesHandler>();
+        builder.WithHandler<DidRenameWorkspaceFilesHandler>();
+        builder.WithHandler<DidDeleteWorkspaceFilesHandler>();
     }
 
     protected override void ConfigureServices(IServiceCollection services)
@@ -162,6 +172,8 @@ internal sealed class CoreLanguageServerApp(
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IPlatformOrchestrationService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IProgramDebugService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<ISymbolSyncService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceReloadService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceFileOperationService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IOptions<SdkAppOptions>>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IDocumentLifecycleService>());
 
@@ -172,57 +184,7 @@ internal sealed class CoreLanguageServerApp(
     }
 
     protected override void RegisterServerCapabilities(ILanguageServer server, ClientCapabilities clientCapabilities)
-    {
-        clientCapabilities.TextDocument = new()
-        {
-            //CallHierarchy = new(true),
-            //CodeAction = new(true),
-            //CodeLens = new(true),
-            //ColorProvider = new(true),
-            //Completion = new(true),
-            Declaration = new(true),
-            Definition = new(true),
-            Diagnostic = new(true),
-            //DocumentHighlight = new(true),
-            //DocumentLink = new(true),
-            DocumentSymbol = new(true),
-            FoldingRange = new(true),
-            //Formatting = new(true),
-            //Hover = new(true),
-            //Implementation = new(true),
-            //InlayHint = new(true),
-            //InlineValue = new(true),
-            //LinkedEditingRange = new(true),
-            //Moniker = new(true),
-            //OnTypeFormatting = new(true),
-            //RangeFormatting = new(true),
-            //References = new(true),
-            //Rename = new(true),
-            SemanticTokens = new(true),
-            //SignatureHelp = new(true),
-            //SelectionRange = new(true),
-            Synchronization = new(true),
-            PublishDiagnostics = new(true),
-            //TypeDefinition = new(true),
-            //TypeHierarchy = new(true),
-        };
-        clientCapabilities.Window = new()
-        {
-            //ShowDocument = new(true),
-            ShowMessage = new(true),
-            WorkDoneProgress = new(true),
-        };
-        clientCapabilities.Workspace = new()
-        {
-            //ApplyEdit = new(true),
-            Diagnostics = new(true),
-            //FileOperations = new(true),
-            //SemanticTokens = new(true),
-            Symbol = new(true),
-            //WorkspaceEdit = new(true),
-            //WorkspaceFolders = new(true),
-        };
-    }
+        => ClientCapabilityDefaults.Complete(clientCapabilities);
 
     protected override async Task OnLanguageServerInitializeAsync(ILanguageServer server, InitializeParams request, CancellationToken cancellationToken)
     {
@@ -268,6 +230,11 @@ internal sealed class CoreLanguageServerApp(
     protected async override Task OnLanguageServerInitializedAsync(ILanguageServer server, InitializeParams request, InitializeResult response, CancellationToken cancellationToken)
     {
         LogIfEnabled(LogLevel.Information, "🤝 LSP initialization handshake completed");
+
+        // workspace/didRenameFiles is read by a handler of the platform's own, which OmniSharp does not state the server has.
+        response.Capabilities.Workspace ??= new();
+        response.Capabilities.Workspace.FileOperations ??= new();
+        response.Capabilities.Workspace.FileOperations.DidRename = WorkspaceFileOperationFilters.DidRename;
         await base.OnLanguageServerInitializedAsync(server, request, response, cancellationToken);
     }
 
@@ -424,11 +391,7 @@ internal sealed class CoreLanguageServerApp(
             }
         }
 
-        if (server.ClientSettings.Capabilities?.Workspace?.Diagnostics.IsSupported == true
-            && server.ClientSettings.Capabilities.Workspace.Diagnostics.Value.RefreshSupport)
-        {
-            server.Workspace.SendDiagnosticRefresh(new DiagnosticRefreshParams());
-        }
+        DiagnosticRefresh.SendIfSupported(server);
     }
 
     protected override async Task OnServerStoppingAsync()
