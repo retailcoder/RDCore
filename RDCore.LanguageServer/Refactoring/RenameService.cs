@@ -16,6 +16,7 @@ using RDCore.SDK.Semantics.Refactoring;
 using RDCore.SDK.Semantics.Static.Abstract;
 using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Workspace;
+using RDCore.SDK.Model.Symbols;
 using RDCore.Symbols;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -119,7 +120,7 @@ internal sealed class RenameService(
             }
 
             var name = parse.SyntaxTree.GetDeclaredName() ?? document.Name;
-            modules.Add(new(document, new UriBuilder(workspaceRoot) { Fragment = name }.Uri, ParsingClientService.ModuleTypeOf(document), parse,
+            modules.Add(new(document, SymbolUri.Module(workspaceRoot, name), ParsingClientService.ModuleTypeOf(document), parse,
                 ParsingClientService.ModuleSourceOf(document)));
         }
 
@@ -349,14 +350,14 @@ internal sealed class RenameWorkspace
     }
 
     /// <summary>
-    /// The names in a document that refer to the symbol named at a position of it (<strong>LSP 3.17</strong> §Document Highlights Request): the references
-    /// that are in the document, its declaration included. Each is a <see cref="DocumentHighlightKind.Text"/>: which name reads the symbol and which assigns it
+    /// The names in a document that refer to the symbol named at a position of it (<strong>LSP 3.17</strong> §Document Highlights Request): what a rename of
+    /// it would rename there (<see cref="SymbolNavigation.OccurrencesAt"/>), every procedure of a property included. Each is a <see cref="DocumentHighlightKind.Text"/>: which name reads the symbol and which assigns it
     /// is not told apart yet.
     /// </summary>
     public IReadOnlyList<DocumentHighlight> Highlights(Uri documentUri, Position position)
     {
         if (ModuleOf(documentUri) is not { } module
-            || SymbolNavigation.ReferencesAt(_context, module.Module, module.ToModulePosition(position)) is not { } target)
+            || SymbolNavigation.OccurrencesAt(_context, module.Module, module.ToModulePosition(position)) is not { } target)
         {
             return [];
         }

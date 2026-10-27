@@ -191,7 +191,7 @@ A verb is registered once. It is registered again only when its descriptor chang
 - the value of a setting with the values of the setting its form names (`ValueOf`), as it is written before it: `True` and `False`, or the names of a choice. Other values are offered nothing;
 - a path or text with nothing.
 
-A verb the client did not register is offered nothing. The interactive shell registers `BREAK` (`CLEAR`, `TOGGLE <line>`, `<line> [condition]`, its condition evaluated at its line), `THEME` (`LIST`, `<theme>`) and `CONFIG` (`RESET [setting]`, `<setting> [value]`; [**RD-VBAL §2.3.3** Configuration](rd-vbal.2.3.3.configuration.md)) the first time one is completed. A command it does not describe is offered nothing after its verb.
+A verb the client did not register is offered nothing. The interactive shell registers `BREAK` (`CLEAR`, `TOGGLE <line>`, `<line> [condition]`, its condition evaluated at its line), `FOLD` (`<line>`), `THEME` (`LIST`, `<theme>`) and `CONFIG` (`RESET [setting]`, `<setting> [value]`; [**RD-VBAL §2.3.3** Configuration](rd-vbal.2.3.3.configuration.md)) the first time one is completed. A command it does not describe is offered nothing after its verb.
 
 ### `textDocument/signatureHelp` and `rdcore/session/signatureHelp`
 
@@ -298,12 +298,24 @@ declares. Ranges are in the text of the document: for a program of the BASIC, it
 The language server answers `textDocument/references` (**LSP 3.17** §Find References Request) with each name, in every document it holds, that refers to the
 symbol named at the position ([`SymbolNavigation.ReferencesAt`](../api/RDCore.SDK.Semantics.Refactoring.SymbolNavigation.html)): the names a rename of the
 symbol would rename (table above), and, for a class, a module, a `Type` or an `Enum`, the names of the type in `As` clauses and after `New`. The names its
-declarations declare are references when the client asks for them (`context.includeDeclaration`). The procedures of a property are one symbol: a reference
-to its `Property Get` is a reference to its `Property Let`. A member accessed late-bound - on an `Object` or a `Variant` - is not known to refer to it, and is
-not a reference.
+declarations declare are references when the client asks for them (`context.includeDeclaration`), and so are the attributes of a member
+(`Attribute Foo.VB_Description`). A member accessed late-bound - on an `Object` or a `Variant` - is not known to refer to it, and is not a reference.
 
-`textDocument/documentHighlight` (**LSP 3.17** §Document Highlights Request) answers the references that are in the document, its declaration included,
-each of kind `Text`: which reads the symbol and which assigns it is not told apart yet.
+Each procedure of a property is referred to by the names that call it (**MS-VBAL §5.3.1.7**), although a rename renames all of them:
+
+|The name|Refers to|
+|---|---|
+|Reads the property, or calls it with arguments (`Debug.Print c.Value`)|Its `Property Get`.|
+|Is the target of a Let-assignment (`c.Value = 1`, `Let c.Value = 1`)|Its `Property Let`.|
+|Is the target of a Set-assignment (`Set c.Item = Nothing`)|Its `Property Set`.|
+
+The procedure is the one whose name is at the position, or the one the name there calls. The name of a function or a `Property Get` that its own body
+assigns, or reads as a simple name (`Value = mValue` in `Property Get Value`, `Counter = Counter + 1` in `Function Counter`), is its function result variable
+(**MS-VBAL §5.3.1**, §5.6.2.1): it calls no procedure, and refers to none. Its name with an argument list (`Fact(n - 1)` in `Function Fact`), in a call
+statement, or after a `.` calls it again, and is a reference.
+
+`textDocument/documentHighlight` (**LSP 3.17** §Document Highlights Request) answers every name in the document that a rename of the symbol would rename
+there, its declaration and every procedure of a property included, each of kind `Text`: which reads the symbol and which assigns it is not told apart yet.
 
 ### `textDocument/declaration`
 
@@ -362,7 +374,7 @@ The language server runs the commands it advertises (`executeCommandProvider.com
 |---|---|---|
 |`rdcore.importProject`|None, a URI, or `{ "uri", "text", "overwrite" }`|Imports a VB6 project ([**RD-VBAL §2.2.3.5**](rd-vbal.2.2.3.projectfile.md#2235-importing-a-vb6-project)).|
 
-`rdcore.importProject` imports the `.vbp` its URI names. A URI of a folder, or none, is that folder, or the workspace's: a folder with one `.vbp` imports it, a folder with several asks the user which one, and a folder with none is refused. `text` is the `.vbp` as the client holds it, which the server reads instead of the file. A folder that has a `.rdproj` already asks the user to replace it, and is refused unless the user chooses to; `overwrite: true` replaces it without asking. The project of the workspace's folder is written by the server, the only writer of its project file, and the workspace is reloaded with it; a project of another folder is written there.
+`rdcore.importProject` imports the `.vbp` its URI names. A URI of a folder, or none, is that folder, or the workspace's: a folder with one `.vbp` imports it, a folder with several asks the user which one, and a folder with none is refused. `text` is the `.vbp` as the client holds it, which the server reads instead of the file. A folder that has a `.rdproj` already asks the user to replace it (`window/showMessageRequest`), and is refused unless the user chooses to; `overwrite: true` replaces it without asking anything - what a client that imports its `.vbp` again after each change sends. Either way, what the `.vbp` does not describe is kept ([**RD-VBAL §2.2.3.5**](rd-vbal.2.2.3.projectfile.md#2235-importing-a-vb6-project)). The project of the workspace's folder is written by the server, the only writer of its project file, and the workspace is reloaded with it; a project of another folder is written there.
 
 It answers what it wrote: the URI of the `.rdproj` (`projectFile`), the project's `name`, its number of `modules`, and what was skipped (`notes`), each with its `kind`, its `subject` as the `.vbp` writes it, and a `message`.
 
@@ -370,7 +382,7 @@ It answers what it wrote: the URI of the `.rdproj` (`projectFile`), the project'
 
 The language server answers `textDocument/codeLens` (**LSP 3.17** §Code Lens Request) with a lens at the name of each member a module declares ([`SymbolLenses`](../api/RDCore.SDK.Semantics.Refactoring.SymbolLenses.html)): a `Sub`, a `Function`, each procedure of a property, a `Declare` statement, an `Event`, a `Type` and an `Enum`. A variable or a constant of the module has none, nor a field of a `Type` or a member of an `Enum`. A `.rdc` program has none: its procedure is the one its lines are the body of.
 
-A lens is answered without its command (`resolveProvider = true`), since its references are found in every document of the workspace: a client resolves the lenses it shows (`codeLens/resolve`), and the server finds the references of each when it is resolved. Its references are those of `textDocument/references` at its name, its declarations not included: the procedures of a property are one symbol, and the lens of each counts the references of all of them. A function's name that its body assigns the result to is a reference.
+A lens is answered without its command (`resolveProvider = true`), since its references are found in every document of the workspace: a client resolves the lenses it shows (`codeLens/resolve`), and the server finds the references of each when it is resolved. Its references are those of `textDocument/references` at its name, its declarations not included: the lens of a `Property Get` counts the names that read the property, and the lens of its `Property Let` or `Property Set` the names that assign it - a property that nothing assigns shows `0 references` above its `Property Let`. The result a function or a `Property Get` assigns or reads in its own body is no reference; a recursive call is.
 
 |Resolved lens|Is|
 |---|---|
@@ -414,6 +426,23 @@ The language server answers `textDocument/selectionRange` (**LSP 3.17** §Select
 step: each node of the syntax tree written around the position, from a name through its expression, its statement, the block of a structured statement and
 the procedure, to everything the module declares ([`SyntaxSelection`](../api/RDCore.SDK.Model.AST.Abstract.SyntaxSelection.html)). Each step is in the next.
 A position that no node is written around is answered with the empty range at it. For a `.rdc` program, ranges are in its lines.
+
+### `textDocument/foldingRange`
+
+The language server answers `textDocument/foldingRange` (**LSP 3.17** §Folding Range Request) with what folds in a module:
+
+|What|From, to|Kind|
+|---|---|---|
+|A member declaration that spans more than one line: a procedure, a property accessor, a `Type`, an `Enum`, a `Declare` broken over lines|its first line, to its `End` statement|`region`|
+|A block that spans more than one line, however deep: `If`, `Select Case`, `For`, `For Each`, a `Do` or `While` loop, `With`|its first line, to its `End` (`End If`, `Next`, `Loop`, ...)|none|
+
+The branches of a block (`ElseIf`, `Else`, `Case`) fold with it, not apart; a single-line `If` does not fold. A client tells a block from a member by the kind.
+For a `.rdc` program, ranges are in its lines, and the procedure its lines are the body of has none.
+
+The interactive shell folds blocks only. `FOLD <line>` folds the block that starts at that line, or unfolds it; a line that starts none is the error
+`NO FOLDING EXISTS AT <line>`. `LIST` has a lane in its margin for the mark of a block (🔽 open, 🔼 folded; `-` and `+` on a console that draws no emoji),
+before the lane of a breakpoint, which is next to the line. A folded block is listed as its first line, faint as ghost text and cut with `…` to the console's
+width. A fold is on a line number, as a breakpoint is, and `NEW` and `LOAD` clear them.
 
 ### `workspace/didChangeWatchedFiles`
 
