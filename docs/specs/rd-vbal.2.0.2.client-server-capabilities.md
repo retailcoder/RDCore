@@ -334,7 +334,7 @@ Names that match alike come by name. An empty query matches every symbol. At mos
 
 ### `textDocument/codeAction`
 
-The language server answers `textDocument/codeAction` (**LSP 3.17** §Code Action Request) for the documents it holds, with the kinds `quickfix` and `refactor.rename`. Every action is complete as it is answered (`resolveProvider = false`); a client that asks for some kinds only (`context.only`) is answered those and the kinds under them.
+The language server answers `textDocument/codeAction` (**LSP 3.17** §Code Action Request) for the documents it holds, with the kinds `quickfix`, `refactor.rename` and `source.rdcore.importProject`. Every action is complete as it is answered (`resolveProvider = false`); a client that asks for some kinds only (`context.only`) is answered those and the kinds under them.
 
 An analyzer states the fix of a finding with it ([`DiagnosticFixes`](../api/RDCore.SDK.Model.Diagnostics.DiagnosticFixes.html)), and the fix travels in the diagnostic's `data`, which a client sends back with the request. The platform makes the fix: an extension says what it is without knowing how the workspace is edited.
 
@@ -343,6 +343,7 @@ An analyzer states the fix of a finding with it ([`DiagnosticFixes`](../api/RDCo
 |A rename that fixes a diagnostic, to each name its analyzer suggests|`quickfix`, preferred|Its `edit` is the rename's `WorkspaceEdit`. Offered only when the rename can be made.|
 |A rename that fixes a diagnostic, to a name the user chooses|`quickfix`|Its `command` is `rdcore.rename`.|
 |A rename of each name the range declares, or of the name at the position of an empty range|`refactor.rename`|Its `command` is `rdcore.rename`.|
+|An import of each VB6 project (`.vbp`) of the workspace's folder, when it has no `.rdproj`|`source.rdcore.importProject`|Its `command` is `rdcore.importProject`, with the URI of the `.vbp`. Offered in every document.|
 
 `rdcore.rename` ([`RefactoringCommands.Rename`](../api/RDCore.SDK.Semantics.Refactoring.RefactoringCommands.html)) is a command a client runs itself: its arguments are the URI of the document and the position of the name. The client asks its user for the new name, and sends `textDocument/rename` with it, unless the user cancels. The titles are in the language of the user interface.
 
@@ -352,6 +353,33 @@ An analyzer states the fix of a finding with it ([`DiagnosticFixes`](../api/RDCo
 |[RDC01002](../diagnostics/rdc01002.md) - Hungarian notation|A rename to the word after the prefix (`strName` to `Name`), or to a name the user chooses.|
 
 The interactive shell asks for them with `DUCKY`, for its program as the document it is: `DUCKY` for the whole program, `DUCKY 20` for line 20. It pulls the diagnostics of the program (`textDocument/diagnostic`), asks for the code actions of the range with those of them that are in it, lists the actions by number, and does the one whose number is typed; <kbd>Esc</kbd> does none. It runs `rdcore.rename` itself: it asks the platform what the name is (`textDocument/prepareRename`), asks for the new name with that one, and renames (`textDocument/rename`) unless <kbd>Esc</kbd> cancels. An edit is made to the program as a whole or not at all: not when it is of a version the program no longer is, and not when it edits a document the shell does not hold. A program that is no document - in a shell attached to a workspace, a program that was neither loaded nor saved - is to be saved first, which `DUCKY` says.
+
+### `workspace/executeCommand`
+
+The language server runs the commands it advertises (`executeCommandProvider.commands`) when a client sends `workspace/executeCommand` (**LSP 3.17** §Execute a command) ([`IServerCommand`](../api/RDCore.SDK.Server.Commands.IServerCommand.html)). A command a client runs itself, such as `rdcore.rename`, is not advertised. A command that is refused is answered with an error (`RequestFailed`, `-32803`) whose message says why, in the language of the user interface, for the client to show its user. What a command asks its user is asked with `window/showMessageRequest`, its choices as the request's actions.
+
+|Command|Arguments|Does|
+|---|---|---|
+|`rdcore.importProject`|None, a URI, or `{ "uri", "text", "overwrite" }`|Imports a VB6 project ([**RD-VBAL §2.2.3.5**](rd-vbal.2.2.3.projectfile.md#2235-importing-a-vb6-project)).|
+
+`rdcore.importProject` imports the `.vbp` its URI names. A URI of a folder, or none, is that folder, or the workspace's: a folder with one `.vbp` imports it, a folder with several asks the user which one, and a folder with none is refused. `text` is the `.vbp` as the client holds it, which the server reads instead of the file. A folder that has a `.rdproj` already asks the user to replace it, and is refused unless the user chooses to; `overwrite: true` replaces it without asking. The project of the workspace's folder is written by the server, the only writer of its project file, and the workspace is reloaded with it; a project of another folder is written there.
+
+It answers what it wrote: the URI of the `.rdproj` (`projectFile`), the project's `name`, its number of `modules`, and what was skipped (`notes`), each with its `kind`, its `subject` as the `.vbp` writes it, and a `message`.
+
+### `textDocument/codeLens` and `codeLens/resolve`
+
+The language server answers `textDocument/codeLens` (**LSP 3.17** §Code Lens Request) with a lens at the name of each member a module declares ([`SymbolLenses`](../api/RDCore.SDK.Semantics.Refactoring.SymbolLenses.html)): a `Sub`, a `Function`, each procedure of a property, a `Declare` statement, an `Event`, a `Type` and an `Enum`. A variable or a constant of the module has none, nor a field of a `Type` or a member of an `Enum`. A `.rdc` program has none: its procedure is the one its lines are the body of.
+
+A lens is answered without its command (`resolveProvider = true`), since its references are found in every document of the workspace: a client resolves the lenses it shows (`codeLens/resolve`), and the server finds the references of each when it is resolved. Its references are those of `textDocument/references` at its name, its declarations not included: the procedures of a property are one symbol, and the lens of each counts the references of all of them. A function's name that its body assigns the result to is a reference.
+
+|Resolved lens|Is|
+|---|---|
+|`command.title`|The count, in the language of the user interface: `0 references`, `1 reference`, `3 references` (`0 référence`, `1 référence`, `3 références`).|
+|`command.command`|`rdcore.showReferences` ([`RefactoringCommands.ShowReferences`](../api/RDCore.SDK.Semantics.Refactoring.RefactoringCommands.html)), a command a client runs itself: it shows its user the references.|
+|`command.arguments`|The URI of the document, the position of the name, and the references (`Location[]`): the arguments of VS Code's `editor.action.showReferences`.|
+
+> [!NOTE]
+> **Not implemented.** A lens that runs a `Sub Main` (`rdcore/session/execute`).
 
 ### `textDocument/typeDefinition` and `textDocument/implementation`
 
@@ -391,13 +419,13 @@ A position that no node is written around is answered with the empty range at it
 
 The language server reads the project file (`.rdproj`) when it initializes. The server is the project file's only writer: a client tells it which files it created,
 renamed or deleted (see [`workspace/didCreateFiles`, `didRenameFiles` and `didDeleteFiles`](#workspacedidcreatefiles-didrenamefiles-and-diddeletefiles)), and does
-not write the project file itself. A project file changed outside the editor (a `git checkout`, a hand edit) is what a client says changed, as **LSP 3.17** has it
-(§DidChangeWatchedFiles Notification): the client owns the file system, and the server watches nothing itself.
+not write the project file itself. A project file or a source file changed outside the editor (a `git checkout`, a module exported from the VBE, a hand edit)
+is what a client says changed, as **LSP 3.17** has it (§DidChangeWatchedFiles Notification): the client owns the file system.
 
 |Message|Direction|Does|
 |---|---|---|
-|`client/registerCapability`|Server to client|Asks a client that registers capabilities dynamically (`workspace.didChangeWatchedFiles.dynamicRegistration`) to watch `**/.rdproj`, created or changed. A client that does not is not asked.|
-|`workspace/didChangeWatchedFiles`|Client to server|Says the workspace's `.rdproj` was created or changed. The server serves it whether or not it asked for it: a client that registers nothing sends it all the same. A change to another folder's `.rdproj`, and a deletion, are left alone; so is a project file that lists what the workspace is, as the one the server wrote does when a client that watches it says it changed.|
+|`client/registerCapability`|Server to client|Asks a client that registers capabilities dynamically (`workspace.didChangeWatchedFiles.dynamicRegistration`) to watch `**/.rdproj`, created or changed, and the source files of every language the platform serves (`**/*.{bas,cls,frm,doccls,rdc}`), created, changed or deleted. A client that does not is not asked.|
+|`workspace/didChangeWatchedFiles`|Client to server|Says files of the workspace changed. The server serves it whether or not it asked for it: a client that registers nothing sends it all the same. The workspace's `.rdproj`, created or changed, is read again (below); another folder's `.rdproj`, and a deletion, are left alone, and so is a project file that lists what the workspace is, as the one the server wrote does when a client that watches it says it changed. A file the project lists is read again ([below](#a-file-changed-outside-the-editor)); one it does not list is nothing of the workspace.|
 |`rdcore/host/project/reload`|Language server to environment host|Asks the host to compose its runtime session again from the project file as it is now ([`ProjectReload`](../api/RDCore.SDK.Client.ProjectReload.html)). A class module's symbol is the project's, so a class the project gained is a type only once the session is composed again. A program that is running or waits keeps the session it runs in.|
 |`workspace/diagnostic/refresh`|Server to client|Asks a client that pulls its diagnostics to pull them again, once the workspace is defined again. Sent to a client whose `workspace.diagnostics.refreshSupport` is `true`.|
 |`window/showMessage`|Server to client|Says why the workspace is as it was (the project file could not be read), or that a running program keeps its modules.|
@@ -409,6 +437,23 @@ On the notification, the language server (`WorkspaceReloadService`):
 3. asks the environment host to compose its session again;
 4. defines the whole workspace again in its three phases - its types declared, its declarations bound, its code loaded - each module replacing what the host held of it. When the host kept its session, a module the project lost is discarded from it (`rdcore/host/discard`) first;
 5. asks the client to pull its diagnostics again.
+
+#### A file changed outside the editor
+
+For a file the project lists that changed, was created or was deleted, the language server (`WorkspaceReloadService.ReloadFilesAsync`) reads it again: a module
+is parsed again, a module whose file is gone is discarded from the environment host and its document is missing, and the whole workspace is defined again in its
+three phases, since another module may refer to what changed. A document the client has open is the client's, and is not read; a file whose text is what was
+loaded changes nothing, as when the server wrote it. The client is then asked to pull its diagnostics again.
+
+#### The server's own watch
+
+The client owns the file system. Only for a client that does not say it watches files - no `workspace.didChangeWatchedFiles` capability at all, with or without
+dynamic registration - does the language server watch the workspace's files itself (`WorkspaceFileSystemWatcher`): its `.rdproj`, and the source files under its
+root, except what a folder whose name starts with a dot holds (`.git`, `.vscode`). What it sees is served as if the client had said it. The events of a moment (a
+save is several, a `git checkout` many) are gathered and served together, once none came for 300 ms.
+
+The setting `Workspace.EnableFileSystemWatchers` (default `true`, read when the workspace loads) turns the server's watch off altogether: a file changed outside
+the editor is then read when the server next starts.
 
 ### `workspace/didCreateFiles`, `didRenameFiles` and `didDeleteFiles`
 

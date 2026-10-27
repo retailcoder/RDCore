@@ -192,6 +192,9 @@
   <data name="ImplicitArrayDeclaration_Message" xml:space="preserve">
     <value>This ReDim declares the array '{0}', whose name matches nothing else. Declare it first, with Dim {0}() As ..., so that a misspelled name does not declare a new array.</value>
   </data>
+  <data name="ImplicitResultLocal_Message" xml:space="preserve">
+    <value>The return value of '{0}' is used as an implicit local variable. Declare a local to work with, and assign it to '{0}' once, at the end.</value>
+  </data>
   <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
     <value>'{0}' implicitly returns a Variant. State its return type with an As clause (As Variant, if that is intended).</value>
   </data>
@@ -218,6 +221,18 @@
   </data>
   <data name="NotAllPathsReturnValue_NeverAssigned_Message" xml:space="preserve">
     <value>'{0}' never assigns its return value: the caller always gets the default value of the type (0, an empty string, Empty or Nothing).</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_Message" xml:space="preserve">
+    <value>IsMissing({0}) is always False: '{0}' is {1}, which an omitted argument never leaves missing. Only a Variant parameter with no default value can be missing.</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_NotAVariant" xml:space="preserve">
+    <value>not a Variant</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_HasADefault" xml:space="preserve">
+    <value>given a default value</value>
+  </data>
+  <data name="ShadowedDeclaration_Message" xml:space="preserve">
+    <value>'{0}' hides '{1}': in this procedure, the name means '{0}', and '{1}' everywhere else. Give '{0}' a name of its own.</value>
   </data>
   <data name="ObsoleteCommentSyntax_Message" xml:space="preserve">
     <value>The Rem keyword is obsolete: a comment starts with an apostrophe (').</value>

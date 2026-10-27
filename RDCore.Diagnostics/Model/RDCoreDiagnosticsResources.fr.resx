@@ -192,6 +192,9 @@
   <data name="ImplicitArrayDeclaration_Message" xml:space="preserve">
     <value>Ce ReDim déclare le tableau '{0}', dont le nom ne désigne rien d'autre. Déclarez-le avant, avec Dim {0}() As ..., pour qu'un nom mal orthographié ne déclare pas un nouveau tableau.</value>
   </data>
+  <data name="ImplicitResultLocal_Message" xml:space="preserve">
+    <value>La valeur de retour de '{0}' est utilisée comme une variable locale implicite. Déclarez une variable locale pour faire le travail, et assignez-la à '{0}' une seule fois, à la fin.</value>
+  </data>
   <data name="ImplicitVariantReturnType_Message" xml:space="preserve">
     <value>'{0}' retourne implicitement un Variant. Indiquez son type de retour avec une clause As (As Variant, si c'est voulu).</value>
   </data>
@@ -218,6 +221,18 @@
   </data>
   <data name="NotAllPathsReturnValue_NeverAssigned_Message" xml:space="preserve">
     <value>'{0}' n'assigne jamais sa valeur de retour: l'appelant reçoit toujours la valeur par défaut du type (0, une chaîne vide, Empty ou Nothing).</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_Message" xml:space="preserve">
+    <value>IsMissing({0}) est toujours False: '{0}' est {1}, qu'un argument omis ne laisse jamais manquant. Seul un paramètre Variant sans valeur par défaut peut être manquant.</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_NotAVariant" xml:space="preserve">
+    <value>autre chose qu'un Variant</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_HasADefault" xml:space="preserve">
+    <value>doté d'une valeur par défaut</value>
+  </data>
+  <data name="ShadowedDeclaration_Message" xml:space="preserve">
+    <value>'{0}' masque '{1}': dans cette procédure, le nom désigne '{0}', et '{1}' partout ailleurs. Donnez à '{0}' un nom bien à lui.</value>
   </data>
   <data name="ObsoleteCommentSyntax_Message" xml:space="preserve">
     <value>Le mot-clé Rem est obsolète: un commentaire commence par une apostrophe (').</value>

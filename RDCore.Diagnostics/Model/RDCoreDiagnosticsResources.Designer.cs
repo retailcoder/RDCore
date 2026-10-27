@@ -248,6 +248,15 @@ namespace RDCore.Diagnostics.Model {
                 return ResourceManager.GetString("ImplicitArrayDeclaration_Message", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The return value of &apos;{0}&apos; is used as an implicit local variable. Declare a local to work with, and assign it to &apos;{0}&apos; once, at the end..
+        /// </summary>
+        public static string ImplicitResultLocal_Message {
+            get {
+                return ResourceManager.GetString("ImplicitResultLocal_Message", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to &apos;{0}&apos; implicitly returns a Variant. State its return type with an As clause (As Variant, if that is intended)..
@@ -336,6 +345,42 @@ namespace RDCore.Diagnostics.Model {
         public static string NotAllPathsReturnValue_NeverAssigned_Message {
             get {
                 return ResourceManager.GetString("NotAllPathsReturnValue_NeverAssigned_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to IsMissing({0}) is always False: &apos;{0}&apos; is {1}, which an omitted argument never leaves missing. Only a Variant parameter with no default value can be missing..
+        /// </summary>
+        public static string IsMissingAlwaysFalse_Message {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to not a Variant.
+        /// </summary>
+        public static string IsMissingAlwaysFalse_NotAVariant {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_NotAVariant", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to given a default value.
+        /// </summary>
+        public static string IsMissingAlwaysFalse_HasADefault {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_HasADefault", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; hides &apos;{1}&apos;: in this procedure, the name means &apos;{0}&apos;, and &apos;{1}&apos; everywhere else. Give &apos;{0}&apos; a name of its own..
+        /// </summary>
+        public static string ShadowedDeclaration_Message {
+            get {
+                return ResourceManager.GetString("ShadowedDeclaration_Message", resourceCulture);
             }
         }
         

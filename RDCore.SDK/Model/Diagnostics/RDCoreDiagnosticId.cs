@@ -38,6 +38,7 @@ public enum RDCoreDiagnosticId
     ImplicitNarrowingConversion = 112, // a value converted into a type that holds less of it, with no conversion function to say so
     ImplicitWideningConversion = 113,
     ImplicitArrayDeclaration = 114, // a ReDim whose name matches nothing declares the array it re-dimensions: a Dim before it says so
+    ImplicitResultLocal = 115, // a function reading its own result variable, as the local it implicitly is: an explicit local says so
 
     IntegerDataTypeDeclaration = 201,
     ModuleScopeDimDeclaration = 202,
@@ -45,6 +46,8 @@ public enum RDCoreDiagnosticId
     MultipleDeclarations = 204,
     MisleadingByRefParameter = 205, // property let/set value parameter is always passed ByVal
     NotAllPathsReturnValue = 206, // [RD2:NonReturningFunctionInspection], but for any path that does not assign the return value, not only when none does
+    IsMissingAlwaysFalse = 207, // [RD2:IsMissingOnInappropriateArgumentInspection] IsMissing of a parameter that is no Variant, or an Optional Variant with a default
+    ShadowedDeclaration = 208, // [RD2:ShadowedDeclarationInspection] a local or a parameter named like a member of the module, of another module or of a library
 
     ObsoleteCallingConvention = 301,
     ObsoleteCallStatement = 302,

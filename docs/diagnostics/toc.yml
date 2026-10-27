@@ -384,6 +384,8 @@
   href: rdc00112.md
 - name: RDC00114 — Implicit array declaration
   href: rdc00114.md
+- name: RDC00115 — Implicit result local
+  href: rdc00115.md
 - name: RDC00201 — Integer data type declaration
   href: rdc00201.md
 - name: RDC00202 — Module-scope Dim declaration
@@ -396,6 +398,10 @@
   href: rdc00205.md
 - name: RDC00206 — Not all code paths return a value
   href: rdc00206.md
+- name: RDC00207 — IsMissing that is always False
+  href: rdc00207.md
+- name: RDC00208 — Shadowed declaration
+  href: rdc00208.md
 - name: RDC00302 — Obsolete Call statement
   href: rdc00302.md
 - name: RDC00303 — Obsolete comment syntax

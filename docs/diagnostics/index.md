@@ -237,12 +237,15 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00107](rdc00107.md)|Implicit Variant return type — a function declared without a return type|
 |[RDC00112](rdc00112.md)|Implicit narrowing conversion — a value converted implicitly into a type that holds less of it|
 |[RDC00114](rdc00114.md)|Implicit array declaration — a `ReDim` that declares the array it re-dimensions|
+|[RDC00115](rdc00115.md)|Implicit result local — a function that reads its own return value, as the local variable it implicitly is|
 |[RDC00201](rdc00201.md)|Integer data type declaration — an As Integer clause|
 |[RDC00202](rdc00202.md)|Module-scope Dim declaration — a module-level variable declared with Dim|
 |[RDC00203](rdc00203.md)|Multiline parameter declaration — one parameter declared over several lines|
 |[RDC00204](rdc00204.md)|Multiple declarations — a statement that declares several names|
 |[RDC00205](rdc00205.md)|Misleading ByRef parameter — ByRef on the value parameter of a property Let or Set|
 |[RDC00206](rdc00206.md)|Not all code paths return a value — a function or property getter with a code path that does not assign its return value|
+|[RDC00207](rdc00207.md)|IsMissing that is always False — IsMissing of a parameter that is not a Variant, or an Optional Variant with a default value|
+|[RDC00208](rdc00208.md)|Shadowed declaration — a local or a parameter named like a member of the module, of another module, or of a library|
 |[RDC00302](rdc00302.md)|Obsolete Call statement — a call statement written with the Call keyword|
 |[RDC00303](rdc00303.md)|Obsolete comment syntax — a comment written with the Rem keyword|
 |[RDC00304](rdc00304.md)|Obsolete error syntax — an Error statement|

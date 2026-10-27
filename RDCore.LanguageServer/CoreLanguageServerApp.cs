@@ -119,7 +119,9 @@ internal sealed class CoreLanguageServerApp(
         builder.WithHandler<WorkspaceSymbolHandler>();
         builder.WithHandler<Navigation.HoverHandler>();
         builder.WithHandler<CodeActionHandler>();
+        builder.WithHandler<Server.Handlers.Workspace.ExecuteCommandHandler>();
         builder.WithHandler<InlayHintHandler>();
+        builder.WithHandler<CodeLensHandler>();
         builder.WithHandler<SessionStatusHandler>();
         builder.WithHandler<SessionExecuteHandler>();
         builder.WithHandler<SessionDiscardHandler>();
@@ -174,8 +176,15 @@ internal sealed class CoreLanguageServerApp(
         services.AddSingleton(_ => ExternalServices.GetRequiredService<ISymbolSyncService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceReloadService>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceFileOperationService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IWatchedFileChanges>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IOptions<SdkAppOptions>>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IDocumentLifecycleService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IProjectFileWriter>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<RDCore.SDK.Runtime.Libraries.ILibrarySource>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<System.IO.Abstractions.IFileSystem>());
+
+        // the commands a client asks the server to run (workspace/executeCommand).
+        services.AddSingleton<RDCore.SDK.Server.Commands.IServerCommand, Workspace.ImportProjectCommand>();
 
         // the documents of every language the platform serves: the client names the language its own way, so what selects a document is the file it is.
         services.AddSingleton(new TextDocumentSelector(SupportedLanguages.All
@@ -235,6 +244,14 @@ internal sealed class CoreLanguageServerApp(
         response.Capabilities.Workspace ??= new();
         response.Capabilities.Workspace.FileOperations ??= new();
         response.Capabilities.Workspace.FileOperations.DidRename = WorkspaceFileOperationFilters.DidRename;
+
+        // the client owns the file system: one that does not say it watches files is watched for, unless the setting says never.
+        if (workspaceDocuments.WorkspaceRoot is { Length: > 0 } root)
+        {
+            ExternalServices.GetRequiredService<IWorkspaceFileSystemWatcher>()
+                .Start(root, clientWatches: request.Capabilities?.Workspace?.DidChangeWatchedFiles.IsSupported == true, server);
+        }
+
         await base.OnLanguageServerInitializedAsync(server, request, response, cancellationToken);
     }
 
@@ -397,6 +414,7 @@ internal sealed class CoreLanguageServerApp(
     protected override async Task OnServerStoppingAsync()
     {
         await _componentsCts.CancelAsync();
+        ExternalServices.GetService<IWorkspaceFileSystemWatcher>()?.Dispose();
         // graceful LSP shutdown/exit of the child components before this process exits.
         await Task.WhenAll(
             new[] { orchestration.ParsingService, orchestration.RuntimeEnvironment }

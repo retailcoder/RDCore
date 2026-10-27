@@ -57,6 +57,8 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, OptionExplicitAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObsoleteCallStatementAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, NotAllPathsReturnValueAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, IsMissingAlwaysFalseAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ShadowedDeclarationAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ImplicitNarrowingConversionAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, BitwiseSemanticsAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, AmbiguousConcatenationAnalyzer>();
@@ -73,6 +75,7 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, ImplicitPublicMemberAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ImplicitVariantDeclarationAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ImplicitArrayDeclarationAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ImplicitResultLocalAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ImplicitVariantReturnTypeAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, IntegerDataTypeAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ModuleScopeDimAnalyzer>();
