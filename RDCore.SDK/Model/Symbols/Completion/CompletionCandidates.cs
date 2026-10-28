@@ -121,18 +121,27 @@ public static class CompletionCandidates
             return moduleUri;
         }
 
+        // the innermost procedure that contains the position, the one whose definition there starts last: a procedure a branch of a #If block writes whole is
+        // within the lines of the procedure whose header that block splits (MemberDeclarationNode.HeaderAlternatives), and is the one the position is in.
+        Uri? origin = null;
+        SourcePosition latest = default;
         foreach (var declaration in module.Declarations.OfType<WorkspaceSymbol>())
         {
-            if (tree.TryGetScope(declaration.Uri, out var scope)
-                && scope.Kind == LexicalScopeKind.Procedure
-                && scope.Uri.AbsoluteUri == declaration.Uri.AbsoluteUri
-                && declaration.AllDefinitions.Any(definition => Contains(definition.Range, position)))
+            if (!tree.TryGetScope(declaration.Uri, out var scope) || scope.Kind != LexicalScopeKind.Procedure || scope.Uri.AbsoluteUri != declaration.Uri.AbsoluteUri)
             {
-                return declaration.Uri;
+                continue;
+            }
+
+            foreach (var definition in declaration.AllDefinitions.Where(definition => Contains(definition.Range, position)))
+            {
+                if (origin is null || definition.Range.Start.CompareTo(latest) > 0)
+                {
+                    (origin, latest) = (declaration.Uri, definition.Range.Start);
+                }
             }
         }
 
-        return moduleUri;
+        return origin ?? moduleUri;
     }
 
     private static bool Contains(SourceRange range, SourcePosition position)
@@ -306,6 +315,28 @@ public static class CompletionCandidates
         }
 
         return candidates.ToList();
+    }
+
+    /// <summary>
+    /// The constants of an <c>Enum</c>, by name: what an argument given to a parameter declared as it is most likely to be (<c>MsgBox "Hello", vbYesNo</c>).
+    /// </summary>
+    /// <remarks>
+    /// A library's <c>Enum</c> carries its constants (<see cref="MembersOf(VBType)"/>). One the workspace declares does not: its constants are declarations of
+    /// the module that declares it, each of them of the <c>Enum</c> (<see cref="VBEnumConstMemberSymbol.ParentUri"/>), and are found there.
+    /// </remarks>
+    /// <param name="tree">The scope tree of the composed workspace.</param>
+    /// <param name="type">The <c>Enum</c>.</param>
+    public static IReadOnlyList<CompletionCandidate> ConstantsOf(ScopeTree tree, VBEnumType type)
+    {
+        IEnumerable<CompletionCandidate> constants = MembersOf(type);
+        if (!constants.Any() && type.Symbol is VBEnumMemberSymbol enumeration && tree.TryGetScope(enumeration.ParentUri, out var module))
+        {
+            constants = module.Declarations.OfType<VBEnumConstMemberSymbol>()
+                .Where(constant => constant.ParentUri.AbsoluteUri == enumeration.Uri.AbsoluteUri && IsMemberName(constant))
+                .Select(constant => Describe(constant) with { Rank = ModuleRank });
+        }
+
+        return [.. constants.DistinctBy(constant => constant.Label, StringComparer.OrdinalIgnoreCase).OrderBy(constant => constant.Label, StringComparer.OrdinalIgnoreCase)];
     }
 
     /// <summary>
