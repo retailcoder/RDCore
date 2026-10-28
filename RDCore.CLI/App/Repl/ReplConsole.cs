@@ -47,7 +47,7 @@ internal sealed class ReplConsole(IConsoleMessageWriter writer, IAnsiConsole con
         }
 
         // the marking is a background, and runs to the end of the line: the line is filled with spaces up to the width of the console. Its foreground is the
-        // whole line's too, as VBE draws a breakpoint and the current statement: syntax colours on that background are hard to read (the author), so the runs are
+        // whole line's too, as VBE draws a breakpoint and the current statement: syntax colours on that background are hard to read, so the runs are
         // written plain under it. The margin keeps its own styles. The widths are in cells.
         var width = runs.Sum(run => App.Console.ConsoleText.WidthOf(run.Text));
         var marginWidth = margin.Sum(run => App.Console.ConsoleText.WidthOf(run.Text));
@@ -74,6 +74,23 @@ internal sealed class ReplConsole(IConsoleMessageWriter writer, IAnsiConsole con
     {
         var builder = new ConsoleMessageBuilder().WithKind(kind).WithMessageBody(message);
         writer.WriteMessage(verbose is { Length: > 0 } ? builder.WithVerbose(verbose) : builder);
+    }
+
+    /// <inheritdoc/>
+    public void WriteFinding(MessageKind kind, string title, Uri? helpUrl, string description)
+    {
+        var theme = themes.Theme;
+        var icon = theme.GetIcon(kind);
+        var titleStyle = theme.GetStyle(kind, MessagePart.Title);
+
+        // the page is written out and is a link where the console draws links (OSC 8): a console that does not shows its address, which is the same text.
+        var link = helpUrl is null ? string.Empty
+            : $" [{titleStyle}][link={Spectre.Console.Markup.Escape(helpUrl.AbsoluteUri)}]{Spectre.Console.Markup.Escape(helpUrl.AbsoluteUri)}[/][/]";
+        console.MarkupLine($"[{titleStyle}]{Spectre.Console.Markup.Escape(icon)}[/] [bold {titleStyle}]{Spectre.Console.Markup.Escape(title)}[/]{link}");
+        if (description.Length > 0)
+        {
+            console.MarkupLine($"  [{theme.GetStyle(kind, MessagePart.Verbose)}]{Spectre.Console.Markup.Escape(description)}[/]");
+        }
     }
 
     // a style the theme does not name is the plain one, which is what the shell is written in already.
