@@ -23,6 +23,7 @@ using RDCore.LanguageServer.Workspace.Services;
 using RDCore.SDK.Workspace;
 using RDCore.SDK.Client;
 using RDCore.SDK.Extensibility;
+using RDCore.SDK.Formatting;
 using RDCore.SDK.Platform;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Server;
@@ -50,6 +51,7 @@ internal sealed class CoreLanguageServerApp(
     ILanguageServerProtocolTransportLayer transportLayer,
     IWorkspaceService workspace,
     IWorkspaceDocumentService workspaceDocuments,
+    IWorkspaceProjects projects,
     IParsingClientService parsing,
     ISymbolSyncService symbolSync,
     IDocumentDiagnosticsService diagnostics,
@@ -175,6 +177,7 @@ internal sealed class CoreLanguageServerApp(
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IClientVerbRegistry>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkProgressReporter>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceDocumentService>());
+        services.AddSingleton(_ => ExternalServices.GetRequiredService<IWorkspaceProjects>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<Workspace.States.IDocumentStateProvider>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<ISymbolResolver>());
         services.AddSingleton(_ => ExternalServices.GetRequiredService<IPlatformOrchestrationService>());
@@ -192,6 +195,7 @@ internal sealed class CoreLanguageServerApp(
 
         // the commands a client asks the server to run (workspace/executeCommand).
         services.AddSingleton<RDCore.SDK.Server.Commands.IServerCommand, Workspace.ImportProjectCommand>();
+        services.AddSingleton<RDCore.SDK.Server.Commands.IServerCommand, Workspace.ImportIndenterSettingsCommand>();
     }
 
     protected override void RegisterServerCapabilities(ILanguageServer server, ClientCapabilities clientCapabilities)
@@ -215,7 +219,10 @@ internal sealed class CoreLanguageServerApp(
     /// </summary>
     private async Task LoadWorkspaceAsync(ILanguageServer server, InitializeParams request)
     {
-        if (request.RootUri is null)
+        // the folders a client gives (LSP 3.17 workspaceFolders); the server is started on the first, or on rootUri when it gives none.
+        var folders = (request.WorkspaceFolders ?? []).Select(folder => folder.Uri.GetFileSystemPath()).ToList();
+        var root = request.RootUri?.GetFileSystemPath() ?? folders.FirstOrDefault();
+        if (root is null)
         {
             LogIfEnabled(LogLevel.Warning, "No RootUri in the initialize request; workspace will not be loaded.");
             return;
@@ -223,7 +230,7 @@ internal sealed class CoreLanguageServerApp(
 
         try
         {
-            await workspace.LoadAsync(request.RootUri.GetFileSystemPath());
+            await workspace.LoadAsync(root, folders);
             LogIfEnabled(LogLevel.Information, "✅ Workspace loaded");
         }
         catch (Exception exception)
@@ -235,7 +242,17 @@ internal sealed class CoreLanguageServerApp(
             server.Window.ShowMessage(new ShowMessageParams
             {
                 Type = MessageType.Error,
-                Message = string.Format(DebuggerMessages.WorkspaceCouldNotBeLoaded, request.RootUri.GetFileSystemPath(), exception.Message),
+                Message = string.Format(DebuggerMessages.WorkspaceCouldNotBeLoaded, root, exception.Message),
+            });
+        }
+
+        // a project that lists a file no workspace folder holds does not have it: the client is told which, and why.
+        foreach (var (project, relativeUri) in projects.Refused)
+        {
+            server.Window.ShowMessage(new ShowMessageParams
+            {
+                Type = MessageType.Warning,
+                Message = string.Format(DebuggerMessages.FileOutsideTheWorkspaceFolders, relativeUri, project),
             });
         }
     }
@@ -269,6 +286,9 @@ internal sealed class CoreLanguageServerApp(
         // and the progress of the work the server does is reported to it, if it shows it.
         progress.Attach(server.WorkDoneManager);
 
+        // the indenter settings the user had in Rubberduck are offered once, to a client that can ask the question.
+        _ = OfferIndenterSettingsAsync(server);
+
         // Bring up the core child components once the client<->LS connection is live. Each runs as a
         // supervised background task (not awaited): a child that is slow or fails to attach must not
         // block or fault the language server.
@@ -284,6 +304,26 @@ internal sealed class CoreLanguageServerApp(
         foreach (var extension in orchestration.Extensions)
         {
             _coreComponentBringUps.Add(BringUpExtensionAsync(extension, _componentsCts.Token));
+        }
+    }
+
+    // the indenter settings the user had in Rubberduck are offered once (IndenterSettingsOffering); the offering listens for the client's settings from now on.
+    private async Task OfferIndenterSettingsAsync(ILanguageServer server)
+    {
+        try
+        {
+            using var offering = new Workspace.IndenterSettingsOffering(
+                server, server.Services.GetRequiredService<IPlatformClientCapabilitiesService>(), ExternalServices.GetRequiredService<IndenterSettingsOffer>(),
+                ExternalServices.GetRequiredService<ILiveSettings>(), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(10), message => LogIfEnabled(LogLevel.Information, message));
+            if (await offering.RunAsync(_componentsCts.Token) is { } outcome)
+            {
+                LogIfEnabled(LogLevel.Information, $"⚙️ {outcome.Message}");
+                server.Window.ShowInfo(outcome.Message);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            LogIfEnabled(LogLevel.Warning, $"The indenter settings of Rubberduck could not be offered: {exception.Message}");
         }
     }
 
@@ -418,6 +458,9 @@ internal sealed class CoreLanguageServerApp(
     protected override async Task OnServerStoppingAsync()
     {
         await _componentsCts.CancelAsync();
+
+        // what a change of the project left to do (composing the host's session, defining the symbols) waits for components that are going away.
+        ExternalServices.GetService<IWorkspaceReloadService>()?.Stop();
         ExternalServices.GetService<IWorkspaceFileSystemWatcher>()?.Dispose();
         // graceful LSP shutdown/exit of the child components before this process exits.
         await Task.WhenAll(
