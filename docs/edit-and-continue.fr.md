@@ -110,7 +110,7 @@ la modification, ou quand le programme se termine.
 > CONT
   ⛔ IMPOSSIBLE DE POURSUIVRE
     Des modifications faites pendant que le programme attendait ne lui sont pas appliquées :
-    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé
+    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé ou qui est devenue Static
   RUN pour recommencer.
   ✅ PRÊT.
 ```
@@ -120,7 +120,7 @@ la modification, ou quand le programme se termine.
 ```text
 > EDITS
   ⚠️ Des modifications faites pendant que le programme attendait ne lui sont pas appliquées :
-    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé
+    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé ou qui est devenue Static
   RUN pour recommencer.
   ✅ PRÊT.
 ```

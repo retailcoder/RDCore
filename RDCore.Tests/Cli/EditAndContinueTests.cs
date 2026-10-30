@@ -237,7 +237,7 @@ public sealed class EditAndContinueTests
 
     // what can't be applied correctly, or is not applied to a program that waits yet: the program waits as it was, and picks the edit up when it is run again.
     [TestMethod]
-    [DataRow(new[] { "Program|Replace|Dim a As Long|    Dim a As Integer" }, "a local of a procedure the program is in, given another type",
+    [DataRow(new[] { "Program|Replace|Dim a As Long|    Dim a As Integer" }, "a local of a procedure the program is in, given another type or made a Static",
         DisplayName = "a local of a procedure the program is in, retyped")]
     [DataRow(new[] { "Program|Replace|Public G As Long|Public G As Integer" }, "a variable that holds a value, given another type",
         DisplayName = "a module variable that holds a value, retyped")]

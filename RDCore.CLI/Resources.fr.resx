@@ -510,7 +510,7 @@
     <value>une procédure où se trouve le programme, retirée</value>
   </data>
   <data name="Host_Edit_LocalOfAnActiveProcedure" xml:space="preserve">
-    <value>une variable locale d'une procédure où se trouve le programme, dont le type a changé</value>
+    <value>une variable locale d'une procédure où se trouve le programme, dont le type a changé ou qui est devenue Static</value>
   </data>
   <data name="Host_Edit_StoredValue" xml:space="preserve">
     <value>une variable ou un champ qui détient une valeur, dont le type a changé ou qui a été retiré</value>

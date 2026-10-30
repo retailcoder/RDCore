@@ -102,7 +102,7 @@ now, or, when the code no longer compiles, where it doesn't compile. It says why
 > CONT
   ⛔ CAN'T CONTINUE
     Edits made while the program waited are not applied to it:
-    Program.Main: a local of a procedure the program is in, given another type
+    Program.Main: a local of a procedure the program is in, given another type or made a Static
   RUN to start again.
   ✅ READY.
 ```
@@ -112,7 +112,7 @@ now, or, when the code no longer compiles, where it doesn't compile. It says why
 ```text
 > EDITS
   ⚠️ Edits made while the program waited are not applied to it:
-    Program.Main: a local of a procedure the program is in, given another type
+    Program.Main: a local of a procedure the program is in, given another type or made a Static
   RUN to start again.
   ✅ READY.
 ```

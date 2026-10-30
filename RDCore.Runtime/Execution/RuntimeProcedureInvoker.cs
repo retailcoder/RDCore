@@ -360,6 +360,14 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         {
             if (local.IsStatic)
             {
+                // a Static declared under the name of a local the activation holds (one the edit removed, or the Dim it made a Static) is not that cell: the cell is
+                // held apart and let go of when the activation returns, and the Static is where the procedure's statics are.
+                if (goesOn && frame.TryResolve(local, out _))
+                {
+                    frame.Retire(local);
+                    _ = retired.Remove(local.SemanticId);
+                }
+
                 fresh.Add(local);
                 continue;
             }
@@ -395,7 +403,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         {
             foreach (var (id, was) in held)
             {
-                if (!declared.Any(local => !local.IsStatic && local.SemanticId == id))
+                if (!declared.Any(local => local.SemanticId == id))
                 {
                     retired[id] = was;
                 }
