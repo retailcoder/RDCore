@@ -16,6 +16,7 @@ public static class RDCorePlatformChannelExtensions
     /// <param name="method">The JSON-RPC method.</param>
     /// <param name="parameters">The parameters.</param>
     /// <param name="token">Cancels the request.</param>
+    /// <returns>The result the server answered.</returns>
     /// <exception cref="JsonException">The server answered <c>null</c>, or a result that is not a <typeparamref name="TResult"/>.</exception>
     public static async Task<TResult> SendRequestAsync<TParams, TResult>(this IRDCorePlatformChannel channel, string method, TParams parameters, CancellationToken token)
     {
@@ -31,6 +32,7 @@ public static class RDCorePlatformChannelExtensions
     /// <param name="method">The JSON-RPC method.</param>
     /// <param name="parameters">The parameters.</param>
     /// <param name="token">Cancels before the notification is sent.</param>
+    /// <returns>A task that completes once the notification is sent.</returns>
     public static Task SendNotificationAsync<TParams>(this IRDCorePlatformChannel channel, string method, TParams parameters, CancellationToken token)
         => channel.SendNotificationAsync(method, JsonSerializer.SerializeToElement(parameters, RDCorePlatformJson.Options), token);
 
@@ -43,7 +45,11 @@ public static class RDCorePlatformChannelExtensions
     /// <param name="method">The JSON-RPC method.</param>
     /// <param name="handler">Answers a request.</param>
     /// <returns>The registration; disposing it stops answering the method.</returns>
-    /// <remarks>A request sent with no <c>params</c> is read as <c>{}</c>: the parameters with every member at its default.</remarks>
+    /// <remarks>
+    /// A request sent with no <c>params</c> is read as <c>{}</c>: the parameters with every member at its default. A request whose <c>params</c> are not a
+    /// <typeparamref name="TParams"/> is not given to the handler: it fails with <see cref="RDCorePlatformInvalidParamsException"/>.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The method is already answered on the channel.</exception>
     public static IDisposable OnRequest<TParams, TResult>(this IRDCorePlatformChannel channel, string method, Func<TParams, CancellationToken, Task<TResult>> handler)
         => channel.OnRequest(method, async (parameters, token) =>
         {
@@ -59,14 +65,27 @@ public static class RDCorePlatformChannelExtensions
     /// <param name="method">The JSON-RPC method.</param>
     /// <param name="handler">Handles a notification.</param>
     /// <returns>The registration; disposing it stops handling the method.</returns>
-    /// <remarks>A notification sent with no <c>params</c> is read as <c>{}</c>.</remarks>
+    /// <remarks>
+    /// A notification sent with no <c>params</c> is read as <c>{}</c>; one whose <c>params</c> are not a <typeparamref name="TParams"/> fails with
+    /// <see cref="RDCorePlatformInvalidParamsException"/>.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The method is already handled on the channel.</exception>
     public static IDisposable OnNotification<TParams>(this IRDCorePlatformChannel channel, string method, Func<TParams, CancellationToken, Task> handler)
         => channel.OnNotification(method, (parameters, token) => handler(ReadParameters<TParams>(parameters, method), token));
 
     private static TParams ReadParameters<TParams>(JsonElement? parameters, string method)
-        => parameters is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }
-            ? Read<TParams>(parameters, method, "params")
-            : JsonSerializer.Deserialize<TParams>("{}", RDCorePlatformJson.Options)!;
+    {
+        try
+        {
+            return parameters is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) }
+                ? Read<TParams>(parameters, method, "params")
+                : JsonSerializer.Deserialize<TParams>("{}", RDCorePlatformJson.Options)!;
+        }
+        catch (JsonException exception)
+        {
+            throw new RDCorePlatformInvalidParamsException(method, exception);
+        }
+    }
 
     private static T Read<T>(JsonElement? json, string method, string what)
         => json is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) } value

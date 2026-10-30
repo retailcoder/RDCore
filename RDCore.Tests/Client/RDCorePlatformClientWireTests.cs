@@ -1,10 +1,13 @@
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.JsonRpc;
 using OmniSharp.Extensions.LanguageServer.Client;
+using OmniSharp.Extensions.LanguageServer.Server;
 using RDCore.SDK.Client;
 using RDCore.SDK.Client.Connection;
 using RDCore.SDK.Platform;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.SDK.Server.Serialization;
 using System.IO.Pipelines;
 using System.Text.Json;
 using OmniSharpLanguageServer = OmniSharp.Extensions.LanguageServer.Server.LanguageServer;
@@ -18,7 +21,10 @@ namespace RDCore.Tests.Client;
 [TestClass]
 public sealed class RDCorePlatformClientWireTests
 {
-    private const string LooksLikeADate = "2026-10-30T12:34:56Z";
+    // strings Newtonsoft would read as dates and write back otherwise: in the offset of the machine, and without the fraction.
+    private const string WithAnOffset = "2026-10-30T12:34:56+02:00";
+
+    private const string WithAFraction = "2026-10-30T12:34:56.000Z";
 
     private sealed record class Connected(OmniSharpLanguageServer Server, LanguageClient Client, RDCorePlatformClient Platform) : IDisposable
     {
@@ -33,9 +39,10 @@ public sealed class RDCorePlatformClientWireTests
     {
         var toServer = new Pipe();
         var toClient = new Pipe();
+        // each end with the serializer the platform gives it.
         var serving = OmniSharpLanguageServer.From(server =>
         {
-            server.WithInput(toServer.Reader).WithOutput(toClient.Writer);
+            server.WithInput(toServer.Reader).WithOutput(toClient.Writer).WithSerializer(new PullDiagnosticsLspSerializer());
             serve?.Invoke(server);
         });
         var connecting = LanguageClient.From(client => client.WithInput(toClient.Reader).WithOutput(toServer.Writer));
@@ -49,11 +56,11 @@ public sealed class RDCorePlatformClientWireTests
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task TheHandshake_IsAnsweredByTheServersHandler()
     {
-        PlatformInitializeRequest? received = null;
-        using var connected = await ConnectAsync(server => server.OnRequest<PlatformInitializeRequest, PlatformInitializeResult>(RDCorePlatformHandshake.Method, (request, _) =>
+        JObject? received = null;
+        using var connected = await ConnectAsync(server => server.OnJsonRequest(RDCorePlatformHandshake.Method, (JToken request, CancellationToken _) =>
         {
-            received = request;
-            return Task.FromResult(new PlatformInitializeResult { Component = CoreServerComponent.LanguageServer, Provided = [nameof(SessionExecute)] });
+            received = (JObject)request;
+            return Task.FromResult<JToken>(JObject.Parse("""{ "component": 1, "provided": ["SessionExecute"] }"""));
         }));
 
         var result = await connected.Platform.InitializeAsync(
@@ -62,27 +69,34 @@ public sealed class RDCorePlatformClientWireTests
         Assert.AreEqual(CoreServerComponent.LanguageServer, result.Component);
         CollectionAssert.AreEqual(new[] { nameof(SessionExecute) }, result.Provided.ToArray());
         Assert.IsNotNull(received);
-        Assert.AreEqual(CoreServerComponent.LanguageServer, received.ExpectedComponent);
-        Assert.IsTrue(received.Expected.LanguageServer!.SessionExecute.IsSupported);
-        Assert.IsNull(received.Expected.Parsing, "a group the client expects nothing of is not sent");
+        Assert.AreEqual((int)CoreServerComponent.LanguageServer, received["expectedComponent"]!.Value<int>());
+        Assert.IsTrue(received["expected"]!["languageServer"]!["sessionExecute"]!["isSupported"]!.Value<bool>());
+        var expected = (JObject)received["expected"]!;
+        Assert.IsFalse(expected.ContainsKey("parsing"), "a group the client expects nothing of is not sent, not even as null");
+        Assert.IsFalse(expected.ContainsKey("environmentHost"));
     }
 
     [TestMethod]
     [Timeout(60_000, CooperativeCancellation = true)]
     public async Task ASessionRequest_ReachesTheServer_AndItsResultComesBackAsTheServerWroteIt()
     {
+        string? source = null;
         using var connected = await ConnectAsync(server => server.OnRequest<ExecuteSessionRequest, ExecuteSessionResult>(RDCorePlatformProtocol.SessionExecute, (request, _) =>
-            Task.FromResult(new ExecuteSessionResult
+        {
+            source = request.Source;
+            return Task.FromResult(new ExecuteSessionResult
             {
                 Outcome = ExecutionOutcome.Suspended,
-                Output = [request.Source, LooksLikeADate],
+                Output = ["1", "2026-10-30T12:34:56"],
                 StackTrace = [new ExecuteStackFrame(request.EntryPoint, 3, 4, [7])],
-            })));
+            });
+        }));
 
         var result = await connected.Platform.ExecuteAsync(new ExecuteSessionParams { Source = "Debug.Print 1", ModuleName = "Module1", EntryPoint = "Main", Debug = true }, CancellationToken.None);
 
+        Assert.AreEqual("Debug.Print 1", source);
         Assert.AreEqual(ExecutionOutcome.Suspended, result.Outcome);
-        CollectionAssert.AreEqual(new[] { "Debug.Print 1", LooksLikeADate }, result.Output.ToArray(), "a string is the string it was, even one that looks like a date");
+        CollectionAssert.AreEqual(new[] { "1", "2026-10-30T12:34:56" }, result.Output.ToArray(), "a date as VBA's Format writes one is read as it was written");
         Assert.AreEqual("Main", result.StackTrace.Single().Procedure);
         CollectionAssert.AreEqual(new[] { 7 }, result.StackTrace.Single().ReturnLines.ToArray());
     }
@@ -142,6 +156,84 @@ public sealed class RDCorePlatformClientWireTests
         Assert.IsTrue(answer.Handled);
         Assert.IsFalse(answer.Cancelled);
         Assert.AreEqual("Rick!", answer.Value);
+    }
+
+    // what C:\Dev\Claude\ticket-omnisharp-input-dates.md is for: the strings are written as they are, and read otherwise.
+    private const string InputDates = "OmniSharp's InputHandler parses ISO date-times with its own JsonTextReader, before any serializer";
+
+    [TestMethod]
+    [Ignore(InputDates)]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task TheLanguageServer_ReadsAStringThatLooksLikeADate_AsTheClientWroteIt()
+    {
+        var sources = new List<string>();
+        using var connected = await ConnectAsync(server => server.OnRequest<ExecuteSessionRequest, ExecuteSessionResult>(RDCorePlatformProtocol.SessionExecute, (request, _) =>
+        {
+            sources.Add(request.Source);
+            return Task.FromResult(new ExecuteSessionResult());
+        }));
+
+        await connected.Platform.ExecuteAsync(new ExecuteSessionParams { Source = WithAnOffset }, CancellationToken.None);
+        await connected.Platform.ExecuteAsync(new ExecuteSessionParams { Source = WithAFraction }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { WithAnOffset, WithAFraction }, sources, "an offset and a fraction of a second are read as written");
+    }
+
+    [TestMethod]
+    [Ignore(InputDates)]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task TheClient_ReadsAStringThatLooksLikeADate_AsTheLanguageServerWroteIt()
+    {
+        string? prompt = null;
+        using var connected = await ConnectAsync(server => server.OnRequest<ExecuteSessionRequest, ExecuteSessionResult>(RDCorePlatformProtocol.SessionExecute, (_, _) =>
+            Task.FromResult(new ExecuteSessionResult { Output = [WithAnOffset, WithAFraction] })));
+        using var registration = connected.Platform.OnInputBox((request, _) =>
+        {
+            prompt = request.Prompt;
+            return Task.FromResult(InputBoxResult.NotHandled);
+        });
+
+        var result = await connected.Platform.ExecuteAsync(new ExecuteSessionParams(), CancellationToken.None);
+        await connected.Server.SendRequest(new SessionInputBoxRequest { Prompt = WithAnOffset }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { WithAnOffset, WithAFraction }, result.Output.ToArray(), "a result is read as written");
+        Assert.AreEqual(WithAnOffset, prompt, "and a request the server sends");
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task ASecondHandlerOfAMethod_IsRefused_UntilTheFirstIsDisposed()
+    {
+        using var connected = await ConnectAsync();
+        var first = connected.Platform.OnMessageBox((_, _) => Task.FromResult(new MessageBoxResult { Handled = true, Result = 1 }));
+
+        var refused = Assert.ThrowsExactly<InvalidOperationException>(() => connected.Platform.OnMessageBox((_, _) => Task.FromResult(MessageBoxResult.NotHandled)));
+        StringAssert.Contains(refused.Message, RDCorePlatformProtocol.SessionMessageBox);
+        Assert.AreEqual(1, (await connected.Server.SendRequest(new SessionMessageBoxRequest(), CancellationToken.None)).Result, "the first still answers");
+
+        first.Dispose();
+        first.Dispose();
+        using var second = connected.Platform.OnMessageBox((_, _) => Task.FromResult(new MessageBoxResult { Handled = true, Result = 2 }));
+        Assert.AreEqual(2, (await connected.Server.SendRequest(new SessionMessageBoxRequest(), CancellationToken.None)).Result, "the second answers once the first is gone");
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task ARequestWhoseParamsAreNotWhatTheMethodTakes_IsAnsweredInvalidParams()
+    {
+        using var connected = await ConnectAsync();
+        var asked = false;
+        using var registration = connected.Platform.OnMessageBox((_, _) =>
+        {
+            asked = true;
+            return Task.FromResult(MessageBoxResult.NotHandled);
+        });
+
+        // OmniSharp tells InvalidParams (-32602) by an exception of its own.
+        await Assert.ThrowsExactlyAsync<OmniSharp.Extensions.JsonRpc.Server.InvalidParametersException>(
+            () => connected.Server.SendRequest(RDCorePlatformProtocol.SessionMessageBox, JObject.Parse("""{ "style": "not a number" }""")).Returning<JToken>(CancellationToken.None));
+
+        Assert.IsFalse(asked, "the handler is not given what it cannot read");
     }
 
     [TestMethod]
