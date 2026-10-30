@@ -141,6 +141,7 @@ public static class ExpressionStaticSemanticsEvaluator
         if (memberAccess.Owner is { } namespaceExpression
             && context.Resolver.NamespaceOf(namespaceExpression, context.Scope.Uri) is { } qualifier)
         {
+            DescribeNamespace(context, namespaceExpression, qualifier);
             return EvaluateNamespaceMember(context, expression, qualifier, memberAccess);
         }
 
@@ -179,6 +180,22 @@ public static class ExpressionStaticSemanticsEvaluator
     // MS-VBAL §5.6.12, an <l-expression> classified as a project or a procedural module: the member access is the
     // member it resolves to, with that member's own declared type - a variable, property or function's, a value's, or
     // none for a subroutine. A name the namespace does not have is as invalid as a member a value's type does not.
+    // the project or the module that qualifies a member is no value, and is not evaluated: what it names is a fact all the same, of every part of it
+    // (`VBA.Strings` and `VBA`), so that the expression the member is written in is analyzed whole.
+    private static void DescribeNamespace(StaticEvaluationContext context, ExpressionNode qualifierExpression, Symbol qualifier)
+    {
+        if (context.Facts is not { } facts)
+        {
+            return;
+        }
+
+        facts.Record(new ExpressionFact(qualifierExpression.Identity, qualifierExpression.Location, null, ExpressionClassification.Namespace, qualifier.SemanticId, 0));
+        if (qualifierExpression is MemberAccessExpressionNode { Owner: { } outer } && context.Resolver.NamespaceOf(outer, context.Scope.Uri) is { } outerQualifier)
+        {
+            DescribeNamespace(context, outer, outerQualifier);
+        }
+    }
+
     private static StaticSemanticsEvaluationResult EvaluateNamespaceMember(
         StaticEvaluationContext context, ExpressionNode expression, Symbol qualifier, MemberAccessExpressionNode memberAccess)
     {
@@ -250,8 +267,9 @@ public static class ExpressionStaticSemanticsEvaluator
             }
         }
 
-        // an index of an array is no argument: any other callee may take what is written in its argument list by reference.
-        if (calleeResult.Result is not VBArrayType)
+        // an index of an array is no argument: any other callee may take what is written in its argument list by reference, a function that returns an array
+        // included.
+        if (calleeResult.Result is not VBArrayType || ProcedureNamedBy(context, indexExpression.Callee) is not null)
         {
             MarkPassedAsArguments(context, indexExpression.Arguments);
         }
