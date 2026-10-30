@@ -9,7 +9,7 @@
 
 This repository contains different projects **under active development** producing different libraries and executables, under a relatively simple licensing model:
 
-- **The RDCore.SDK library** (including its documentation) is licensed under **⚖️MIT**;
+- **The RDCore.SDK and RDCore.SDK.Protocol libraries** (including their documentation) are licensed under **⚖️MIT**;
 - **Everything else** built around it is licensed under **⚖️GPLv3**.
 
 This arrangement protects both the legacy and current contributors while enabling the future: **The RDCore runtime implementation shall remain open-source**.

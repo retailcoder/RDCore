@@ -10,8 +10,13 @@
     <!-- the package is public API, which the documentation site is generated from: nothing of it goes undocumented. -->
     <WarningsAsErrors>CS1591</WarningsAsErrors>
     <Authors>9562-7303 Québec inc.</Authors>
-    <Copyright>Copyright © 2026 ${Authors}</Copyright>
+    <Copyright>Copyright © 2026 $(Authors)</Copyright>
     <Product>RDCore</Product>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE-MIT.md" Pack="true" PackagePath="" />
+  </ItemGroup>
 
 </Project>

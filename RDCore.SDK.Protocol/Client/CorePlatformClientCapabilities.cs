@@ -202,7 +202,6 @@ public class LanguageServerCapabilities
 [JsonDerivedType(typeof(SessionInteraction))]
 [JsonDerivedType(typeof(Unattended))]
 [JsonDerivedType(typeof(RubberduckIndenterSettings))]
-[JsonPolymorphic]
 public abstract record class CorePlatformClientCapability(bool IsSupported = true);
 
 /// <summary>

@@ -338,7 +338,7 @@ public sealed class ChildConnection(
         Transition(ConnectionState.Initializing);
         _client?.Dispose();
         _client = await LanguageClient.From(ConfigureClientOptions, ct);
-        _channel = new OmniSharpPlatformChannel(_client, logger);
+        _channel = new OmniSharpPlatformChannel(_client, logger, _request.ExpectedComponent.ToString());
 
         // non-LSP platform handshake: the child's advertised capabilities become "provided" ones.
         PlatformInfo = await new RDCorePlatformClient(_channel).InitializeAsync(_request.ExpectedComponent, _request.ExpectedCapabilities, ct);

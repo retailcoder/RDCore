@@ -16,6 +16,13 @@ namespace RDCore.SDK.Client;
 /// A request the server answers with a JSON-RPC error faults the returned task with whatever exception the implementation raises for one; the channel adds no
 /// error model of its own.
 /// </para>
+/// <para>
+/// An implementation hands the JSON on as it is: a string stays the string it is, whatever it looks like. 👉 The language server and <c>rdc.exe</c> read through
+/// OmniSharp, which does not keep to that for one shape of string: an ISO 8601 date and time (19 to 40 characters, a digit first, a <c>T</c> at the eleventh) with an
+/// offset, a <c>Z</c> or a fraction of a second is read as a date and written back as one, so <c>"2026-10-30T12:34:56+02:00"</c> arrives in the offset of the machine that
+/// read it, and <c>"2026-10-30T12:34:56.000Z"</c> without its fraction. A date and time with none of them, as VBA's <c>Format</c> writes one
+/// (<c>yyyy-mm-ddThh:nn:ss</c>), arrives as it was written.
+/// </para>
 /// </remarks>
 public interface IRDCorePlatformChannel
 {
@@ -42,6 +49,8 @@ public interface IRDCorePlatformChannel
     /// <param name="method">The JSON-RPC method.</param>
     /// <param name="handler">Answers a request: given its <c>params</c> (<see langword="null"/> when it has none), returns its <c>result</c>.</param>
     /// <returns>The registration; disposing it stops answering the method.</returns>
+    /// <remarks>A method has one handler at a time: another is registered once the registration of the first is disposed.</remarks>
+    /// <exception cref="InvalidOperationException">The method is already answered or handled on this channel.</exception>
     IDisposable OnRequest(string method, Func<JsonElement?, CancellationToken, Task<JsonElement?>> handler);
 
     /// <summary>
@@ -50,5 +59,7 @@ public interface IRDCorePlatformChannel
     /// <param name="method">The JSON-RPC method.</param>
     /// <param name="handler">Handles a notification, given its <c>params</c> (<see langword="null"/> when it has none).</param>
     /// <returns>The registration; disposing it stops handling the method.</returns>
+    /// <remarks>A method has one handler at a time: another is registered once the registration of the first is disposed.</remarks>
+    /// <exception cref="InvalidOperationException">The method is already answered or handled on this channel.</exception>
     IDisposable OnNotification(string method, Func<JsonElement?, CancellationToken, Task> handler);
 }
