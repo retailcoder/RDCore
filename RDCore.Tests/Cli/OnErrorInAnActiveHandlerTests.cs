@@ -1,3 +1,5 @@
+using RDCore.SDK.Runtime.Shared;
+
 namespace RDCore.Tests.Cli;
 
 /// <summary>
@@ -88,9 +90,9 @@ public sealed class OnErrorInAnActiveHandlerTests
     [TestMethod]
     public void HandlingOver_OfAStateThatIsNotHandling_IsThatState()
     {
-        var resumeNext = new RDCore.SDK.Runtime.Shared.ErrorHandlerState(RDCore.SDK.Runtime.Shared.ErrorHandlingMode.ResumeNext, null, null, null);
+        var resumeNext = new ErrorHandlerState(ErrorHandlingMode.ResumeNext, null, null, null);
 
-        Assert.AreEqual(RDCore.SDK.Runtime.Shared.ErrorHandlerState.Disabled, RDCore.SDK.Runtime.Shared.ErrorHandlerState.Disabled.HandlingOver());
+        Assert.AreEqual(ErrorHandlerState.Disabled, ErrorHandlerState.Disabled.HandlingOver());
         Assert.AreEqual(resumeNext, resumeNext.HandlingOver());
     }
 
