@@ -234,6 +234,21 @@ public sealed class FlowSoundnessTests
         CollectionAssert.AreEqual(new[] { analyzed.Line(goesOn + 2) }, errors);
     }
 
+    // oracle s54 F01-F07: an error in the header of a For goes on at the first statement of the body, untested, with the counter as it was (F04: i keeps 7).
+    [TestMethod]
+    [DataRow("For i = 10 \\ n To 2", DisplayName = "the start")]
+    [DataRow("For i = 1 To 10 \\ n", DisplayName = "the end")]
+    [DataRow("For i = 1 To 3 Step 10 \\ n", DisplayName = "the step")]
+    public void S0D_AnErrorInTheHeaderOfAFor_UnderResumeNext_EntersTheBody_WithTheCounterAsItWas(string header)
+    {
+        var analyzed = Analyze($"Dim i As Long\nOn Error Resume Next\ni = 7\n{header}\nDebug.Print i\nNext");
+        var errors = analyzed.States.Edges.SuccessorsOf(analyzed.Line(3)).Where(edge => edge.Kind is ControlFlowEdgeKind.Error).Select(edge => edge.To).ToArray();
+
+        CollectionAssert.AreEqual(new[] { analyzed.Line(4) }, errors, "the body, never past Next");
+        Assert.IsTrue(analyzed.Reaching.ReachingBefore(analyzed.Line(4), analyzed.Variable("i")).Any(definition => definition.Offset == analyzed.Line(2)),
+            "i = 7 reaches the body: the counter is not assigned");
+    }
+
     // ---------------- soundness: definitions ----------------
 
     [TestMethod]

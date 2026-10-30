@@ -23,9 +23,9 @@ namespace RDCore.SDK.Semantics.Flow;
 /// result of a function (<see cref="DefinitionsAndUses.OutliveTheActivation"/>).</description></item>
 /// </list>
 /// <para>
-/// Where <c>On Error Resume Next</c> goes on after an error in a condition is as MS-VBA has it (<see cref="ControlFlowGraph.NextAfterAnError"/>), but for the bounds
-/// and the step of a <c>For</c>, which are still to be measured and go on at the next instruction meanwhile: until they are, "not live" holds on the paths of every
-/// other statement.
+/// Where <c>On Error Resume Next</c> goes on after an error in a condition or in the header of a <c>For</c> is as MS-VBA has it
+/// (<see cref="ControlFlowGraph.NextAfterAnError"/>, oracle s54), but for the collection of a <c>For Each</c> and the object of a <c>With</c>, which are still to be
+/// measured and go on at the next instruction meanwhile: until they are, "not live" holds on the paths of every other statement.
 /// </para>
 /// </remarks>
 public sealed class LiveVariables
