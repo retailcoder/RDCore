@@ -9,7 +9,7 @@
 
 Ce dépôt contient différents projets **en cours de développement** produisant diverses bibliothèques et exécutables, sous un modèle de licence relativement simple :
 
-- **La bibliothèque RDCore.SDK** (incluant sa documentation) est sous licence **⚖️MIT**;
+- **Les bibliothèques RDCore.SDK et RDCore.SDK.Protocol** (incluant leur documentation) sont sous licence **⚖️MIT**;
 - **Tout le reste** construit autour d'elle est sous licence **⚖️GPLv3**.
 
 Cet arrangement protège les contributeurs historiques et actuels tout en permettant l'avenir : **l'implémentation du runtime RDCore demeurera open-source**.

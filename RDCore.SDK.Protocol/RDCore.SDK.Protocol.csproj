@@ -12,6 +12,11 @@
     <Authors>9562-7303 Québec inc.</Authors>
     <Copyright>Copyright © 2026 ${Authors}</Copyright>
     <Product>RDCore</Product>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE-MIT.md" Pack="true" PackagePath="" />
+  </ItemGroup>
 
 </Project>
