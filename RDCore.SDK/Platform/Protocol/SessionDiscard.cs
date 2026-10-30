@@ -8,7 +8,7 @@ namespace RDCore.SDK.Platform.Protocol;
 /// <see cref="DiscardSessionParams"/> as the platform's JSON-RPC handlers and senders know it: the method it is a request of, and what it is answered with.
 /// </summary>
 [Method(RDCorePlatformProtocol.SessionDiscard, Direction.ClientToServer)]
-public sealed record class DiscardSessionRequest : DiscardSessionParams, IRequest, IRequest<DiscardSessionResult>;
+public record class DiscardSessionRequest : DiscardSessionParams, IRequest, IRequest<DiscardSessionResult>;
 
 /// <summary>
 /// Request for <c>rdcore/host/discard</c>: the language-server side of <see cref="DiscardSessionParams"/>, addressed to the component that owns the

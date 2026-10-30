@@ -8,7 +8,7 @@ namespace RDCore.SDK.Platform.Protocol;
 /// <see cref="PeekSessionParams"/> as the platform's JSON-RPC handlers and senders know it: the method it is a request of, and what it is answered with.
 /// </summary>
 [Method(RDCorePlatformProtocol.SessionPeek, Direction.ClientToServer)]
-public sealed record class PeekSessionRequest : PeekSessionParams, IRequest, IRequest<PeekSessionResult>;
+public record class PeekSessionRequest : PeekSessionParams, IRequest, IRequest<PeekSessionResult>;
 
 /// <summary>
 /// Request for <c>rdcore/host/memory/peek</c>: the language-server side of
@@ -25,7 +25,7 @@ public record class HostPeekParams : IRequest, IRequest<PeekSessionResult>
 /// <see cref="PokeSessionParams"/> as the platform's JSON-RPC handlers and senders know it: the method it is a request of, and what it is answered with.
 /// </summary>
 [Method(RDCorePlatformProtocol.SessionPoke, Direction.ClientToServer)]
-public sealed record class PokeSessionRequest : PokeSessionParams, IRequest, IRequest<PokeSessionResult>;
+public record class PokeSessionRequest : PokeSessionParams, IRequest, IRequest<PokeSessionResult>;
 
 /// <summary>
 /// Request for <c>rdcore/host/memory/poke</c>: the language-server side of

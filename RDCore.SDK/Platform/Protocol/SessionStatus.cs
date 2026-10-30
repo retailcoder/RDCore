@@ -9,7 +9,7 @@ namespace RDCore.SDK.Platform.Protocol;
 /// <see cref="SessionStatusParams"/> as the platform's JSON-RPC handlers and senders know it: the method it is a request of, and what it is answered with.
 /// </summary>
 [Method(RDCorePlatformProtocol.SessionStatus, Direction.ClientToServer)]
-public sealed record class SessionStatusRequest : SessionStatusParams, IRequest, IRequest<SessionStatusResult>;
+public record class SessionStatusRequest : SessionStatusParams, IRequest, IRequest<SessionStatusResult>;
 
 /// <summary>
 /// Request for <c>rdcore/host/session/status</c>: the language-server side of

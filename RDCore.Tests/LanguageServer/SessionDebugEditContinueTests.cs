@@ -158,7 +158,7 @@ public sealed class SessionDebugEditContinueTests
         });
 
         object answer = request == "execute"
-            ? await new SessionDebugExecuteHandler(_debugging, _capabilities, _editStatus).Handle(new SessionDebugExecuteRequest { Statement = "End" }, cancelled.Token)
+            ? await new SessionDebugExecuteHandler(_debugging, _capabilities, _editStatus).Handle(new SessionDebugExecuteParams { Statement = "End" }, cancelled.Token)
             : await new SessionDiscardHandler(symbols, _capabilities, _editStatus).Handle(new DiscardSessionRequest { ModuleName = "M1", EndProgram = true }, cancelled.Token);
 
         Assert.IsNotNull(answer);

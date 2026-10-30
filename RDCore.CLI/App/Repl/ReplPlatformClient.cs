@@ -164,23 +164,26 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
 
     /// <inheritdoc/>
     public Task<SessionStatusResult> GetSessionStatusAsync(int waitMilliseconds, CancellationToken token)
-        => Platform.StatusAsync(new SessionStatusParams { WaitMilliseconds = waitMilliseconds }, token);
+        => client.SendRequestAsync<SessionStatusRequest, SessionStatusResult>(
+            new SessionStatusRequest { WaitMilliseconds = waitMilliseconds }, token);
 
     /// <inheritdoc/>
     public Task<ExecuteSessionResult> ExecuteAsync(string source, string moduleName, string entryPoint, CancellationToken token)
-        => Platform.ExecuteAsync(new ExecuteSessionParams { Source = source, ModuleName = moduleName, EntryPoint = entryPoint }, token);
+        => client.SendRequestAsync<ExecuteSessionRequest, ExecuteSessionResult>(
+            new ExecuteSessionRequest { Source = source, ModuleName = moduleName, EntryPoint = entryPoint }, token);
 
     /// <inheritdoc/>
     public Task<DiscardSessionResult> DiscardAsync(string moduleName, CancellationToken token)
-        => Platform.DiscardAsync(new DiscardSessionParams { ModuleName = moduleName }, token);
+        => client.SendRequestAsync<DiscardSessionRequest, DiscardSessionResult>(new DiscardSessionRequest { ModuleName = moduleName }, token);
 
     /// <inheritdoc/>
     public Task<DiscardSessionResult> DiscardAsync(string moduleName, bool endProgram, CancellationToken token)
-        => Platform.DiscardAsync(new DiscardSessionParams { ModuleName = moduleName, EndProgram = endProgram }, token);
+        => client.SendRequestAsync<DiscardSessionRequest, DiscardSessionResult>(new DiscardSessionRequest { ModuleName = moduleName, EndProgram = endProgram }, token);
 
     /// <inheritdoc/>
     public Task<ExecuteSessionResult> ExecuteAsync(string source, string moduleName, string entryPoint, bool debug, bool immediate, CancellationToken token)
-        => Platform.ExecuteAsync(new ExecuteSessionParams { Source = source, ModuleName = moduleName, EntryPoint = entryPoint, Debug = debug, Immediate = immediate }, token);
+        => client.SendRequestAsync<ExecuteSessionRequest, ExecuteSessionResult>(
+            new ExecuteSessionRequest { Source = source, ModuleName = moduleName, EntryPoint = entryPoint, Debug = debug, Immediate = immediate }, token);
 
     /// <inheritdoc/>
     public Task<ExecuteSessionResult> ResumeAsync(StepKind? step, CancellationToken token)
@@ -255,12 +258,10 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
 
     /// <inheritdoc/>
     public Task<PeekSessionResult> PeekAsync(int address, CancellationToken token)
-        => Platform.PeekAsync(new PeekSessionParams { Address = address }, token);
+        => client.SendRequestAsync<PeekSessionRequest, PeekSessionResult>(new PeekSessionRequest { Address = address }, token);
 
     /// <inheritdoc/>
     public Task<PokeSessionResult> PokeAsync(int address, byte value, CancellationToken token)
-        => Platform.PokeAsync(new PokeSessionParams { Address = address, Value = value }, token);
-
-    // the platform protocol's requests go through the client logic every client of the platform has; the connection is the channel only once it is ready.
-    private RDCorePlatformClient Platform => new(client.Channel);
+        => client.SendRequestAsync<PokeSessionRequest, PokeSessionResult>(
+            new PokeSessionRequest { Address = address, Value = value }, token);
 }
