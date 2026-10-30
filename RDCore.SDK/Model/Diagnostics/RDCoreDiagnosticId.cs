@@ -104,6 +104,7 @@ public enum RDCoreDiagnosticId
     ReDimOfAnImplicitVariant = 11022, // y = 5 ... ReDim y(2), y undeclared: MS-VBAL and vb6.exe re-dimension the implicit variable; MS-VBA: Invalid ReDim
     ProcedureTooLarge = 11023, // a procedure of more than 5,000 statements: MS-VBA refuses one past 64K of compiled code (Procedure too large); RD-VBA runs it
     ImplementsInDocumentModule = 11024, // Implements in a document module: MS-VBAL §5.2.4.2 forbids it in an extension module; MS-VBA compiles and runs it
+    ArrayGivenASecondEmptyArgumentList = 11025, // f()(): MS-VBAL §5.6.13.1 makes it invalid; MS-VBA compiles it as the array, and raises 9 when it runs
 
     /*
      * [20000-20999]: the debugger and edit-and-continue, issued by the language server while a program waits

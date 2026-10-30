@@ -249,6 +249,9 @@
   <data name="VBTypeOf_ObjectVariableNotSet_Verbose" xml:space="preserve">
     <value>Ce que TypeOf teste est Nothing : une variable objet qui n'a jamais été définie, ou qui a été définie à Nothing, n'a aucun objet dont le type pourrait être testé. Testez-la d'abord avec 'Is Nothing'.</value>
   </data>
+  <data name="VBIndex_SecondEmptyArgumentList_Verbose" xml:space="preserve">
+    <value>Le tableau reçoit une deuxième liste d'arguments vide, f()() : la première est le tableau lui-même, et la deuxième n'en choisit aucun élément.</value>
+  </data>
   <data name="VBIndex_NothingToIndex_Verbose" xml:space="preserve">
     <value>Un {0} n'est ni un tableau ni un objet : il n'y a rien à indexer.</value>
   </data>
@@ -317,6 +320,9 @@
   </data>
   <data name="VBCompileError_TypeMismatch_Verbose" xml:space="preserve">
     <value>Aucune des règles sémantiques applicables pour cette opération ne correspond au(x) type(s) spécifié(s) en intrant : {$INPUTS}</value>
+  </data>
+  <data name="VBCompileError_ArrayPrinted_Verbose" xml:space="preserve">
+    <value>Un tableau est imprimé : Debug.Print écrit des valeurs, et un tableau n'en est pas une - imprimez ses éléments, un à la fois.</value>
   </data>
   <data name="VBCompileError_LetCoercionTypeMismatch_Verbose" xml:space="preserve">
     <value>La coercion implicite (let-coercion) est statiquement invalide pour les intrants spécifiés pour cette expression.</value>

@@ -65,9 +65,10 @@ public sealed class IndexExpressionStaticSemanticsTests
         Assert.AreEqual(array, result.Result);
     }
 
-    // the array was already given its empty argument list: `f()()` is not the array a second time.
+    // `f()()`, the array already given its empty argument list, MS-VBAL makes invalid; MS-VBA compiles it as the array, and raises 9 when it runs (oracle\s53
+    // E07, E08), which RDC11025 warns of.
     [TestMethod]
-    public void ArrayCallee_GivenAnEmptyArgumentListAlready_IsNotTheArrayAgain()
+    public void ArrayCallee_GivenAnEmptyArgumentListAlready_IsTheArray_AsMSVBACompilesIt()
     {
         var array = new VBFixedSizeArrayType(VBLongType.TypeInfo);
         var once = new IndexExpressionNode(new(TestUri.TestModuleUri().AbsolutePath, [53]), TestLocations.TestLocation, NameOf("data"), []);
@@ -75,7 +76,10 @@ public sealed class IndexExpressionStaticSemanticsTests
 
         var result = IndexExpressionStaticSemantics.Instance.DetermineDeclaredType(Context, twice, array);
 
-        Assert.AreNotEqual(array, result.Result);
+        Assert.IsTrue(result.IsSuccess, result.ErrorInfo?.Description);
+        Assert.AreEqual(array, result.Result);
+        Assert.IsTrue(IndexExpressionStaticSemantics.IsASecondEmptyArgumentList(twice));
+        Assert.IsFalse(IndexExpressionStaticSemantics.IsASecondEmptyArgumentList(once));
     }
 
     [TestMethod]

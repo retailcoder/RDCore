@@ -96,6 +96,7 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, SetThroughACallAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ArgumentTypedArithmeticAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, IgnoredTypeCharacterAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ArrayGivenASecondEmptyArgumentListAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ProcedureConstantLengthAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ReDimOfAnImplicitVariantAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ProcedureTooLargeAnalyzer>();

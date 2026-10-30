@@ -257,6 +257,15 @@ public static class StatementStaticSemanticsEvaluator
             return;
         }
 
+        // an array is no value Debug.Print can write, written `f` or `f()`: a type mismatch when it compiles (MS-VBA, Excel-verified, oracle\s53 E02, E03, F02,
+        // F03). Its items are evaluated as any statement's are, after.
+        if (statement is DebugPrintStatementNode debugPrint && !walk.Structural
+            && debugPrint.Items.FirstOrDefault(item => item.Value is { } printed
+                && ExpressionStaticSemanticsEvaluator.Evaluate(context, printed) is { IsSuccess: true, Result: VBArrayType }) is { Value: { } printedArray })
+        {
+            walk.Errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.TypeMismatch, printedArray.Location, Exceptions.VBCompileError_ArrayPrinted_Verbose));
+        }
+
         // AssignmentStatementNode needs both Target's and Value's declared types kept around (not just
         // their error status) to run the coercion rule matching its Kind - the generic Inputs pass below
         // only ever checks IsError, so this is handled separately rather than folded into it.

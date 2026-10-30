@@ -1596,6 +1596,14 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             return calleeResult;
         }
 
+        // `f()()`: a second empty argument list, which MS-VBAL makes invalid, MS-VBA compiles - and when it runs, it is a subscript out of range (Excel-verified,
+        // oracle\s53 E07, E08, F07, F08).
+        if (SDK.Semantics.Static.Expressions.IndexExpressionStaticSemantics.IsASecondEmptyArgumentList(indexExpression) && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is VBArrayType)
+        {
+            return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
+                Exceptions.VBIndex_SecondEmptyArgumentList_Verbose));
+        }
+
         if (EvaluateSubscripts(session, context, indexExpression.Arguments, out var subscripts, out var subscriptsKnown) is { } subscriptFailure)
         {
             return subscriptFailure;
@@ -1642,7 +1650,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is VBArrayType;
 
     // the array `f()` is, as the expression that names it - `f` - so that it is the variable `f` is; any other expression as it is.
-    private static ExpressionNode TheArrayItself(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
+    internal static ExpressionNode TheArrayItself(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
         => expression is IndexExpressionNode whole && IsTheArrayItself(session, context, whole) ? whole.Callee : expression;
 
     // whether what an index expression indexes is a variable declared As New - an array of automatic instantiation variables - named bare: a local, a field of
