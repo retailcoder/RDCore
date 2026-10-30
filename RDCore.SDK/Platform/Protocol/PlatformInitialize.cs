@@ -9,4 +9,4 @@ namespace RDCore.SDK.Platform.Protocol;
 /// Sent by <see cref="ChildConnection"/> once LSP's <c>initialize</c> is answered.
 /// </summary>
 [Method(RDCorePlatformHandshake.Method, Direction.ClientToServer)]
-public record class PlatformInitializeRequest : PlatformInitializeParams, IRequest, IRequest<PlatformInitializeResult>;
+public sealed record class PlatformInitializeRequest : PlatformInitializeParams, IRequest, IRequest<PlatformInitializeResult>;

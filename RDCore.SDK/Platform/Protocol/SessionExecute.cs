@@ -9,7 +9,7 @@ namespace RDCore.SDK.Platform.Protocol;
 /// <see cref="ExecuteSessionParams"/> as the platform's JSON-RPC handlers and senders know it: the method it is a request of, and what it is answered with.
 /// </summary>
 [Method(RDCorePlatformProtocol.SessionExecute, Direction.ClientToServer)]
-public record class ExecuteSessionRequest : ExecuteSessionParams, IRequest, IRequest<ExecuteSessionResult>;
+public sealed record class ExecuteSessionRequest : ExecuteSessionParams, IRequest, IRequest<ExecuteSessionResult>;
 
 /// <summary>
 /// Request for <c>rdcore/host/execute</c>: the language-server side of
