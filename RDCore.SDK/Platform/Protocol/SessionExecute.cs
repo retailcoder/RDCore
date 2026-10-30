@@ -108,46 +108,6 @@ public record class HostExecuteParams : IRequest, IRequest<ExecuteSessionResult>
 public record class HostExecutePayload(Uri DocumentUri, ModuleParseResult ParseResult);
 
 /// <summary>
-/// How a run ended.
-/// </summary>
-public enum ExecutionOutcome
-{
-    /// <summary>The entry point ran to completion.</summary>
-    Completed,
-
-    /// <summary>The source did not parse; <see cref="ExecuteSessionResult.Diagnostics"/> says why.</summary>
-    SyntaxError,
-
-    /// <summary>There is no such procedure to invoke, or no runtime session to invoke it in.</summary>
-    NotFound,
-
-    /// <summary>A run-time error was raised and nothing handled it.</summary>
-    RuntimeError,
-
-    /// <summary>An <c>End</c> statement stopped the program.</summary>
-    Halted,
-
-    /// <summary>A <c>Stop</c> statement, or the caller cancelling the request, interrupted the program.</summary>
-    Interrupted,
-
-    /// <summary>
-    /// The interpreter reached something it has no implementation for. Not a program error: a gap.
-    /// </summary>
-    NotImplemented,
-
-    /// <summary>
-    /// The program was run under a debugger and waits where it stopped: <see cref="ExecuteSessionResult.ErrorLine"/> and
-    /// <see cref="ExecuteSessionResult.ErrorCharacter"/> say where. It is neither over nor failed.
-    /// </summary>
-    Suspended,
-
-    /// <summary>
-    /// The request cannot be answered now: a program is running, or is suspended and the request would wreck it.
-    /// </summary>
-    Refused,
-}
-
-/// <summary>
 /// The result of a run. The same result answers both hops — the language server passes the host's
 /// answer back to the client unchanged, except for a parse that never reached the host at all.
 /// </summary>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- what a client of the RDCore platform speaks to it, and nothing of the platform itself: the .NET base library only. -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- the package is public API, which the documentation site is generated from: nothing of it goes undocumented. -->
+    <WarningsAsErrors>CS1591</WarningsAsErrors>
+    <Authors>9562-7303 Québec inc.</Authors>
+    <Copyright>Copyright © 2026 ${Authors}</Copyright>
+    <Product>RDCore</Product>
+  </PropertyGroup>
+
+</Project>

@@ -44,6 +44,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\RDCore.SDK.Protocol\RDCore.SDK.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Update="ServerOptionsHelpText.fr.Designer.cs">
       <DependentUpon>ServerOptionsHelpText.fr.resx</DependentUpon>
       <DesignTime>True</DesignTime>
