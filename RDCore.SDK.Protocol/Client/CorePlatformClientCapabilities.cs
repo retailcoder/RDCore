@@ -1,5 +1,3 @@
-using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Serialization;
 using System.Text.Json.Serialization;
 
 namespace RDCore.SDK.Client;
@@ -12,13 +10,13 @@ public class CorePlatformClientCapabilities
     /// <summary>
     /// The core platform capabilities of the parser process.
     /// </summary>
-    [Optional]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ParserCapabilities? Parsing { get; set; }
 
     /// <summary>
     /// The core platform capabilities of the environment-host process.
     /// </summary>
-    [Optional]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public EnvironmentHostCapabilities? EnvironmentHost { get; set; }
 
     /// <summary>
@@ -31,7 +29,7 @@ public class CorePlatformClientCapabilities
     /// language server, which owns them. So the capabilities a client asks for are the language
     /// server's, even where servicing one means fanning the work out to a child component.
     /// </remarks>
-    [Optional]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public LanguageServerCapabilities? LanguageServer { get; set; }
 }
 
@@ -174,6 +172,11 @@ public class LanguageServerCapabilities
     public RubberduckIndenterSettings RubberduckIndenterSettings { get; set; } = new();
 }
 
+/// <summary>
+/// A capability of the RDCore platform beyond LSP: what a component of it says it provides (its assembly declares it), and what one that connects to it
+/// expects it to (<c>rdcore/platform/initialize</c>). Each capability is a type of its own, named after what it makes possible.
+/// </summary>
+/// <param name="IsSupported">Whether the capability is expected, or provided.</param>
 [JsonDerivedType(typeof(ParseFullDocument))]
 [JsonDerivedType(typeof(ParseTokens))]
 [JsonDerivedType(typeof(DefineSymbols))]
@@ -317,8 +320,7 @@ public record class SemanticAnalysis(bool IsSupported = false) : CorePlatformCli
 /// </summary>
 /// <remarks>
 /// Declared via <c>[assembly: ProvidesCorePlatformClientCapability&lt;DiagnoseDocument&gt;]</c>;
-/// <c>rdc.exe describe-ext</c> records it in the extension's <see cref="RDCore.SDK.Extensibility.ExtensionInfo"/>
-/// manifest, which is where the language server reads it — nothing is negotiated over
+/// <c>rdc.exe describe-ext</c> records it in the extension's manifest (<c>ExtensionInfo</c>), which is where the language server reads it — nothing is negotiated over
 /// <c>rdcore/platform/initialize</c> for this capability.
 /// </remarks>
 public record class DiagnoseDocument(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
@@ -329,7 +331,7 @@ public record class DiagnoseDocument(bool IsSupported = false) : CorePlatformCli
 /// <remarks>
 /// Declared via <c>[assembly: ProvidesCorePlatformClientCapability&lt;CliCommand&gt;]</c>. The CLI itself
 /// declares it for its native verbs; an extension declares it to have <c>rdc.exe describe-ext</c> record
-/// the capability in its <see cref="RDCore.SDK.Extensibility.ExtensionInfo"/> manifest. Providers are
+/// the capability in its manifest (<c>ExtensionInfo</c>). Providers are
 /// <see cref="CoreServerComponent.ClientApp"/> and <see cref="CoreServerComponent.Extension"/>. Currently
 /// informational: nothing is negotiated over <c>rdcore/platform/initialize</c> for this capability yet.
 /// </remarks>

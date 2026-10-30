@@ -333,7 +333,7 @@ public sealed class ChildConnection(
         _client = await LanguageClient.From(ConfigureClientOptions, ct);
 
         // non-LSP platform handshake: the child's advertised capabilities become "provided" ones.
-        PlatformInfo = await SendRequestAsync<PlatformInitializeParams, PlatformInitializeResult>(new PlatformInitializeParams
+        PlatformInfo = await SendRequestAsync<PlatformInitializeRequest, PlatformInitializeResult>(new PlatformInitializeRequest
         {
             ExpectedComponent = _request.ExpectedComponent,
             Expected = _request.ExpectedCapabilities,
