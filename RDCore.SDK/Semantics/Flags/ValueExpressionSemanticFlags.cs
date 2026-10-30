@@ -117,4 +117,10 @@ public enum ValueExpressionSemanticFlags
     /// automates (<see cref="DocumentModuleFact"/>).
     /// </summary>
     HostedDocumentName = 1 << 17,
+
+    /// <summary>
+    /// It is an array given a second empty argument list, <c>f()()</c>: <strong>MS-VBAL §5.6.13.1</strong> makes it invalid, an empty argument list having
+    /// already been specified for the array; <strong>MS-VBA</strong> compiles it as the array, and raises run-time error 9 (Subscript out of range) when it runs.
+    /// </summary>
+    ArrayGivenASecondEmptyArgumentList = 1 << 18,
 }

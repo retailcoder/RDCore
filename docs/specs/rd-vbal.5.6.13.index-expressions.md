@@ -61,6 +61,29 @@ dimension"; MS-VBA coerces it as any value is coerced to a `Long`
 |A `Null` subscript.|94 — Invalid use of Null|
 |A subscript outside its dimension, or a number of subscripts other than the array's rank.|9 — Subscript out of range|
 
+### Empty Argument List
+
+An array written with an empty argument list is the array itself (**MS-VBAL §5.6.13**), with the classification and the declared type of the array:
+`f()` is `f`, wherever it is written. MS-VBA agrees (recorded in Excel, oracle\s53), for a fixed-size array and a dynamic one alike:
+
+|Code|Is|
+|---|---|
+|`UBound(f())`, `LBound(f(), 1)`|The bounds of `f`.|
+|`v = f()`|A copy of `f`, as `v = f` is.|
+|`Fill f()`, to `ByRef a() As Long`|`f` itself, passed by reference: what `Fill` assigns, `f` holds.|
+|`Erase f()`|`Erase f`.|
+|`Debug.Print f()`, as `Debug.Print f`|[VBC09310](../diagnostics/vbc09310.md) _Type mismatch_, when it compiles: an array is no value `Debug.Print` writes.|
+
+The parser reads `f()` as one missing argument;
+[IndexExpressionNode.IsEmptyArgumentList](../api/RDCore.SDK.Model.AST.Expressions.IndexExpressionNode.html) says whether an argument list is empty,
+written either way.
+
+> [!IMPORTANT]
+> **MS-VBAL §5.6.13** makes an array given a second empty argument list, `f()()`, invalid: the rule takes an empty argument list only of an array that
+> "an empty argument list has not already been specified for". **MS-VBA** compiles it as the array (`UBound(f()())` compiles), and raises run-time error 9
+> (Subscript out of range) whenever it runs (oracle\s53 E07, E08, F07, F08). **RD-VBA** follows MS-VBA, and warns:
+> [RDC11025](../diagnostics/rdc11025.md).
+
 ### Object Callee
 
 An index expression whose `Callee` is an object - or a `Variant` holding one - calls the object's **default member**, the one its class marks with `VB_UserMemId = 0`: `c(1)` is

@@ -183,8 +183,11 @@ public sealed record class ArrayStatementRuntimeSemantics(
     public RuntimeExecutionOutcome ExecuteErase(
         IRuntimeSession session, RuntimeEvaluationContext context, KeywordStatementNode statement)
     {
-        foreach (var element in statement.Inputs.OfType<ExpressionNode>())
+        foreach (var input in statement.Inputs.OfType<ExpressionNode>())
         {
+            // `Erase f()` erases the array `f()` is, which is `f` (MS-VBAL §5.6.13.1; MS-VBA, oracle\s53 E06, F06).
+            var element = RuntimeExpressionEvaluator.TheArrayItself(session, context, input);
+
             // §5.4.3.4 allows any l-expression classified as a variable, property, function or unbound member: a simple name is a symbol, and
             // the rest - a member access, an element - are expressions.
             var name = element is SimpleNameExpressionNode simpleName ? simpleName.IdentifierName : element.ToString() ?? string.Empty;

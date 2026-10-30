@@ -88,6 +88,11 @@ internal static class ExpressionFactDescriber
             {
                 return Fact(null, ValueExpressionSemanticFlags.LateBound | ValueExpressionSemanticFlags.ProcedureCall);
             }
+
+            if (calleeType is VBArrayType && Expressions.IndexExpressionStaticSemantics.IsASecondEmptyArgumentList(index))
+            {
+                return Fact(null, ValueExpressionSemanticFlags.ArrayGivenASecondEmptyArgumentList);
+            }
         }
 
         return Fact(null, 0);

@@ -270,6 +270,9 @@
   <data name="VBTypeOf_ObjectVariableNotSet_Verbose" xml:space="preserve">
     <value>What TypeOf tests is Nothing: an object variable that was never set, or that was set to Nothing, has no object whose type could be tested. Test it with 'Is Nothing' first.</value>
   </data>
+  <data name="VBIndex_SecondEmptyArgumentList_Verbose" xml:space="preserve">
+    <value>The array is given a second empty argument list, f()(): the first is the array itself, and the second selects no element of it.</value>
+  </data>
   <data name="VBIndex_NothingToIndex_Verbose" xml:space="preserve">
     <value>A {0} is neither an array nor an object: there is nothing to index.</value>
   </data>
@@ -332,6 +335,9 @@
   </data>
   <data name="VBCompileError_TypeMismatch_Verbose" xml:space="preserve">
     <value>None of the static semantic applicable rules for this operation matched the data type(s) of the provided input(s): {$INPUTS}</value>
+  </data>
+  <data name="VBCompileError_ArrayPrinted_Verbose" xml:space="preserve">
+    <value>An array is printed: Debug.Print writes values, and an array is none - print its elements, one at a time.</value>
   </data>
   <data name="VBCompileError_LetCoercionTypeMismatch_Verbose" xml:space="preserve">
     <value>Implicit let-coercion is statically invalid for the specified inputs of this expression.</value>
