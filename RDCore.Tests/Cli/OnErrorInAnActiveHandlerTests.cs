@@ -55,6 +55,7 @@ public sealed class OnErrorInAnActiveHandlerTests
     // a second error in the handler goes to the caller, whatever On Error the handler ran.
     [TestMethod]
     [DataRow(new[] { "Err.Raise 6" }, "H 5|outer 6|", DisplayName = "A01 no On Error")]
+    [DataRow(new[] { "Err.Raise 6", "P \"not here\"" }, "H 5|outer 6|", DisplayName = "D01 nothing after the second error runs")]
     [DataRow(new[] { "On Error GoTo Other", "Err.Raise 6" }, "H 5|outer 6|", DisplayName = "A02 On Error GoTo Other")]
     [DataRow(new[] { "On Error Resume Next", "Err.Raise 6", "P \"after \" & Err.Number" }, "H 5|outer 6|", DisplayName = "A03 On Error Resume Next")]
     [DataRow(new[] { "On Error GoTo 0", "Err.Raise 6" }, "H 5|outer 6|", DisplayName = "A04 On Error GoTo 0")]
@@ -82,6 +83,16 @@ public sealed class OnErrorInAnActiveHandlerTests
     [DataRow(new[] { "Resume Next" }, "H 5|resumed|H again 7|back|", DisplayName = "C05 no On Error: the label")]
     public Task TheOnErrorOfTheHandler_IsThePolicyOnceItIsResumed(string[] handler, string expected)
         => AssertPrinted(expected, handler);
+
+    // with no handler running there is no handling to end: a state that is not handling is its own state after it, whatever its AfterHandling defaults to.
+    [TestMethod]
+    public void HandlingOver_OfAStateThatIsNotHandling_IsThatState()
+    {
+        var resumeNext = new RDCore.SDK.Runtime.Shared.ErrorHandlerState(RDCore.SDK.Runtime.Shared.ErrorHandlingMode.ResumeNext, null, null, null);
+
+        Assert.AreEqual(RDCore.SDK.Runtime.Shared.ErrorHandlerState.Disabled, RDCore.SDK.Runtime.Shared.ErrorHandlerState.Disabled.HandlingOver());
+        Assert.AreEqual(resumeNext, resumeNext.HandlingOver());
+    }
 
     // every On Error statement clears Err, in a handler too.
     [TestMethod]

@@ -44,12 +44,13 @@ public enum ErrorHandlingMode
 /// offset the policy after it branches to, when <paramref name="AfterHandling"/> is <see cref="ErrorHandlingMode.GoTo"/>. Unused otherwise.
 /// </param>
 /// <param name="ActiveError">
-/// The error a handler most recently caught, if any — cleared by a <c>Resume</c> statement. <c>Resume</c>
+/// The error a handler most recently caught, if any — cleared by a <c>Resume</c> statement, or an <c>On Error GoTo -1</c>. <c>Resume</c>
 /// with no active error is <strong>MS-VBAL §5.4.4.2</strong> error 20, "Resume without error".
 /// </param>
 /// <param name="HandlerEntry">
-/// For an activation that is running the handler an <c>On Error GoTo</c> caught an error with: the offset of the handler, until a <c>Resume</c> ends it. Kept apart from
-/// <paramref name="HandlerTarget"/> because catching resets the policy, and with it where the next error would go. <see langword="null"/> when no handler is running.
+/// For an activation that is running the handler an <c>On Error GoTo</c> caught an error with: the offset of the handler, until a <c>Resume</c> or an
+/// <c>On Error GoTo -1</c> ends it. Kept apart from <paramref name="HandlerTarget"/>, which is then where the next error goes once the handler is over, and
+/// which an <c>On Error</c> statement the handler runs changes. <see langword="null"/> when no handler is running.
 /// </param>
 /// <param name="FaultStatementOffset">
 /// The offset of the instruction whose execution raised <see cref="ActiveError"/> — what a bare
@@ -71,9 +72,10 @@ public readonly record struct ErrorHandlerState(
 
     /// <summary>
     /// The policy once the running handler is over (<see cref="AfterHandling"/>, <see cref="HandlerTarget"/>): no error active, and none being handled.
+    /// When no handler is running (<see cref="IsHandling"/>), there is nothing to end: the state as it is.
     /// </summary>
     public ErrorHandlerState HandlingOver()
-        => new(AfterHandling, AfterHandling == ErrorHandlingMode.GoTo ? HandlerTarget : null, null, null);
+        => IsHandling ? new(AfterHandling, AfterHandling == ErrorHandlingMode.GoTo ? HandlerTarget : null, null, null) : this;
 
     /// <summary>
     /// The state every activation starts with: no handler active, no active error.

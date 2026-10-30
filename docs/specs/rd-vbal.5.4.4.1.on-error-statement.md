@@ -40,7 +40,7 @@ An `On Error` statement sets the error-handling policy of the current activation
 |---|---|---|
 |`Disabled` (the policy [**MS-VBAL §5.4.4** Error Handling Statements](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/47b18690-3175-44d9-9de1-31629f0aacc7) calls *Default*)|`On Error GoTo 0`; an error caught under `GoTo`|The error is not caught: it propagates out of the activation (see [Propagation](#propagation)).|
 |`ResumeNext`|`On Error Resume Next`|The error is caught silently. Execution continues at the statement that follows the one that raised the error. The policy is not reset: every later error in the same activation is caught the same way.|
-|`GoTo`|`On Error GoTo <label>`; a `Resume` that ends the handler|The error branches to the label. The policy is reset to disabled while the handler runs: a second, unhandled error inside the handler body propagates rather than re-entering the handler. A `Resume` ends the handler and sets the policy back to `GoTo` the same label: the next error goes to it again.|
+|`GoTo`|`On Error GoTo <label>`; a `Resume` that ends the handler|The error branches to the label. The policy is reset to disabled while the handler runs: a second, unhandled error inside the handler body propagates rather than re-entering the handler. A `Resume`, or an `On Error GoTo -1`, ends the handler and sets the policy it is to have after it: `GoTo` the same label, unless an `On Error` statement in the handler said otherwise ([In an active handler](#in-an-active-handler)).|
 
 The asymmetry between `On Error Resume Next` (policy kept) and `On Error GoTo <label>` (policy reset to disabled
 while the handler runs) follows MS-VBAL: the policy is still to go to the label, and an error inside the handler is
@@ -62,9 +62,13 @@ An `On Error` statement the handler runs sets the policy for **after** the handl
 |nothing|goes to the caller (A01)|goes to the handler's label again (C05)|
 |`On Error GoTo Other`|goes to the caller (A02)|goes to `Other` (C01)|
 |`On Error Resume Next`|goes to the caller (A03)|is gone past (C02)|
-|`On Error GoTo 0`, or `Err.Clear` and `On Error GoTo Other`|goes to the caller (A04, A07)|goes to the caller (C03)|
+|`On Error GoTo 0`|goes to the caller (A04)|goes to the caller (C03)|
+|`Err.Clear`, then `On Error GoTo Other`|goes to the caller (A07)|not recorded|
 |`On Error GoTo -1`|goes to the handler's label again (A05)|`Resume` has nothing to resume: error 20 (C04)|
-|`On Error GoTo -1`, then `On Error GoTo Other`|goes to `Other` (A06)||
+|`On Error GoTo -1`, then `On Error GoTo Other`|goes to `Other` (A06)|not recorded|
+|`On Error GoTo -1`, then `On Error Resume Next`|is gone past (A10)|not recorded|
+
+What follows a second error in the handler doesn't run (D02).
 
 `On Error GoTo -1` ends the error being handled and keeps the policy. In a handler, that policy is the one the handler is to have after it: its own label,
 unless an `On Error` in the handler said otherwise. Outside a handler, RD-VBA's `-1` clears the error `On Error Resume Next` went past and keeps the
