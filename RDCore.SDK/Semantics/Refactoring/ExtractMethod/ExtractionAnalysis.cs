@@ -141,7 +141,7 @@ public static class ExtractionAnalysis
 
         var constants = ConstantsOf(selection, accesses.Instructions, model, scopes, refusals);
         var (exits, jumps) = ExtractionControlFlow.Of(selection, graph);
-        var (startsWithResumeNext, changes, errors) = ExtractionControlFlow.ErrorHandlingOf(region, states);
+        var (startsWithResumeNext, changes, errors) = ExtractionControlFlow.ErrorHandlingOf(region, states, ReadsErr(region, accesses.Instructions, scopes, model));
         return new ExtractionPlan(selection, [.. parameters], [.. locals], [.. movedOut], assignsResult, readsResult, withTarget, [.. jumps, .. errors, .. refusals],
             [.. exits], startsWithResumeNext, [.. changes])
         {
@@ -174,6 +174,15 @@ public static class ExtractionAnalysis
 
         return [.. inside.Select(read => read.Constant).Where(constant => !DeclaredInside(constant)).Select(constant => constant.SemanticId).Distinct()];
     }
+
+    // whether the selection reads the library's Err or Erl, which the library runs (an external target): a name the workspace declares is its own.
+    private static bool ReadsErr(IReadOnlySet<int> region, InstructionList instructions, ScopeTree scopes, ProcedureSemanticModel model)
+        => region.Select(offset => instructions.Items[offset].Node).OfType<StatementNode>()
+            .SelectMany(OwnExpressionsOf)
+            .OfType<SimpleNameExpressionNode>()
+            .Any(name => (name.IdentifierName.Equals("Err", StringComparison.OrdinalIgnoreCase) || name.IdentifierName.Equals("Erl", StringComparison.OrdinalIgnoreCase))
+                && model.Expressions.TryGetValue(name.Identity, out var fact) && fact.Binding is { } binding
+                && FlowSymbols.SymbolOf(scopes, binding)?.GetProperty(SymbolProperties.ExternalTarget) is not null);
 
     // the expressions of the statement itself, nested ones included: those of the statements of its blocks are theirs.
     private static IEnumerable<SyntaxNode> OwnExpressionsOf(SyntaxNode node)

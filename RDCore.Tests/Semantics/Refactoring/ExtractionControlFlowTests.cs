@@ -193,11 +193,31 @@ public sealed class ExtractionControlFlowTests
         Assert.IsTrue(plan.IsExtractable, string.Join(", ", RefusalsOf(plan)));
     }
 
+    // the second review's 2a-6: a handler that ends without a Resume leaves the error active inline; extracted, the call ends with its callee, and the error with it.
     [TestMethod]
-    public void AWholeHandlingOfItsOwn_IsExtracted()
+    public void AHandlerOfItsOwnThatFallsThroughWithTheErrorActive_IsRefused()
+        => CollectionAssert.Contains(RefusalsOf(Plan("Debug.Print n\nOn Error GoTo H\nDebug.Print 1 / n\nH:\nOn Error GoTo 0\nDebug.Print n", 1, 4)),
+            ExtractionRefusalKind.ErrorHandlingChanged);
+
+    [TestMethod]
+    public void AHandlingOfItsOwnThatResumes_IsExtracted()
     {
-        var plan = Plan("Debug.Print n\nOn Error GoTo H\nDebug.Print 1 / n\nH:\nOn Error GoTo 0\nDebug.Print n", 1, 4);
+        var plan = Plan("Debug.Print n\nOn Error GoTo H\nDebug.Print 1 / n\nGoTo Done\nH:\nResume Done\nDone:\nOn Error GoTo 0\nDebug.Print n", 1, 7);
 
         Assert.IsTrue(plan.IsExtractable, string.Join(", ", RefusalsOf(plan)));
     }
+
+    // the second review's 2a-5: the On Error Resume Next the new procedure starts with clears what Err says of an error before the selection.
+    [TestMethod]
+    public void AReadOfErrUnderAnInheritedResumeNext_IsABehaviourChange()
+    {
+        var plan = Plan("On Error Resume Next\nDebug.Print 1 / n\nDebug.Print Err.Number", 2, 2);
+
+        Assert.IsTrue(plan.StartsWithResumeNext);
+        CollectionAssert.Contains(plan.BehaviourChanges.Select(change => change.Kind).ToArray(), ExtractionBehaviourChangeKind.ErrClearedOnEntry);
+    }
+
+    [TestMethod]
+    public void NoReadOfErrUnderAnInheritedResumeNext_ChangesNothing()
+        => Assert.IsEmpty(Plan("On Error Resume Next\nDebug.Print 1 / n\nDebug.Print 2 / n", 2, 2).BehaviourChanges);
 }

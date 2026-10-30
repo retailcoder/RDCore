@@ -91,8 +91,11 @@ internal static class ExtractionControlFlow
     /// What extracting the selection changes of its error handling (<strong>Extract Method §3.4</strong>): an error raised in the new procedure, which has no
     /// handler of its own, is raised to its caller at the call.
     /// </summary>
+    /// <param name="region">The instructions of the selection.</param>
+    /// <param name="states">The error-handling states of the source procedure.</param>
+    /// <param name="readsErr">Whether the selection reads <c>Err</c> or <c>Erl</c>.</param>
     public static (bool StartsWithResumeNext, List<ExtractionBehaviourChange> Changes, List<ExtractionRefusal> Refusals) ErrorHandlingOf(
-        IReadOnlySet<int> region, ErrorHandlingStates states)
+        IReadOnlySet<int> region, ErrorHandlingStates states, bool readsErr)
     {
         var graph = states.Graph;
         var items = graph.Instructions.Items;
@@ -123,7 +126,7 @@ internal static class ExtractionControlFlow
                 .Select(instruction => new ExtractionRefusal(ExtractionRefusalKind.ErrorHandlingChanged, instruction.Location, null)));
         }
 
-        var raises = region.Any(offset => ControlFlowGraph.CanRaiseError(items[offset].Kind));
+        var raises = region.Any(graph.CanRaise);
         if (!raises)
         {
             return (false, changes, refusals);
@@ -153,6 +156,13 @@ internal static class ExtractionControlFlow
         var resumingNext = entry.Where(state => !state.IsHandling).Select(state => state.Policy is ErrorHandlingPolicy.ResumeNext).Distinct().ToArray();
         if (resumingNext is [true])
         {
+            // the On Error Resume Next the new procedure starts with clears Err, which the selection reads of an error before it, as far as is known: whether Err is
+            // what it was across a call is to be measured in Excel.
+            if (readsErr)
+            {
+                changes.Add(new ExtractionBehaviourChange(ExtractionBehaviourChangeKind.ErrClearedOnEntry, [], [], IsNote: false));
+            }
+
             return (true, changes, refusals);
         }
 
@@ -191,6 +201,21 @@ internal static class ExtractionControlFlow
                 }
 
                 var instruction = items[arrival.Node];
+
+                // an error the selection's own handler takes, and the next statement under Resume Next: a handler that ends without a Resume leaves the error active,
+                // which the call would end - its callee's error goes with it.
+                if (graph.CanRaise(arrival.Node))
+                {
+                    if (arrival.State.CatchingHandler is { } handler && region.Contains(handler))
+                    {
+                        pending.Push((handler, arrival.State with { IsHandling = true }));
+                    }
+                    else if (arrival.State is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
+                    {
+                        pending.Push((ControlFlowGraph.NextAfterAnError(instruction), arrival.State));
+                    }
+                }
+
                 var leaves = ErrorHandlingStates.After(instruction, arrival.State);
                 foreach (var edge in graph.SuccessorsOf(arrival.Node).Where(edge => edge.Kind is not ControlFlowEdgeKind.Error))
                 {

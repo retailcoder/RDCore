@@ -159,6 +159,12 @@ public enum ExtractionBehaviourChangeKind
     /// measured in Excel for an error raised in a callee.
     /// </summary>
     ErlReportsTheCall,
+
+    /// <summary>
+    /// The selection runs under <c>On Error Resume Next</c> and reads <c>Err</c> or <c>Erl</c>, which may be about an error raised before it: the
+    /// <c>On Error Resume Next</c> the new procedure starts with clears them. Whether <c>Err</c> is what it was across a call is to be measured in Excel.
+    /// </summary>
+    ErrClearedOnEntry,
 }
 
 /// <summary>
@@ -201,10 +207,11 @@ public sealed record class ExtractionWithTarget(WithStatementNode With, Semantic
 /// <param name="IsOutput">Whether the selection gives it a value that is read after it.</param>
 /// <param name="MayBeMissing">
 /// Whether it is a parameter of the source procedure that can be missing - an <c>Optional</c> <c>Variant</c> with no default value, or a <c>ParamArray</c> - so that
-/// <c>IsMissing</c> of it means something: it is passed as a <c>Variant</c>. Whether <c>IsMissing</c> is still <c>True</c> of it in the new procedure is to be measured
-/// (<strong>Extract Method §3.3</strong>).
+/// <c>IsMissing</c> of it means something: it is passed as a <c>Variant</c> (<strong>Extract Method §3.3</strong>). A missing argument passed on stays missing in the
+/// new procedure, by value or by reference, <c>Optional</c> or not - and a default value given to the new parameter is not applied to it (MS-VBA, measured: oracle
+/// s54 M01-M07). So the parameter is a plain <c>Variant</c>, never <c>Optional</c>.
 /// </param>
-/// <param name="IsUndeclared">Whether it is declared by being named, with no <c>Option Explicit</c>: the new procedure declares the parameter, as a <c>Variant</c>.</param>
+/// <param name="IsUndeclared">Whether it is declared by being named, with no <c>Option Explicit</c>: the new procedure declares the parameter, of the type its DefType gives it.</param>
 public sealed record class ExtractionParameter(
     SemanticId Variable, string Name, VBType? Type, ExtractionPassing Passing, ExtractionPassingReason Reason, bool IsInput, bool IsOutput, bool MayBeMissing = false,
     bool IsUndeclared = false);
