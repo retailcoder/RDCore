@@ -218,15 +218,16 @@ internal sealed record class CompiledCallee(SDK.Model.Symbols.Abstract.VBTypeMem
 /// </remarks>
 /// <param name="Entry">The callee's typed entry: its compiled activation, then each parameter as a <see cref="long"/> or a <see cref="double"/>.</param>
 /// <param name="Procedure">The callee.</param>
-/// <param name="List">The callee's instructions, which its activation is of.</param>
-/// <param name="Invoker">What makes the callee's activation, and ends it.</param>
-internal sealed class DirectCall(System.Reflection.MethodInfo Entry, SDK.Model.Symbols.Abstract.VBTypeMemberSymbol Procedure, SDK.Semantics.Instructions.InstructionList List,
-    Execution.RuntimeProcedureInvoker Invoker)
+/// <param name="List">
+/// The callee's instructions, which its activation is of: the call is made this way only while they are the callee's body still, and not after its module
+/// was loaded again.
+/// </param>
+/// <remarks>Nothing of a session is held: the body is shared by every session composed over the same scopes, each of which makes the activations itself.</remarks>
+internal sealed class DirectCall(System.Reflection.MethodInfo Entry, SDK.Model.Symbols.Abstract.VBTypeMemberSymbol Procedure, SDK.Semantics.Instructions.InstructionList List)
 {
     public System.Reflection.MethodInfo Entry { get; } = Entry;
     public SDK.Model.Symbols.Abstract.VBTypeMemberSymbol Procedure { get; } = Procedure;
     public SDK.Semantics.Instructions.InstructionList List { get; } = List;
-    public Execution.RuntimeProcedureInvoker Invoker { get; } = Invoker;
 
     /// <summary>The callee's compiled body; set once it is created, for a procedure that calls itself.</summary>
     public CompiledBody? Body { get; set; }

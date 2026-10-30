@@ -5,6 +5,7 @@ using RDCore.Runtime.Compiled;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
+using RDCore.Tests.Platform;
 
 namespace RDCore.Tests.Cli;
 
@@ -288,4 +289,239 @@ public sealed class CompiledDirectCallTests
         Assert.AreEqual(interpreted, compiled);
         StringAssert.Contains(compiled, "| 66 |");
     }
+
+    // a callee called directly whose operation compiled code declines - a Double let-coerced to a Long, which rounds - is handed to the interpreter, which
+    // assigns its result, and the call returns it.
+    [TestMethod]
+    public async Task ACalleeCalledDirectly_HandedToTheInterpreter_ReturnsWhatItAssigned()
+    {
+        CompiledExecutionTests.RequirePayloads();
+        var program = Program(
+            "Public Sub Main()",
+            "    Debug.Print Sum(4)",
+            "End Sub",
+            "Private Function Sum(ByVal n As Long) As Long",
+            "    Dim i As Long, t As Long, u As Long",
+            "    For i = 1 To n",
+            "        u = Half(i)",
+            "        t = t + u",
+            "    Next",
+            "    Sum = t",
+            "End Function",
+            "Private Function Half(ByVal x As Long) As Long",
+            "    Dim d As Double",
+            "    d = x / 2",
+            "    Half = d",
+            "End Function");
+        var (observed, direct, indirect) = await AssertAlikeAsync(program, "Sum");
+
+        // 0.5, 1, 1.5, 2 rounded to even: 0 + 1 + 2 + 2.
+        StringAssert.Contains(observed, "| 5 |");
+        AssertCalls(4, (direct, indirect));
+    }
+
+    // an End in an interpreted callee of a callee called directly ends the program there, as it does when the interpreter makes every call.
+    [TestMethod]
+    public async Task AnEnd_InACalleeOfACalleeCalledDirectly_EndsTheProgram()
+    {
+        var (observed, _, _) = await AssertAlikeAsync(Program(
+            "Public Sub Main()",
+            "    Debug.Print Outer(3)",
+            "    Debug.Print \"not here\"",
+            "End Sub",
+            "Private Function Outer(ByVal n As Long) As Long",
+            "    Dim i As Long, t As Long, u As Long",
+            "    For i = 1 To n",
+            "        u = Middle(i)",
+            "        t = t + u",
+            "    Next",
+            "    Outer = t",
+            "End Function",
+            "Private Function Middle(ByVal x As Long) As Long",
+            "    Dim w As Long",
+            "    w = Ender(x)",
+            "    Middle = w",
+            "End Function",
+            "Private Function Ender(ByVal y As Long) As Long",
+            "    Debug.Print \"ender \"; y",
+            "    If y = 2 Then End",
+            "    Ender = y",
+            "End Function"), "Outer");
+
+        StringAssert.Contains(observed, "ender  1 ; ender  2");
+        Assert.IsFalse(observed.Contains("not here", StringComparison.Ordinal), observed);
+    }
+
+    // an argument that overflows its parameter's type at a call made directly is the call's error 6, raised before anything is called.
+    [TestMethod]
+    public async Task AnArgumentThatOverflows_AtACallMadeDirectly_IsAnOverflowOfTheCall()
+    {
+        var (observed, _, _) = await AssertAlikeAsync(Program(
+            "Public Sub Main()",
+            "    Debug.Print Outer(3)",
+            "End Sub",
+            "Private Function Outer(ByVal n As Long) As Long",
+            "    Dim i As Long, t As Long, u As Long",
+            "    For i = 1 To n",
+            "        u = Small(i * 20000)",
+            "        t = t + u",
+            "    Next",
+            "    Outer = t",
+            "End Function",
+            "Private Function Small(ByVal x As Integer) As Long",
+            "    Small = x",
+            "End Function"), "Outer");
+
+        StringAssert.Contains(observed, "| 6 VBR00006");
+    }
+
+    // a Function called as a statement, through its typed entry: what it returns is not read.
+    [TestMethod]
+    public async Task AFunctionCalledAsAStatement_IsCalledThroughItsTypedEntry()
+    {
+        var (observed, direct, indirect) = await AssertAlikeAsync(Program(
+            "Public Sub Main()",
+            "    Outer 3",
+            "End Sub",
+            "Private Sub Outer(ByVal n As Long)",
+            "    Dim i As Long",
+            "    For i = 1 To n",
+            "        Twice i",
+            "    Next",
+            "End Sub",
+            "Private Function Twice(ByVal x As Long) As Long",
+            "    Twice = x * 2",
+            "End Function"), "Outer");
+
+        StringAssert.StartsWith(observed, "Completed");
+        AssertCalls(3, (direct, indirect));
+    }
+
+    // the callee's body loaded again - an edit of its body alone, which defines no symbol again, run with its module as edited - is what the next call runs,
+    // and not the IL compiled from the body it had: the caller is of another module, which is not loaded again, and keeps its compiled body.
+    [TestMethod]
+    public async Task ACalleeWhoseBodyAloneIsLoadedAgain_IsCalledAsItNowIs()
+    {
+        CompiledExecutionTests.RequirePayloads();
+        static string Calling(string twice) => Program(
+            "Public Sub Main()",
+            "    Debug.Print Outer(3)",
+            "End Sub",
+            "Public Function Twice(ByVal x As Long) As Long",
+            $"    Twice = {twice}",
+            "End Function");
+        var outer = ModuleWorkspace.StandardModule("Callers",
+            "Public Function Outer(ByVal n As Long) As Long",
+            "    Dim i As Long, t As Long, u As Long",
+            "    For i = 1 To n",
+            "        u = Twice(i)",
+            "        t = t + u",
+            "    Next",
+            "    Outer = t",
+            "End Function");
+
+        foreach (var engine in new[] { VBExecutionEngine.Interpreter, VBExecutionEngine.Compiled })
+        {
+            using var running = CompiledExecution.Running(engine);
+            await ModuleWorkspace.InspectWithModulesAsync([("Callers", outer)], Calling("x * 2"), async (provider, first, runAgain) =>
+            {
+                StringAssert.Contains(Observed(first), "| 12 |");
+                var again = await RunWithAsync(provider, Calling("x * 3"));
+                StringAssert.Contains(Observed(again), "| 18 |", engine.ToString());
+                if (engine is VBExecutionEngine.Compiled && !CompiledExecution.WalksBackAtRandom)
+                {
+                    Assert.AreEqual(3L, BodyOf(provider, "Outer").DirectCalls, "the first run's calls only");
+                }
+            });
+        }
+    }
+
+    private static Task<ExecuteSessionResult> RunWithAsync(EnvironmentSessionProvider provider, string source)
+    {
+        var uri = new UriBuilder(Wire.FileUri(ModuleWorkspace.Root)) { Fragment = "Program" }.Uri;
+        var parse = new RDCore.Parsing.ModuleParser().Parse(Wire.FileUri(Path.Combine(ModuleWorkspace.Root, "Program.bas")), source);
+        return new HostExecuteHandler(provider, NSubstitute.Substitute.For<RDCore.SDK.Services.VerboseMessages.IVerboseMessageBuilder>(),
+                NullLogger<HostExecuteHandler>.Instance)
+            .Handle(new HostExecuteParams
+            {
+                Json = PlatformJson.Serialize(new HostExecutePayload(uri, parse)),
+                ModuleName = "Program",
+                EntryPoint = "Main",
+            }, CancellationToken.None).WaitAsync(Patience);
+    }
+
+    // the symbols defined again while the program waits: the caller compiled against them as they were makes no call through a typed entry after it.
+    [TestMethod]
+    public async Task AfterTheSymbolsAreDefinedAgain_NoCallIsMadeThroughATypedEntry()
+    {
+        CompiledExecutionTests.RequirePayloads();
+        if (CompiledExecution.WalksBackAtRandom)
+        {
+            Assert.Inconclusive("under the random walk-back, the caller may be handed to the interpreter before it calls");
+        }
+
+        var edited = Waiting.Replace("    Inner = y", "    Inner = y + 0", StringComparison.Ordinal);
+        using var running = CompiledExecution.Running(VBExecutionEngine.Compiled);
+        await ModuleWorkspace.InspectAsync([], Waiting, async (provider, first, runAgain) =>
+        {
+            try
+            {
+                _ = await Resume(provider);
+                Assert.IsEmpty(await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, edited)));
+                var done = await Resume(provider);
+                StringAssert.Contains(Observed(done), "| 63 |");
+                var outer = provider.Image.Compiler.Results.Where(result => result.Procedure.Name == "Outer").Select(result => result.Result.Body).OfType<CompiledBody>();
+                Assert.AreEqual(1L, outer.Sum(body => body.DirectCalls), "only the call made before the symbols were defined again");
+            }
+            finally
+            {
+                if (provider.Execution.State is not ProgramState.Idle)
+                {
+                    _ = await Terminate(provider);
+                }
+            }
+        }, debug: true, engine: VBExecutionEngine.Compiled);
+    }
+
+    // the session told to run no compiled code while a compiled caller waits on its callee: its calls after are made through the invoker, which interprets
+    // them, as Run would.
+    [TestMethod]
+    [DoNotParallelize]
+    public async Task TheEngineChangedWhileACompiledCallerWaits_ItsCallsAfterAreInterpreted()
+    {
+        CompiledExecutionTests.RequirePayloads();
+        if (CompiledExecution.WalksBackAtRandom)
+        {
+            Assert.Inconclusive("under the random walk-back, the caller may be handed to the interpreter before it calls");
+        }
+
+        var engine = CompiledExecution.Engine;
+        try
+        {
+            CompiledExecution.Engine = VBExecutionEngine.Compiled;
+            await ModuleWorkspace.InspectAsync([], Waiting, async (provider, first, runAgain) =>
+            {
+                try
+                {
+                    _ = await Resume(provider);
+                    CompiledExecution.Engine = VBExecutionEngine.Interpreter;
+                    StringAssert.Contains(Observed(await Resume(provider)), "| 63 |");
+                    var outer = BodyOf(provider, "Outer");
+                    Assert.AreEqual((1L, 2L), (outer.DirectCalls, outer.IndirectCalls));
+                }
+                finally
+                {
+                    if (provider.Execution.State is not ProgramState.Idle)
+                    {
+                        _ = await Terminate(provider);
+                    }
+                }
+            }, debug: true, engine: VBExecutionEngine.Compiled);
+        }
+        finally
+        {
+            CompiledExecution.Engine = engine;
+        }
+    }
+
 }

@@ -249,6 +249,7 @@ internal sealed class ProcedureEmitter
             _il.Emit(OpCodes.Call, direct.Entry);
             _il.Emit(OpCodes.Stloc, outcome);
             _il.Emit(OpCodes.Ldarg_0);
+            _il.Emit(OpCodes.Ldc_I4, call.Callee);
             _il.Emit(OpCodes.Ldloc, callee);
             _il.Emit(OpCodes.Ldloc, outcome);
             _il.Emit(OpCodes.Ldloca, integral);

@@ -243,7 +243,7 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
         var compiled = image.Compiler.Compile(Session, Executor.Expressions, procedure, body);
         if (compiled.Body is { } code)
         {
-            return code.Run(new CompiledActivation(Session, frame, body, Executor, context, code));
+            return code.Run(new CompiledActivation(Session, frame, body, Executor, context, code, this));
         }
 
         // a test that expects every procedure it runs to be compiled fails the call of one that is not, rather than run it interpreted unnoticed.

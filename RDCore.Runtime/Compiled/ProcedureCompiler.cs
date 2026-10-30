@@ -187,7 +187,7 @@ internal sealed class ProcedureCompiler
 
         if (callee.Procedure.SemanticId == caller.SemanticId)
         {
-            return new DirectCall(entry, callee.Procedure, list, invoker);
+            return new DirectCall(entry, callee.Procedure, list);
         }
 
         if (_inProgress.Contains(callee.Procedure.SemanticId) || invoker.BodyOf(callee.Procedure) is not { } calleeList
@@ -196,7 +196,7 @@ internal sealed class ProcedureCompiler
             return null;
         }
 
-        return new DirectCall(calleeEntry, callee.Procedure, calleeList, invoker) { Body = calleeBody };
+        return new DirectCall(calleeEntry, callee.Procedure, calleeList) { Body = calleeBody };
     }
 }
 
