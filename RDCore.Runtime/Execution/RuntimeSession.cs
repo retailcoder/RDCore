@@ -645,29 +645,39 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
             RetireStatics(procedure, edited);
         }
 
-        // the same declaration, written again: a variable that holds storage and is declared as the type it was.
-        // Anything else is a different variable - or no variable - and is replaced the long way.
-        var sameDeclaration = existing is ITypedSymbol { ResolvedType: var before }
-            && symbol is ITypedSymbol { ResolvedType: var after }
-            && IsSameType(before, after)
-            && SessionBindings.TryGetAddress(existing, out _);
         var key = existing.Uri.ToString();
-        if (!sameDeclaration)
+        var sameType = existing is ITypedSymbol { ResolvedType: var before } && symbol is ITypedSymbol { ResolvedType: var after } && IsSameType(before, after);
+
+        // while a program is in progress, what a variable holds is not let go of: a definition of another type is held, and the variable stays as it was. Held
+        // is told first, with the lock held, as the release at the program's end tells it - and before the session's storage is read, which a running program
+        // allocates its Statics in on its own thread. A variable of a module, or a global, was given its storage when it was defined; a field of a Type or of a
+        // class holds none of the session's.
+        if (existing is ITypedSymbol and not VBUserDefinedTypeFieldSymbol && existing.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
+            && scope is ScopeKind.Module or ScopeKind.Global)
         {
-            // while a program is in progress, what the variable holds is not let go of: the definition is held, and the variable stays as it was. Whether one
-            // is, is told with the lock held, as the release at the program's end tells it.
-            if (existing is ITypedSymbol && SessionBindings.TryGetAddress(existing, out _))
+            lock (_resetLock)
             {
-                lock (_resetLock)
+                if (_holdsStoredValues && !sameType)
                 {
-                    if (_holdsStoredValues)
-                    {
-                        _held = _held.SetItem(key, (symbol, scope));
-                        return true;
-                    }
+                    _held = _held.SetItem(key, (symbol, scope));
+                    return true;
+                }
+
+                if (_holdsStoredValues)
+                {
+                    // the variable declared as it was: a definition held for it is taken back, and it keeps its storage.
+                    _held = _held.Remove(key);
+                    table.Replace(symbol, scope);
+                    return true;
                 }
             }
+        }
 
+        // the same declaration, written again: a variable that holds storage and is declared as the type it was.
+        // Anything else is a different variable - or no variable - and is replaced the long way.
+        var sameDeclaration = sameType && SessionBindings.TryGetAddress(existing, out _);
+        if (!sameDeclaration)
+        {
             return Replaced(existing, symbol, scope);
         }
 
