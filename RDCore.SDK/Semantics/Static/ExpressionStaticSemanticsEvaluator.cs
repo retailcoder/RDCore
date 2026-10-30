@@ -177,11 +177,8 @@ public static class ExpressionStaticSemanticsEvaluator
         return MemberAccessExpressionStaticSemantics.Instance.DetermineDeclaredType(context, expression, ownerType);
     }
 
-    // MS-VBAL §5.6.12, an <l-expression> classified as a project or a procedural module: the member access is the
-    // member it resolves to, with that member's own declared type - a variable, property or function's, a value's, or
-    // none for a subroutine. A name the namespace does not have is as invalid as a member a value's type does not.
     // the project or the module that qualifies a member is no value, and is not evaluated: what it names is a fact all the same, of every part of it
-    // (`VBA.Strings` and `VBA`), so that the expression the member is written in is analyzed whole.
+    // (`VBA.Strings` and `VBA`), so that the expression the member is written in is analyzed whole - written in another case than it is declared in, too.
     private static void DescribeNamespace(StaticEvaluationContext context, ExpressionNode qualifierExpression, Symbol qualifier)
     {
         if (context.Facts is not { } facts)
@@ -189,13 +186,23 @@ public static class ExpressionStaticSemanticsEvaluator
             return;
         }
 
-        facts.Record(new ExpressionFact(qualifierExpression.Identity, qualifierExpression.Location, null, ExpressionClassification.Namespace, qualifier.SemanticId, 0));
+        var written = qualifierExpression switch
+        {
+            SimpleNameExpressionNode name => name.IdentifierName,
+            MemberAccessExpressionNode access => access.Member.IdentifierName,
+            _ => qualifier.Name,
+        };
+        var flags = string.Equals(qualifier.Name, written, StringComparison.Ordinal) ? 0 : ValueExpressionSemanticFlags.CaseMismatch;
+        facts.Record(new ExpressionFact(qualifierExpression.Identity, qualifierExpression.Location, null, ExpressionClassification.Namespace, qualifier.SemanticId, flags));
         if (qualifierExpression is MemberAccessExpressionNode { Owner: { } outer } && context.Resolver.NamespaceOf(outer, context.Scope.Uri) is { } outerQualifier)
         {
             DescribeNamespace(context, outer, outerQualifier);
         }
     }
 
+    // MS-VBAL §5.6.12, an <l-expression> classified as a project or a procedural module: the member access is the
+    // member it resolves to, with that member's own declared type - a variable, property or function's, a value's, or
+    // none for a subroutine. A name the namespace does not have is as invalid as a member a value's type does not.
     private static StaticSemanticsEvaluationResult EvaluateNamespaceMember(
         StaticEvaluationContext context, ExpressionNode expression, Symbol qualifier, MemberAccessExpressionNode memberAccess)
     {
@@ -267,9 +274,9 @@ public static class ExpressionStaticSemanticsEvaluator
             }
         }
 
-        // an index of an array is no argument: any other callee may take what is written in its argument list by reference, a function that returns an array
-        // included.
-        if (calleeResult.Result is not VBArrayType || ProcedureNamedBy(context, indexExpression.Callee) is not null)
+        // an index of an array is no argument: any other callee may take what is written in its argument list by reference, a function that returns an array and
+        // has parameters included. One that has none is called with none, and what is written after its name indexes what it returns.
+        if (calleeResult.Result is not VBArrayType || ProcedureNamedBy(context, indexExpression.Callee) is { Parameters.IsEmpty: false })
         {
             MarkPassedAsArguments(context, indexExpression.Arguments);
         }
