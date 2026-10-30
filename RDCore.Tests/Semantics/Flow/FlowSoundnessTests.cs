@@ -199,14 +199,36 @@ public sealed class FlowSoundnessTests
         Assert.Contains(analyzed.Variable("x"), analyzed.Live.LiveAfter(analyzed.Lines(2, 2)), $"{statement} raises, and Resume Next goes on to read x");
     }
 
-    // the re-review's D, to measure in Excel before either side moves: RD-VBA's runtime continues at End Select (ProcedureExecutor), the analysis at the first Case.
+    // the re-review's D, measured in MS-VBA (oracle s54): an error in the expression of a Select Case goes on after End Select, with no Case run, the Case Else
+    // included - as RD-VBA's runtime does.
     [TestMethod]
-    [Ignore("measure in Excel: where MS-VBA goes on after an error in the expression of a Select Case under On Error Resume Next (overnight #64 D)")]
     public void S0B_AnErrorInTheExpressionOfASelectCase_UnderResumeNext_GoesOnAtEndSelect()
     {
         var analyzed = Analyze("Dim x As Long\nOn Error Resume Next\nSelect Case 10 \\ n\nCase Else\nx = 2\nEnd Select\nDebug.Print x");
         Assert.IsTrue(analyzed.Reaching.ReachingBefore(analyzed.Line(6), analyzed.Variable("x")).Any(definition => definition.Kind is VariableDefinitionKind.Entry),
             "the Case Else is skipped, and x is still 0");
+    }
+
+    // where Resume Next goes on after an error in a condition, as MS-VBA has it (oracle s54): the line it raises on, and the line it goes on at, zero-based.
+    [TestMethod]
+    [DataRow("Select Case 10 \\ n\nCase 1\nx = 1\nCase Else\nx = 2\nEnd Select\nDebug.Print x", 0, 6, DisplayName = "the expression of a Select Case: after End Select")]
+    [DataRow("Select Case n\nCase 10 \\ n\nx = 1\nCase Else\nx = 2\nEnd Select\nDebug.Print x", 1, 2, DisplayName = "a Case expression: that Case's body")]
+    [DataRow("If 10 \\ n Then\nx = 1\nElse\nx = 2\nEnd If\nDebug.Print x", 0, 1, DisplayName = "an If condition: the Then branch")]
+    [DataRow("If n Then\nx = 1\nElseIf 10 \\ n Then\nx = 2\nEnd If\nDebug.Print x", 2, 3, DisplayName = "an ElseIf condition: that branch")]
+    [DataRow("Do While 10 \\ n\nx = 1\nLoop\nDebug.Print x", 0, 1, DisplayName = "a Do While condition: the body")]
+    [DataRow("Do Until 10 \\ n\nx = 1\nLoop\nDebug.Print x", 0, 1, DisplayName = "a Do Until condition: the body")]
+    [DataRow("While 10 \\ n\nx = 1\nWend\nDebug.Print x", 0, 1, DisplayName = "a While condition: the body")]
+    // a post-test loop's condition is its LoopBack, which is of the loop statement and written where it starts: -1 names it.
+    [DataRow("Do\nx = 1\nLoop Until 10 \\ n\nDebug.Print x", -1, 3, DisplayName = "a Loop Until condition: out of the loop")]
+    [DataRow("Do\nx = 1\nLoop While 10 \\ n\nDebug.Print x", -1, 3, DisplayName = "a Loop While condition: out of the loop")]
+    public void S0C_AnErrorInACondition_UnderResumeNext_GoesOnWhereMsVbaGoesOn(string code, int raises, int goesOn)
+    {
+        var analyzed = Analyze($"Dim x As Long\nOn Error Resume Next\n{code}");
+        var at = raises < 0
+            ? analyzed.Instructions.Items.Single(instruction => instruction.Kind is InstructionKind.LoopBack).Offset
+            : analyzed.Instructions.Items.First(instruction => instruction.Location?.Range.Start.Line - analyzed.FirstBodyLine == raises + 2 && instruction.Node is not null).Offset;
+        var errors = analyzed.States.Edges.SuccessorsOf(at).Where(edge => edge.Kind is ControlFlowEdgeKind.Error).Select(edge => edge.To).ToArray();
+        CollectionAssert.AreEqual(new[] { analyzed.Line(goesOn + 2) }, errors);
     }
 
     // ---------------- soundness: definitions ----------------

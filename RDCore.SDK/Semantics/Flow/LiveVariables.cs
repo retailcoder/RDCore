@@ -23,9 +23,9 @@ namespace RDCore.SDK.Semantics.Flow;
 /// result of a function (<see cref="DefinitionsAndUses.OutliveTheActivation"/>).</description></item>
 /// </list>
 /// <para>
-/// One path is not yet known to be the one MS-VBA takes: under <c>On Error Resume Next</c>, an error raised by the condition of a <c>Select Case</c>, an <c>If</c> or
-/// a loop goes on at the next instruction here - the first <c>Case</c>, the <c>Then</c> branch - which is to be measured in Excel. Until it is, "not live" holds on the
-/// paths of every other statement.
+/// Where <c>On Error Resume Next</c> goes on after an error in a condition is as MS-VBA has it (<see cref="ControlFlowGraph.NextAfterAnError"/>), but for the bounds
+/// and the step of a <c>For</c>, which are still to be measured and go on at the next instruction meanwhile: until they are, "not live" holds on the paths of every
+/// other statement.
 /// </para>
 /// </remarks>
 public sealed class LiveVariables

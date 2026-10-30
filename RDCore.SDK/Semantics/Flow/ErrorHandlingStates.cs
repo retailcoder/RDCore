@@ -104,7 +104,7 @@ public sealed class ErrorHandlingStates
             // under On Error Resume Next it goes on at the next instruction, in the same state: the only way there for an Error statement, which never completes.
             else if (ControlFlowGraph.CanRaiseError(instruction.Kind) && arrival.State is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
             {
-                pending.Enqueue((arrival.Node + 1, arrival.State));
+                pending.Enqueue((ControlFlowGraph.NextAfterAnError(instruction), arrival.State));
             }
 
             var after = After(instruction, arrival.State);
@@ -129,9 +129,10 @@ public sealed class ErrorHandlingStates
         };
     }
 
-    // the statement after one that raised an error: where the instruction would have continued, or the next one in order.
+    // the statement after one that raised an error: where the instruction would have continued, or the next one in order, or where Resume Next goes on after it.
     private static IEnumerable<int> AfterFault(ControlFlowGraph graph, int fault)
-        => graph.SuccessorsOf(fault).Where(edge => edge.Kind is not ControlFlowEdgeKind.Error).Select(edge => edge.To).Append(fault + 1).Distinct();
+        => graph.SuccessorsOf(fault).Where(edge => edge.Kind is not ControlFlowEdgeKind.Error).Select(edge => edge.To)
+            .Append(fault + 1).Append(ControlFlowGraph.NextAfterAnError(graph.Instructions.Items[fault])).Distinct();
 
     // what running the instruction to completion leaves.
     private static ErrorHandlingState After(Instruction instruction, ErrorHandlingState before) => instruction.Kind switch

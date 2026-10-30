@@ -13,7 +13,7 @@ namespace RDCore.SDK.Semantics.Flow;
 /// </para>
 /// <list type="bullet">
 /// <item><description>to the handler, when one takes it;</description></item>
-/// <item><description>to the next instruction, under <c>On Error Resume Next</c>;</description></item>
+/// <item><description>to where <c>On Error Resume Next</c> goes on, under it: the next instruction, or past <c>End Select</c> (<see cref="ControlFlowGraph.NextAfterAnError"/>);</description></item>
 /// <item><description>to <see cref="ControlFlowGraph.Exit"/>, when it is raised to the caller - under no policy, or while a handler runs - where what outlives the activation
 /// is what the caller may read.</description></item>
 /// </list>
@@ -80,7 +80,7 @@ internal sealed class FlowEdges
                 }
                 else if (state is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
                 {
-                    Add(instruction.Offset, instruction.Offset + 1, ControlFlowEdgeKind.Error);
+                    Add(instruction.Offset, ControlFlowGraph.NextAfterAnError(instruction), ControlFlowEdgeKind.Error);
                 }
                 else
                 {

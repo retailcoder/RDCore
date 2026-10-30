@@ -349,4 +349,17 @@ public sealed class ControlFlowGraph
         or InstructionKind.ForEachOpener or InstructionKind.ForEachNext or InstructionKind.With or InstructionKind.Select or InstructionKind.JumpTable
         or InstructionKind.GoSubTable or InstructionKind.RaiseError or InstructionKind.Return or InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext
         or InstructionKind.ResumeLabel;
+
+    /// <summary>
+    /// Where <c>On Error Resume Next</c> goes on after the instruction raised an error: the next instruction, but past the <c>End Select</c> for the expression of a
+    /// <c>Select Case</c>, with no <c>Case</c> run.
+    /// </summary>
+    /// <remarks>
+    /// Measured in MS-VBA (oracle s54): an error in the expression of a <c>Select Case</c> goes on after <c>End Select</c>, the <c>Case Else</c> included; one in a
+    /// <c>Case</c> expression runs that <c>Case</c>'s body, one in an <c>If</c> or <c>ElseIf</c> condition runs that branch, one in a <c>Do While</c>, <c>Do Until</c> or
+    /// <c>While</c> condition runs the body, and one in a <c>Loop Until</c> or <c>Loop While</c> condition leaves the loop - which is the next instruction for each of
+    /// them as they are lowered. An error in the bounds or the step of a <c>For</c> is still to be measured, and goes on at the next instruction meanwhile.
+    /// </remarks>
+    internal static int NextAfterAnError(Instruction instruction)
+        => instruction is { Kind: InstructionKind.Select, End: { } after } ? after : instruction.Offset + 1;
 }
