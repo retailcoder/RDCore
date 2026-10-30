@@ -29,8 +29,7 @@ ou relancer le programme.
 - Les lignes peuvent bouger : une modification qui ajoute ou retire des lignes au-dessus de l'interruption est appliquée, et les points d'arrêt suivent les
   lignes où ils étaient.
 - Ajoutez une variable locale, `Dim` ou `Static`, à la procédure où vous êtes ou à une procédure qui l'a appelée : elle commence à sa valeur par défaut, et
-  les autres gardent leurs valeurs. Une `Dim` que vous retirez n'existe plus pour le code, et disparaît au retour de sa procédure. Une `Static` que vous
-  retirez attend (voir plus bas).
+  les autres gardent leurs valeurs. Une variable locale que vous retirez n'existe plus pour le code, et disparaît au retour de sa procédure.
 
 **Les déclarations que vous ajoutez :**
 - Une procédure, dans un module ou une classe.
@@ -68,8 +67,7 @@ pour l'avoir.
 
 | Vous avez changé… | Pourquoi cela attend |
 |---|---|
-| Un `Type` dont le programme peut détenir des valeurs, un champ y ajouté ou changé | Ces valeurs sont déjà disposées, selon les champs qu'avait le `Type`. Le `Type` garde ces champs tant que le programme est en cours : annulez la modification et poursuivez, ou terminez le programme, et la modification s'applique. Les valeurs du projet sont alors réinitialisées, comme MS-VBA réinitialise le projet pour cette modification : chaque variable repart de sa valeur par défaut, et les objets disparaissent, comme après un `End`. |
-| Une `Static` retirée d'une procédure | Ce que la procédure y a stocké survit à l'appel : relancez le programme pour qu'elle disparaisse. |
+| Un champ ajouté à un `Type` dont le programme détient des valeurs | Ces valeurs sont déjà disposées, à la taille qu'avait le `Type`. |
 | Le type d'une variable locale, ou d'une variable, pendant qu'elle détient une valeur | Il faudrait convertir la valeur sous le programme. Une variable de module ou une `Static` garde sa valeur, telle qu'elle était déclarée, tant que le programme est en cours : annulez la modification et poursuivez avec elle, ou terminez le programme, et la modification s'applique. |
 | Une `Const` (ou un membre d'un `Enum`) qui dimensionne un tableau ou une `String * N`, changée de valeur, directement ou par une autre `Const` | Ce qu'elle dimensionne existe déjà, à son ancienne taille. |
 | Une `Const` ou un membre d'un `Enum` que lit une procédure où se trouve le programme | Cette procédure a déjà lu l'ancienne valeur. |
@@ -110,7 +108,7 @@ la modification, ou quand le programme se termine.
 > CONT
   ⛔ IMPOSSIBLE DE POURSUIVRE
     Des modifications faites pendant que le programme attendait ne lui sont pas appliquées :
-    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé ou qui est devenue Static
+    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé
   RUN pour recommencer.
   ✅ PRÊT.
 ```
@@ -120,7 +118,7 @@ la modification, ou quand le programme se termine.
 ```text
 > EDITS
   ⚠️ Des modifications faites pendant que le programme attendait ne lui sont pas appliquées :
-    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé ou qui est devenue Static
+    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé
   RUN pour recommencer.
   ✅ PRÊT.
 ```
@@ -160,12 +158,11 @@ gère :
 | La ligne d'appel d'un appelant | **réinitialise** | attend, et nomme la modification |
 | Une variable locale ajoutée (`Dim`) | poursuit | poursuit |
 | Une variable locale retirée; une `Static` ajoutée | **réinitialise** | poursuit |
-| Une variable locale changée de type, ou un `Dim` devenu `Static` | **réinitialise** | attend, et nomme la modification |
+| Une variable locale changée de type | **réinitialise** | attend, et nomme la modification |
 | Une variable de module `Private`, une `Const` ou un `Declare` ajoutés | poursuit | poursuit |
 | Une variable de module `Public` ajoutée | **réinitialise** | poursuit |
 | Une procédure ajoutée, dans un module ou une classe | **réinitialise** | poursuit |
 | Un `Type` ou un `Enum` ajouté, ou un membre ajouté à un `Enum` | **réinitialise** | poursuit |
-| Un champ ajouté ou changé dans un `Type` dont le programme peut détenir des valeurs | **réinitialise** | attend, et nomme la modification; le projet est réinitialisé une fois le programme terminé |
 | La valeur d'une `Const` changée | **réinitialise** | poursuit, sauf si elle dimensionne ce que détient une variable, ou qu'une procédure en cours l'a lue (attend) |
 | Les paramètres d'une procédure changés, pour une où vous n'êtes pas | **réinitialise** | poursuit |
 | La même chose, pour celle où vous êtes | **réinitialise** | attend, et nomme la modification |
