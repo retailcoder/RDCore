@@ -302,6 +302,8 @@ public sealed class DefinitionsAndUses
 
             return SymbolOf(variable) switch
             {
+                // the elements of a ParamArray are the caller's variables (MS-VBAL §5.3.1.11).
+                ParamArrayParameterSymbol => true,
                 VBParameterSymbol parameter => parameter.ParameterKind is ParameterKind.ImplicitByRef or ParameterKind.ExplicitByRef,
                 VBLocalVariableSymbol local => local.IsStatic,
                 // a field, a global, or what is not known: its value is someone else's to read.

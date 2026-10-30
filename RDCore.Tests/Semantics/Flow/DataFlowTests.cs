@@ -63,10 +63,10 @@ public sealed class DataFlowTests
         public int Line(int line) => Lines(line, line).Min();
     }
 
-    private static Analyzed Analyze(string body, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub")
+    private static Analyzed Analyze(string body, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub", bool optionExplicit = true)
     {
         var moduleLevel = Others.ReplaceLineEndings("\r\n");
-        var prefix = $"Attribute VB_Name = \"Main\"\r\nOption Explicit\r\n{moduleLevel}\r\n{header}\r\n";
+        var prefix = $"Attribute VB_Name = \"Main\"\r\n{(optionExplicit ? "Option Explicit" : "' no Option Explicit")}\r\n{moduleLevel}\r\n{header}\r\n";
         var parse = new ModuleParser().Parse(new Uri("file:///c:/ws/Main.bas"), $"{prefix}{body.ReplaceLineEndings("\r\n")}\r\n{end}\r\n");
         Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));
 
@@ -218,6 +218,35 @@ public sealed class DataFlowTests
 
         var live = analyzed.Live.LiveBefore(analyzed.Graph.Exit);
         CollectionAssert.AreEquivalent(new[] { analyzed.Variable("r"), analyzed.Variable("kept"), analyzed.Variable("field") }, live.ToArray());
+    }
+
+    [TestMethod]
+    public void TheLocalsOfAStaticSub_OutliveTheActivation()
+    {
+        var analyzed = Analyze("Dim kept As Long\nkept = kept + 1", header: "Public Static Sub Run(ByVal n As Long)");
+
+        CollectionAssert.AreEquivalent(new[] { analyzed.Variable("kept") }, analyzed.Live.LiveBefore(analyzed.Graph.Exit).ToArray(), "the next call reads it");
+    }
+
+    [TestMethod]
+    public void TheElementsOfAParamArray_AreTheCallers()
+    {
+        var analyzed = Analyze("rest(0) = 1", header: "Public Sub Run(ParamArray rest() As Variant)");
+
+        Assert.Contains(analyzed.Variable("rest"), analyzed.Accesses.OutliveTheActivation);
+        Assert.Contains(analyzed.Variable("rest"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)), "the caller reads what is written to them");
+    }
+
+    [TestMethod]
+    public void AnUndeclaredVariable_IsAVariableAsWell()
+    {
+        // with no Option Explicit, a name assigned is a local declared by the assignment, a Variant.
+        var analyzed = Analyze("total = n\ntotal = total + 1\nDebug.Print total", optionExplicit: false);
+        var total = analyzed.Variable("total");
+
+        Assert.IsTrue(analyzed.Accesses.DefinitionsAt(analyzed.Line(0)).Any(definition => definition.Variable == total && definition.IsComplete));
+        Assert.Contains(total, analyzed.Live.LiveAfter(analyzed.Lines(1, 1)));
+        Assert.DoesNotContain(total, analyzed.Accesses.OutliveTheActivation, "it is a local of the procedure");
     }
 
     [TestMethod]
