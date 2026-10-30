@@ -341,7 +341,11 @@ public sealed class ChildConnection(
         _channel = new OmniSharpPlatformChannel(_client, logger, _request.ExpectedComponent.ToString());
 
         // non-LSP platform handshake: the child's advertised capabilities become "provided" ones.
-        PlatformInfo = await new RDCorePlatformClient(_channel).InitializeAsync(_request.ExpectedComponent, _request.ExpectedCapabilities, ct);
+        PlatformInfo = await SendRequestAsync<PlatformInitializeRequest, PlatformInitializeResult>(new PlatformInitializeRequest
+        {
+            ExpectedComponent = _request.ExpectedComponent,
+            Expected = _request.ExpectedCapabilities,
+        }, ct);
         logger.LogInformation("Platform handshake with {Component}: provides {Provided}",
             PlatformInfo.Component, PlatformInfo.Provided);
 
