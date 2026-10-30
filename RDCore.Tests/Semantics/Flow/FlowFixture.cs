@@ -75,11 +75,11 @@ internal static class FlowFixture
     }
 
     /// <summary>
-    /// Analyzes a procedure <c>Run</c> whose body is <paramref name="body"/>.
+    /// Analyzes a procedure <c>Run</c> whose body is <paramref name="body"/>, in a module that declares what <paramref name="declarations"/> says before the rest.
     /// </summary>
-    public static Analyzed Analyze(string body, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub", bool optionExplicit = true)
+    public static Analyzed Analyze(string body, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub", bool optionExplicit = true, string declarations = "")
     {
-        var moduleLevel = Others.ReplaceLineEndings("\r\n");
+        var moduleLevel = $"{declarations}\r\n{Others}".ReplaceLineEndings("\r\n");
         var prefix = $"Attribute VB_Name = \"Main\"\r\n{(optionExplicit ? "Option Explicit" : "' no Option Explicit")}\r\n{moduleLevel}\r\n{header}\r\n";
         var parse = new ModuleParser().Parse(new Uri("file:///c:/ws/Main.bas"), $"{prefix}{body.ReplaceLineEndings("\r\n")}\r\n{end}\r\n");
         Assert.IsTrue(parse.IsSuccess, string.Join("; ", parse.SyntaxErrors.Select(error => error.Verbose)));

@@ -69,6 +69,12 @@ public enum ExtractionRefusalKind
     WithTargetIsNotAVariable,
 
     /// <summary>
+    /// A local <c>Const</c> declared in the selection is used after it: the declaration would move into the new procedure, where the code after the call cannot
+    /// name it.
+    /// </summary>
+    ConstantUsedAfter,
+
+    /// <summary>
     /// A jump from outside the selection lands in it - a <c>GoTo</c>, a <c>Resume</c> to a label, an error into a handler written in it - or control enters it other
     /// than at its first statement (<strong>Extract Method §3.1</strong>). The labels move with the code, and a procedure's labels are its own.
     /// </summary>
@@ -256,6 +262,12 @@ public sealed record class ExtractionPlan(
 {
     /// <summary>Whether the selection is extracted: nothing refuses it.</summary>
     public bool IsExtractable => Refusals.IsEmpty;
+
+    /// <summary>
+    /// The local constants of the source procedure that the selection reads and does not declare: the new procedure declares each as the source does. A constant
+    /// is never passed - it is no variable - and its value is the same in both.
+    /// </summary>
+    public ImmutableArray<SemanticId> Constants { get; init; } = [];
 
     /// <summary>
     /// The parameters the new procedure may return instead: those it only gives a value to, which the call site can assign from it.

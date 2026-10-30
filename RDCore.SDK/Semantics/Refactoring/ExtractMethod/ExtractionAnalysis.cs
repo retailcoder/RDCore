@@ -56,6 +56,11 @@ public static class ExtractionAnalysis
         bool ReadsFromOutside(SemanticId variable, bool startsInside) => uses.Any(use => use.Variable == variable
             && reaching.ReachingBefore(use.Offset, variable).Any(definition => !region.Contains(definition.Offset) && !(startsInside && definition.Kind is VariableDefinitionKind.Entry)));
 
+        // a Dim does not give its variable its initial value again: a local is created and initialized once, with the invocation (MS-VBAL §2.3, procedure
+        // extent). One declared in a selection that can run again in the same activation - a
+        // loop around it, a jump back to it - starts with the value it was left with, and that comes from outside the new procedure.
+        var runsAgain = RunsAgain(region, states.Edges);
+
         var parameters = new List<ExtractionParameter>();
         var locals = new List<ExtractionLocal>();
         var movedOut = new List<SemanticId>();
@@ -66,8 +71,10 @@ public static class ExtractionAnalysis
         {
             if (variable == procedure)
             {
-                assignsResult |= definitions.Any(definition => definition.Variable == variable);
-                readsResult |= ReadsFromOutside(variable, startsInside: false);
+                // the result the selection may leave as it found it is read too: what it had before the selection is what the source procedure returns then.
+                var assigns = definitions.Any(definition => definition.Variable == variable);
+                assignsResult |= assigns;
+                readsResult |= ReadsFromOutside(variable, startsInside: false) || assigns && !AlwaysReplaces(region, states, live, accesses, variable, isResult: true);
                 continue;
             }
 
@@ -81,18 +88,24 @@ public static class ExtractionAnalysis
             var declaredInside = local is not VBParameterSymbol && !isUndeclared
                 && local.Range.Start >= selection.Range.Start && local.Range.End <= selection.Range.End;
 
-            // a variable declared in the selection starts with its initial value, which moves in with the declaration.
-            var input = ReadsFromOutside(variable, startsInside: declaredInside);
+            // a variable declared in the selection starts with its initial value, which moves in with the declaration - unless the selection runs again.
             var output = definitions.Any(definition => definition.Variable == variable) && liveAfter.Contains(variable);
+
+            // an output the selection may leave as it found it - written on some paths through it only - is an input as well: what it had before is what is read
+            // after it on the others (`x = 5`, then `If c Then x = 10`).
+            var input = ReadsFromOutside(variable, startsInside: declaredInside && !runsAgain)
+                        || output && !AlwaysReplaces(region, states, live, accesses, variable, isResult: false);
             var usedOutside = accesses.Uses.Any(use => use.Variable == variable && !region.Contains(use.Offset))
                 || accesses.Definitions.Any(definition => definition.Variable == variable && definition.Offset >= 0 && !region.Contains(definition.Offset));
 
-            // a Static's lifetime is the source procedure's: its declaration stays there, wherever it is used.
-            if (declaredInside && (usedOutside || local.IsStatic))
+            // a Static's lifetime is the source procedure's: its declaration stays there, wherever it is used. So does the declaration of a variable the new
+            // procedure is given, which it declares as its parameter.
+            if (declaredInside && (usedOutside || local.IsStatic || input || output || local is ParamArrayParameterSymbol))
             {
                 movedOut.Add(variable);
             }
 
+            // an undeclared variable has the type its name's DefType says, or Variant (MS-VBAL §5.2.3.1.5), which the new procedure declares it as.
             var type = local.ResolvedType;
             if (local is ParamArrayParameterSymbol)
             {
@@ -108,22 +121,125 @@ public static class ExtractionAnalysis
             else if (input || output)
             {
                 var (passing, reason) = PassingOf(type, input, output);
-                parameters.Add(new ExtractionParameter(variable, local.Name, isUndeclared ? null : type, passing, reason, input, output,
+                parameters.Add(new ExtractionParameter(variable, local.Name, type, passing, reason, input, output,
                     MayBeMissing: local is VBParameterSymbol { IsOptional: true, DefaultValue: null, ResolvedType: VBVariantType }, IsUndeclared: isUndeclared));
             }
             else if (!declaredInside || usedOutside)
             {
                 // nothing comes in or goes out: the new procedure has a local of its own, which takes the declaration when nothing else uses it.
-                locals.Add(new ExtractionLocal(variable, local.Name, isUndeclared ? null : type,
+                locals.Add(new ExtractionLocal(variable, local.Name, type,
                     MovesDeclaration: !usedOutside && local is not VBParameterSymbol && !isUndeclared, IsUndeclared: isUndeclared));
             }
         }
 
+        // the variable a With block names is given to the new procedure once, as the block's target, which the new procedure's own block names.
         var withTarget = WithTargetOf(selection, accesses.Instructions, model, refusals);
+        if (withTarget is { } target)
+        {
+            parameters.RemoveAll(parameter => parameter.Variable == target.Variable);
+        }
+
+        var constants = ConstantsOf(selection, accesses.Instructions, model, scopes, refusals);
         var (exits, jumps) = ExtractionControlFlow.Of(selection, graph);
         var (startsWithResumeNext, changes, errors) = ExtractionControlFlow.ErrorHandlingOf(region, states);
         return new ExtractionPlan(selection, [.. parameters], [.. locals], [.. movedOut], assignsResult, readsResult, withTarget, [.. jumps, .. errors, .. refusals],
-            [.. exits], startsWithResumeNext, [.. changes]);
+            [.. exits], startsWithResumeNext, [.. changes])
+        {
+            Constants = [.. constants],
+        };
+    }
+
+    // the local constants the selection reads: those declared outside it are declared again by the new procedure, and one it declares that the code after it reads
+    // cannot move with it.
+    private static List<SemanticId> ConstantsOf(
+        ExtractionSelection selection, InstructionList instructions, ProcedureSemanticModel model, ScopeTree scopes, List<ExtractionRefusal> refusals)
+    {
+        IEnumerable<(SyntaxNode Node, VBLocalConstantSymbol Constant)> ReadBy(IEnumerable<Instruction> where) => where
+            .Select(instruction => instruction.Node).OfType<StatementNode>()
+            .SelectMany(OwnExpressionsOf)
+            .Select(node => (Node: node, Fact: model.Expressions.TryGetValue(node.Identity, out var fact) ? fact : null))
+            .Where(read => read.Fact is { Classification: Semantics.ExpressionClassification.Constant, Binding: not null })
+            .Select(read => (read.Node, Constant: FlowSymbols.SymbolOf(scopes, read.Fact!.Binding!.Value) as VBLocalConstantSymbol))
+            .Where(read => read.Constant is not null)
+            .Select(read => (read.Node, read.Constant!));
+
+        var inside = ReadBy(selection.Region.Select(offset => instructions.Items[offset])).ToArray();
+        var after = ReadBy(instructions.Items.Where(instruction => !selection.Region.Contains(instruction.Offset))).ToArray();
+        bool DeclaredInside(VBLocalConstantSymbol constant) => constant.Range.Start >= selection.Range.Start && constant.Range.End <= selection.Range.End;
+
+        foreach (var (node, constant) in after.Where(read => DeclaredInside(read.Constant)).DistinctBy(read => read.Constant.SemanticId))
+        {
+            refusals.Add(new ExtractionRefusal(ExtractionRefusalKind.ConstantUsedAfter, node.SourceLocation, constant.Name));
+        }
+
+        return [.. inside.Select(read => read.Constant).Where(constant => !DeclaredInside(constant)).Select(constant => constant.SemanticId).Distinct()];
+    }
+
+    // the expressions of the statement itself, nested ones included: those of the statements of its blocks are theirs.
+    private static IEnumerable<SyntaxNode> OwnExpressionsOf(SyntaxNode node)
+        => node.Children.Where(child => child is not StatementNode).SelectMany(child => (IEnumerable<SyntaxNode>)[child, .. OwnExpressionsOf(child)]);
+
+    // whether every path through the selection, from its first instruction to where it leaves it for a place the variable is live at, replaces the whole of it:
+    // an instruction that raises has not completed, and replaces nothing on its error edge. The result of a function is no value of an activation an error ends,
+    // unless Resume Next goes on past its last instruction.
+    private static bool AlwaysReplaces(
+        IReadOnlySet<int> region, ErrorHandlingStates states, LiveVariables live, DefinitionsAndUses accesses, SemanticId variable, bool isResult)
+    {
+        var edges = states.Edges;
+        var exit = states.Graph.Exit;
+        var seen = new HashSet<int> { region.Min() };
+        var pending = new Stack<int>(seen);
+        while (pending.TryPop(out var node))
+        {
+            var replaces = accesses.DefinitionsAt(node).Any(definition => definition.Variable == variable && definition.IsComplete);
+            foreach (var edge in edges.SuccessorsOf(node).Where(edge => !(replaces && edge.Kind is not ControlFlowEdgeKind.Error)))
+            {
+                if (region.Contains(edge.To))
+                {
+                    if (seen.Add(edge.To))
+                    {
+                        pending.Push(edge.To);
+                    }
+
+                    continue;
+                }
+
+                var raisedToTheCaller = edge.Kind is ControlFlowEdgeKind.Error && edge.To == exit
+                    && !states.At(node).Any(state => state is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false });
+                if (live.IsLiveBefore(edge.To, variable) && !(isResult && raisedToTheCaller))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // whether control that leaves the selection can come back to it in the same activation.
+    private static bool RunsAgain(IReadOnlySet<int> region, FlowEdges edges)
+    {
+        var seen = new HashSet<int>();
+        var pending = new Stack<int>(region.SelectMany(node => edges.SuccessorsOf(node)).Select(edge => edge.To).Where(to => !region.Contains(to)).Distinct());
+        while (pending.TryPop(out var node))
+        {
+            if (region.Contains(node))
+            {
+                return true;
+            }
+
+            if (!seen.Add(node) || node >= edges.Count - 1)
+            {
+                continue;
+            }
+
+            foreach (var edge in edges.SuccessorsOf(node))
+            {
+                pending.Push(edge.To);
+            }
+        }
+
+        return false;
     }
 
     // arrays and variables of a Type are passed by reference only; a fixed-length string is passed as a String, by reference, so that what is written to it comes back.
