@@ -435,16 +435,6 @@ namespace RDCore.CLI {
         public static string Host_Edit_HandlerOfAnActiveProcedure => ResourceManager.GetString("Host_Edit_HandlerOfAnActiveProcedure", resourceCulture)!;
 
         /// <summary>
-        ///   Looks up a localized string similar to a local added to or removed from a procedure the program is in, which is not applied to a program that waits yet.
-        /// </summary>
-        public static string Host_Edit_LocalsOfAnActiveProcedure => ResourceManager.GetString("Host_Edit_LocalsOfAnActiveProcedure", resourceCulture)!;
-
-        /// <summary>
-        ///   Looks up a localized string similar to a field added to a class whose objects the program may hold, which is not applied to a program that waits yet.
-        /// </summary>
-        public static string Host_Edit_FieldOfAClass => ResourceManager.GetString("Host_Edit_FieldOfAClass", resourceCulture)!;
-
-        /// <summary>
         ///   Looks up a localized string similar to the signature of a procedure the program is in.
         /// </summary>
         public static string Host_Edit_SignatureOfAnActiveProcedure => ResourceManager.GetString("Host_Edit_SignatureOfAnActiveProcedure", resourceCulture)!;
@@ -485,9 +475,9 @@ namespace RDCore.CLI {
         public static string Host_Edit_OptionOfAnActiveModule => ResourceManager.GetString("Host_Edit_OptionOfAnActiveModule", resourceCulture)!;
 
         /// <summary>
-        ///   Looks up a localized string similar to a field added to a Type whose values the program may hold, which is not applied to a program that waits yet.
+        ///   Looks up a localized string similar to a Type whose values the program may hold, given other fields: its values keep the fields they have while the program is in progress, and the edit applies once the program is over - take the edit back to go on.
         /// </summary>
-        public static string Host_Edit_FieldOfAType => ResourceManager.GetString("Host_Edit_FieldOfAType", resourceCulture)!;
+        public static string Host_Edit_TypeHeldUntilRun => ResourceManager.GetString("Host_Edit_TypeHeldUntilRun", resourceCulture)!;
 
         /// <summary>
         ///   Looks up a localized string similar to a constant that sizes what a variable holds, given another value.

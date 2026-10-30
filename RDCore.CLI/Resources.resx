@@ -505,12 +505,6 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Host_Edit_HandlerOfAnActiveProcedure" xml:space="preserve">
     <value>the error handler of a procedure the program is in, or the statement its error was raised at</value>
   </data>
-  <data name="Host_Edit_LocalsOfAnActiveProcedure" xml:space="preserve">
-    <value>a local added to or removed from a procedure the program is in, which is not applied to a program that waits yet</value>
-  </data>
-  <data name="Host_Edit_FieldOfAClass" xml:space="preserve">
-    <value>a field added to a class whose objects the program may hold, which is not applied to a program that waits yet</value>
-  </data>
   <data name="Host_Edit_SignatureOfAnActiveProcedure" xml:space="preserve">
     <value>the signature of a procedure the program is in</value>
   </data>
@@ -518,7 +512,7 @@ Long Live the Cucumber (Latin)</comment>
     <value>a procedure the program is in, removed</value>
   </data>
   <data name="Host_Edit_LocalOfAnActiveProcedure" xml:space="preserve">
-    <value>a local of a procedure the program is in, given another type</value>
+    <value>a local of a procedure the program is in, given another type or made a Static</value>
   </data>
   <data name="Host_Edit_StoredValue" xml:space="preserve">
     <value>a variable or a field that holds a value, given another type or removed</value>
@@ -535,8 +529,8 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Host_Edit_OptionOfAnActiveModule" xml:space="preserve">
     <value>an option of the module the program is in, which is not applied to a program that waits yet</value>
   </data>
-  <data name="Host_Edit_FieldOfAType" xml:space="preserve">
-    <value>a field added to a Type whose values the program may hold, which is not applied to a program that waits yet</value>
+  <data name="Host_Edit_TypeHeldUntilRun" xml:space="preserve">
+    <value>a Type whose values the program may hold, given other fields: its values keep the fields they have while the program is in progress, and the edit applies once the program is over, and the project's values are reset then, as MS-VBA resets the project for this edit - take the edit back to go on</value>
   </data>
   <data name="Host_Edit_ValueThatSizesStoredData" xml:space="preserve">
     <value>a constant that sizes what a variable holds, given another value</value>

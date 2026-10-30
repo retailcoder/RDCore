@@ -45,8 +45,8 @@ public sealed class ObjectInstance(VBRuntimeObjectId objectId, VBClassModuleSymb
     /// <inheritdoc/>
     public IReadOnlyCollection<Symbol> StaticLocals => _staticLocals;
 
-    // the fields the object was given storage for: those of its class as it was when the object was created, which a field added to the class while the
-    // object lives is not one of, and a field removed from it still is.
+    // the fields the object was given storage for: those of its class as it was when the object was created, and those the class was given while the object
+    // lived (ISessionSymbols.ExtendLiveInstances). A field removed from the class still is one.
     internal IReadOnlyCollection<Symbol> Fields => _fields;
 
     /// <inheritdoc/>

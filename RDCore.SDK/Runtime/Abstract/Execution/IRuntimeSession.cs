@@ -397,6 +397,17 @@ public interface ISessionSymbols
     IObjectInstance CreateInstance(VBRuntimeObjectId objectId, VBClassModuleSymbol classModule);
 
     /// <summary>
+    /// Gives every live object each instance field its class declares now that the object has no storage for, at the field's default: a field added to
+    /// the class while the object lives - an edit made while the program waits.
+    /// </summary>
+    /// <remarks>
+    /// What <see cref="CreateInstance"/> allocates for a new object, allocated for one made before the edit. A field removed from the class keeps its
+    /// storage until the object is released: nothing names it any more.
+    /// </remarks>
+    /// <returns>How many fields were given, over every object.</returns>
+    int ExtendLiveInstances();
+
+    /// <summary>
     /// Gets the <see cref="IObjectInstance"/> registered for <paramref name="objectId"/>, if any —
     /// e.g. to resolve a member-access expression's target once <paramref name="objectId"/> is known
     /// from evaluating the object reference it was accessed through.

@@ -41,8 +41,19 @@ internal sealed class DefineSymbolsHandler(
             return Task.FromResult(new DefineSymbolsResult());
         }
 
+        // made against declarations a program in progress holds as they were: made again once the program is over, against them as they are declared - in
+        // the order the requests came in, the latest of each module and phase.
         var session = sessionProvider.Session;
+        var result = HeldDefinitions.Define(session, $"{request.ModuleName}|{request.DeclareTypesOnly}|{request.CodeOnly}", request.ModuleName,
+            loadsCode: !request.DeclareTypesOnly, () => Define(session, request), () => [.. Define(session, request).CodeErrors]);
 
+        // told once it is made: a statement typed at a stop from now on is given what the code as edited declares.
+        ProgramEdits.Edited(session);
+        return Task.FromResult(result);
+    }
+
+    private DefineSymbolsResult Define(IRuntimeSession session, DefineSymbolsParams request)
+    {
         ApplyDirectives(session, request);
 
         var unresolvedTypeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -98,7 +109,7 @@ internal sealed class DefineSymbolsHandler(
                 request.ModuleName, defined, replaced, merged, skipped.Count, unresolvedTypeNames.Count);
         }
 
-        return Task.FromResult(new DefineSymbolsResult
+        return new DefineSymbolsResult
         {
             Defined = defined,
             Replaced = replaced,
@@ -106,7 +117,7 @@ internal sealed class DefineSymbolsHandler(
             UnresolvedTypeNames = [.. unresolvedTypeNames],
             CodeErrors = loadErrors,
             MergedDefinitions = merged,
-        });
+        };
     }
 
     // what declares a type: a user-defined type, with its fields, and an enumeration, with its members (DefineSymbolsParams.DeclareTypesOnly).
@@ -290,13 +301,7 @@ internal sealed class DefineSymbolsHandler(
             return [];
         }
 
-        var errors = Load(session, request.ModuleName, module, parseResult);
-
-        // lowered against a variable a program in progress holds as it was: lowered again once the program is over, against the variable as it is declared,
-        // and what is wrong with it then said as it is said now.
-        var name = request.ModuleName;
-        HeldDefinitions.Loaded(session, name, () => session.Symbols.TryGetModule(name, out var current) ? Load(session, name, current, parseResult) : []);
-        return errors;
+        return Load(session, request.ModuleName, module, parseResult);
     }
 
     private ImmutableArray<string> Load(IRuntimeSession session, string name, VBModuleSymbol module, ModuleParseResult parseResult)
