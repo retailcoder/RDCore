@@ -228,7 +228,8 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[VBR00735](vbr00735.md)|Can't save file to TEMP — a file cannot be saved to the temporary directory|
 |[VBR00744](vbr00744.md)|Search text not found — the text searched for is not found|
 |[VBR00746](vbr00746.md)|Replacements too long — the replacement text is too long|
-|[VBR50001](vbr50001.md)|Nobody to answer — a program run unattended opens a dialog (untrappable; RD-VBA's own run-time errors are VBR50000-50999)|
+|[VBR50001](vbr50001.md)|Nobody to answer — a program run unattended opens a dialog, or the client that shows its dialogs declines one (untrappable; RD-VBA's own run-time errors are VBR50000-50999)|
+|[VBR50002](vbr50002.md)|Unusable dialog answer — the client that shows a program's dialogs answers one with what it can't be answered with, or can't be reached (untrappable)|
 
 ### Rubberduck Core diagnostics
 
