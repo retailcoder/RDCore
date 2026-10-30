@@ -143,10 +143,16 @@ public enum InstructionKind
     OnErrorGoTo,
 
     /// <summary>
-    /// <c>On Error GoTo 0</c> (or the undocumented VBA6/7 <c>On Error GoTo -1</c>) — disables the
-    /// activation's error-handling policy and clears any active error. Always falls through.
+    /// <c>On Error GoTo 0</c> (<strong>MS-VBAL §5.4.4.1</strong>): disables the activation's error-handling policy. Always falls through.
     /// </summary>
     OnErrorDisable,
+
+    /// <summary>
+    /// <c>On Error GoTo -1</c>, which MS-VBAL does not specify and MS-VBA compiles: ends the error the activation's handler is handling, and keeps the
+    /// error-handling policy - an <c>On Error GoTo</c> label is the handler of the next error again (MS-VBA, Excel-verified, oracle\s53 A05, C04). Always falls
+    /// through.
+    /// </summary>
+    OnErrorReset,
 
     /// <summary>
     /// <c>On Error Resume Next</c> (<strong>MS-VBAL §5.4.4.1</strong>): sets the activation's

@@ -269,7 +269,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             InstructionKind.GoSubTable => ExecuteJumpTable(session, context, instruction, activation, pushReturn: true),
             InstructionKind.Jump or InstructionKind.ExitLoop or InstructionKind.GoSub or InstructionKind.Return or InstructionKind.ExitProcedure
                 or InstructionKind.Halt or InstructionKind.Break or InstructionKind.OnErrorGoTo or InstructionKind.OnErrorDisable
-                or InstructionKind.OnErrorResumeNext or InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext
+                or InstructionKind.OnErrorReset or InstructionKind.OnErrorResumeNext or InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext
                 or InstructionKind.ResumeLabel => null,
             _ => RuntimeExecutionOutcome.InternalError,
         };
@@ -524,6 +524,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                     break;
 
                 case InstructionKind.OnErrorDisable:
+                case InstructionKind.OnErrorReset:
                     activation.ErrorHandler = ErrorHandlerState.Disabled;
                     // On Error GoTo 0 / On Error GoTo -1 is an On Error statement too, and §6.1.3.2.1
                     // makes no exception for it.
