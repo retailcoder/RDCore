@@ -921,8 +921,6 @@ public sealed class EditAndContinueTests
     // the Type held while the program waited is applied with a reset of the project, as MS-VBA resets it for this edit: run again, a Static of the Type starts
     // from its default, with the field it was given.
     [TestMethod]
-    [Ignore("a Static declared as another type keeps the storage it was given, under the identity it was given it as, which a reset of the project does not reach: "
-        + "the redefinition of its procedure has to retire it")]
     public async Task ATypeHeldWhileTheProgramWaited_ResetsTheProject_AStaticOfIt_StartsAgain()
     {
         var program = Lines(
