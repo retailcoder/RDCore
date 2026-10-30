@@ -301,14 +301,19 @@ public static class InstructionListLowering
     }
 
     // MS-VBAL §5.4.4.1 carves the line-number-label 0 out as a sentinel ("error handling disabled"), not
-    // a label to resolve; real-world VBA also accepts -1 the same way (OnErrorGoToStatementNode's own doc
-    // already anticipated both). Neither sentinel gets a PendingJumps entry - OnErrorDisable needs no
-    // Target at all, it always means "disable, right now."
+    // a label to resolve; MS-VBA also takes -1, which ends the error being handled and keeps the policy
+    // (OnErrorReset). Neither sentinel gets a PendingJumps entry: neither has a Target.
     private static void LowerOnErrorGoTo(OnErrorGoToStatementNode onErrorGoTo, LoweringState state, LoweringScope scope)
     {
-        if (LabelOperands.IsIntegerConstant(onErrorGoTo.LabelExpression, 0) || LabelOperands.IsIntegerConstant(onErrorGoTo.LabelExpression, -1))
+        if (LabelOperands.IsIntegerConstant(onErrorGoTo.LabelExpression, 0))
         {
             Emit(state, scope, onErrorGoTo, InstructionKind.OnErrorDisable);
+            return;
+        }
+
+        if (LabelOperands.IsIntegerConstant(onErrorGoTo.LabelExpression, -1))
+        {
+            Emit(state, scope, onErrorGoTo, InstructionKind.OnErrorReset);
             return;
         }
 

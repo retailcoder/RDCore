@@ -269,7 +269,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             InstructionKind.GoSubTable => ExecuteJumpTable(session, context, instruction, activation, pushReturn: true),
             InstructionKind.Jump or InstructionKind.ExitLoop or InstructionKind.GoSub or InstructionKind.Return or InstructionKind.ExitProcedure
                 or InstructionKind.Halt or InstructionKind.Break or InstructionKind.OnErrorGoTo or InstructionKind.OnErrorDisable
-                or InstructionKind.OnErrorResumeNext or InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext
+                or InstructionKind.OnErrorReset or InstructionKind.OnErrorResumeNext or InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext
                 or InstructionKind.ResumeLabel => null,
             _ => RuntimeExecutionOutcome.InternalError,
         };
@@ -517,22 +517,31 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                     {
                         return RuntimeExecutionOutcome.InternalError;
                     }
-                    activation.ErrorHandler = new ErrorHandlerState(ErrorHandlingMode.GoTo, handlerTarget, null, null);
+                    activation.ErrorHandler = PolicyOf(activation.ErrorHandler, ErrorHandlingMode.GoTo, handlerTarget);
                     // MS-VBAL §6.1.3.2.1: an On Error statement clears the Err object.
                     session.Errors.Clear();
                     activation.Pc = instruction.Offset + 1;
                     break;
 
                 case InstructionKind.OnErrorDisable:
-                    activation.ErrorHandler = ErrorHandlerState.Disabled;
-                    // On Error GoTo 0 / On Error GoTo -1 is an On Error statement too, and §6.1.3.2.1
-                    // makes no exception for it.
+                    activation.ErrorHandler = PolicyOf(activation.ErrorHandler, ErrorHandlingMode.Disabled, null);
+                    // On Error GoTo 0 is an On Error statement too, and §6.1.3.2.1 makes no exception for it.
+                    session.Errors.Clear();
+                    activation.Pc = instruction.Offset + 1;
+                    break;
+
+                case InstructionKind.OnErrorReset:
+                    // On Error GoTo -1 ends the error being handled, and keeps the policy: in a handler, the one it is to have after it - the On Error GoTo
+                    // label it caught the error with, unless it said otherwise - and Resume has nothing to resume (MS-VBA, oracle\s53 A05, C04).
+                    activation.ErrorHandler = activation.ErrorHandler.IsHandling
+                        ? activation.ErrorHandler.HandlingOver()
+                        : activation.ErrorHandler with { ActiveError = null, FaultStatementOffset = null };
                     session.Errors.Clear();
                     activation.Pc = instruction.Offset + 1;
                     break;
 
                 case InstructionKind.OnErrorResumeNext:
-                    activation.ErrorHandler = new ErrorHandlerState(ErrorHandlingMode.ResumeNext, null, null, null);
+                    activation.ErrorHandler = PolicyOf(activation.ErrorHandler, ErrorHandlingMode.ResumeNext, null);
                     session.Errors.Clear();
                     activation.Pc = instruction.Offset + 1;
                     break;
@@ -640,6 +649,14 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             activation.WaitsAfterPc = false;
         }
     }
+
+    // what an On Error statement makes the activation's policy. In a handler it is the policy once the handler is over, and nothing more: the error is still the
+    // one being handled, which a Resume still resumes, and a second error in the handler still goes to the caller (MS-VBA, Excel-verified, oracle\s53 A02-A04,
+    // A08, A09, C01-C03). Anywhere else, it is the policy from now on.
+    private static ErrorHandlerState PolicyOf(ErrorHandlerState current, ErrorHandlingMode mode, int? target)
+        => current.IsHandling
+            ? current with { HandlerTarget = target, AfterHandling = mode }
+            : new ErrorHandlerState(mode, target, null, null);
 
     // MS-VBAL §6.1.3.2.1: Exit Sub, Exit Function and Exit Property clear Err. In MS-VBA, reaching the end of the body does too, and either does only from
     // within an error handler - an error On Error GoTo caught: one On Error Resume Next went on past is still Err when the procedure returns (recorded in
@@ -1529,8 +1546,10 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
             case ErrorHandlingMode.GoTo:
                 // Catching via GoTo resets the activation's own policy to Default - an unhandled second
-                // error inside the handler body itself propagates rather than re-entering the handler.
-                activation.ErrorHandler = new ErrorHandlerState(ErrorHandlingMode.Disabled, null, outcome.ErrorInfo, faultOffset, HandlerEntry: handler.HandlerTarget);
+                // error inside the handler body itself propagates rather than re-entering the handler. What it is to be once the handler is over is the
+                // same label, until the handler says otherwise (ErrorHandlerState.AfterHandling).
+                activation.ErrorHandler = new ErrorHandlerState(ErrorHandlingMode.Disabled, handler.HandlerTarget, outcome.ErrorInfo, faultOffset,
+                    HandlerEntry: handler.HandlerTarget, AfterHandling: ErrorHandlingMode.GoTo);
                 activation.Pc = handler.HandlerTarget!.Value;
                 return null;
 
@@ -1551,10 +1570,11 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
         }
 
         // MS-VBAL §5.4.4.1: the policy an On Error GoTo set is still to go to its label - catching an error only made it the handler's to run, which an
-        // error inside it does not re-enter. The Resume ends the handler: the next error goes to the label again (MS-VBA, grid oracle\s16 W03).
+        // error inside it does not re-enter. The Resume ends the handler: the next error goes to the label again (MS-VBA, grid oracle\s16 W03), or where an
+        // On Error statement in the handler said it goes after it (oracle\s53 C01-C03).
         var resumed = activation.ErrorHandler;
-        activation.ErrorHandler = resumed is { Mode: ErrorHandlingMode.Disabled, HandlerEntry: { } handler }
-            ? new ErrorHandlerState(ErrorHandlingMode.GoTo, handler, null, null)
+        activation.ErrorHandler = resumed.IsHandling
+            ? resumed.HandlingOver()
             : resumed with { ActiveError = null, FaultStatementOffset = null, HandlerEntry = null };
         activation.Pc = instruction.Kind switch
         {
