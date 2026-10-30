@@ -198,8 +198,11 @@ public sealed class RDCorePlatformJsonWireTests
             Reach(message, reached);
         }
 
+        // the client logic sends and answers messages, and is none.
+        Type[] notMessages = [typeof(RDCorePlatformClient)];
+
         var unreached = typeof(RDCorePlatformJson).Assembly.GetExportedTypes()
-            .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !reached.Contains(type))
+            .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !notMessages.Contains(type) && !reached.Contains(type))
             .Select(type => type.FullName)
             .ToList();
 
