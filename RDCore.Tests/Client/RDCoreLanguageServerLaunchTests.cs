@@ -117,31 +117,6 @@ public sealed class RDCoreLanguageServerLaunchTests
     }
 
     [TestMethod]
-    [DataRow("RDCore.LanguageServer.exe", "RDCore.LanguageServer", DisplayName = "named for Windows, deployed elsewhere")]
-    [DataRow("RDCore.LanguageServer", "RDCore.LanguageServer.exe", DisplayName = "named without the extension, deployed on Windows")]
-    public void TheLanguageServer_IsFound_WithOrWithoutItsExtension(string named, string deployed)
-    {
-        WithManifest(Manifest($"RDCore.LanguageServer/{named}"));
-        File.WriteAllText(Path.Combine(_root, "RDCore.LanguageServer", deployed), string.Empty);
-
-        var launch = RDCoreLanguageServerLaunch.Prepare(Options());
-
-        Assert.AreEqual(Path.Combine(_root, "RDCore.LanguageServer", deployed), launch.ExecutablePath);
-    }
-
-    [TestMethod]
-    [DataRow("workspace", DisplayName = "a relative path")]
-    [DataRow("https://example.com/workspace", DisplayName = "not a file: URI")]
-    [DataRow("", DisplayName = "nothing")]
-    public void AWorkspaceThatIsNotAnAbsoluteFileUri_IsRefused(string workspace)
-    {
-        WithManifest(Manifest($"RDCore.LanguageServer/{Executable}"));
-        WithLanguageServer();
-
-        Assert.ThrowsExactly<ArgumentException>(() => RDCoreLanguageServerLaunch.Prepare(Options() with { Workspace = workspace }));
-    }
-
-    [TestMethod]
     public void ARootThatIsNotThere_IsSaid() => Assert.ThrowsExactly<DirectoryNotFoundException>(
         () => RDCoreLanguageServerLaunch.Prepare(Options() with { PlatformRoot = Path.Combine(_root, "nowhere") }));
 

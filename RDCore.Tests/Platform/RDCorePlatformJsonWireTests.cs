@@ -198,8 +198,8 @@ public sealed class RDCorePlatformJsonWireTests
             Reach(message, reached);
         }
 
-        // the client logic sends and answers messages, and is none.
-        Type[] notMessages = [typeof(RDCorePlatformClient)];
+        // the client logic sends and answers messages, and is none; the pre-launch preparation is local to the client, and the manifest is a file of the platform root.
+        Type[] notMessages = [typeof(RDCorePlatformClient), typeof(RDCoreLanguageServerLaunch), typeof(RDCoreLanguageServerLaunchOptions), typeof(PlatformManifest)];
 
         var unreached = typeof(RDCorePlatformJson).Assembly.GetExportedTypes()
             .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !notMessages.Contains(type) && !reached.Contains(type))

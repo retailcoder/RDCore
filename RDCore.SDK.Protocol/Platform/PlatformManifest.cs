@@ -13,20 +13,20 @@ public record class PlatformManifest
     public const string FileName = "rdcore.json";
 
     /// <summary>The version of the deployed platform.</summary>
-    public string PlatformVersion { get; init; } = string.Empty;
+    public string PlatformVersion { get; set; } = string.Empty;
 
     /// <summary>When the manifest was written, in UTC.</summary>
-    public DateTime GeneratedUtc { get; init; } = default;
+    public DateTime GeneratedUtc { get; set; } = default;
 
     /// <summary>The folder of the platform's extensions: one subfolder each, named for the extension.</summary>
-    public string ExtensionsDirectory { get; init; } = string.Empty;
+    public string ExtensionsDirectory { get; set; } = string.Empty;
 
     /// <summary>The executable of the environment host: <c>rdc.exe</c>, which runs in host mode for it.</summary>
-    public string HostService { get; init; } = string.Empty;
+    public string HostService { get; set; } = string.Empty;
 
     /// <summary>The executable of the language server, which a client starts and connects to.</summary>
-    public string LangService { get; init; } = string.Empty;
+    public string LangService { get; set; } = string.Empty;
 
     /// <summary>The executable of the parse server.</summary>
-    public string ParseServer { get; init; } = string.Empty;
+    public string ParseServer { get; set; } = string.Empty;
 }
