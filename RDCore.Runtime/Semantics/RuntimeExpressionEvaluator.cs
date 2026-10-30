@@ -1591,6 +1591,11 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
                 string.Format(Exceptions.VBIndex_NothingToIndex_Verbose, calleeValue?.TypeInfo.Name)));
         }
 
+        if (IsTheArrayItself(session, context, indexExpression))
+        {
+            return calleeResult;
+        }
+
         if (EvaluateSubscripts(session, context, indexExpression.Arguments, out var subscripts, out var subscriptsKnown) is { } subscriptFailure)
         {
             return subscriptFailure;
@@ -1629,6 +1634,16 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
                 : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.SubscriptOutOfRange, expression.Location,
                     string.Join(", ", subscripts)));
     }
+
+    // MS-VBAL 5.6.13.1: an empty argument list, of an array declared as one that was not already given one, is the array itself - `f()` is `f`.
+    private static bool IsTheArrayItself(IRuntimeSession session, RuntimeEvaluationContext context, IndexExpressionNode indexExpression)
+        => IndexExpressionNode.IsEmptyArgumentList(indexExpression.Arguments)
+            && !(indexExpression.Callee is IndexExpressionNode given && IndexExpressionNode.IsEmptyArgumentList(given.Arguments))
+            && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is VBArrayType;
+
+    // the array `f()` is, as the expression that names it - `f` - so that it is the variable `f` is; any other expression as it is.
+    private static ExpressionNode TheArrayItself(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression)
+        => expression is IndexExpressionNode whole && IsTheArrayItself(session, context, whole) ? whole.Callee : expression;
 
     // whether what an index expression indexes is a variable declared As New - an array of automatic instantiation variables - named bare: a local, a field of
     // the module, or of the object whose code this is.
@@ -2473,6 +2488,9 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     {
         reference = VBRuntimeReference.NullRef;
         evaluated = null;
+
+        // `f()` is the array itself (MS-VBAL §5.6.13.1), passed by reference as `f` is.
+        argument = TheArrayItself(session, context, argument);
 
         // an element of an array is a variable (MS-VBAL §5.6.13.1), passed by reference as one: MS-VBA writes what the callee assigns to the element, and the
         // array is locked for as long as the call runs (ICallStackFrame.LocksArray). A Declare is given the element where it is in the array: the reference
