@@ -50,6 +50,34 @@ public sealed class IndexExpressionStaticSemanticsTests
         Assert.AreEqual(VBLongType.TypeInfo, result.Result);
     }
 
+    // MS-VBAL 5.6.13.1: an empty argument list of an array is the array itself, written either way the parser reads it - none, or `()`.
+    [TestMethod]
+    [DataRow(false, DisplayName = "no argument")]
+    [DataRow(true, DisplayName = "the parentheses of f()")]
+    public void ArrayCallee_WithAnEmptyArgumentList_IsTheArray(bool parenthesized)
+    {
+        var array = new VBFixedSizeArrayType(VBLongType.TypeInfo);
+        ExpressionNode[] arguments = parenthesized ? [new MissingArgumentNode(new(TestUri.TestModuleUri().AbsolutePath, [52]), TestLocations.TestLocation)] : [];
+
+        var result = IndexExpressionStaticSemantics.Instance.DetermineDeclaredType(Context, IndexOf("data", arguments), array);
+
+        Assert.IsTrue(result.IsSuccess, result.ErrorInfo?.Description);
+        Assert.AreEqual(array, result.Result);
+    }
+
+    // the array was already given its empty argument list: `f()()` is not the array a second time.
+    [TestMethod]
+    public void ArrayCallee_GivenAnEmptyArgumentListAlready_IsNotTheArrayAgain()
+    {
+        var array = new VBFixedSizeArrayType(VBLongType.TypeInfo);
+        var once = new IndexExpressionNode(new(TestUri.TestModuleUri().AbsolutePath, [53]), TestLocations.TestLocation, NameOf("data"), []);
+        var twice = new IndexExpressionNode(new(TestUri.TestModuleUri().AbsolutePath, [54]), TestLocations.TestLocation, once, []);
+
+        var result = IndexExpressionStaticSemantics.Instance.DetermineDeclaredType(Context, twice, array);
+
+        Assert.AreNotEqual(array, result.Result);
+    }
+
     [TestMethod]
     public void VariantCallee_IsLateBound_SucceedsAsVariant()
     {
