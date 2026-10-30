@@ -99,6 +99,7 @@ public sealed class ChildConnection(
     private int _restartCount;
     private NamedPipeClientStream? _pipe;
     private LanguageClient? _client;
+    private OmniSharpPlatformChannel? _channel;
     private volatile bool _shuttingDown;
     private bool _disposed;
 
@@ -121,6 +122,12 @@ public sealed class ChildConnection(
     /// The live language client. Throws until the connection is <see cref="ConnectionStateValue.Ready"/>.
     /// </summary>
     public ILanguageClient Client => _client ?? throw new InvalidOperationException($"The connection is {State.Value}, not Ready.");
+
+    /// <summary>
+    /// The live language client as a channel of the platform protocol (<see cref="RDCorePlatformClient"/>). Throws until the connection is
+    /// <see cref="ConnectionStateValue.Ready"/>.
+    /// </summary>
+    public IRDCorePlatformChannel Channel => _channel ?? throw new InvalidOperationException($"The connection is {State.Value}, not Ready.");
 
     /// <summary>
     /// Raised on every state transition.
@@ -331,13 +338,10 @@ public sealed class ChildConnection(
         Transition(ConnectionState.Initializing);
         _client?.Dispose();
         _client = await LanguageClient.From(ConfigureClientOptions, ct);
+        _channel = new OmniSharpPlatformChannel(_client, logger, _request.ExpectedComponent.ToString());
 
         // non-LSP platform handshake: the child's advertised capabilities become "provided" ones.
-        PlatformInfo = await SendRequestAsync<PlatformInitializeParams, PlatformInitializeResult>(new PlatformInitializeParams
-        {
-            ExpectedComponent = _request.ExpectedComponent,
-            Expected = _request.ExpectedCapabilities,
-        }, ct);
+        PlatformInfo = await new RDCorePlatformClient(_channel).InitializeAsync(_request.ExpectedComponent, _request.ExpectedCapabilities, ct);
         logger.LogInformation("Platform handshake with {Component}: provides {Provided}",
             PlatformInfo.Component, PlatformInfo.Provided);
 

@@ -51,7 +51,7 @@ public sealed class PlatformEnvironment : IPlatformEnvironment
     /// Name of the environment variable that overrides the derived root. Set on the entry process;
     /// inherited by spawned children.
     /// </summary>
-    public const string RootEnvironmentVariable = "RDCORE_PLATFORM_ROOT";
+    public const string RootEnvironmentVariable = Client.RDCoreLanguageServerLaunch.PlatformRootEnvironmentVariable;
 
     /// <summary>
     /// Name of the folder of the platform root that holds the descriptions of the libraries a project can reference
@@ -97,7 +97,7 @@ public sealed class PlatformEnvironment : IPlatformEnvironment
             ? _fileSystem.Path.GetFullPath(overridden)
             : _fileSystem.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RDCore");
 
-    public string ManifestPath => _fileSystem.Path.Combine(Root, "rdcore.json");
+    public string ManifestPath => _fileSystem.Path.Combine(Root, PlatformManifest.FileName);
 
     public string LogsDirectory
     {

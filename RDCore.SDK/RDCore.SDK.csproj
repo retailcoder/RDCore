@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ApplicationIcon>logo.ico</ApplicationIcon>
     <Authors>9562-7303 Québec inc.</Authors>
-    <Copyright>Copyright © 2026 ${Authors}</Copyright>
+    <Copyright>Copyright © 2026 $(Authors)</Copyright>
     <Product>RDCore</Product>
   </PropertyGroup>
 
@@ -41,6 +41,10 @@
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
     <PackageReference Include="System.IO.Abstractions" Version="22.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RDCore.SDK.Protocol\RDCore.SDK.Protocol.csproj" />
   </ItemGroup>
 
   <ItemGroup>

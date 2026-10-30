@@ -35,15 +35,35 @@ public readonly record struct SourcePosition(int Line, int Character) :
         anchor.Line + Line,
         Line == 0 ? anchor.Character + Character : Character);
 
+    /// <summary>
+    /// Compares two positions in document order: by line, then by character within the line.
+    /// </summary>
+    /// <param name="other">The position to compare with.</param>
+    /// <returns>Less than zero when this position comes before <paramref name="other"/>, zero when they are the same, greater than zero when it comes after.</returns>
     public int CompareTo(SourcePosition other) =>
         Line != other.Line ? Line.CompareTo(other.Line) : Character.CompareTo(other.Character);
 
+    /// <summary>Whether <paramref name="left"/> comes before <paramref name="right"/> in the document.</summary>
     public static bool operator <(SourcePosition left, SourcePosition right) => left.CompareTo(right) < 0;
+
+    /// <summary>Whether <paramref name="left"/> comes after <paramref name="right"/> in the document.</summary>
     public static bool operator >(SourcePosition left, SourcePosition right) => left.CompareTo(right) > 0;
+
+    /// <summary>Whether <paramref name="left"/> comes before <paramref name="right"/> in the document, or is the same position.</summary>
     public static bool operator <=(SourcePosition left, SourcePosition right) => left.CompareTo(right) <= 0;
+
+    /// <summary>Whether <paramref name="left"/> comes after <paramref name="right"/> in the document, or is the same position.</summary>
     public static bool operator >=(SourcePosition left, SourcePosition right) => left.CompareTo(right) >= 0;
 
+    /// <summary>
+    /// The component-wise sum of two positions: lines added to lines, characters to characters.
+    /// </summary>
+    /// <remarks>👉 Not a translation into a document's coordinates: <see cref="AnchoredAt"/> is.</remarks>
     public static SourcePosition operator +(SourcePosition left, SourcePosition right) => new(left.Line + right.Line, left.Character + right.Character);
+
+    /// <summary>
+    /// The component-wise difference of two positions: lines from lines, characters from characters.
+    /// </summary>
     public static SourcePosition operator -(SourcePosition left, SourcePosition right) => new(left.Line - right.Line, left.Character - right.Character);
 
     /// <summary>
@@ -54,6 +74,11 @@ public readonly record struct SourcePosition(int Line, int Character) :
     /// </remarks>
     /// <returns>Line/Character position in a <c>L0C0</c> notation</returns>
     public override string ToString() => $"L{Line}C{Character}";
+
+    /// <summary>Whether two positions are the same line and the same character.</summary>
+    /// <param name="other">The position to compare with.</param>
     public bool Equals(SourcePosition other) => other.Line == Line && other.Character == Character;
+
+    /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(Line, Character);
 }

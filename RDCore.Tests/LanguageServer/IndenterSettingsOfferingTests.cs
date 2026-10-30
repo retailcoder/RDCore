@@ -311,7 +311,7 @@ public sealed class IndenterSettingsOfferingTests
         extensions.Discover().Returns([]);
         var settings = new PlatformSettings(new MockFileSystem(), environment, extensions);
         var handler = new RubberduckIndenterSettingsApplyHandler(settings, Substitute.For<ILiveSettings>(), new LiveSettingsNotifier(_ => Task.CompletedTask));
-        var result = await handler.Handle(new RubberduckIndenterSettingsApplyParams
+        var result = await handler.Handle(new RubberduckIndenterSettingsApplyRequest
         {
             Source = RubberduckIndenterSettingsSource.RubberduckConfig,
             Settings = new Dictionary<string, string>

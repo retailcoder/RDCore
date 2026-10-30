@@ -24,13 +24,14 @@ VBA n'est pas qu'un runtime vieillissant - c'est aussi une _spécification de la
 ---
 ## 🚀 Architecture
 
-- **La librairie RDCore.SDK** est sous licence  **⚖️MIT**;
+- **Les librairies RDCore.SDK et RDCore.SDK.Protocol** sont sous licence  **⚖️MIT**;
 - **Tout le reste** construit par-dessus, est sous licence **⚖️GPLv3**.
 
 ![Survol de la Solution RDCore](images/solution-overview.png)
 
 RDCore est constitué de :
 - **RDCore.SDK** (MIT) définit le _coeur de langage_ : syntaxe, symboles, modèle sémantique, système de typage, etc.
+- **RDCore.SDK.Protocol** (MIT) est ce qu'un client parle à la plateforme : ses messages `rdcore/*`, la poignée de main, et comment démarrer le serveur de langage, avec la seule bibliothèque de base .NET.
 - **RDCore.Runtime** (GPLv3) implémente les abstractions définies par le SDK autour des sémantiques run-time, la librairie standard, etc.
 - **Hôtes** (GPLv3) incluant un client CLI (rdc.exe), un serveur LSP et les applications satellites lui permettant de manipuler et de comprendre le langage (parser, diagnostics, etc.).
 

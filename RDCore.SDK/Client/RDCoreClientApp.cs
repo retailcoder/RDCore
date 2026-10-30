@@ -27,6 +27,13 @@ public interface IRDCoreClientApp : IRDCoreApp
 {
     Task<TResult> SendRequestAsync<TParams, TResult>(TParams request, CancellationToken token) where TParams : IRequest<TResult>;
     Task SendNotificationAsync<TParams>(TParams notification, CancellationToken token) where TParams : IRequest;
+
+    /// <summary>
+    /// The connection to the server as a channel of the platform protocol: what <see cref="RDCorePlatformClient"/> speaks through, as any client of the platform does.
+    /// Throws until the connection is ready.
+    /// </summary>
+    IRDCorePlatformChannel Channel { get; }
+
     /// <summary>
     /// Says to the server that the live settings changed (<c>workspace/didChangeConfiguration</c>): it asks for them (<c>workspace/configuration</c>), and is
     /// answered with what this component hands down (<see cref="ILiveSettings.Current"/>).
@@ -133,6 +140,9 @@ public abstract class RDCoreClientApp : IRDCoreClientApp
 
     public Task SendNotificationAsync<TParams>(TParams notification, CancellationToken token) where TParams : IRequest
         => Connection.SendNotificationAsync(notification, token);
+
+    /// <inheritdoc/>
+    public IRDCorePlatformChannel Channel => Connection.Channel;
 
     // the server asks for the section it wants (LSP's pull model).
     public Task NotifyLiveSettingsChangedAsync(CancellationToken token) => SendNotificationAsync(LiveSettingsProtocol.Changed, token);

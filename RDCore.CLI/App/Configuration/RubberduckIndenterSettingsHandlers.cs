@@ -10,11 +10,11 @@ namespace RDCore.CLI.App.Configuration;
 /// Rubberduck keeps them (<see cref="RubberduckIndenterSettingsReader"/>) and says them as they are - on Windows; elsewhere it found none.
 /// </summary>
 /// <param name="reader">Reads Rubberduck's settings.</param>
-internal sealed class RubberduckIndenterSettingsHandler(RubberduckIndenterSettingsReader reader) : IJsonRpcRequestHandler<RubberduckIndenterSettingsParams, RubberduckIndenterSettingsResult>
+internal sealed class RubberduckIndenterSettingsHandler(RubberduckIndenterSettingsReader reader) : IJsonRpcRequestHandler<RubberduckIndenterSettingsRequest, RubberduckIndenterSettingsReply>
 {
     /// <inheritdoc/>
-    public Task<RubberduckIndenterSettingsResult> Handle(RubberduckIndenterSettingsParams request, CancellationToken cancellationToken)
-        => Task.FromResult(reader.Read());
+    public Task<RubberduckIndenterSettingsReply> Handle(RubberduckIndenterSettingsRequest request, CancellationToken cancellationToken)
+        => Task.FromResult(new RubberduckIndenterSettingsReply(reader.Read()));
 }
 
 /// <summary>
@@ -31,10 +31,10 @@ internal sealed record class LiveSettingsNotifier(Func<CancellationToken, Task> 
 /// <param name="liveSettings">The shell's own live settings.</param>
 /// <param name="notifier">Tells the language server the live settings changed.</param>
 internal sealed class RubberduckIndenterSettingsApplyHandler(IPlatformSettings settings, ILiveSettings liveSettings, LiveSettingsNotifier notifier)
-    : IJsonRpcRequestHandler<RubberduckIndenterSettingsApplyParams, RubberduckIndenterSettingsApplyResult>
+    : IJsonRpcRequestHandler<RubberduckIndenterSettingsApplyRequest, RubberduckIndenterSettingsApplyResult>
 {
     /// <inheritdoc/>
-    public async Task<RubberduckIndenterSettingsApplyResult> Handle(RubberduckIndenterSettingsApplyParams request, CancellationToken cancellationToken)
+    public async Task<RubberduckIndenterSettingsApplyResult> Handle(RubberduckIndenterSettingsApplyRequest request, CancellationToken cancellationToken)
     {
         // the server asks for the settings of an import and for no others: a client owns its configuration, and this is no channel to write any of it.
         var result = IndenterSettingsImport.ApplyTo(settings.Store, request.Settings);
