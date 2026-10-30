@@ -208,6 +208,8 @@ internal sealed class PlatformDebugWorkspace(
             EntryPoint = entryPoint,
             Debug = true,
             StreamOutput = true,
+            Unattended = services.GetService(typeof(RDCore.SDK.Server.Services.IPlatformClientCapabilitiesService))
+                is RDCore.SDK.Server.Services.IPlatformClientCapabilitiesService expected && expected.Expects(capabilities => capabilities.Unattended),
         }, token);
     }
 

@@ -47,6 +47,15 @@ internal sealed class RuntimeSession(
     public ISessionRandomNumberGenerator RandomNumbers { get; init; } = new SessionRandomNumberGenerator();
     public ICallStack CallStack { get; init; } = callStack;
     public ISessionHalt Halt { get; init; } = halt;
+
+    // set by the run's start, on the request's thread, and read by the program's dialogs, on its own.
+    private volatile bool _runsUnattended;
+
+    public bool RunsUnattended
+    {
+        get => _runsUnattended;
+        set => _runsUnattended = value;
+    }
     public IReadOnlyList<ReferencePriorityInfo> References { get; init; } = references;
     public IRuntimeOutput Output { get; init; } = output;
     public RDCore.SDK.Runtime.Libraries.ILibrarySource? Libraries { get; init; }

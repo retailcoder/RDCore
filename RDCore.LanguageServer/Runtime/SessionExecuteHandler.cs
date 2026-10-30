@@ -81,6 +81,9 @@ internal sealed class SessionExecuteHandler(
             EntryPoint = request.EntryPoint,
             Debug = request.Debug,
             Immediate = request.Immediate,
+
+            // nobody answers the dialogs of a client that runs unattended: a dialog fails the run.
+            Unattended = clientCapabilities.Expects(capabilities => capabilities.Unattended),
         }, token);
 
         if (logger.IsEnabled(LogLevel.Information))

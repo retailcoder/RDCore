@@ -1812,6 +1812,15 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to {0} in a program run unattended (--unattended): nobody is there to answer it, and the run fails..
+        /// </summary>
+        public static string VBRuntimeError_NobodyToAnswer_Verbose {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_NobodyToAnswer_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to This For loop counts in {0}, and its start, end or step is not a value of that type..
         /// </summary>
         public static string VBForLoopOperandNotOfLoopType_Verbose {
