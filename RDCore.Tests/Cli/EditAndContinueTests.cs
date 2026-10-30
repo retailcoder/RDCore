@@ -1067,6 +1067,106 @@ public sealed class EditAndContinueTests
         CollectionAssert.AreEqual(new[] { "T=1" }, Output(again));
     }
 
+    // a procedure whose Static the next run counts: it prints the Static's type and how often it was called.
+    private static string Counting(string type) => Lines(
+        "Option Explicit",
+        "Public Sub Main()",
+        "    Stop",
+        "    Count",
+        "End Sub",
+        "Public Sub Count()",
+        $"    Static S As {type}",
+        "    S = S + 1",
+        "    Debug.Print TypeName(S) & \" \" & S",
+        "End Sub");
+
+    // a Static given another type is a variable of the type it is declared as from then on, as a module variable is: what it held, as it was, is let go of -
+    // when it is edited while no program is in progress, or once the program it was edited under is over, however it ended.
+    [TestMethod]
+    [DataRow(false, DisplayName = "edited with no program in progress")]
+    [DataRow(true, DisplayName = "edited while the program waits, the program then ended")]
+    public async Task AStaticRetyped_IsOfItsNewType_WhenTheProgramIsRunAgain(bool whileWaiting)
+    {
+        var edited = Counting("Integer");
+        ExecuteSessionResult? first = null, again = null, done = null;
+        await ModuleWorkspace.InspectAsync([], Counting("Long"), async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            first = await Resume(provider);
+            if (whileWaiting)
+            {
+                // the program waits again at its Stop, the Static holding what its first run left in it.
+                var waits = await RunWithAsync(provider, Counting("Long"));
+                Assert.AreEqual(ExecutionOutcome.Suspended, waits.Outcome, waits.ErrorMessage);
+                _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, edited));
+                _ = await provider.Execution.TerminateAsync(wipe: false);
+            }
+            else
+            {
+                _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, edited));
+            }
+
+            again = await RunWithAsync(provider, edited);
+            done = await Resume(provider);
+        }, debug: true);
+
+        CollectionAssert.AreEqual(new[] { "Long 1" }, Output(first!));
+        Assert.AreEqual(ExecutionOutcome.Suspended, again!.Outcome, again.ErrorMessage);
+        Assert.AreEqual(ExecutionOutcome.Completed, done!.Outcome, done.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "Integer 1" }, Output(done));
+    }
+
+    // a class whose member counts in a Static: MS-VBA gives each object its own.
+    private static string CountingClass(string type) => ModuleWorkspace.ClassModule("D",
+        "Option Explicit",
+        "Public Function Count() As String",
+        $"    Static S As {type}",
+        "    S = S + 1",
+        "    Count = TypeName(S) & \" \" & S",
+        "End Function");
+
+    // an object that lives through the edit of a member's Static - a module variable holds it from one run to the next - has its Static as it is declared
+    // from then on, as a Static of a module's procedure does.
+    [TestMethod]
+    [DataRow(false, DisplayName = "edited with no program in progress")]
+    [DataRow(true, DisplayName = "edited while the program waits, the program then ended")]
+    public async Task AStaticOfAClassRetyped_IsOfItsNewType_OnAnObjectThatLivedThroughTheEdit(bool whileWaiting)
+    {
+        var program = Lines(
+            "Option Explicit",
+            "Public X As D",
+            "Public Sub Main()",
+            "    If X Is Nothing Then Set X = New D",
+            "    Stop",
+            "    Debug.Print X.Count",
+            "End Sub");
+        ExecuteSessionResult? first = null, again = null, done = null;
+        await ModuleWorkspace.InspectAsync([("D", CountingClass("Long"))], program, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            first = await Resume(provider);
+            if (whileWaiting)
+            {
+                var waits = await RunWithAsync(provider, program);
+                Assert.AreEqual(ExecutionOutcome.Suspended, waits.Outcome, waits.ErrorMessage);
+                _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["D"], ("D", ModuleType.ClassModule, CountingClass("Integer")), ("Program", ModuleType.StdModule, program));
+                _ = await provider.Execution.TerminateAsync(wipe: false);
+            }
+            else
+            {
+                _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["D"], ("D", ModuleType.ClassModule, CountingClass("Integer")), ("Program", ModuleType.StdModule, program));
+            }
+
+            again = await RunWithAsync(provider, program);
+            done = await Resume(provider);
+        }, debug: true);
+
+        CollectionAssert.AreEqual(new[] { "Long 1" }, Output(first!));
+        Assert.AreEqual(ExecutionOutcome.Suspended, again!.Outcome, again.ErrorMessage);
+        Assert.AreEqual(ExecutionOutcome.Completed, done!.Outcome, done.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "Integer 1" }, Output(done));
+    }
+
     // the object a variable of a class holds, the variable retyped while the program waits, is still held: its Class_Terminate does not run, and the edit
     // taken back, the program goes on with it.
     [TestMethod]
