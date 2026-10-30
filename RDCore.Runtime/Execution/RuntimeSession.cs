@@ -704,13 +704,6 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
                 original = _heldStatics.GetValueOrDefault(current.SemanticId) ?? current;
             }
 
-            // a Static of a module's procedure has storage of the session's; one of a class's member called on an object, the object's (MS-VBA: each object
-            // has its own).
-            if (!SessionBindings.TryGetAddress(original, out _) && !_instances.Values.Any(instance => instance.HoldsStatic(original)))
-            {
-                continue;
-            }
-
             if (declared.TryGetValue(original.SemanticId, out var now) && IsSameType(original.ResolvedType, now.ResolvedType))
             {
                 lock (_resetLock)
@@ -721,6 +714,9 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
                 continue;
             }
 
+            // held or retired is told first, with the lock held, and before anything of the program's storage is read: a program in progress - running, on a
+            // thread of its own - allocates Statics and makes and lets go of objects as it goes, so whether anything holds this one is left for the release,
+            // which runs when the program is over (ApplyHeldDefinitions). A Static held that held nothing is retired as nothing.
             lock (_resetLock)
             {
                 if (_holdsStoredValues)
@@ -732,7 +728,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
                 _heldStatics = _heldStatics.Remove(original.SemanticId);
             }
 
-            Retired(original);
+            // no program is in progress: a Static of a module's procedure has storage of the session's, and one of a class's member called on an object the
+            // object's (MS-VBA: each object has its own).
+            if (SessionBindings.TryGetAddress(original, out _) || _instances.Values.Any(instance => instance.HoldsStatic(original)))
+            {
+                Retired(original);
+            }
         }
     }
 
