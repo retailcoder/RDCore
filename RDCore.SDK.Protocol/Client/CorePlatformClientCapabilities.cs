@@ -172,11 +172,6 @@ public class LanguageServerCapabilities
     public RubberduckIndenterSettings RubberduckIndenterSettings { get; set; } = new();
 }
 
-/// <summary>
-/// A capability of the RDCore platform beyond LSP: what a component of it says it provides (its assembly declares it), and what one that connects to it
-/// expects it to (<c>rdcore/platform/initialize</c>). Each capability is a type of its own, named after what it makes possible.
-/// </summary>
-/// <param name="IsSupported">Whether the capability is expected, or provided.</param>
 [JsonDerivedType(typeof(ParseFullDocument))]
 [JsonDerivedType(typeof(ParseTokens))]
 [JsonDerivedType(typeof(DefineSymbols))]
