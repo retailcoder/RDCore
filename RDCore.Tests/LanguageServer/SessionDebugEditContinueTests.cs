@@ -159,7 +159,7 @@ public sealed class SessionDebugEditContinueTests
 
         object answer = request == "execute"
             ? await new SessionDebugExecuteHandler(_debugging, _capabilities, _editStatus).Handle(new SessionDebugExecuteParams { Statement = "End" }, cancelled.Token)
-            : await new SessionDiscardHandler(symbols, _capabilities, _editStatus).Handle(new DiscardSessionParams { ModuleName = "M1", EndProgram = true }, cancelled.Token);
+            : await new SessionDiscardHandler(symbols, _capabilities, _editStatus).Handle(new DiscardSessionRequest { ModuleName = "M1", EndProgram = true }, cancelled.Token);
 
         Assert.IsNotNull(answer);
         Assert.IsEmpty(_editStatus.Current.Edits);

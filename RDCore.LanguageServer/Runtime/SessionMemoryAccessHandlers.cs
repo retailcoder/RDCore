@@ -15,9 +15,9 @@ internal sealed class SessionPeekHandler(
     IPlatformOrchestrationService orchestration,
     IPlatformClientCapabilitiesService clientCapabilities,
     ILogger<SessionPeekHandler> logger)
-    : RDCoreRequestHandler<PeekSessionParams, PeekSessionResult>
+    : RDCoreRequestHandler<PeekSessionRequest, PeekSessionResult>
 {
-    protected override async Task<PeekSessionResult> HandleAsync(PeekSessionParams request, CancellationToken token)
+    protected override async Task<PeekSessionResult> HandleAsync(PeekSessionRequest request, CancellationToken token)
     {
         SessionMemoryRelay.RequireCapability(clientCapabilities);
 
@@ -41,9 +41,9 @@ internal sealed class SessionPokeHandler(
     IPlatformOrchestrationService orchestration,
     IPlatformClientCapabilitiesService clientCapabilities,
     ILogger<SessionPokeHandler> logger)
-    : RDCoreRequestHandler<PokeSessionParams, PokeSessionResult>
+    : RDCoreRequestHandler<PokeSessionRequest, PokeSessionResult>
 {
-    protected override async Task<PokeSessionResult> HandleAsync(PokeSessionParams request, CancellationToken token)
+    protected override async Task<PokeSessionResult> HandleAsync(PokeSessionRequest request, CancellationToken token)
     {
         SessionMemoryRelay.RequireCapability(clientCapabilities);
 
