@@ -67,7 +67,7 @@ internal sealed class FlowEdges
                 Add(instruction.Offset, next, ControlFlowEdgeKind.Branch);
             }
 
-            if (!ControlFlowGraph.CanRaiseError(instruction.Kind))
+            if (!graph.CanRaise(instruction.Offset))
             {
                 continue;
             }

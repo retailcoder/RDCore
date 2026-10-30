@@ -45,7 +45,7 @@ public static class ReturnValueAnalysis
             return null;
         }
 
-        var graph = ControlFlowGraph.Of(instructions);
+        var graph = ControlFlowGraph.Of(instructions, model);
         if (graph.Imprecision.HasFlag(ControlFlowImprecision.UnresolvedJump) || graph.Imprecision.HasFlag(ControlFlowImprecision.Subroutines))
         {
             return null;

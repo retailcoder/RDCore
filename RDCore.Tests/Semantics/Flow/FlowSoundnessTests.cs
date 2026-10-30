@@ -79,6 +79,9 @@ public sealed class FlowSoundnessTests
         public int Line(int line) => Lines(line, line).Min();
 
         public bool Defines(int line, SemanticId variable) => Lines(line, line).Any(offset => Accesses.DefinitionsAt(offset).Any(definition => definition.Variable == variable));
+
+        // read by the instruction itself: not live because some other path, an error's, keeps it so.
+        public bool Uses(int line, SemanticId variable) => Lines(line, line).Any(offset => Accesses.UsesAt(offset).Any(use => use.Variable == variable));
     }
 
     private static Analyzed Analyze(string body, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub", string others = Others, ModuleType moduleType = ModuleType.StdModule)
@@ -101,7 +104,7 @@ public sealed class FlowSoundnessTests
         Assert.IsTrue(model.IsFullyAnalyzed, string.Join("; ", model.CompileErrors.Select(error => error.ToString())));
 
         var instructions = InstructionListLowering.Lower(block, default, run.MemberKind).InstructionList;
-        var graph = ControlFlowGraph.Of(instructions);
+        var graph = ControlFlowGraph.Of(instructions, model);
         return new Analyzed(instructions, model, DefinitionsAndUses.Of(instructions, model, composition.ScopeTree), graph, prefix.Split("\r\n").Length - 1);
     }
 
@@ -323,13 +326,42 @@ public sealed class FlowSoundnessTests
         Assert.IsTrue(analyzed.Defines(2, analyzed.Variable("p")));
     }
 
+    // the second review's 3: a function that returns an array and has no parameters is called with none, and what is written after its name indexes the result.
+    [TestMethod]
+    public void S26_AnIndexOfWhatAParameterlessArrayFunctionReturns_IsNoDefinition()
+    {
+        const string rows = Others + "\n\nPrivate Function Rows() As Long()\nEnd Function";
+        var analyzed = Analyze("Dim x As Long\nDim i As Long\nx = Rows(i)\nDebug.Print i", others: rows);
+        Assert.IsFalse(analyzed.Defines(2, analyzed.Variable("i")));
+    }
+
+    // the second review's 2: an assignment of a literal that converts to the variable's type cannot raise (MS-VBAL §5.5.1.2); anything else may.
+    [TestMethod]
+    [DataRow("Dim x As Long\nx = 1", false, DisplayName = "a number to a Long")]
+    [DataRow("Dim i As Integer\ni = -32768", false, DisplayName = "the least Integer")]
+    [DataRow("Dim i As Integer\ni = True", false, DisplayName = "True to an Integer, which is -1")]
+    [DataRow("Dim b As Byte\nb = 254.5", false, DisplayName = "a number that rounds to an even Byte")]
+    [DataRow("Dim s As String\ns = 1", false, DisplayName = "a number to a String")]
+    [DataRow("Dim v As Variant\nv = \"x\"", false, DisplayName = "a string to a Variant")]
+    [DataRow("Dim b As Byte\nb = 300", true, DisplayName = "a number a Byte does not hold")]
+    [DataRow("Dim b As Byte\nb = 255.5", true, DisplayName = "a number that rounds past a Byte")]
+    [DataRow("Dim b As Byte\nb = True", true, DisplayName = "True to a Byte, which is -1")]
+    [DataRow("Dim k As Long\nk = \"1\"", true, DisplayName = "a string to a number")]
+    [DataRow("Dim x As Long\nx = G()", true, DisplayName = "a call")]
+    [DataRow("Dim x As Long\nx = 1 + 1", true, DisplayName = "an expression that is not a literal")]
+    public void S27_AnAssignmentOfALiteral_CanRaise_OnlyWhereTheTypeMayNotHoldIt(string body, bool canRaise)
+    {
+        var analyzed = Analyze(body);
+        Assert.AreEqual(canRaise, analyzed.Graph.CanRaise(analyzed.Line(1)));
+    }
+
     // the re-review's F: a field named through its module, or through Me, is the field.
     [TestMethod]
     [DataRow("field = 1\nDebug.Print Main.field\nfield = 2", DisplayName = "read through the module")]
     public void S23_AFieldReadThroughItsModule_IsAUse(string body)
     {
         var analyzed = Analyze(body, others: PublicField);
-        Assert.Contains(analyzed.Variable("field"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)));
+        Assert.IsTrue(analyzed.Uses(1, analyzed.Variable("field")));
     }
 
     // a member of the module, as its qualified name, or Me, sees it: a Public one.
@@ -346,7 +378,7 @@ public sealed class FlowSoundnessTests
     public void S25_AFieldReadAndWrittenThroughMe_IsTheField()
     {
         var analyzed = Analyze("field = 1\nDebug.Print Me.field\nMe.field = 2", others: PublicField, moduleType: ModuleType.ClassModule);
-        Assert.Contains(analyzed.Variable("field"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)));
+        Assert.IsTrue(analyzed.Uses(1, analyzed.Variable("field")));
         Assert.IsTrue(analyzed.Defines(2, analyzed.Variable("field")));
     }
 

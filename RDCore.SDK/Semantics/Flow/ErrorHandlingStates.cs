@@ -77,7 +77,7 @@ public sealed class ErrorHandlingStates
     // the instructions that can raise an error into a handler: the fault statements a Resume may continue at.
     private static HashSet<int> FaultsOf(ControlFlowGraph graph, ImmutableHashSet<ErrorHandlingState>[] states)
         => [.. graph.Instructions.Items
-            .Where(instruction => ControlFlowGraph.CanRaiseError(instruction.Kind) && states[instruction.Offset].Any(state => state.CatchingHandler is not null))
+            .Where(instruction => graph.CanRaise(instruction.Offset) && states[instruction.Offset].Any(state => state.CatchingHandler is not null))
             .Select(instruction => instruction.Offset)];
 
     private static ImmutableHashSet<ErrorHandlingState>[] Propagate(ControlFlowGraph graph, IReadOnlySet<int> faults)
@@ -96,13 +96,13 @@ public sealed class ErrorHandlingStates
             var instruction = items[arrival.Node];
 
             // an error raised in this state goes to the handler, which runs with the error active.
-            if (ControlFlowGraph.CanRaiseError(instruction.Kind) && arrival.State.CatchingHandler is { } handler)
+            if (graph.CanRaise(arrival.Node) && arrival.State.CatchingHandler is { } handler)
             {
                 pending.Enqueue((handler, arrival.State with { IsHandling = true }));
             }
 
             // under On Error Resume Next it goes on at the next instruction, in the same state: the only way there for an Error statement, which never completes.
-            else if (ControlFlowGraph.CanRaiseError(instruction.Kind) && arrival.State is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
+            else if (graph.CanRaise(arrival.Node) && arrival.State is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
             {
                 pending.Enqueue((ControlFlowGraph.NextAfterAnError(instruction), arrival.State));
             }

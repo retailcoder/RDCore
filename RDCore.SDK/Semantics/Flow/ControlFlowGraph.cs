@@ -27,12 +27,14 @@ namespace RDCore.SDK.Semantics.Flow;
 public sealed class ControlFlowGraph
 {
     private readonly ImmutableArray<ControlFlowEdge>[] _successors;
+    private readonly IReadOnlySet<int> _raiseFree;
 
-    private ControlFlowGraph(InstructionList instructions, ImmutableArray<ControlFlowEdge>[] successors, ControlFlowImprecision imprecision)
+    private ControlFlowGraph(InstructionList instructions, ImmutableArray<ControlFlowEdge>[] successors, ControlFlowImprecision imprecision, IReadOnlySet<int> raiseFree)
     {
         Instructions = instructions;
         _successors = successors;
         Imprecision = imprecision;
+        _raiseFree = raiseFree;
     }
 
     /// <summary>
@@ -59,7 +61,19 @@ public sealed class ControlFlowGraph
     /// Builds the graph of a procedure body.
     /// </summary>
     /// <param name="instructions">The lowered body of a procedure.</param>
-    public static ControlFlowGraph Of(InstructionList instructions) => new Builder(instructions).Build();
+    /// <param name="model">
+    /// What the static pass found out about the body, which tells of the assignments that cannot raise an error (a literal let-coerced without one); without it,
+    /// every instruction of a kind that can raise one is taken to.
+    /// </param>
+    public static ControlFlowGraph Of(InstructionList instructions, ProcedureSemanticModel? model = null)
+        => new Builder(instructions, model is null ? new HashSet<int>() : RaiseFreeAssignments.Of(instructions, model)).Build();
+
+    /// <summary>
+    /// Whether the instruction at <paramref name="node"/> can raise an error: one of a kind that can (<see cref="CanRaiseError"/>), and not an assignment the
+    /// static pass tells cannot.
+    /// </summary>
+    /// <param name="node">The offset of an instruction.</param>
+    public bool CanRaise(int node) => node < Instructions.Items.Length && CanRaiseError(Instructions.Items[node].Kind) && !_raiseFree.Contains(node);
 
     /// <summary>
     /// The ways control can pass from <paramref name="node"/> to another.
@@ -117,7 +131,7 @@ public sealed class ControlFlowGraph
         return false;
     }
 
-    private sealed class Builder(InstructionList instructions)
+    private sealed class Builder(InstructionList instructions, IReadOnlySet<int> raiseFree)
     {
         private readonly ImmutableArray<Instruction> _items = instructions.Items;
         private readonly List<ControlFlowEdge>[] _edges = [.. Enumerable.Range(0, instructions.Items.Length + 1).Select(_ => new List<ControlFlowEdge>())];
@@ -135,7 +149,7 @@ public sealed class ControlFlowGraph
             AddReturnEdges();
             AddErrorEdges();
 
-            return new ControlFlowGraph(instructions, [.. _edges.Select(edges => edges.ToImmutableArray())], _imprecision);
+            return new ControlFlowGraph(instructions, [.. _edges.Select(edges => edges.ToImmutableArray())], _imprecision, raiseFree);
         }
 
         private void Add(int from, int to, ControlFlowEdgeKind kind)
@@ -299,7 +313,7 @@ public sealed class ControlFlowGraph
             {
                 foreach (var node in ProtectedBy(statement))
                 {
-                    if (CanRaiseError(_items[node].Kind))
+                    if (CanRaiseError(_items[node].Kind) && !raiseFree.Contains(node))
                     {
                         Add(node, statement.Target!.Value, ControlFlowEdgeKind.Error);
                     }
@@ -358,7 +372,8 @@ public sealed class ControlFlowGraph
     /// Measured in MS-VBA (oracle s54): an error in the expression of a <c>Select Case</c> goes on after <c>End Select</c>, the <c>Case Else</c> included; one in a
     /// <c>Case</c> expression runs that <c>Case</c>'s body, one in an <c>If</c> or <c>ElseIf</c> condition runs that branch, one in a <c>Do While</c>, <c>Do Until</c> or
     /// <c>While</c> condition runs the body, and one in a <c>Loop Until</c> or <c>Loop While</c> condition leaves the loop - which is the next instruction for each of
-    /// them as they are lowered. An error in the bounds or the step of a <c>For</c> is still to be measured, and goes on at the next instruction meanwhile.
+    /// them as they are lowered. An error in the bounds or the step of a <c>For</c>, in the collection of a <c>For Each</c> or in the object of a <c>With</c> is still to
+    /// be measured, and goes on at the next instruction meanwhile: the first statement of the body.
     /// </remarks>
     internal static int NextAfterAnError(Instruction instruction)
         => instruction is { Kind: InstructionKind.Select, End: { } after } ? after : instruction.Offset + 1;

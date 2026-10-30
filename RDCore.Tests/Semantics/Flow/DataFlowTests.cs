@@ -79,7 +79,7 @@ public sealed class DataFlowTests
         Assert.IsTrue(model.IsFullyAnalyzed, string.Join("; ", model.CompileErrors.Select(error => error.ToString())));
 
         var instructions = InstructionListLowering.Lower(block, default, run.MemberKind).InstructionList;
-        var graph = ControlFlowGraph.Of(instructions);
+        var graph = ControlFlowGraph.Of(instructions, model);
         return new Analyzed(instructions, model, DefinitionsAndUses.Of(instructions, model, composition.ScopeTree), graph, prefix.Split("\r\n").Length - 1);
     }
 
