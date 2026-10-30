@@ -136,6 +136,7 @@ public sealed class ClientWithoutOmniSharpTests
 
         platform.AssertTheProgramPrintedTheAnswer(executed);
         Assert.IsNull((await diagnostics)["error"]);
+        StringAssert.Contains(WholeLogOf(platform.Root), "OmniSharp.Extensions.", "what OmniSharp's own container logs is in the language server's file as well");
         await platform.ShutdownAsync(6);
     }
 
@@ -173,6 +174,50 @@ public sealed class ClientWithoutOmniSharpTests
         Assert.IsNull((await diagnostics)["error"]);
         Assert.IsNotNull(pulledAgain, "the server asked for a refresh: " + string.Join(", ", platform.Asked));
         Assert.IsNull((await pulledAgain)["error"], "and the second pull is answered");
+        await platform.ShutdownAsync(7);
+    }
+
+    // the third byte tap (C:\Dev\Claude\hexide-msgbox-tap3-2026-10-30.log), in its order to the byte: HexIDE pulls the document's diagnostics again before it answers
+    // the refresh, and writes both at once; the program's msgBox is then the language server's request 5, which is the id of the client's execute, still running.
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public async Task AProgramRunWhileTheClientPullsAgainBeforeItAnswersTheRefresh_AsksTheClient_AndCompletesWithItsAnswer()
+    {
+        await using var platform = await Platform.StartAsync(others: 60);
+        var rpc = platform.Rpc;
+        Task<JsonObject>? pulledAgain = null;
+        rpc.Before = method =>
+        {
+            if (method != "workspace/diagnostic/refresh" || pulledAgain is not null)
+            {
+                return null;
+            }
+
+            pulledAgain = rpc.Expect(6);
+            return new JsonObject
+            {
+                ["jsonrpc"] = "2.0", ["id"] = 6, ["method"] = "textDocument/diagnostic",
+                ["params"] = new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri }, ["identifier"] = "rdcore" },
+            };
+        };
+
+        var initialize = await rpc.RequestAsync(2, "initialize", platform.InitializeParams(AsHexIdeDeclares));
+        Assert.IsNull(initialize["error"], initialize.ToJsonString());
+        await rpc.NotifyAsync("initialized", new JsonObject());
+        await rpc.NotifyAsync("textDocument/didOpen", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri, ["languageId"] = "vba", ["version"] = 1, ["text"] = ModuleText },
+        });
+        var handshake = rpc.RequestAsync(3, RDCorePlatformHandshake.Method, JsonNode.Parse(ClaimsDialogs)!.AsObject());
+        var diagnostics = rpc.RequestAsync(4, "textDocument/diagnostic", new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri }, ["identifier"] = "rdcore" });
+        Assert.IsNull((await handshake)["error"]);
+
+        var executed = await rpc.RequestAsync(5, RDCorePlatformProtocol.SessionExecute, new JsonObject { ["source"] = ModuleText, ["moduleName"] = "Program", ["entryPoint"] = "Main" });
+
+        platform.AssertTheProgramPrintedTheAnswer(executed);
+        Assert.IsNull((await diagnostics)["error"]);
+        Assert.IsNotNull(pulledAgain, "the server asked for a refresh: " + string.Join(", ", platform.Asked));
+        Assert.IsNull((await pulledAgain.WaitAsync(Bound))["error"], "and the second pull is answered");
         await platform.ShutdownAsync(7);
     }
 
@@ -330,6 +375,17 @@ public sealed class ClientWithoutOmniSharpTests
         /// <summary>What the client does once it has answered a request of the server, given its method.</summary>
         public Action<string>? Answered { get; set; }
 
+        /// <summary>A message the client writes before it answers a request of the server, given its method, in the same write as the answer; or none.</summary>
+        public Func<string, JsonObject?>? Before { get; set; }
+
+        /// <summary>The answer to a request with this id, which the client writes itself.</summary>
+        public Task<JsonObject> Expect(int id)
+        {
+            var answered = new TaskCompletionSource<JsonObject>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _pending[id] = answered;
+            return answered.Task;
+        }
+
         public Task NotifyAsync(string method, JsonObject parameters) => WriteAsync(new JsonObject { ["jsonrpc"] = "2.0", ["method"] = method, ["params"] = parameters });
 
         public async Task<JsonObject> RequestAsync(int id, string method, JsonObject parameters)
@@ -353,7 +409,8 @@ public sealed class ClientWithoutOmniSharpTests
                         if (message["id"] is { } asked)
                         {
                             // a request from the server is answered: what the client does with it, or nothing.
-                            await WriteAsync(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = asked.DeepClone(), ["result"] = _answer(method, message["params"])?.DeepClone() });
+                            var answer = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = asked.DeepClone(), ["result"] = _answer(method, message["params"])?.DeepClone() };
+                            await WriteAsync(Before?.Invoke(method) is { } first ? [first, answer] : [answer]);
                             Answered?.Invoke(method);
                         }
                         else if (method == "window/logMessage")
@@ -376,15 +433,23 @@ public sealed class ClientWithoutOmniSharpTests
             }
         }
 
-        private async Task WriteAsync(JsonObject message)
+        private Task WriteAsync(JsonObject message) => WriteAsync([message]);
+
+        // the messages framed one after the other, and written at once.
+        private async Task WriteAsync(JsonObject[] messages)
         {
-            var body = Encoding.UTF8.GetBytes(message.ToJsonString());
-            var header = Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n");
+            var frames = new MemoryStream();
+            foreach (var message in messages)
+            {
+                var body = Encoding.UTF8.GetBytes(message.ToJsonString());
+                frames.Write(Encoding.ASCII.GetBytes($"Content-Length: {body.Length}\r\n\r\n"));
+                frames.Write(body);
+            }
+
             await _writing.WaitAsync();
             try
             {
-                await _stream.WriteAsync(header);
-                await _stream.WriteAsync(body);
+                await _stream.WriteAsync(frames.ToArray());
                 await _stream.FlushAsync();
             }
             finally
