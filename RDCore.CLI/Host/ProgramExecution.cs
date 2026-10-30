@@ -130,12 +130,17 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
     /// Whether the program's output is said as it is printed (<see cref="IEnvironmentSessionProvider.OutputStreamed"/>), for the whole of a run under a debugger, and not
     /// kept for the answers. Ignored for a run that is not.
     /// </param>
+    /// <param name="unattended">
+    /// Whether nobody is there to answer a dialog the program opens, which fails the run (<see cref="IRuntimeSession.RunsUnattended"/>), for the whole of the run.
+    /// Ignored for a statement run alongside a program that waits, which runs as that program does.
+    /// </param>
     /// <returns>
     /// How it ended, or where it waits. A program that is suspended is let go of, and not refused: running one is what <c>RUN</c> does, and in BASIC it starts the
     /// program over. A program that is running is refused.
     /// </returns>
     public Task<ExecuteSessionResult> RunAsync(
-        RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, bool debug, CancellationToken token, bool immediate = false, bool streamOutput = false)
+        RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, bool debug, CancellationToken token, bool immediate = false, bool streamOutput = false,
+        bool unattended = false)
     {
         var session = provider.Session;
         lock (_sync)
@@ -160,6 +165,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             _idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _terminating = false;
             _streaming = debug && streamOutput;
+            session.RunsUnattended = unattended;
         }
 
         // the program is in its turn for as long as it runs or waits at a Stop: an event that something outside the workspace raises is handled between two programs and not

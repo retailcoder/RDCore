@@ -166,6 +166,12 @@ public class LanguageServerCapabilities
     public SessionInteraction SessionInteraction { get; set; } = new();
 
     /// <summary>
+    /// If expected, the client runs programs unattended - a CI run, a script - and nobody is there to answer a dialog: the language server runs every program
+    /// the client asks it to so that a dialog it opens fails the run (<c>VBR50001</c>). It wins over <see cref="SessionInteraction"/>.
+    /// </summary>
+    public Unattended Unattended { get; set; } = new();
+
+    /// <summary>
     /// If supported, the language server asks the client for the indenter settings its user had in Rubberduck, over <c>rdcore/rubberduck-indenter-settings</c>, and
     /// asks it to take the <c>Formatting</c> settings it mapped from them as its own, over <c>rdcore/rubberduck-indenter-settings/apply</c>.
     /// </summary>
@@ -194,6 +200,7 @@ public class LanguageServerCapabilities
 [JsonDerivedType(typeof(SemanticAnalysis))]
 [JsonDerivedType(typeof(SessionMemoryAccess))]
 [JsonDerivedType(typeof(SessionInteraction))]
+[JsonDerivedType(typeof(Unattended))]
 [JsonDerivedType(typeof(RubberduckIndenterSettings))]
 public abstract record class CorePlatformClientCapability(bool IsSupported = true);
 
@@ -296,6 +303,18 @@ public record class SessionMemoryAccess(bool IsSupported = false) : CorePlatform
 /// asked, and the language server answers that nobody was, so that the host shows the dialog of the platform it runs on.
 /// </remarks>
 public record class SessionInteraction(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
+
+/// <summary>
+/// Advertises that nobody is there to answer the dialogs a program opens: a client that expects it runs programs unattended (a CI run, <c>rdc --unattended</c>),
+/// and the language server runs each program it asks for so that a dialog - <c>MsgBox</c>, <c>InputBox</c>, a form shown, modal or not - fails the run with
+/// the untrappable run-time error <c>VBR50001</c>, which no <c>On Error</c> of the program catches.
+/// </summary>
+/// <remarks>
+/// The dialogs are the standard library's, which every program has: a client opts out of answering them, rather than into it. A client that expects both this
+/// and <see cref="SessionInteraction"/> runs unattended: a run that fails loudly is the safe reading of a contradiction. A test framework that mocks the dialogs
+/// intercepts them before they open, so a run that reaches one has a dialog nothing intercepted.
+/// </remarks>
+public record class Unattended(bool IsSupported = false) : CorePlatformClientCapability(IsSupported);
 
 /// <summary>
 /// Advertises that the language server asks the client for the indenter settings its user had in Rubberduck - <c>rdcore/rubberduck-indenter-settings</c> - and asks it to

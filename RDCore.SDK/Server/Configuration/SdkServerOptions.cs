@@ -72,6 +72,15 @@ public record class SdkAppCommandLineArgs
     [Option('t', "trace-level")]
     public LogLevel? TraceLevel { get; set; }
     /// <summary>
+    /// A <em>command-line switch</em> that has a client app run programs unattended: it tells the language server that nobody is there to answer a program's
+    /// dialogs (<see cref="Unattended"/>), and a program that opens one fails the run with the untrappable run-time error <c>VBR50001</c>.
+    /// </summary>
+    /// <remarks>
+    /// 👉 For a run nobody watches - a CI job, a script piped into <c>rdc.exe</c> - which has to fail loudly rather than wait for an answer. A server app ignores it.
+    /// </remarks>
+    [Option("unattended")]
+    public bool? Unattended { get; set; }
+    /// <summary>
     /// A <em>command-line switch</em> that overrides the <see cref="SdkServerOptions.TraceLevel"/> setting.
     /// </summary>
     /// <remarks>

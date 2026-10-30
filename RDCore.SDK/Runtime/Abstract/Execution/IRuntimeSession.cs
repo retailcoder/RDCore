@@ -104,6 +104,17 @@ public interface IRuntimeSession
     ISessionHalt Halt { get; }
 
     /// <summary>
+    /// Whether the program that runs is run unattended - by a client that said so (<c>--unattended</c>), as a run in continuous integration is: nobody is there
+    /// to answer a dialog it opens.
+    /// </summary>
+    /// <remarks>
+    /// A dialog - <c>MsgBox</c>, <c>InputBox</c>, a form shown, in the process or through an external host - is then not shown anywhere, and fails the run with
+    /// <see cref="RDCore.SDK.Model.Errors.VBRuntimeErrorId.NobodyToAnswer"/>, an error no handler of the program catches: a program that expects a person
+    /// fails loudly where it expects one. Set by whatever starts the run, for that run.
+    /// </remarks>
+    bool RunsUnattended { get; set; }
+
+    /// <summary>
     /// The workspace's references in declaration order (<strong>RD-VBAL §2.3.1.2</strong>): index
     /// <c>0</c> appears first and is the lowest precedence (the <c>VBA</c> standard library), so a
     /// later entry shadows it on a global-scope name collision. This is the precedence order only —

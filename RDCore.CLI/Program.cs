@@ -94,13 +94,14 @@ public class Program
 
             // rdc.exe with no arguments: the interactive shell. It is an LSP client like any other,
             // so it needs a workspace to attach to - it scaffolds a private, scratch one of its own.
+            // So does one given only --unattended: a shell that a CI job pipes a program into.
             ReplWorkspace? scratchWorkspace = null;
-            if (args.Length == 0)
+            if (args.Length == 0 || args is ["--unattended"])
             {
                 Console.WriteLine("Initializing...");
                 var fileSystem = new FileSystem();
                 scratchWorkspace = await ReplWorkspace.CreateAsync(fileSystem, new ProjectFileWriter(fileSystem));
-                args = ["--workspace", scratchWorkspace.Root];
+                args = [.. args, "--workspace", scratchWorkspace.Root];
             }
 
             using var clientHost = new RDCoreConsoleClientHost(scratchWorkspace);
@@ -134,6 +135,9 @@ internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) :
             // assigns is the one the next line reads, the standard library is RDC rather than VBA, and a bare Print is a statement. The
             // servers are told, when they are started and in the initializationOptions of the initialize request.
             ("Configuration:Workspace:Language", SupportedLanguages.BASIC.Id),
+            // a shell given --unattended answers no dialog; one that is not keeps what its settings say.
+            .. baseArgs.Unattended is true ? [($"{SettingsSchema.Root}:{AppOptions.Section}:{nameof(AppOptions.Unattended)}", (string?)bool.TrueString)]
+                : Array.Empty<(string, string?)>(),
         ];
 
     protected override SettingsSchema Settings => SettingsSchema.Platform.Combine(AppOptions.Schema);
@@ -317,6 +321,7 @@ internal class RDCoreConsoleClientApp(
     RubberduckIndenterSettingsReader rubberduck,
     IPlatformSettings settings,
     ILiveSettings liveSettings,
+    IOptions<AppOptions> appOptions,
     ILogger<RDCoreConsoleClientApp> logger)
     : RDCoreClientApp(options, connectionFactory, logger)
 {
@@ -344,8 +349,9 @@ internal class RDCoreConsoleClientApp(
             // the code it lists - the condition of a breakpoint - is highlighted the way the language server tells the tokens of it.
             SessionSemanticTokens = new SessionSemanticTokens(true),
             SessionMemoryAccess = new SessionMemoryAccess(true),
-            // the shell answers the dialogs a program opens, at its console.
-            SessionInteraction = new SessionInteraction(true),
+            // the shell answers the dialogs a program opens, at its console - unless it runs unattended (--unattended), and nobody is there to.
+            SessionInteraction = new SessionInteraction(!appOptions.Value.Unattended),
+            Unattended = new Unattended(appOptions.Value.Unattended),
             // the shell reads the indenter settings its user had in Rubberduck (on Windows), and takes the ones the language server maps as its own.
             RubberduckIndenterSettings = new RubberduckIndenterSettings(true),
         },

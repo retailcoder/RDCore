@@ -478,6 +478,12 @@ public sealed class StdInteraction(
             return RuntimeSemanticsEvaluationResult<VBLongValue>.Error(caption.ErrorInfo!);
         }
 
+        // a program run unattended has nobody to answer it, and fails (IRuntimeSession.RunsUnattended).
+        if (session.RunsUnattended)
+        {
+            return RuntimeSemanticsEvaluationResult<VBLongValue>.Error(Execution.Unattended.NobodyToAnswer(session, "MsgBox"));
+        }
+
         var request = new MessageBoxRequest(text.Result!.ToString()!, caption.Result!.ToString()!, buttons);
         try
         {
@@ -507,6 +513,11 @@ public sealed class StdInteraction(
         if (new[] { text, caption, initial, x, y }.FirstOrDefault(result => result is { IsSuccess: false }) is { } failed)
         {
             return RuntimeSemanticsEvaluationResult<VBStringValue>.Error(failed.ErrorInfo!);
+        }
+
+        if (session.RunsUnattended)
+        {
+            return RuntimeSemanticsEvaluationResult<VBStringValue>.Error(Execution.Unattended.NobodyToAnswer(session, "InputBox"));
         }
 
         var request = new InputBoxRequest(
