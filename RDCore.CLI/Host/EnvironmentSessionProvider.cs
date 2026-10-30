@@ -211,7 +211,7 @@ public sealed class EnvironmentSessionProvider(
         Image = new ProgramImage();
         Image.CompilationRefused += (procedure, exception)
             => logger.LogWarning(exception, "⚙️ {procedure} was not compiled: the compiler failed, and it runs in the interpreter.", procedure.Name);
-        Execution = new ProgramExecution(this);
+        Execution = new ProgramExecution(this, logger);
         ProjectName = project.Name;
         ModuleCount = project.Modules.Length;
 
