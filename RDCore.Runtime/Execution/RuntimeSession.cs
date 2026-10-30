@@ -704,7 +704,9 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
                 original = _heldStatics.GetValueOrDefault(current.SemanticId) ?? current;
             }
 
-            if (!SessionBindings.TryGetAddress(original, out _))
+            // a Static of a module's procedure has storage of the session's; one of a class's member called on an object, the object's (MS-VBA: each object
+            // has its own).
+            if (!SessionBindings.TryGetAddress(original, out _) && !_instances.Values.Any(instance => instance.HoldsStatic(original)))
             {
                 continue;
             }
@@ -734,7 +736,8 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         }
     }
 
-    // a Static's storage freed: what it held is let go of, and the procedure's next call gives it storage again.
+    // a Static's storage freed, the session's and that of every object that holds one of its own: what it held is let go of, and the procedure's next call
+    // gives it storage again.
     private void Retired(VBLocalVariableSymbol original)
     {
         if (LettingGo is { } letGo && SessionBindings.TryGetAddress(original, out var address) && SessionBindings.TryRead(address, out var cell) && cell is not null)
@@ -742,7 +745,13 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
             letGo(cell);
         }
 
-        if (SessionBindings.TryDeallocate(original))
+        var freed = SessionBindings.TryDeallocate(original);
+        foreach (var instance in _instances.Values)
+        {
+            freed |= instance.ForgetStatic(original, LettingGo);
+        }
+
+        if (freed)
         {
             lock (_resetLock)
             {
