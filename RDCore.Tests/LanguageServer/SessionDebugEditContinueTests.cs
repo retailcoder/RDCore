@@ -61,7 +61,7 @@ public sealed class SessionDebugEditContinueTests
         });
         var handler = new SessionDebugResumeHandler(_debugging, _capabilities, _editStatus, _lifecycle);
 
-        var answer = handler.Handle(new SessionDebugResumeParams(), CancellationToken.None);
+        var answer = handler.Handle(new SessionDebugResumeRequest(), CancellationToken.None);
         await asked.Task.WaitAsync(Patience);
 
         await _debugging.DidNotReceiveWithAnyArgs().ResumeAsync(default, default);
@@ -80,7 +80,7 @@ public sealed class SessionDebugEditContinueTests
         _debugging.GotoAsync(Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(new HostDebugGotoResult { Moved = false, Reason = DoesNotCompile.Reason });
         var handler = new SessionDebugGotoHandler(_debugging, _capabilities, _editStatus, _lifecycle);
 
-        var answer = handler.Handle(new SessionDebugGotoParams { Line = 3 }, CancellationToken.None);
+        var answer = handler.Handle(new SessionDebugGotoRequest { Line = 3 }, CancellationToken.None);
         await asked.Task.WaitAsync(Patience);
 
         await _debugging.DidNotReceiveWithAnyArgs().GotoAsync(default, default, default);
@@ -96,7 +96,7 @@ public sealed class SessionDebugEditContinueTests
         var listed = new HostDebugEditStatusResult { Suspended = true, Edits = [DoesNotCompile] };
         var handler = new SessionDebugEditStatusHandler(_capabilities, _editStatus, _lifecycle);
 
-        var answer = handler.Handle(new SessionDebugEditStatusParams(), CancellationToken.None);
+        var answer = handler.Handle(new SessionDebugEditStatusRequest(), CancellationToken.None);
         await asked.Task.WaitAsync(Patience);
 
         await _debugging.DidNotReceiveWithAnyArgs().EditStatusAsync(default);
@@ -115,7 +115,7 @@ public sealed class SessionDebugEditContinueTests
         _debugging.ResumeAsync(null, Arg.Any<CancellationToken>()).Returns(new ExecuteSessionResult { Outcome = ExecutionOutcome.Suspended });
         var handler = new SessionDebugResumeHandler(_debugging, _capabilities, _editStatus, _lifecycle);
 
-        Assert.AreEqual(ExecutionOutcome.Suspended, (await handler.Handle(new SessionDebugResumeParams(), CancellationToken.None).WaitAsync(Patience)).Outcome);
+        Assert.AreEqual(ExecutionOutcome.Suspended, (await handler.Handle(new SessionDebugResumeRequest(), CancellationToken.None).WaitAsync(Patience)).Outcome);
     }
 
     // a program that is over, or went on with every edit, has none it does not have: what was said is cleared once it is answered.
@@ -129,7 +129,7 @@ public sealed class SessionDebugEditContinueTests
         _debugging.EditStatusAsync(Arg.Any<CancellationToken>()).Returns(new HostDebugEditStatusResult());
         var handler = new SessionDebugResumeHandler(_debugging, _capabilities, _editStatus, _lifecycle);
 
-        _ = await handler.Handle(new SessionDebugResumeParams(), CancellationToken.None).WaitAsync(Patience);
+        _ = await handler.Handle(new SessionDebugResumeRequest(), CancellationToken.None).WaitAsync(Patience);
 
         Assert.IsEmpty(_editStatus.Current.Edits);
     }
@@ -158,7 +158,7 @@ public sealed class SessionDebugEditContinueTests
         });
 
         object answer = request == "execute"
-            ? await new SessionDebugExecuteHandler(_debugging, _capabilities, _editStatus).Handle(new SessionDebugExecuteParams { Statement = "End" }, cancelled.Token)
+            ? await new SessionDebugExecuteHandler(_debugging, _capabilities, _editStatus).Handle(new SessionDebugExecuteRequest { Statement = "End" }, cancelled.Token)
             : await new SessionDiscardHandler(symbols, _capabilities, _editStatus).Handle(new DiscardSessionRequest { ModuleName = "M1", EndProgram = true }, cancelled.Token);
 
         Assert.IsNotNull(answer);
