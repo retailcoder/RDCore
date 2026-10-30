@@ -123,17 +123,8 @@ internal sealed class ProgramEdits
         var edits = new List<ProgramEdit>();
         var frames = session.CallStack.Frames.OfType<CallStackFrame>().Where(frame => frame.Procedure is not null).ToList();
 
-        // the declarations of the procedures the program is in, and the locals a statement typed at the break declared in them: the frame holds those already.
+        // the declarations of the procedures the program is in.
         var activeDeclarations = suspended._active.Select(id => suspended._procedures.GetValueOrDefault(id)).OfType<string>().ToHashSet();
-        var declaredAtAStop = new Dictionary<string, HashSet<string>>();
-        foreach (var frame in frames)
-        {
-            if (suspended._procedures.GetValueOrDefault(frame.Procedure!.SemanticId.ToString()) is { } key)
-            {
-                var names = declaredAtAStop.TryGetValue(key, out var known) ? known : declaredAtAStop[key] = new(StringComparer.OrdinalIgnoreCase);
-                names.UnionWith(frame.DeclaredAtAStop.Select(local => local.Name));
-            }
-        }
 
         // the names the code of each frame reads: a constant folded into it keeps the value it had when the activation began. A name its procedure declares
         // for itself - a parameter, a local - is not the module's.
@@ -148,7 +139,7 @@ internal sealed class ProgramEdits
                 continue;
             }
 
-            edits.Add(Classify(before, after, activeDeclarations.Contains(key), declaredAtAStop.GetValueOrDefault(key) ?? [], suspended, now, activeDeclarations, framesRead));
+            edits.Add(Classify(before, after, activeDeclarations.Contains(key), suspended, now, activeDeclarations, framesRead));
         }
 
         // a procedure the program is in, whose code was edited or whose lines moved: each of its activations goes on in the edited body from where it is,
@@ -268,8 +259,17 @@ internal sealed class ProgramEdits
     {
         foreach (var (frame, body, alignment, waits) in Rebasings(session, image).ToList())
         {
-            _ = frame.TryRebase(body, alignment, waits);
+            // a local the edit added to the procedure is the activation's from now on, at its default; one it removed is held until the activation returns,
+            // with nothing naming it.
+            if (frame.TryRebase(body, alignment, waits)
+                && session.Symbols.MembersOf(frame.Procedure!.ParentUri).FirstOrDefault(member => member.SemanticId == frame.Procedure.SemanticId) is { } procedure)
+            {
+                _ = RuntimeProcedureInvoker.DeclareAddedLocals(session, frame, procedure);
+            }
         }
+
+        // an object the program holds has the fields its class was given.
+        _ = session.Symbols.ExtendLiveInstances();
     }
 
     // the activations whose procedure's body is not the one they run - edited, or its module loaded again - each with that body, how the two align, and
@@ -327,19 +327,17 @@ internal sealed class ProgramEdits
     }
 
     // what an edited declaration is to the program.
-    private static ProgramEdit Classify(Declaration? before, Declaration? after, bool active, IReadOnlySet<string> declaredAtAStop, ProgramEdits suspended,
+    private static ProgramEdit Classify(Declaration? before, Declaration? after, bool active, ProgramEdits suspended,
         ProgramEdits now, IReadOnlySet<string> activeDeclarations, IReadOnlyList<IReadOnlySet<string>> framesRead)
     {
         var name = (after ?? before)!.Name;
         var kind = (after ?? before)!.Kind;
         ProgramEdit Edit(ProgramEditKind editKind, string reason) => new(name, editKind, reason, (after ?? before)!.Module, after?.Range);
 
-        // added: nothing running holds it, unless it is a field of a class, which an object the program holds has no cell for yet.
+        // added: nothing running holds it. A field of a class is given to the objects the program holds, at its default, when it goes on (Rebase).
         if (before is null)
         {
-            return kind == SymbolDescriptorKind.ModuleField && after!.InClass
-                ? Edit(ProgramEditKind.NotYet, Resources.Host_Edit_FieldOfAClass)
-                : Edit(ProgramEditKind.Applies, Resources.Host_Edit_Applies);
+            return Edit(ProgramEditKind.Applies, Resources.Host_Edit_Applies);
         }
 
         // removed: its storage goes, and code that still names it does not compile. A procedure the program is in can't go, nor a field of an object it holds.
@@ -380,13 +378,9 @@ internal sealed class ProgramEdits
                 return Edit(ProgramEditKind.NotYet, Resources.Host_Edit_ValueAnActiveProcedureRead);
             }
 
-            // a local added to or removed from the frame changes its layout, which is not done to a program that waits yet: a local the frame already holds -
-            // declared by a statement typed at the break - is no change of it. Its code is the bodies' to say, and its signature is as it was.
-            var added = after.Locals.Where(local => !before.Locals.Any(other => string.Equals(other.Name, local.Name, StringComparison.OrdinalIgnoreCase)));
-            var relaidOut = after.Locals.Length < before.Locals.Length || added.Any(local => !declaredAtAStop.Contains(local.Name));
-            return active && relaidOut
-                ? Edit(ProgramEditKind.NotYet, Resources.Host_Edit_LocalsOfAnActiveProcedure)
-                : Edit(ProgramEditKind.Applies, Resources.Host_Edit_Applies);
+            // a local added is declared on each frame of the procedure at its default when the program goes on, and one removed is held until the frame
+            // returns (Rebase). Its code is the bodies' to say, and its signature is as it was.
+            return Edit(ProgramEditKind.Applies, Resources.Host_Edit_Applies);
         }
 
         switch (kind)

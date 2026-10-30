@@ -435,16 +435,6 @@ namespace RDCore.CLI {
         public static string Host_Edit_HandlerOfAnActiveProcedure => ResourceManager.GetString("Host_Edit_HandlerOfAnActiveProcedure", resourceCulture)!;
 
         /// <summary>
-        ///   Looks up a localized string similar to a local added to or removed from a procedure the program is in, which is not applied to a program that waits yet.
-        /// </summary>
-        public static string Host_Edit_LocalsOfAnActiveProcedure => ResourceManager.GetString("Host_Edit_LocalsOfAnActiveProcedure", resourceCulture)!;
-
-        /// <summary>
-        ///   Looks up a localized string similar to a field added to a class whose objects the program may hold, which is not applied to a program that waits yet.
-        /// </summary>
-        public static string Host_Edit_FieldOfAClass => ResourceManager.GetString("Host_Edit_FieldOfAClass", resourceCulture)!;
-
-        /// <summary>
         ///   Looks up a localized string similar to the signature of a procedure the program is in.
         /// </summary>
         public static string Host_Edit_SignatureOfAnActiveProcedure => ResourceManager.GetString("Host_Edit_SignatureOfAnActiveProcedure", resourceCulture)!;

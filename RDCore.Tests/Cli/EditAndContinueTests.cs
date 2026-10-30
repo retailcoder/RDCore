@@ -408,19 +408,63 @@ public sealed class EditAndContinueTests
         CollectionAssert.AreEqual(expected ?? AsItWas, Output(resumed));
     }
 
+    // MS-VBA resets the project for each of these; RD-VBA applies them: a local added starts at its default, the others keep their values, and an object the
+    // program holds is given the field its class was given, at its default.
     [TestMethod]
-    [Ignore("a local added to or removed from a procedure the program is in, and a field added to an object it holds, are not applied to it yet")]
-    [DataRow(new[] { "Program|InsertAfter|Dim tt As T|    Dim b As Long", "Program|Replace|Debug.Print \"callee:after-stop|    b = 7: Debug.Print \"callee:after-stop b=\" & b" },
+    [DataRow(new[] { "Program|InsertAfter|Dim tt As T|    Dim b As Long", "Program|Replace|Debug.Print \"callee:after-stop|    b = b + 7: Debug.Print \"callee:after-stop b=\" & b" },
         new[] { "callee:after-stop b=7", "callee:done a=11 S=1 G=2 E1=1", "main:after G=2 K=1 obj=10", "other:1 obj=10 k=1 ub=3", "main:end" },
         DisplayName = "a local added to the procedure the program is in, and used")]
+    [DataRow(new[] { "Program|InsertAfter|Dim tt As T|    Static R As Long", "Program|Replace|Debug.Print \"callee:after-stop|    R = R + 3: Debug.Print \"callee:after-stop R=\" & R" },
+        new[] { "callee:after-stop R=3", "callee:done a=11 S=1 G=2 E1=1", "main:after G=2 K=1 obj=10", "other:1 obj=10 k=1 ub=3", "main:end" },
+        DisplayName = "a Static added to the procedure the program is in, and used")]
+    [DataRow(new[] { "Program|Delete|    Dim z As Long" }, null, DisplayName = "a local removed from the procedure the program is in")]
     [DataRow(new[] { "Program|InsertAfter|Public Sub Main()|    Dim m As Long" }, null, DisplayName = "a local added to a caller")]
+    [DataRow(new[] { "Program|InsertAfter|Public Sub Main()|    Dim m As Long", "Program|Replace|    Other|    m = m + 1: Debug.Print \"main:m=\" & m: Other" },
+        new[] { "callee:after-stop a=10", "callee:done a=11 S=1 G=2 E1=1", "main:after G=2 K=1 obj=10", "main:m=1", "other:1 obj=10 k=1 ub=3", "main:end" },
+        DisplayName = "a local added to a caller, and used once the call returns")]
     [DataRow(new[] { "C|InsertAfter|Private mValue As Long|Private mOther As Long" }, null, DisplayName = "a field added to a class whose object the program holds")]
+    [DataRow(new[] { "C|InsertAfter|Private mValue As Long|Private mOther As Long", "C|Replace|    Value = mValue * 10|    mOther = mOther + 1: Value = mValue * 10 + mOther" },
+        new[] { "callee:after-stop a=10", "callee:done a=11 S=1 G=2 E1=1", "main:after G=2 K=1 obj=11", "other:1 obj=12 k=1 ub=3", "main:end" },
+        DisplayName = "a field added to a class whose object the program holds, and used")]
     public async Task AnEditOfTheLayoutOfAFrame_IsApplied_AsMsVbaAppliesIt(string[] edits, string[]? expected)
     {
         var resumed = await EditedAtTheStopAsync(edits);
 
         Assert.AreEqual(ExecutionOutcome.Completed, resumed.Outcome, resumed.ErrorMessage);
         CollectionAssert.AreEqual(expected ?? AsItWas, Output(resumed));
+    }
+
+    // a local an edit added to the procedure the program is in is one of its locals: the object it holds is let go of when the procedure returns.
+    [TestMethod]
+    public async Task AnObjectHeldByALocalAnEditAdded_IsLetGoOf_WhenItsProcedureReturns()
+    {
+        var owned = ModuleWorkspace.ClassModule("D",
+            "Option Explicit",
+            "Private Sub Class_Terminate()",
+            "    Debug.Print \"d:terminate\"",
+            "End Sub");
+        var program = Lines(
+            "Option Explicit",
+            "Public Sub Main()",
+            "    Inner",
+            "    Debug.Print \"main:after inner\"",
+            "End Sub",
+            "Private Sub Inner()",
+            "    Stop",
+            "    Debug.Print \"inner:end\"",
+            "End Sub");
+        var edited = program
+            .Replace("    Stop\r\n", "    Dim o As D\r\n    Stop\r\n    Set o = New D\r\n", StringComparison.Ordinal);
+        ExecuteSessionResult? resumed = null;
+        await ModuleWorkspace.InspectAsync([("D", owned)], program, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("D", ModuleType.ClassModule, owned), ("Program", ModuleType.StdModule, edited));
+            resumed = await Resume(provider);
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.Completed, resumed!.Outcome, resumed.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "inner:end", "d:terminate", "main:after inner" }, Output(resumed));
     }
 
     // a program of one module run to its Stop, edited into another, and resumed.
@@ -1276,39 +1320,64 @@ public sealed class EditAndContinueTests
 
     private static readonly string[] Holding = ["Private mChild As Object"];
 
-    // the fields of an object edited while it lives, with what is done with it at the stop or after: the program waits on, refusing to go on.
-    private static async Task<(ExecuteSessionResult Refused, T After)> OwnerEditedAsync<T>(string[] fields, Func<EnvironmentSessionProvider,
+    // the fields of an object edited while it lives, with what is done with it at the stop, and the program resumed then.
+    private static async Task<(ExecuteSessionResult Resumed, T After)> OwnerEditedAsync<T>(string[] fields, Func<EnvironmentSessionProvider,
         Func<Task<ExecuteSessionResult>>, Task<T>> then)
     {
-        ExecuteSessionResult? refused = null;
+        ExecuteSessionResult? resumed = null;
         T after = default!;
         await ModuleWorkspace.InspectAsync([("Child", Child), ("Owner", Owner(true, Holding))], Owning, async (provider, stopped, runAgain) =>
         {
             Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
             _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Owner"], ("Child", ModuleType.ClassModule, Child),
                 ("Owner", ModuleType.ClassModule, Owner(fields.Contains(Holding[0]), fields)), ("Program", ModuleType.StdModule, Owning));
-            refused = await new HostDebugResumeHandler(provider, NullLogger<HostDebugResumeHandler>.Instance)
-                .Handle(new HostDebugResumeParams(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20));
             after = await then(provider, runAgain);
+            resumed = await new HostDebugResumeHandler(provider, NullLogger<HostDebugResumeHandler>.Instance)
+                .Handle(new HostDebugResumeParams(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20));
         }, debug: true);
 
-        return (refused!, after);
+        return (resumed!, after);
     }
 
-    // an object is let go of with the fields it was created with: a field added to its class while it lives has no storage on it, and a field removed from
-    // its class still holds the object it was set to, which goes when it does.
+    // an object let go of at the stop lets go of what its fields hold: a field added to its class while it lives - given to it when the program goes on - and
+    // a field removed from its class, which still holds the object it was set to, which goes when it does. The program goes on.
     [TestMethod]
     [DataRow(new[] { "Private mChild As Object", "Private mOther As Object" }, DisplayName = "a field added to the class of an object the program holds")]
     [DataRow(new[] { "Private mKept As Object" }, DisplayName = "the field that holds an object removed from its class")]
     public async Task AnObjectOfAClassWhoseFieldsWereEdited_LetGoOfAtTheStop_LetsGoOfWhatItHolds(string[] fields)
     {
-        var (refused, released) = await OwnerEditedAsync(fields, (provider, _) => new HostDebugExecuteHandler(provider, Substitute.For<IVerboseMessageBuilder>())
+        var (resumed, released) = await OwnerEditedAsync(fields, (provider, _) => new HostDebugExecuteHandler(provider, Substitute.For<IVerboseMessageBuilder>())
             .Handle(new HostDebugExecuteParams { FrameId = 0, Json = PlatformJson.Serialize(Statement("Set Obj = Nothing")) }, CancellationToken.None)
             .WaitAsync(TimeSpan.FromSeconds(20)));
 
-        Assert.AreEqual(ExecutionOutcome.Refused, refused.Outcome, "the object's layout is not applied to it");
         Assert.IsTrue(released.Success, released.Error);
         CollectionAssert.AreEqual(new[] { "owner gone", "child gone" }, released.Output.Select(line => line.Trim()).ToArray());
+        Assert.AreEqual(ExecutionOutcome.Completed, resumed.Outcome, resumed.ErrorMessage);
+    }
+
+    // an object the program holds, its class given a field while it waits, holds both the field it had and the one it was given: let go of when the program
+    // goes on to its end, it lets go of what each holds.
+    [TestMethod]
+    public async Task AnObjectWhoseClassWasGivenAField_LetsGoOfWhatTheFieldHolds()
+    {
+        var program = Owning.Replace("    Stop\r\n", "    Stop\r\n    Obj.Adopt\r\n    Set Obj = Nothing\r\n", StringComparison.Ordinal);
+        var edited = ModuleWorkspace.ClassModule("Owner",
+            "Private mChild As Object",
+            "Private mOther As Object",
+            "Public Sub Adopt()", "    Set mOther = New Child", "End Sub",
+            "Private Sub Class_Terminate()", "    Debug.Print \"owner gone\"", "End Sub");
+        ExecuteSessionResult? resumed = null;
+        await ModuleWorkspace.InspectAsync([("Child", Child), ("Owner", Owner(true, Holding))], program, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Owner"], ("Child", ModuleType.ClassModule, Child),
+                ("Owner", ModuleType.ClassModule, edited), ("Program", ModuleType.StdModule, program));
+            resumed = await new HostDebugResumeHandler(provider, NullLogger<HostDebugResumeHandler>.Instance)
+                .Handle(new HostDebugResumeParams(), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(20));
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.Completed, resumed!.Outcome, resumed.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "owner gone", "child gone", "child gone" }, Output(resumed));
     }
 
     [TestMethod]

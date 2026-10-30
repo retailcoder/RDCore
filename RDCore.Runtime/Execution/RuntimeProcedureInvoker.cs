@@ -290,6 +290,16 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             }
         }
 
+        // a local an edit added to the procedure while the activation waited is one of its locals as much as those it began with.
+        foreach (var added in frame.AddedByAnEdit)
+        {
+            if (added is VBLocalVariableSymbol { IsStatic: false } variable && ObjectReferences.CanHoldAnObject(variable.ResolvedType)
+                && CellOf(frame, variable, -1) is { } handle)
+            {
+                ObjectReferences.Release(Session, handle);
+            }
+        }
+
         // a block the activation left by returning from inside it: an Exit Function in a With block.
         foreach (var holder in frame.TakeBlockHoldersOutside(null))
         {
@@ -318,10 +328,37 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     private static VBTypedValue DefaultValueOf(IRuntimeSession session, VBLocalVariableSymbol variable)
         => session.Symbols.Defaults?.DefaultValueOf(variable) ?? variable.ResolvedType.DefaultValue;
 
-    internal static void HoistLocals(IRuntimeSession session, CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals)
+    /// <summary>
+    /// Declares on an activation the locals an edit made while the program waited added to its procedure, each as the activation's own locals were declared
+    /// when it began: a <c>Dim</c> at its default, on the activation; a <c>Static</c> at its default, where the procedure's statics are, when it has no
+    /// storage yet. The activation lets go of them when it returns (<see cref="CallStackFrame.AddedByAnEdit"/>).
+    /// </summary>
+    /// <param name="session">The session the program is in.</param>
+    /// <param name="frame">The activation.</param>
+    /// <param name="procedure">The procedure the activation is of, as it is defined now.</param>
+    /// <returns>How many locals were declared.</returns>
+    public static int DeclareAddedLocals(IRuntimeSession session, CallStackFrame frame, VBTypeMemberSymbol procedure)
+    {
+        // a local the activation began with, or one declared since - at a stop, or by an earlier edit - is held already; a Static is the procedure's, and
+        // is new when the procedure the activation began as did not declare it.
+        var began = frame.Procedure is { } before ? GetLocals(before).Select(local => local.SemanticId).ToHashSet() : [];
+        ImmutableArray<BoundTypedSymbol> added = [.. GetLocals(procedure).Where(local => local is VBLocalVariableSymbol variable
+            && !began.Contains(variable.SemanticId) && !frame.AddedByAnEdit.Any(other => other.SemanticId == variable.SemanticId)
+            && (variable.IsStatic || !frame.TryResolve(variable, out _)))];
+        HoistLocals(session, frame, added, numbered: false);
+        foreach (var local in added)
+        {
+            frame.RecordAddedByAnEdit(local);
+        }
+
+        return added.Length;
+    }
+
+    // numbered: whether the locals are the procedure's own, which the frame's layout numbers; locals added by an edit are no part of its layout.
+    internal static void HoistLocals(IRuntimeSession session, CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals, bool numbered = true)
     {
         // the locals of the procedure the frame is laid out as are in its slots by number (S1.3).
-        var slots = frame.Layout is { LocalSlots: var numbered } && numbered.Length == locals.Length ? numbered : default;
+        var slots = numbered && frame.Layout is { LocalSlots: var slotted } && slotted.Length == locals.Length ? slotted : default;
         for (var i = 0; i < locals.Length; i++)
         {
             var local = locals[i];

@@ -48,6 +48,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         public Stack<int>? GoSubReturns;
         public Dictionary<int, (int? End, ValueBindingHandle Cell)>? BlockHolders;
         public List<Symbol>? DeclaredAtAStop;
+        public List<Symbol>? AddedByAnEdit;
         public Dictionary<SemanticId, MemoryAddress>? ReferenceVariants;
     }
 
@@ -1022,6 +1023,18 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     /// The locals of this activation that statements typed where the program waited declared (<see cref="PushDeclaredAtAStop"/>), in the order they were.
     /// </summary>
     public IReadOnlyList<Symbol> DeclaredAtAStop => (IReadOnlyList<Symbol>?)_occasional?.DeclaredAtAStop ?? [];
+
+    /// <summary>
+    /// The locals an edit made while the program waited added to the procedure this is an activation of, declared on it since
+    /// (<see cref="RecordAddedByAnEdit"/>): what the activation lets go of when it returns, beside the locals its procedure had when it began.
+    /// </summary>
+    public IReadOnlyList<Symbol> AddedByAnEdit => (IReadOnlyList<Symbol>?)_occasional?.AddedByAnEdit ?? [];
+
+    /// <summary>
+    /// Records that <paramref name="local"/>, a local an edit added to the procedure this is an activation of, was declared on it (<see cref="AddedByAnEdit"/>).
+    /// </summary>
+    /// <param name="local">The local, declared already.</param>
+    public void RecordAddedByAnEdit(Symbol local) => (Occasionally.AddedByAnEdit ??= []).Add(local);
 
     /// <summary>
     /// Declares <paramref name="symbol"/> on this frame as a <c>ByRef</c> reference parameter binding

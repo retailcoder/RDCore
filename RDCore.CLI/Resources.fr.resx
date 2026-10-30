@@ -503,12 +503,6 @@
   <data name="Host_Edit_HandlerOfAnActiveProcedure" xml:space="preserve">
     <value>le gestionnaire d'erreurs d'une procédure où se trouve le programme, ou l'instruction où son erreur a été levée</value>
   </data>
-  <data name="Host_Edit_LocalsOfAnActiveProcedure" xml:space="preserve">
-    <value>une variable locale ajoutée à une procédure où se trouve le programme, ou retirée, ce qui n'est pas encore appliqué à un programme en attente</value>
-  </data>
-  <data name="Host_Edit_FieldOfAClass" xml:space="preserve">
-    <value>un champ ajouté à une classe dont le programme peut détenir des objets, ce qui n'est pas encore appliqué à un programme en attente</value>
-  </data>
   <data name="Host_Edit_SignatureOfAnActiveProcedure" xml:space="preserve">
     <value>la signature d'une procédure où se trouve le programme</value>
   </data>

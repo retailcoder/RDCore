@@ -867,12 +867,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     public IObjectInstance CreateInstance(VBRuntimeObjectId objectId, VBClassModuleSymbol classModule)
     {
         var instance = new ObjectInstance(objectId, classModule, storage, table);
-        var fields = table.InstanceSymbols.Where(field =>
-            field.ParentUri.AbsoluteUri == classModule.Uri.AbsoluteUri
-            && field.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
-            && field is ITypedSymbol { ResolvedType: var _ });
-
-        foreach (var field in fields)
+        foreach (var field in InstanceFieldsOf(classModule))
         {
             instance.Push(field, DefaultValueOf(field));
         }
@@ -880,6 +875,29 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         _instances[objectId] = instance;
         return instance;
     }
+
+    public int ExtendLiveInstances()
+    {
+        var given = 0;
+        foreach (var instance in _instances.Values)
+        {
+            var held = instance.Fields.Concat(instance.StaticLocals).Select(field => field.SemanticId).ToHashSet();
+            foreach (var field in InstanceFieldsOf(instance.ClassModule).Where(field => !held.Contains(field.SemanticId)))
+            {
+                instance.Push(field, DefaultValueOf(field));
+                given++;
+            }
+        }
+
+        return given;
+    }
+
+    // the instance fields a class declares, as the session has them now.
+    private IEnumerable<Symbol> InstanceFieldsOf(VBClassModuleSymbol classModule)
+        => table.InstanceSymbols.Where(field =>
+            field.ParentUri.AbsoluteUri == classModule.Uri.AbsoluteUri
+            && field.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
+            && field is ITypedSymbol { ResolvedType: var _ });
 
     public bool TryGetInstance(VBRuntimeObjectId objectId, [NotNullWhen(true)][MaybeNullWhen(false)] out IObjectInstance? instance)
     {
