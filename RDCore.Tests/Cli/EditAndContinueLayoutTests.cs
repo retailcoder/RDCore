@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using RDCore.CLI;
 using RDCore.CLI.Host;
 using RDCore.CLI.Host.Handlers;
 using RDCore.Parsing;
@@ -157,44 +156,6 @@ public sealed class EditAndContinueLayoutTests
         var log = await EditedAsync([], Numbers, Reload([], removed), Reload([], readded));
 
         Same(["a", expected], log);
-    }
-
-    private static readonly string CalledTwice = Lines(
-        "Option Explicit",
-        "Public Sub Main()",
-        "    Inner",
-        "    Inner",
-        "End Sub",
-        "Private Sub Inner()",
-        "    Dim x As Long",
-        "    x = x + 42",
-        "    Stop",
-        "    Debug.Print \"a\"",
-        "    Stop",
-        "    Debug.Print \"b\"",
-        "End Sub");
-
-    // a local removed at one stop and added back as a Static at a later one is the procedure's Static, not the cell the removed local held.
-    [TestMethod]
-    public async Task ALocalRemoved_ThenAddedBackAsAStatic_AtALaterStop_IsTheProceduresStatic()
-    {
-        var removed = CalledTwice.Replace("    Dim x As Long\r\n    x = x + 42\r\n", string.Empty, StringComparison.Ordinal);
-        var readded = removed.Replace("    Debug.Print \"b\"\r\n", "    Static x As Long\r\n    x = x + 1: Debug.Print \"b x=\" & x\r\n", StringComparison.Ordinal);
-
-        var log = await EditedAsync([], CalledTwice, Reload([], removed), Reload([], readded));
-
-        Same(["a", "b x=1", "a", "b x=2"], log);
-    }
-
-    // a Dim of a procedure the program is in, made a Static, is an edit the program can't go on with, as in MS-VBA: run again, the procedure has a Static.
-    [TestMethod]
-    public async Task ALocalMadeAStatic_InAProcedureTheProgramIsIn_IsNotApplied()
-    {
-        var edited = CalledTwice.Replace("    Dim x As Long\r\n", "    Static x As Long\r\n", StringComparison.Ordinal);
-
-        var log = await EditedAsync([], CalledTwice, Reload([], edited));
-
-        Same([$"Refused: {string.Format(Resources.Host_ChangedWhileWaiting_Resume, $"Program.Inner ({Resources.Host_Edit_LocalOfAnActiveProcedure})")}"], log);
     }
 
     // a local removed and added back before the program goes on was never removed from it: it goes on with its value.

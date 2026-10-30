@@ -510,7 +510,7 @@
     <value>une procédure où se trouve le programme, retirée</value>
   </data>
   <data name="Host_Edit_LocalOfAnActiveProcedure" xml:space="preserve">
-    <value>une variable locale d'une procédure où se trouve le programme, dont le type a changé ou qui est devenue Static</value>
+    <value>une variable locale d'une procédure où se trouve le programme, dont le type a changé</value>
   </data>
   <data name="Host_Edit_StoredValue" xml:space="preserve">
     <value>une variable ou un champ qui détient une valeur, dont le type a changé ou qui a été retiré</value>
@@ -528,7 +528,7 @@
     <value>une option du module où se trouve le programme, ce qui n'est pas encore appliqué à un programme en attente</value>
   </data>
   <data name="Host_Edit_TypeHeldUntilRun" xml:space="preserve">
-    <value>un Type dont le programme peut détenir des valeurs, dont les champs ont changé : ses valeurs gardent leurs champs tant que le programme est en cours, et la modification s'applique une fois le programme terminé, et les valeurs du projet sont alors réinitialisées, comme MS-VBA réinitialise le projet pour cette modification - annulez la modification pour poursuivre</value>
+    <value>un Type dont le programme peut détenir des valeurs, dont les champs ont changé : ses valeurs gardent leurs champs tant que le programme est en cours, et la modification s'applique une fois le programme terminé - annulez la modification pour poursuivre</value>
   </data>
   <data name="Host_Edit_ValueThatSizesStoredData" xml:space="preserve">
     <value>une constante qui dimensionne ce que détient une variable, dont la valeur a changé</value>
