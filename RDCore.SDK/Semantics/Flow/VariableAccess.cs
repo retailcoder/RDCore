@@ -48,14 +48,33 @@ public enum VariableDefinitionKind
 /// <summary>
 /// A place where a variable may be given a value.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Every variable the procedure defines or uses has one <see cref="VariableDefinitionKind.Entry"/> definition, the value it has when the activation starts, and one
+/// definition for each instruction that may write it. A write to a part of it - <c>a(1) = 5</c>, <c>t.X = 1</c>, <c>a(1).X = 1</c>, <c>.X = 1</c> in a <c>With</c> block
+/// on a <c>Type</c> variable, <c>Mid(s, 1) = "x"</c> - is a definition of the variable the target is rooted at, of the kind
+/// <see cref="VariableDefinitionKind.PartialWrite"/> whatever the statement is.
+/// </para>
+/// <para>
+/// A definition is made when its instruction <em>completes</em>. An instruction that raises an error does not complete: along its error edge (<see cref="FlowEdges"/>),
+/// the values before it are the ones that reach the handler, the next statement, or the caller.
+/// </para>
+/// <para>
+/// What a procedure that is called writes is no definition here: a field, a global or a <c>Static</c> local that it may change is only a use where it is called, which
+/// keeps the value before it live. An argument it may take by reference is a definition (<see cref="VariableDefinitionKind.ByRefArgument"/>), which is not complete.
+/// </para>
+/// </remarks>
 /// <param name="Variable">The variable.</param>
 /// <param name="Offset">The offset of the instruction that defines it; <c>-1</c> for <see cref="VariableDefinitionKind.Entry"/>.</param>
 /// <param name="Kind">How.</param>
 /// <param name="IsComplete">
 /// Whether the whole value is replaced, every time the instruction completes: what ends the life of the value before. A write to a part, and an argument that may or may
-/// not be written, is not.
+/// not be written, is not; neither is a <c>For Each</c> loop's assignment of its control variable, which an empty collection never makes.
 /// </param>
-/// <param name="Expression">The expression that names the variable there; <see langword="null"/> for <see cref="VariableDefinitionKind.Entry"/>.</param>
+/// <param name="Expression">
+/// The target the instruction writes, the whole of it: <c>a(1).X</c> for a write to <c>a(1).X</c>, of which <see cref="Variable"/> is <c>a</c>. <see langword="null"/>
+/// for <see cref="VariableDefinitionKind.Entry"/>.
+/// </param>
 public sealed record class VariableDefinition(SemanticId Variable, int Offset, VariableDefinitionKind Kind, bool IsComplete, SyntaxNode? Expression);
 
 /// <summary>
