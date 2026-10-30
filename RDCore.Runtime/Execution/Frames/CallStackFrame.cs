@@ -385,7 +385,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
 
         // an error is being handled when an On Error GoTo caught it: its Resume goes back to the statement that raised it. One On Error Resume Next went on
         // past is gone by.
-        var handling = handler is { Mode: ErrorHandlingMode.Disabled, ActiveError: not null, HandlerEntry: not null };
+        var handling = handler.IsHandling;
 
         // where the activation goes on from, and may go back to: where it is, where each GoSub it is in returns to, and the statement a Resume goes back to.
         var returns = _occasional?.GoSubReturns?.ToList() ?? [];
