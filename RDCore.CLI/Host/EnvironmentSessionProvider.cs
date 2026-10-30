@@ -239,7 +239,7 @@ public sealed class EnvironmentSessionProvider(
         var settings = new JsonWorkspaceSettings(fileSystem, workspaceRoot.IsFile ? workspaceRoot.LocalPath : workspaceRoot.OriginalString);
         return host with
         {
-            Interaction = new RelayedUserInteraction(this, host.Interaction),
+            Interaction = new RelayedUserInteraction(this, host.Interaction, logger),
             DialogTitle = project.Name is { Length: > 0 } name ? name : host.DialogTitle,
             WorkspaceSettings = settings,
             ProgramSettings = MachinePlatform.ProgramSettings(environment, settings),

@@ -221,6 +221,45 @@ public sealed class ClientWithoutOmniSharpTests
         await platform.ShutdownAsync(7);
     }
 
+    // overnight #39/#75, what hung HexIDE: its probe answered a vbOKOnly box with vbYes, and the host showed a native dialog nobody saw. A client that shows dialogs
+    // is the one that answers, and an answer the dialog cannot have fails the run, untrappably, instead; one it can have is the program's.
+    private const string OkOnly = "Public Sub Main()\r\n    On Error Resume Next\r\n    Debug.Print MsgBox(\"from the add-in probe\")\r\n    Debug.Print \"after\"\r\nEnd Sub\r\n";
+
+    [TestMethod]
+    [DataRow(6, true, ExecutionOutcome.RuntimeError, "VBR50002", DisplayName = "answered with vbYes, which a vbOKOnly box has no button for")]
+    [DataRow(1, true, ExecutionOutcome.Completed, "", DisplayName = "answered with vbOK")]
+    [DataRow(0, false, ExecutionOutcome.RuntimeError, "VBR50001", DisplayName = "declined: not handled")]
+    [Timeout(180_000, CooperativeCancellation = true)]
+    public async Task AClientThatShowsDialogs_IsTheOneThatAnswers_AndNoDialogOfTheHostWaits(int result, bool handled, ExecutionOutcome outcome, string code)
+    {
+        await using var platform = await Platform.StartAsync();
+        platform.MessageBoxAnswer = () => new JsonObject { ["handled"] = handled, ["result"] = result };
+        var rpc = platform.Rpc;
+
+        var initialize = await rpc.RequestAsync(1, "initialize", platform.InitializeParams(AsHexIdeDeclares));
+        Assert.IsNull(initialize["error"], initialize.ToJsonString());
+        await rpc.NotifyAsync("initialized", new JsonObject());
+        Assert.IsNull((await rpc.RequestAsync(2, RDCorePlatformHandshake.Method, JsonNode.Parse(ClaimsDialogs)!.AsObject()))["error"]);
+
+        var executed = await rpc.RequestAsync(3, RDCorePlatformProtocol.SessionExecute, new JsonObject { ["source"] = OkOnly, ["moduleName"] = "Program", ["entryPoint"] = "Main" });
+
+        var told = $"{executed.ToJsonString()}\n{LogOf(platform.Root)}";
+        Assert.IsNull(executed["error"], told);
+        Assert.AreEqual((int)outcome, executed["result"]!["outcome"]!.GetValue<int>(), told);
+        var output = executed["result"]!["output"]!.AsArray().Select(line => line!.GetValue<string>().Trim()).ToArray();
+        if (outcome is ExecutionOutcome.Completed)
+        {
+            CollectionAssert.AreEqual(new[] { "1", "after" }, output, told);
+        }
+        else
+        {
+            Assert.AreEqual(code, executed["result"]!["errorCode"]!.GetValue<string>(), told);
+            Assert.DoesNotContain("after", output, "untrappable: On Error Resume Next does not go on past it");
+        }
+
+        await platform.ShutdownAsync(4);
+    }
+
     // the platform as a deployment has it, with a workspace of one module, and the language server started from it as an IDE starts it.
     private sealed class Platform : IAsyncDisposable
     {
@@ -238,11 +277,14 @@ public sealed class ClientWithoutOmniSharpTests
             Rpc = new JsonRpc(pipe, (method, _) =>
             {
                 Asked.Enqueue(method);
-                return method == RDCorePlatformProtocol.SessionMessageBox ? new JsonObject { ["handled"] = true, ["result"] = 6 } : null;
+                return method == RDCorePlatformProtocol.SessionMessageBox ? MessageBoxAnswer() : null;
             });
         }
 
         public JsonRpc Rpc { get; }
+
+        /// <summary>What the client answers a MsgBox with: vbYes, by default.</summary>
+        public Func<JsonObject> MessageBoxAnswer { get; set; } = () => new JsonObject { ["handled"] = true, ["result"] = 6 };
 
         public string Root => _root;
 

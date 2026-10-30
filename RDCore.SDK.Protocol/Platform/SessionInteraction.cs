@@ -65,6 +65,18 @@ public sealed record class MessageBoxResult
     /// <summary>The <c>VbMsgBoxResult</c> of the button that closed the dialog.</summary>
     public int Result { get; init; }
 
+    /// <summary>
+    /// Whether the one asked shows dialogs, and declined to answer this one: nobody else will, and the program's run fails (<c>VBR50001</c>). The language server
+    /// says so of a client that said it shows dialogs and did not handle one; the host shows no dialog of its own then.
+    /// </summary>
+    public bool Declined { get; init; }
+
+    /// <summary>
+    /// Why the answer cannot be used, when it cannot: a <see cref="Result"/> that is none of the dialog's buttons. The program's run fails with it
+    /// (<c>VBR50002</c>), naming the client, the buttons and the answer. <see langword="null"/> for an answer that can be used.
+    /// </summary>
+    public string? Failure { get; init; }
+
     /// <summary>The answer of one who has nobody to ask.</summary>
     public static MessageBoxResult NotHandled { get; } = new();
 }
@@ -85,6 +97,9 @@ public sealed record class InputBoxResult
 
     /// <summary>What was typed; ignored when <see cref="Cancelled"/>.</summary>
     public string Value { get; init; } = string.Empty;
+
+    /// <inheritdoc cref="MessageBoxResult.Declined"/>
+    public bool Declined { get; init; }
 
     /// <inheritdoc cref="MessageBoxResult.NotHandled"/>
     public static InputBoxResult NotHandled { get; } = new();
