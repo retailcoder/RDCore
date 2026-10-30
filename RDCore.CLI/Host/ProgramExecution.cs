@@ -506,8 +506,6 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
         provider.Output.Target = output;
         try
         {
-            // what the code as edited declares, the statement names: the locals an edit added, the fields a class was given.
-            ProgramEdits.Prepare(session);
             var (value, failure) = RunGuarded(session, stack, selected, procedure, run);
 
             lock (_sync)
@@ -567,6 +565,8 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
     {
         try
         {
+            // what the code as edited declares, the statement names: the locals an edit added, the fields a class was given.
+            ProgramEdits.Prepare(session);
             return run(session, stack, selected, procedure);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

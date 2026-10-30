@@ -274,18 +274,39 @@ internal sealed class ProgramEdits
         _ = session.Symbols.ExtendLiveInstances();
     }
 
+    // how many requests defined symbols or loaded code in a session, and how many had when its activations were last given what the code declares.
+    private sealed class Edits
+    {
+        public int Made;
+        public int PreparedAt;
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IRuntimeSession, Edits> EditsBySession = new();
+
+    /// <summary>
+    /// A request defined symbols or loaded code in <paramref name="session"/>: what its procedures declare may have changed.
+    /// </summary>
+    public static void Edited(IRuntimeSession session) => _ = Interlocked.Increment(ref EditsBySession.GetOrCreateValue(session).Made);
+
     /// <summary>
     /// Gives the activations of the program that waits the locals an edit added to their procedures, and the objects it holds the fields their classes were
-    /// given, before a statement typed at the stop runs: what the statement names, the code as edited declares. Nothing is retired or replaced, so that an
-    /// edit taken back before the program goes on loses nothing.
+    /// given, before a statement typed at the stop runs: what the statement names, the code as edited declares. A local the activation holds already is kept
+    /// as it is - one the edit removed or gave another type too - so that an edit taken back before the program goes on loses nothing; what the program goes
+    /// on with is laid out when it goes on (<see cref="Rebase"/>). Done once for the edits made since it was last done.
     /// </summary>
     public static void Prepare(IRuntimeSession session)
     {
-        foreach (var frame in session.CallStack.Frames.OfType<CallStackFrame>())
+        var edits = EditsBySession.GetOrCreateValue(session);
+        var made = Volatile.Read(ref edits.Made);
+        if (made != edits.PreparedAt)
         {
-            if (frame.Procedure is not null && CurrentProcedureOf(session, frame) is { } procedure)
+            edits.PreparedAt = made;
+            foreach (var frame in session.CallStack.Frames.OfType<CallStackFrame>())
             {
-                _ = RuntimeProcedureInvoker.DeclareAddedLocals(session, frame, procedure, goesOn: false);
+                if (frame.Procedure is not null && CurrentProcedureOf(session, frame) is { } procedure)
+                {
+                    _ = RuntimeProcedureInvoker.DeclareAddedLocals(session, frame, procedure, goesOn: false);
+                }
             }
         }
 

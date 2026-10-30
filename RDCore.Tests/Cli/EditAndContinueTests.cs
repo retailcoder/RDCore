@@ -918,6 +918,116 @@ public sealed class EditAndContinueTests
         CollectionAssert.AreEqual(new[] { "X=1 Y=0" }, Output(done));
     }
 
+    // the Type held while the program waited is applied with a reset of the project, as MS-VBA resets it for this edit: run again, a Static of the Type starts
+    // from its default, with the field it was given.
+    [TestMethod]
+    [Ignore("a Static declared as another type keeps the storage it was given, under the identity it was given it as, which a reset of the project does not reach: "
+        + "the redefinition of its procedure has to retire it")]
+    public async Task ATypeHeldWhileTheProgramWaited_ResetsTheProject_AStaticOfIt_StartsAgain()
+    {
+        var program = Lines(
+            "Option Explicit",
+            "Public Type T",
+            "    X As Long",
+            "End Type",
+            "Public Sub Main()",
+            "    Bump",
+            "End Sub",
+            "Private Sub Bump()",
+            "    Static s As T",
+            "    s.X = s.X + 1",
+            "    Stop",
+            "    Debug.Print \"X=\" & s.X",
+            "End Sub");
+        var edited = program.Replace("    X As Long\r\n", "    X As Long\r\n    Y As String\r\n", StringComparison.Ordinal)
+            .Replace("\"X=\" & s.X", "\"X=\" & s.X & \" Y=[\" & s.Y & \"]\"", StringComparison.Ordinal);
+        ExecuteSessionResult? again = null, done = null;
+        await ModuleWorkspace.InspectAsync([], program, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, edited));
+            again = await RunWithAsync(provider, edited);
+            done = await Resume(provider);
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.Suspended, again!.Outcome, string.Join("; ", again.Diagnostics ?? []));
+        Assert.AreEqual(ExecutionOutcome.Completed, done!.Outcome, done.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "X=1 Y=[]" }, Output(done));
+    }
+
+    // the project reset that applies a held Type lets go of the objects of the session: run again, an object whose field is of the Type is a new one, its field
+    // at its default, with the field the Type was given.
+    [TestMethod]
+    public async Task ATypeHeldWhileTheProgramWaited_ResetsTheProject_AnObjectsFieldOfIt_StartsAgain()
+    {
+        var holder = ModuleWorkspace.ClassModule("C",
+            "Option Explicit",
+            "Private V As T",
+            "Public Sub Bump()",
+            "    V.X = V.X + 1",
+            "End Sub",
+            "Public Function Show() As String",
+            "    Show = \"X=\" & V.X",
+            "End Function");
+        var program = Lines(
+            "Option Explicit",
+            "Public Type T",
+            "    X As Long",
+            "End Type",
+            "Public O As C",
+            "Public Sub Main()",
+            "    If O Is Nothing Then Set O = New C",
+            "    O.Bump",
+            "    Stop",
+            "    Debug.Print O.Show",
+            "End Sub");
+        var editedProgram = program.Replace("    X As Long\r\n", "    X As Long\r\n    Y As String\r\n", StringComparison.Ordinal);
+        var editedHolder = holder.Replace("\"X=\" & V.X", "\"X=\" & V.X & \" Y=[\" & V.Y & \"]\"", StringComparison.Ordinal);
+        ExecuteSessionResult? again = null, done = null;
+        await ModuleWorkspace.InspectAsync([("C", holder)], program, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadAsync(provider, ("C", ModuleType.ClassModule, editedHolder), ("Program", ModuleType.StdModule, editedProgram));
+            again = await RunWithAsync(provider, editedProgram);
+            done = await Resume(provider);
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.Suspended, again!.Outcome, string.Join("; ", again.Diagnostics ?? []));
+        Assert.AreEqual(ExecutionOutcome.Completed, done!.Outcome, done.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "X=1 Y=[]" }, Output(done));
+    }
+
+    // a module compiled against the Type as it was held, which no longer compiles once it is applied (it names a field the Type no longer has): the next run is
+    // refused with what is wrong with it, rather than running the code it had.
+    [TestMethod]
+    public async Task AModuleThatNoLongerCompilesOnceTheHeldTypeIsApplied_RefusesTheNextRun()
+    {
+        var shown = ModuleWorkspace.StandardModule("Mod2", "Option Explicit", "Public Sub Show()", "    Debug.Print \"X=\" & R.X", "End Sub");
+        var program = Lines(
+            "Option Explicit",
+            "Public Type T",
+            "    X As Long",
+            "End Type",
+            "Public R As T",
+            "Public Sub Main()",
+            "    R.X = 1",
+            "    Stop",
+            "    Mod2.Show",
+            "End Sub");
+        var edited = program.Replace("    X As Long\r\n", "    Z As Long\r\n", StringComparison.Ordinal).Replace("    R.X = 1\r\n", "    R.Z = 1\r\n", StringComparison.Ordinal);
+        ExecuteSessionResult? again = null;
+        await ModuleWorkspace.InspectWithModulesAsync([("Mod2", shown)], program, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadAsync(provider, ("Mod2", ModuleType.StdModule, shown), ("Program", ModuleType.StdModule, edited));
+            again = await RunWithAsync(provider, edited);
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.SyntaxError, again!.Outcome, again.ErrorMessage);
+        Assert.IsNotEmpty(again.Diagnostics);
+        StringAssert.Contains(string.Join("; ", again.Diagnostics), "Mod2");
+    }
+
     // a variable held as it was holds the reference to its object it held: the held definition applied, that reference is let go of, once - the object is
     // let go of when the last other is.
     [TestMethod]

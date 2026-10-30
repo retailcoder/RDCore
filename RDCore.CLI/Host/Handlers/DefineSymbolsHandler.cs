@@ -41,13 +41,14 @@ internal sealed class DefineSymbolsHandler(
             return Task.FromResult(new DefineSymbolsResult());
         }
 
-        var session = sessionProvider.Session;
-        var result = Define(session, request);
-
         // made against declarations a program in progress holds as they were: made again once the program is over, against them as they are declared - in
         // the order the requests came in, the latest of each module and phase.
-        HeldDefinitions.Received(session, $"{request.ModuleName}|{request.DeclareTypesOnly}|{request.CodeOnly}", request.ModuleName,
-            () => [.. Define(session, request).CodeErrors]);
+        var session = sessionProvider.Session;
+        var result = HeldDefinitions.Define(session, $"{request.ModuleName}|{request.DeclareTypesOnly}|{request.CodeOnly}", request.ModuleName,
+            loadsCode: !request.DeclareTypesOnly, () => Define(session, request), () => [.. Define(session, request).CodeErrors]);
+
+        // told once it is made: a statement typed at a stop from now on is given what the code as edited declares.
+        ProgramEdits.Edited(session);
         return Task.FromResult(result);
     }
 
