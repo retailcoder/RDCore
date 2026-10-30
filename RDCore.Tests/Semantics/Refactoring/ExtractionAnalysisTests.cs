@@ -11,14 +11,8 @@ namespace RDCore.Tests.Semantics.Refactoring;
 [TestClass]
 public sealed class ExtractionAnalysisTests
 {
-    // the plan of extracting the lines of the body from `first` to `last` (zero-based).
     private static ExtractionPlan Plan(string body, int first, int last, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub", bool optionExplicit = true)
-    {
-        var analyzed = FlowFixture.Analyze(body, header, end, optionExplicit);
-        var requested = new SourceRange(analyzed.FirstBodyLine + first, 0, analyzed.FirstBodyLine + last, 1);
-        Assert.IsTrue(ExtractionSelection.TrySnap(analyzed.Procedure, analyzed.Instructions, requested, out var selection, out var refusal, out _), $"refused: {refusal}");
-        return ExtractionAnalysis.Plan(selection!, analyzed.Graph, analyzed.Accesses, analyzed.Model, analyzed.Scopes);
-    }
+        => ExtractionFixture.Plan(body, first, last, header, end, optionExplicit);
 
     private static ExtractionParameter Parameter(ExtractionPlan plan, string name) => plan.Parameters.Single(parameter => parameter.Name == name);
 

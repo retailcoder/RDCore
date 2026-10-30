@@ -31,6 +31,12 @@ public enum ExtractionSelectionRefusal
 public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray<StatementNode> Statements, ImmutableArray<SyntaxNode> Declarations, IReadOnlySet<int> Region)
 {
     /// <summary>
+    /// The labels and line numbers written in the run, which move with it: a jump from outside to one of them lands in the selection. A label written before the
+    /// run names the call that replaces it.
+    /// </summary>
+    public ImmutableArray<string> Labels { get; init; } = [];
+
+    /// <summary>
     /// Snaps a requested range to whole statements.
     /// </summary>
     /// <param name="procedure">The procedure the range is in.</param>
@@ -48,8 +54,8 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
     /// naming it, rather than grown across a block boundary.
     /// </para>
     /// <para>
-    /// A declaration of a local is one of the block's lines as a statement is: an end on it takes it, and a declaration of several variables (<c>Dim a, b</c>) is
-    /// taken whole. A run of declarations alone holds no statement.
+    /// A declaration of a local, and a label, is one of the block's lines as a statement is: an end on it takes it, and a declaration of several variables
+    /// (<c>Dim a, b</c>) is taken whole. A run of declarations and labels alone holds no statement.
     /// </para>
     /// </remarks>
     public static bool TrySnap(MemberDeclarationNode procedure, InstructionList instructions, SourceRange requested,
@@ -106,13 +112,18 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
             }
 
             var range = new SourceRange(first.SourceLocation.Range.Start, last.SourceLocation.Range.End);
-            selection = new ExtractionSelection(range, statements, [.. run.Where(node => node is not StatementNode)], RegionOf(statements, range, instructions));
+            selection = new ExtractionSelection(range, statements, [.. run.Where(IsDeclaration)], RegionOf(statements, range, instructions))
+            {
+                Labels = [.. run.OfType<LineLabelNode>().Select(label => label.Name)],
+            };
             return true;
         }
     }
 
-    // what a block is written as, line by line: its statements, and the declarations of its locals among them.
-    private static bool IsWrittenInTheBlock(SyntaxNode node) => node is StatementNode or VariableDeclarationNode or ConstantDeclarationNode;
+    // what a block is written as, line by line: its statements, and the declarations of its locals and its labels among them.
+    private static bool IsWrittenInTheBlock(SyntaxNode node) => node is StatementNode or LineLabelNode || IsDeclaration(node);
+
+    private static bool IsDeclaration(SyntaxNode node) => node is VariableDeclarationNode or ConstantDeclarationNode;
 
     private static int FirstLineOf(SyntaxNode node) => node.SourceLocation.Range.Start.Line;
 
@@ -121,9 +132,12 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
     // whether a line is one the statement is written on, outside the bodies of its blocks: its header, an ElseIf or Else, its closer.
     private static bool OnHeaderOrCloser(SyntaxNode statement, int line) => line >= FirstLineOf(statement) && line <= LastLineOf(statement) && BlockHolding(statement, line) is null;
 
-    // the statements of the block of the statement that are written around the line, when the line is inside the body of one of its blocks.
+    // the statements of the block of the statement that are written around the line, when the line is inside the body of one of its blocks. The statement's own
+    // first and last lines are its header and its closer, whatever else is written on them: a single-line If is written on one.
     private static IReadOnlyList<SyntaxNode>? BlockHolding(SyntaxNode statement, int line)
-        => BlocksOf(statement).FirstOrDefault(block => block.Count > 0 && line >= FirstLineOf(block[0]) && line <= LastLineOf(block[^1]));
+        => line == FirstLineOf(statement) || line == LastLineOf(statement)
+            ? null
+            : BlocksOf(statement).FirstOrDefault(block => block.Count > 0 && line >= FirstLineOf(block[0]) && line <= LastLineOf(block[^1]));
 
     // the blocks a statement guards: its own, and those of the branches it holds (ElseIf, Else, Case).
     private static IEnumerable<IReadOnlyList<SyntaxNode>> BlocksOf(SyntaxNode node)

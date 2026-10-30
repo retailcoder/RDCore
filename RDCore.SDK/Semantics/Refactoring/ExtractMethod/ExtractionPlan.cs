@@ -67,7 +67,102 @@ public enum ExtractionRefusalKind
     /// expression again (<c>With New Thing</c>, <c>With Sheet.Range("A1")</c>), where the block evaluates it once.
     /// </summary>
     WithTargetIsNotAVariable,
+
+    /// <summary>
+    /// A jump from outside the selection lands in it - a <c>GoTo</c>, a <c>Resume</c> to a label, an error into a handler written in it - or control enters it other
+    /// than at its first statement (<strong>Extract Method §3.1</strong>). The labels move with the code, and a procedure's labels are its own.
+    /// </summary>
+    JumpIntoTheSelection,
+
+    /// <summary>
+    /// A <c>GoSub</c> in the selection to a routine outside it (<strong>Extract Method §3.1</strong>). The routine can be converted to a procedure first (§7).
+    /// </summary>
+    GoSubToOutside,
+
+    /// <summary>
+    /// A <c>Return</c> in the selection whose <c>GoSub</c> is outside it: the selection is part of a <c>GoSub</c> routine (<strong>Extract Method §3.1</strong>),
+    /// which can be converted to a procedure first (§7).
+    /// </summary>
+    ReturnOfAGoSubOutside,
+
+    /// <summary>
+    /// An <c>On Error</c> in the selection leaves the error handling of the source procedure other than the selection found it (<strong>Extract Method §3.4</strong>):
+    /// in the new procedure it would be the new procedure's, and the code after the call would run as it did before the selection.
+    /// </summary>
+    ErrorHandlingChanged,
+
+    /// <summary>
+    /// An <c>On Error GoTo</c> in the selection names a handler outside it, which the new procedure has no label of.
+    /// </summary>
+    HandlerOutsideTheSelection,
+
+    /// <summary>
+    /// A <c>Resume</c> in the selection, about an error raised before it (<strong>Extract Method §3.4</strong>): the new procedure has no error of its own to resume.
+    /// </summary>
+    ResumeOfAnErrorBefore,
 }
+
+/// <summary>
+/// Where control leaves the selection other than by falling through to the statement after it.
+/// </summary>
+public enum ExtractionExitKind
+{
+    /// <summary>An <c>Exit Sub</c>, <c>Exit Function</c> or <c>Exit Property</c>: the caller exits too.</summary>
+    Procedure,
+
+    /// <summary>An <c>Exit For</c> or <c>Exit Do</c> of a loop the selection is inside of.</summary>
+    Loop,
+
+    /// <summary>A <c>GoTo</c> (or <c>On…GoTo</c>, or a <c>Resume</c> of a label) to a label outside the selection.</summary>
+    Label,
+}
+
+/// <summary>
+/// A place outside the selection that control leaves it for, which the new procedure tells its caller to go to: one exit code each (<strong>Extract Method §3.1,
+/// §4.3</strong>).
+/// </summary>
+/// <param name="Kind">What leaves.</param>
+/// <param name="Target">The offset of the instruction control goes to; the graph's exit for <see cref="ExtractionExitKind.Procedure"/>.</param>
+/// <param name="Label">The label of the target, for <see cref="ExtractionExitKind.Label"/>.</param>
+/// <param name="From">The statements in the selection that leave for it.</param>
+public sealed record class ExtractionExit(ExtractionExitKind Kind, int Target, string? Label, ImmutableArray<SourceLocation> From);
+
+/// <summary>
+/// What the extracted code would do differently, which the user accepts or cancels: never silent (<strong>Extract Method §3.4</strong>).
+/// </summary>
+public enum ExtractionBehaviourChangeKind
+{
+    /// <summary>
+    /// A handler of the source procedure can catch an error of the selection. Extracted, the error is raised to it at the call: a <c>Resume Next</c> of it skips the
+    /// rest of the extracted code, and a <c>Resume</c> runs the whole call again.
+    /// </summary>
+    CallerHandlerResumes,
+
+    /// <summary>
+    /// A handler of the source procedure can catch an error of the selection, and none of them resumes: only what <c>Erl</c> says changes. A note.
+    /// </summary>
+    ErlOnly,
+
+    /// <summary>
+    /// The selection runs with <c>On Error Resume Next</c> on some paths and without it on others: the new procedure cannot start as all of them do.
+    /// </summary>
+    ResumeNextOnSomePaths,
+
+    /// <summary>
+    /// The selection has line numbers, and a handler of the source procedure can catch an error of it: <c>Erl</c> reports the call's line, as far as is known. To be
+    /// measured in Excel for an error raised in a callee.
+    /// </summary>
+    ErlReportsTheCall,
+}
+
+/// <summary>
+/// A behaviour change of the extraction, and what it is about.
+/// </summary>
+/// <param name="Kind">The change.</param>
+/// <param name="Handlers">The labels of the handlers it is about.</param>
+/// <param name="Resumes">The <c>Resume</c> statements of those handlers.</param>
+/// <param name="IsNote">Whether it is a note rather than a change to accept: what only <c>Erl</c> says.</param>
+public sealed record class ExtractionBehaviourChange(ExtractionBehaviourChangeKind Kind, ImmutableArray<string> Handlers, ImmutableArray<SourceLocation> Resumes, bool IsNote);
 
 /// <summary>
 /// A reason the selection is not extracted, and where it is.
@@ -140,6 +235,12 @@ public sealed record class ExtractionLocal(SemanticId Variable, string Name, VBT
 /// </param>
 /// <param name="WithTarget">The object of the <c>With</c> block the selection is inside of and uses a member of; <see langword="null"/> when there is none.</param>
 /// <param name="Refusals">Why the selection is not extracted; empty when it is.</param>
+/// <param name="Exits">Where control leaves the selection for, other than the statement after it (<strong>Extract Method §3.1</strong>).</param>
+/// <param name="StartsWithResumeNext">
+/// Whether the selection runs with <c>On Error Resume Next</c> on every path, which the new procedure starts with: an error resumes inside it, as it does inline
+/// (<strong>Extract Method §3.4</strong>).
+/// </param>
+/// <param name="BehaviourChanges">What the extracted code would do differently, and the notes (<strong>Extract Method §3.4</strong>).</param>
 public sealed record class ExtractionPlan(
     ExtractionSelection Selection,
     ImmutableArray<ExtractionParameter> Parameters,
@@ -148,7 +249,10 @@ public sealed record class ExtractionPlan(
     bool AssignsResult,
     bool ReadsResult,
     ExtractionWithTarget? WithTarget,
-    ImmutableArray<ExtractionRefusal> Refusals)
+    ImmutableArray<ExtractionRefusal> Refusals,
+    ImmutableArray<ExtractionExit> Exits,
+    bool StartsWithResumeNext,
+    ImmutableArray<ExtractionBehaviourChange> BehaviourChanges)
 {
     /// <summary>Whether the selection is extracted: nothing refuses it.</summary>
     public bool IsExtractable => Refusals.IsEmpty;

@@ -120,7 +120,10 @@ public static class ExtractionAnalysis
         }
 
         var withTarget = WithTargetOf(selection, accesses.Instructions, model, refusals);
-        return new ExtractionPlan(selection, [.. parameters], [.. locals], [.. movedOut], assignsResult, readsResult, withTarget, [.. refusals]);
+        var (exits, jumps) = ExtractionControlFlow.Of(selection, graph);
+        var (startsWithResumeNext, changes, errors) = ExtractionControlFlow.ErrorHandlingOf(region, states);
+        return new ExtractionPlan(selection, [.. parameters], [.. locals], [.. movedOut], assignsResult, readsResult, withTarget, [.. jumps, .. errors, .. refusals],
+            [.. exits], startsWithResumeNext, [.. changes]);
     }
 
     // arrays and variables of a Type are passed by reference only; a fixed-length string is passed as a String, by reference, so that what is written to it comes back.

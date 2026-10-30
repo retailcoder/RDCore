@@ -135,7 +135,7 @@ public sealed class ErrorHandlingStates
             .Append(fault + 1).Append(ControlFlowGraph.NextAfterAnError(graph.Instructions.Items[fault])).Distinct();
 
     // what running the instruction to completion leaves.
-    private static ErrorHandlingState After(Instruction instruction, ErrorHandlingState before) => instruction.Kind switch
+    internal static ErrorHandlingState After(Instruction instruction, ErrorHandlingState before) => instruction.Kind switch
     {
         // inside a handler, the policy set is for after the handler ends: the error stays active (MS-VBA, oracle\s53 C01-C03).
         InstructionKind.OnErrorGoTo => new ErrorHandlingState(ErrorHandlingPolicy.GoTo, instruction.Target, before.IsHandling),
