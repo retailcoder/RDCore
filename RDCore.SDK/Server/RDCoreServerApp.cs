@@ -339,8 +339,9 @@ public abstract class RDCoreServerApp(
             }
 
             // the other half of the platform handshake: what the connected client expects of us.
-            // A handler serving an optional, client-driven request family consults it.
-            services.AddSingleton<IPlatformClientCapabilitiesService, PlatformClientCapabilitiesService>();
+            // A handler serving an optional, client-driven request family consults it. It logs what it
+            // is told with this app's logger, which writes to the file; this container's write to the client.
+            services.AddSingleton<IPlatformClientCapabilitiesService>(new PlatformClientCapabilitiesService(logger));
 
             // OmniSharp's own AddOptions() hands handlers an unconfigured SdkServerOptions; bridge the
             // configured instance so a closed-type registration wins over the open generic.
