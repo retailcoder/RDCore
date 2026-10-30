@@ -140,7 +140,8 @@ read by a program's code, whose handler it doesn't reach.
 
 |Code|Description|
 |---|---|
-|[`VBR50001`](../diagnostics/vbr50001.md)|Nobody to answer: a program run unattended opens a dialog. Untrappable.|
+|[`VBR50001`](../diagnostics/vbr50001.md)|Nobody to answer: a program run unattended opens a dialog, or the client that shows its dialogs declines one. Untrappable.|
+|[`VBR50002`](../diagnostics/vbr50002.md)|Unusable dialog answer: the client that shows a program's dialogs answers one with what it can't be answered with (a button the `MsgBox` doesn't have), or can't be reached. Untrappable.|
 
 ## Application Errors
 

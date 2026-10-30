@@ -234,6 +234,18 @@
   <data name="VBRuntimeError_NobodyToAnswer_Verbose" xml:space="preserve">
     <value>{0} dans un programme exécuté sans surveillance (--unattended) : personne n'est là pour y répondre, et l'exécution échoue.</value>
   </data>
+  <data name="VBRuntimeError_NobodyToAnswer_Declined" xml:space="preserve">
+    <value>{1}, qui affiche les dialogues du programme, a refusé de répondre à son {0} : personne d'autre ne le fera, et l'exécution échoue.</value>
+  </data>
+  <data name="VBRuntimeError_UnusableDialogAnswer_NoSuchButton" xml:space="preserve">
+    <value>{0} a répondu au MsgBox du programme ({1}) par {2}, qui n'est aucun de ses boutons : le programme ne peut pas continuer avec cette réponse, et l'exécution échoue.</value>
+  </data>
+  <data name="VBRuntimeError_UnusableDialogAnswer_NotRelayed" xml:space="preserve">
+    <value>Le {0} du programme n'a pas pu être relayé au client qui affiche ses dialogues ({1}) : l'exécution échoue, plutôt que d'attendre un dialogue que personne ne voit.</value>
+  </data>
+  <data name="UnnamedClient" xml:space="preserve">
+    <value>Le client</value>
+  </data>
   <data name="VBForLoopOperandNotOfLoopType_Verbose" xml:space="preserve">
     <value>Cette boucle For compte en {0}, et son début, sa fin ou son pas n'est pas une valeur de ce type.</value>
   </data>

@@ -376,6 +376,10 @@
   href: vbr00744.md
 - name: VBR00746 — Replacements too long
   href: vbr00746.md
+- name: VBR50001 — Nobody to answer
+  href: vbr50001.md
+- name: VBR50002 — Unusable dialog answer
+  href: vbr50002.md
 - name: RDC00101 — Implicit declarations enabled
   href: rdc00101.md
 - name: RDC00102 — Implicit non-default array base
