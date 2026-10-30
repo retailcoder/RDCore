@@ -530,7 +530,7 @@ Long Live the Cucumber (Latin)</comment>
     <value>an option of the module the program is in, which is not applied to a program that waits yet</value>
   </data>
   <data name="Host_Edit_TypeHeldUntilRun" xml:space="preserve">
-    <value>a Type whose values the program may hold, given other fields: its values keep the fields they have while the program is in progress, and the edit applies once the program is over - take the edit back to go on</value>
+    <value>a Type whose values the program may hold, given other fields: its values keep the fields they have while the program is in progress, and the edit applies once the program is over, and the project's values are reset then, as MS-VBA resets the project for this edit - take the edit back to go on</value>
   </data>
   <data name="Host_Edit_ValueThatSizesStoredData" xml:space="preserve">
     <value>a constant that sizes what a variable holds, given another value</value>

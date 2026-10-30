@@ -61,7 +61,7 @@ with its reason. Take the edit back and go on, or run the program again to have 
 
 | You changed… | Why it waits |
 |---|---|
-| A `Type` whose values the program may hold, a field added to it or changed in it | Those values are laid out already, by the fields the `Type` had. The `Type` keeps those fields for as long as the program is in progress: take the edit back and go on, or end the program, and the edit applies. |
+| A `Type` whose values the program may hold, a field added to it or changed in it | Those values are laid out already, by the fields the `Type` had. The `Type` keeps those fields for as long as the program is in progress: take the edit back and go on, or end the program, and the edit applies. The project's values are reset then, as MS-VBA resets the project for this edit: every variable starts again from its default, and the objects go, as after an `End`. |
 | A `Static` removed from a procedure | What the procedure stored in it outlives the call: run the program again to have it gone. |
 | A local's type, or a variable's type, while it holds a value | The value would have to be converted under the program. A module variable or a `Static` keeps its value, as it was declared, for as long as the program is in progress: take the edit back and go on with it, or end the program, and the edit applies. |
 | A `Const` (or `Enum` member) that sizes an array or a `String * N`, given another value, directly or through another `Const` | What it sizes exists already, at its old size. |
@@ -150,11 +150,12 @@ Measured in Excel (64-bit) at a `Stop` in a procedure, across 44 kinds of edit, 
 | A caller's call line | **resets** | waits, and names the edit |
 | A local added (`Dim`) | goes on | goes on |
 | A local removed; a `Static` added | **resets** | goes on |
-| A local retyped | **resets** | waits, and names the edit |
+| A local retyped, or a `Dim` made a `Static` | **resets** | waits, and names the edit |
 | A `Private` module variable, a `Const` or a `Declare` added | goes on | goes on |
 | A `Public` module variable added | **resets** | goes on |
 | A procedure added, in a module or a class | **resets** | goes on |
 | A `Type` or an `Enum` added, or a member added to an `Enum` | **resets** | goes on |
+| A field added to or changed in a `Type` the program may hold values of | **resets** | waits, and names the edit; the project is reset once the program is over |
 | A `Const`'s value changed | **resets** | goes on, unless it sizes what a variable holds, or a running procedure read it (waits) |
 | A procedure's parameters changed, for one you're not in | **resets** | goes on |
 | The same, for the one you're in | **resets** | waits, and names the edit |

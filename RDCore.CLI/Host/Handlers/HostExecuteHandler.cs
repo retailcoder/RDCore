@@ -92,6 +92,18 @@ internal sealed class HostExecuteHandler(
             };
         }
 
+        // a module that no longer compiled once what a program held was applied keeps the code it had: the run is refused rather than running that code, as
+        // MS-VBA refuses to run anything, a statement typed at a prompt too, while the project does not compile.
+        HeldDefinitions.Loaded(session, request.ModuleName);
+        if (HeldDefinitions.FailedToLoad(session, except: request.ModuleName) is { Count: > 0 } failed)
+        {
+            return new ExecuteSessionResult
+            {
+                Outcome = ExecutionOutcome.SyntaxError,
+                Diagnostics = failed,
+            };
+        }
+
         if (!session.Symbols.TryResolveValue(request.EntryPoint, module, out var entry) || entry is not VBTypeMemberSymbol entryPoint)
         {
             return NotFound(string.Format(Resources.Host_NotAProcedureOfTheModule, request.ModuleName, request.EntryPoint));
