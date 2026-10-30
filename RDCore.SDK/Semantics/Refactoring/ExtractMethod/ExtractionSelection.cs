@@ -57,6 +57,9 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
     /// A declaration of a local, and a label, is one of the block's lines as a statement is: an end on it takes it, and a declaration of several variables
     /// (<c>Dim a, b</c>) is taken whole. A run of declarations and labels alone holds no statement.
     /// </para>
+    /// <para>
+    /// A range that ends at the first character of a line, after the line it starts on, ends on the line before: it is how an editor selects whole lines.
+    /// </para>
     /// </remarks>
     public static bool TrySnap(MemberDeclarationNode procedure, InstructionList instructions, SourceRange requested,
         out ExtractionSelection? selection, out ExtractionSelectionRefusal refusal, out StatementNode? cut)
@@ -65,8 +68,9 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
         refusal = ExtractionSelectionRefusal.NoStatement;
         cut = null;
 
+        // a selection of whole lines ends at the start of the line after the last: that line is not in it.
         var start = requested.Start.Line;
-        var end = requested.End.Line;
+        var end = requested.End is { Character: 0, Line: var next } && next > start ? next - 1 : requested.End.Line;
         if (start <= procedure.SourceLocation.Range.Start.Line || end >= procedure.SourceLocation.Range.End.Line)
         {
             // the header and the End line are the procedure's, which is never extracted.

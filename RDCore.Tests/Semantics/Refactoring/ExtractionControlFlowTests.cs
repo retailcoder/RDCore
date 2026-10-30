@@ -81,6 +81,13 @@ public sealed class ExtractionControlFlowTests
         Assert.AreEqual("Done", exit.Label);
     }
 
+    // the second review's 2a-9: an exit a literal condition never takes is still code the new procedure has, and an edit of the literal takes it.
+    [TestMethod]
+    [DataRow("If False Then Exit Sub\nDebug.Print n", 0, 0, ExtractionExitKind.Procedure, DisplayName = "behind If False")]
+    [DataRow("Dim i As Long\nDo\nIf False Then Exit Do\ni = i + 1\nLoop While True", 2, 3, ExtractionExitKind.Loop, DisplayName = "out of a loop that never ends")]
+    public void AnExitALiteralConditionNeverTakes_IsAnExitAllTheSame(string body, int first, int last, ExtractionExitKind kind)
+        => Assert.AreEqual(kind, Plan(body, first, last).Exits.Single().Kind);
+
     [TestMethod]
     public void TwoExitsToOneTarget_AreOneExit()
         => Assert.HasCount(1, Plan("If n = 0 Then Exit Sub\nIf n = 1 Then Exit Sub\nDebug.Print n", 0, 1).Exits);

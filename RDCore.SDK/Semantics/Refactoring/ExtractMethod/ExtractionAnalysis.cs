@@ -140,7 +140,8 @@ public static class ExtractionAnalysis
         }
 
         var constants = ConstantsOf(selection, accesses.Instructions, model, scopes, refusals);
-        var (exits, jumps) = ExtractionControlFlow.Of(selection, graph);
+        // the exits and jumps are of the code as it is written: one a literal condition never takes is still there, and an edit of the literal takes it.
+        var (exits, jumps) = ExtractionControlFlow.Of(selection, ControlFlowGraph.Of(graph.Instructions, model, foldConstants: false));
         var (startsWithResumeNext, changes, errors) = ExtractionControlFlow.ErrorHandlingOf(region, states, ReadsErr(region, accesses.Instructions, scopes, model));
         return new ExtractionPlan(selection, [.. parameters], [.. locals], [.. movedOut], assignsResult, readsResult, withTarget, [.. jumps, .. errors, .. refusals],
             [.. exits], startsWithResumeNext, [.. changes])
