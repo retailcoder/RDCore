@@ -64,8 +64,10 @@ internal sealed class RuntimeSession(
     // the objects whose Terminate is running.
     private readonly HashSet<VBRuntimeObjectId> _terminating = [];
 
-    // while a variable a definition replaced lets go of what it held: nothing it destroys runs a Terminate.
-    private bool _resetting;
+    // while a variable a definition replaced lets go of what it held, on this thread: nothing that release destroys runs a Terminate. A release another thread
+    // makes meanwhile is no part of it, and runs the Terminate of what it destroys.
+    [ThreadStatic]
+    private static bool _resetting;
 
     /// <summary>
     /// Lets go of the objects <paramref name="cell"/> holds, its storage freed by a definition that replaces its variable: each reference it was is dropped,
