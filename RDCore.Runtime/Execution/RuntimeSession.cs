@@ -549,9 +549,15 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     public IReadOnlyList<Symbol> ApplyHeldDefinitions()
     {
         ImmutableDictionary<string, (Symbol Symbol, ScopeKind Scope)> held;
+        ImmutableDictionary<SemanticId, VBLocalVariableSymbol> statics;
         lock (_resetLock)
         {
-            (held, _held, _holdsStoredValues) = (_held, _held.Clear(), false);
+            (held, _held, statics, _heldStatics, _holdsStoredValues) = (_held, _held.Clear(), _heldStatics, _heldStatics.Clear(), false);
+        }
+
+        foreach (var original in statics.Values)
+        {
+            Retired(original);
         }
 
         var applied = new List<Symbol>();
@@ -633,6 +639,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
             return false;
         }
 
+        // a procedure defined again: its Statics are storage kept by their identity, which a Static declared as another type, or removed, is no storage of.
+        if (existing is VBTypeMemberSymbol procedure && symbol is VBTypeMemberSymbol edited)
+        {
+            RetireStatics(procedure, edited);
+        }
+
         // the same declaration, written again: a variable that holds storage and is declared as the type it was.
         // Anything else is a different variable - or no variable - and is replaced the long way.
         var sameDeclaration = existing is ITypedSymbol { ResolvedType: var before }
@@ -669,6 +681,74 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         // symbol itself leaves what it holds where it is.
         table.Replace(symbol, scope);
         return true;
+    }
+
+    // the Statics held as they were while a program is in progress, by identity: each as it was declared when it was given its storage.
+    private ImmutableDictionary<SemanticId, VBLocalVariableSymbol> _heldStatics = ImmutableDictionary<SemanticId, VBLocalVariableSymbol>.Empty;
+
+    // the Statics of a procedure whose storage its edited definition no longer declares as it is - one given another type, or removed - let go of what they
+    // hold, as a variable a definition replaces does, and the procedure's next call gives one it declares storage of the type it is declared as. While a
+    // program is in progress, that is held until the program is over (ApplyHeldDefinitions), and the Static declared as it was again takes it back.
+    private void RetireStatics(VBTypeMemberSymbol procedure, VBTypeMemberSymbol edited)
+    {
+        static IEnumerable<VBLocalVariableSymbol> StaticsOf(VBTypeMemberSymbol member)
+            => RuntimeProcedureInvoker.GetLocals(member).OfType<VBLocalVariableSymbol>().Where(local => local.IsStatic);
+
+        var declared = StaticsOf(edited).ToDictionary(local => local.SemanticId);
+        foreach (var current in StaticsOf(procedure))
+        {
+            // a Static held as it was is what its storage was given as, whatever the procedure was defined as since.
+            VBLocalVariableSymbol original;
+            lock (_resetLock)
+            {
+                original = _heldStatics.GetValueOrDefault(current.SemanticId) ?? current;
+            }
+
+            if (!SessionBindings.TryGetAddress(original, out _))
+            {
+                continue;
+            }
+
+            if (declared.TryGetValue(original.SemanticId, out var now) && IsSameType(original.ResolvedType, now.ResolvedType))
+            {
+                lock (_resetLock)
+                {
+                    _heldStatics = _heldStatics.Remove(original.SemanticId);
+                }
+
+                continue;
+            }
+
+            lock (_resetLock)
+            {
+                if (_holdsStoredValues)
+                {
+                    _heldStatics = _heldStatics.SetItem(original.SemanticId, original);
+                    continue;
+                }
+
+                _heldStatics = _heldStatics.Remove(original.SemanticId);
+            }
+
+            Retired(original);
+        }
+    }
+
+    // a Static's storage freed: what it held is let go of, and the procedure's next call gives it storage again.
+    private void Retired(VBLocalVariableSymbol original)
+    {
+        if (LettingGo is { } letGo && SessionBindings.TryGetAddress(original, out var address) && SessionBindings.TryRead(address, out var cell) && cell is not null)
+        {
+            letGo(cell);
+        }
+
+        if (SessionBindings.TryDeallocate(original))
+        {
+            lock (_resetLock)
+            {
+                _valuesReset = _valuesReset.Add(original);
+            }
+        }
     }
 
     // a symbol replaced the long way, its storage freed and allocated again: what a variable held is let go of with it, the objects it held among it - each
