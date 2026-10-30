@@ -106,7 +106,10 @@ public sealed class RDCorePlatformJsonWireTests
             {
                 Parsing = new ParserCapabilities { ParseFullDocument = new ParseFullDocument(true) },
                 EnvironmentHost = new EnvironmentHostCapabilities { DefineSymbols = new DefineSymbols(true) },
-                LanguageServer = new LanguageServerCapabilities { SessionExecute = new SessionExecute(true), SessionInteraction = new SessionInteraction(true) },
+                LanguageServer = new LanguageServerCapabilities
+                {
+                    SessionExecute = new SessionExecute(true), SessionInteraction = new SessionInteraction(true), Unattended = new Unattended(true),
+                },
             },
         });
         yield return Same(new PlatformInitializeParams { ExpectedComponent = CoreServerComponent.LanguageServer, Expected = new CorePlatformClientCapabilities { LanguageServer = new() } });

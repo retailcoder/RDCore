@@ -719,6 +719,9 @@
   <data name="CLI_Theme" xml:space="preserve">
     <value>Le thème avec lequel la console démarre. THEME ne change que le thème de cette session.</value>
   </data>
+  <data name="CLI_Unattended" xml:space="preserve">
+    <value>Si la console exécute les programmes sans surveillance (--unattended) : personne n'est là pour répondre à une boîte de dialogue, et un programme qui en ouvre une - MsgBox, InputBox, un formulaire affiché - échoue avec VBR50001.</value>
+  </data>
   <data name="Config_Summary" xml:space="preserve">
     <value>Affiche les paramètres de la plateforme, et les règle pour vous</value>
   </data>

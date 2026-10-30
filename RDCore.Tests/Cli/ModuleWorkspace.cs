@@ -142,6 +142,27 @@ internal static class ModuleWorkspace
         => RunCoreAsync(classes, program, errorsOnly: false, libraries: libraries, modules: modules);
 
     /// <summary>
+    /// Runs <c>Program.Main</c> unattended, as the language server runs it for a client that expects <c>Unattended</c>: nobody is there to answer a dialog.
+    /// What came of the run, whatever it was.
+    /// </summary>
+    /// <param name="classes">The class modules of the workspace.</param>
+    /// <param name="program">The source of the <c>Program</c> standard module.</param>
+    /// <param name="libraries">The libraries the project references; only the standard library when omitted.</param>
+    /// <param name="forms">The forms of the workspace, whose parse has what their designer declares.</param>
+    public static async Task<ExecuteSessionResult> RunUnattendedAsync(
+        IReadOnlyList<(string Name, string Source)> classes, string program, WorkspaceLibraries? libraries = null,
+        IReadOnlyList<(string Name, string Source, FormDescriptor Designer)>? forms = null)
+    {
+        ExecuteSessionResult? ran = null;
+        await RunCoreAsync(classes, program, errorsOnly: false, inspect: (_, result, _) =>
+        {
+            ran = result;
+            return Task.CompletedTask;
+        }, libraries: libraries, forms: forms, unattended: true);
+        return ran!;
+    }
+
+    /// <summary>
     /// Loads the workspace like <see cref="LoadErrorsAsync"/>, and asks the host what the semantic analysis pass found out about it, as the language server does.
     /// </summary>
     /// <param name="classes">The class modules of the workspace.</param>
@@ -244,7 +265,7 @@ internal static class ModuleWorkspace
         WorkspaceLibraries? libraries = null, IReadOnlyList<(string Name, string Source)>? modules = null,
         IReadOnlyList<(string Name, string Source, FormDescriptor Designer)>? forms = null, bool programFirst = false,
         VBBuildConfiguration configuration = VBBuildConfiguration.Debug, VBExecutionEngine engine = VBExecutionEngine.Interpreter,
-        bool releaseDropsDebugStatements = false, IReadOnlyList<(string Name, string Source, DocClassType? Super)>? documents = null)
+        bool releaseDropsDebugStatements = false, IReadOnlyList<(string Name, string Source, DocClassType? Super)>? documents = null, bool unattended = false)
     {
         var loadErrors = new List<string>();
 
@@ -325,6 +346,7 @@ internal static class ModuleWorkspace
                     ModuleName = "Program",
                     EntryPoint = "Main",
                     Debug = debug,
+                    Unattended = unattended,
                 }, cancellation);
 
         // the first run's request is cancelled once the program is seen where the test wants it, and not after a time, which a slower machine would spend
