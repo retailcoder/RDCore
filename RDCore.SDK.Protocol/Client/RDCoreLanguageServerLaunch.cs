@@ -12,10 +12,11 @@ public sealed record class RDCoreLanguageServerLaunchOptions
     /// <summary>
     /// The platform root: the folder of <c>rdcore.json</c> (<see cref="PlatformManifest.FileName"/>), with a subfolder for each component.
     /// </summary>
+    /// <remarks>A relative path is relative to the current directory of the process that prepares the launch.</remarks>
     public required string PlatformRoot { get; init; }
 
     /// <summary>
-    /// The workspace the language server opens, as the client names it: its folder's <c>file:</c> URI.
+    /// The workspace the language server opens, as the client names it: its folder's absolute <c>file:</c> URI.
     /// </summary>
     public required string Workspace { get; init; }
 
@@ -45,8 +46,12 @@ public sealed record class RDCoreLanguageServerLaunchOptions
 /// The platform root is given to the server explicitly (<see cref="PlatformRootEnvironmentVariable"/>), whatever the folder the IDE starts it in, and is inherited by
 /// every process it starts.
 /// </para>
+/// <para>
+/// The executable is the one the manifest names, with or without <c>.exe</c>: a platform deployed on Windows names <c>RDCore.LanguageServer.exe</c>, which is
+/// <c>RDCore.LanguageServer</c> elsewhere.
+/// </para>
 /// </remarks>
-public sealed record class RDCoreLanguageServerLaunch
+public sealed class RDCoreLanguageServerLaunch
 {
     /// <summary>
     /// The environment variable that names the platform root to a process of the platform: <c>RDCORE_PLATFORM_ROOT</c>.
@@ -81,11 +86,17 @@ public sealed record class RDCoreLanguageServerLaunch
     /// </summary>
     /// <param name="options">The platform, the workspace, and the pipe.</param>
     /// <returns>How to start it.</returns>
+    /// <exception cref="ArgumentException">The workspace is not an absolute <c>file:</c> URI.</exception>
     /// <exception cref="DirectoryNotFoundException">The platform root does not exist.</exception>
     /// <exception cref="FileNotFoundException">The platform root has no manifest, or the manifest names a language server that is not there.</exception>
     /// <exception cref="InvalidDataException">The manifest is not one, or names no language server.</exception>
     public static RDCoreLanguageServerLaunch Prepare(RDCoreLanguageServerLaunchOptions options)
     {
+        if (!Uri.TryCreate(options.Workspace, UriKind.Absolute, out var workspace) || !workspace.IsFile)
+        {
+            throw new ArgumentException($"The workspace '{options.Workspace}' is not an absolute file: URI.", nameof(options));
+        }
+
         var root = Path.GetFullPath(options.PlatformRoot);
         if (!Directory.Exists(root))
         {
@@ -98,11 +109,9 @@ public sealed record class RDCoreLanguageServerLaunch
             throw new InvalidDataException($"The platform manifest of '{root}' names no language server ('langService').");
         }
 
-        var executable = Path.GetFullPath(Path.Combine(root, manifest.LangService.Replace('\\', '/').Replace('/', Path.DirectorySeparatorChar)));
-        if (!File.Exists(executable))
-        {
-            throw new FileNotFoundException($"The platform manifest of '{root}' names a language server that is not there.", executable);
-        }
+        var named = Path.GetFullPath(Path.Combine(root, manifest.LangService.Replace('\\', '/').Replace('/', Path.DirectorySeparatorChar)));
+        var executable = ExecutableOf(named)
+            ?? throw new FileNotFoundException($"The platform manifest of '{root}' names a language server that is not there.", named);
 
         var pipe = options.PipeName ?? NewPipeName();
         List<string> arguments = ["--pipe-name", pipe, "--workspace", options.Workspace];
@@ -121,6 +130,18 @@ public sealed record class RDCoreLanguageServerLaunch
             Arguments = arguments,
             Environment = new Dictionary<string, string> { [PlatformRootEnvironmentVariable] = root },
         };
+    }
+
+    // the executable as named, or else as this platform names it: a manifest written on Windows names an .exe, which an apphost elsewhere has no extension for.
+    private static string? ExecutableOf(string named)
+    {
+        if (File.Exists(named))
+        {
+            return named;
+        }
+
+        var other = named.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? named[..^4] : named + ".exe";
+        return File.Exists(other) ? other : null;
     }
 
     /// <summary>
