@@ -14,10 +14,10 @@ namespace RDCore.CLI.App.Repl;
 /// </remarks>
 /// <param name="interaction">The shell's dialogs.</param>
 /// <param name="console">The shell's console.</param>
-internal sealed class ReplMessageBoxHandler(ReplUserInteraction interaction, IReplConsole console) : IJsonRpcRequestHandler<SessionMessageBoxParams, MessageBoxResult>
+internal sealed class ReplMessageBoxHandler(ReplUserInteraction interaction, IReplConsole console) : IJsonRpcRequestHandler<SessionMessageBoxRequest, MessageBoxResult>
 {
     /// <inheritdoc/>
-    public Task<MessageBoxResult> Handle(SessionMessageBoxParams request, CancellationToken cancellationToken)
+    public Task<MessageBoxResult> Handle(SessionMessageBoxRequest request, CancellationToken cancellationToken)
         // the console is read on a thread of its own: the dialog waits for a person, and the connection does not.
         => Task.Run(() =>
         {
@@ -32,10 +32,10 @@ internal sealed class ReplMessageBoxHandler(ReplUserInteraction interaction, IRe
 /// </summary>
 /// <param name="interaction">The shell's dialogs.</param>
 /// <param name="console">The shell's console.</param>
-internal sealed class ReplInputBoxHandler(ReplUserInteraction interaction, IReplConsole console) : IJsonRpcRequestHandler<SessionInputBoxParams, InputBoxResult>
+internal sealed class ReplInputBoxHandler(ReplUserInteraction interaction, IReplConsole console) : IJsonRpcRequestHandler<SessionInputBoxRequest, InputBoxResult>
 {
     /// <inheritdoc/>
-    public Task<InputBoxResult> Handle(SessionInputBoxParams request, CancellationToken cancellationToken)
+    public Task<InputBoxResult> Handle(SessionInputBoxRequest request, CancellationToken cancellationToken)
         => Task.Run(() =>
         {
             ReplInteraction.WriteOutput(console, request.Output);

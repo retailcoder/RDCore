@@ -15,10 +15,10 @@ internal interface IInteractionClient
     bool ShowsDialogs { get; }
 
     /// <summary>Asks the client to answer a <c>MsgBox</c> (<c>rdcore/session/interaction/msgBox</c>).</summary>
-    Task<MessageBoxResult> MessageBoxAsync(SessionMessageBoxParams request, CancellationToken token);
+    Task<MessageBoxResult> MessageBoxAsync(SessionMessageBoxRequest request, CancellationToken token);
 
     /// <summary>Asks the client to answer an <c>InputBox</c> (<c>rdcore/session/interaction/inputBox</c>).</summary>
-    Task<InputBoxResult> InputBoxAsync(SessionInputBoxParams request, CancellationToken token);
+    Task<InputBoxResult> InputBoxAsync(SessionInputBoxRequest request, CancellationToken token);
 }
 
 /// <summary>
@@ -49,13 +49,13 @@ internal sealed class ClientInteractionRelay : IClientInteractionRelay
     public async Task<MessageBoxResult> MessageBoxAsync(HostMessageBoxParams request, CancellationToken token)
         => _client is { ShowsDialogs: true } client
             ? await client.MessageBoxAsync(
-                new SessionMessageBoxParams { Prompt = request.Prompt, Title = request.Title, Style = request.Style, Output = request.Output }, token)
+                new SessionMessageBoxRequest { Prompt = request.Prompt, Title = request.Title, Style = request.Style, Output = request.Output }, token)
             : MessageBoxResult.NotHandled;
 
     public async Task<InputBoxResult> InputBoxAsync(HostInputBoxParams request, CancellationToken token)
         => _client is { ShowsDialogs: true } client
             ? await client.InputBoxAsync(
-                new SessionInputBoxParams
+                new SessionInputBoxRequest
                 {
                     Prompt = request.Prompt, Title = request.Title, Default = request.Default, XPos = request.XPos, YPos = request.YPos, Output = request.Output,
                 }, token)
@@ -70,9 +70,9 @@ internal sealed class LanguageServerInteractionClient(ILanguageServer server) : 
 {
     public bool ShowsDialogs => server.Services.GetService<IPlatformClientCapabilitiesService>()?.Expects(capabilities => capabilities.SessionInteraction) == true;
 
-    public Task<MessageBoxResult> MessageBoxAsync(SessionMessageBoxParams request, CancellationToken token) => server.SendRequest(request, token);
+    public Task<MessageBoxResult> MessageBoxAsync(SessionMessageBoxRequest request, CancellationToken token) => server.SendRequest(request, token);
 
-    public Task<InputBoxResult> InputBoxAsync(SessionInputBoxParams request, CancellationToken token) => server.SendRequest(request, token);
+    public Task<InputBoxResult> InputBoxAsync(SessionInputBoxRequest request, CancellationToken token) => server.SendRequest(request, token);
 }
 
 /// <summary>

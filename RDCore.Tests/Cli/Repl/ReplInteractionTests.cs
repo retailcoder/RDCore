@@ -204,7 +204,7 @@ public sealed class ReplInteractionTests
         var (interaction, _) = Shell(new ScriptedKeys().Press(Char('n')));
 
         var answer = await new ReplMessageBoxHandler(interaction, console).Handle(
-            new SessionMessageBoxParams { Prompt = "Sure?", Title = "t", Style = (int)VBMsgBoxStyle.VBYesNo, Output = ["one", "two"] }, CancellationToken.None);
+            new SessionMessageBoxRequest { Prompt = "Sure?", Title = "t", Style = (int)VBMsgBoxStyle.VBYesNo, Output = ["one", "two"] }, CancellationToken.None);
 
         Assert.AreEqual(new MessageBoxResult { Handled = true, Result = (int)VBMsgBoxResult.VBNo }, answer);
         Received.InOrder(() =>
@@ -219,9 +219,9 @@ public sealed class ReplInteractionTests
     {
         var console = Substitute.For<IReplConsole>();
         var cancelled = await new ReplInputBoxHandler(Shell(new ScriptedKeys().Press(Key(ConsoleKey.Escape))).Interaction, console)
-            .Handle(new SessionInputBoxParams { Prompt = "x", Default = "d" }, CancellationToken.None);
+            .Handle(new SessionInputBoxRequest { Prompt = "x", Default = "d" }, CancellationToken.None);
         var typed = await new ReplInputBoxHandler(Shell(new ScriptedKeys().Type("hi").Press(Key(ConsoleKey.Enter))).Interaction, console)
-            .Handle(new SessionInputBoxParams { Prompt = "x" }, CancellationToken.None);
+            .Handle(new SessionInputBoxRequest { Prompt = "x" }, CancellationToken.None);
 
         Assert.AreEqual(new InputBoxResult { Handled = true, Cancelled = true }, cancelled);
         Assert.AreEqual(new InputBoxResult { Handled = true, Value = "hi" }, typed);
