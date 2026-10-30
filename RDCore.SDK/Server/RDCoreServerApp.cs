@@ -352,6 +352,8 @@ public abstract class RDCoreServerApp(
                 // not AddLanguageProtocolLogging(): OmniSharp's protocol logger forwards a caught
                 // exception's raw ToString() over window/logMessage. Forward the same records scrubbed.
                 builder.Services.AddSingleton<ILoggerProvider, ScrubbingLanguageServerLoggerProvider>();
+                // and to the file, which otherwise has nothing of the connection's own failures.
+                builder.Services.AddSingleton<ILoggerProvider>(new ContainerFileLoggerProvider(logger));
             });
 
             // app-specific service registrations:
