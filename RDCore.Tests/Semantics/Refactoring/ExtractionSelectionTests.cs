@@ -115,6 +115,34 @@ public sealed class ExtractionSelectionTests
         CollectionAssert.AreEqual(Enumerable.Range(region[0], region.Length).ToArray(), region, "contiguous");
     }
 
+    // a Dim is written in the block as a statement is: what moves with the selection, or out of it (§3.2), is the declaration of the variable it holds.
+    [TestMethod]
+    public void ADeclarationOfALocal_IsTakenWithTheStatementsAfterIt()
+    {
+        var selection = Snapped(1, 0, 2, 3);
+
+        CollectionAssert.AreEqual(new[] { "x = 1" }, TextOf(selection));
+        Assert.AreEqual("x", ((VariableDeclarationNode)selection.Declarations.Single()).Name);
+        Assert.AreEqual(1, selection.Range.Start.Line, "the selection starts at the Dim");
+    }
+
+    [TestMethod]
+    public void ADeclarationAlone_HoldsNoStatement()
+        => Assert.AreEqual(ExtractionSelectionRefusal.NoStatement, Refused(1, 1).Refusal);
+
+    [TestMethod]
+    public void ADeclarationInsideABlock_IsOneOfItsLines()
+    {
+        string[] lines = ["Public Sub S()", "If True Then", "    Dim y As Long", "    y = 1", "End If", "End Sub"];
+        var result = new ModuleParser().Parse(TestUri.TestModuleUri(), string.Join("\r\n", lines) + "\r\n");
+        var member = result.SyntaxTree!.Children.OfType<MemberDeclarationNode>().Single();
+        var instructions = InstructionListLowering.Lower(new StatementBlock([.. member.Children])).InstructionList;
+
+        Assert.IsTrue(ExtractionSelection.TrySnap(member, instructions, new SourceRange(2, 4, 3, 5), out var selection, out var refusal, out _), $"refused: {refusal}");
+        Assert.AreEqual("y", ((VariableDeclarationNode)selection!.Declarations.Single()).Name);
+        Assert.AreEqual(2, selection.Range.Start.Line, "inside the If's body, not grown to the If");
+    }
+
     [TestMethod]
     public void TheRegionOfAnIf_DoesNotHoldTheStatementAfterIt()
     {

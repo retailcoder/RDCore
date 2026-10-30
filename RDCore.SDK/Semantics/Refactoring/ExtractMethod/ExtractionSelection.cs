@@ -21,10 +21,14 @@ public enum ExtractionSelectionRefusal
 /// <summary>
 /// The statements a selection is extracted as: the smallest whole run of statements of one statement list that holds it (<strong>RD-VBAL Extract Method §2</strong>).
 /// </summary>
-/// <param name="Range">Where the run is: from the start of its first statement to the end of its last, which is what the editor shows will move.</param>
+/// <param name="Range">Where the run is: from the start of its first statement or declaration to the end of its last, which is what the editor shows will move.</param>
 /// <param name="Statements">The statements, in order: siblings of one block.</param>
+/// <param name="Declarations">
+/// The declarations of local variables and constants (<c>Dim</c>, <c>Static</c>, <c>Const</c>) that the run holds, in order, among its statements: they are written
+/// in the block as statements are, and run no code.
+/// </param>
 /// <param name="Region">The offsets of the instructions the statements were lowered to, the closers of their blocks included: a contiguous run of the procedure's instructions.</param>
-public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray<StatementNode> Statements, IReadOnlySet<int> Region)
+public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray<StatementNode> Statements, ImmutableArray<SyntaxNode> Declarations, IReadOnlySet<int> Region)
 {
     /// <summary>
     /// Snaps a requested range to whole statements.
@@ -43,6 +47,10 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
     /// that the other end is outside of, or inside another block of it (the <c>Then</c> branch and the <c>Else</c> branch), cuts it: the selection is refused,
     /// naming it, rather than grown across a block boundary.
     /// </para>
+    /// <para>
+    /// A declaration of a local is one of the block's lines as a statement is: an end on it takes it, and a declaration of several variables (<c>Dim a, b</c>) is
+    /// taken whole. A run of declarations alone holds no statement.
+    /// </para>
     /// </remarks>
     public static bool TrySnap(MemberDeclarationNode procedure, InstructionList instructions, SourceRange requested,
         out ExtractionSelection? selection, out ExtractionSelectionRefusal refusal, out StatementNode? cut)
@@ -59,7 +67,7 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
             return false;
         }
 
-        IReadOnlyList<StatementNode> list = [.. procedure.Children.OfType<StatementNode>()];
+        IReadOnlyList<SyntaxNode> list = [.. procedure.Children.Where(IsWrittenInTheBlock)];
         while (true)
         {
             var firstIndex = Enumerable.Range(0, list.Count).FirstOrDefault(index => LastLineOf(list[index]) >= start, -1);
@@ -85,33 +93,42 @@ public sealed record class ExtractionSelection(SourceRange Range, ImmutableArray
                 if (BlockHolding(statement, line) is not null && !(ReferenceEquals(first, last) && OnHeaderOrCloser(first, start == line ? end : start)))
                 {
                     refusal = ExtractionSelectionRefusal.CutsABlock;
-                    cut = statement;
+                    cut = (StatementNode)statement;
                     return false;
                 }
             }
 
-            var statements = list.Skip(firstIndex).Take(lastIndex - firstIndex + 1).ToImmutableArray();
+            var run = list.Skip(firstIndex).Take(lastIndex - firstIndex + 1).ToArray();
+            var statements = run.OfType<StatementNode>().ToImmutableArray();
+            if (statements.IsEmpty)
+            {
+                return false;
+            }
+
             var range = new SourceRange(first.SourceLocation.Range.Start, last.SourceLocation.Range.End);
-            selection = new ExtractionSelection(range, statements, RegionOf(statements, range, instructions));
+            selection = new ExtractionSelection(range, statements, [.. run.Where(node => node is not StatementNode)], RegionOf(statements, range, instructions));
             return true;
         }
     }
 
-    private static int FirstLineOf(StatementNode statement) => statement.SourceLocation.Range.Start.Line;
+    // what a block is written as, line by line: its statements, and the declarations of its locals among them.
+    private static bool IsWrittenInTheBlock(SyntaxNode node) => node is StatementNode or VariableDeclarationNode or ConstantDeclarationNode;
 
-    private static int LastLineOf(StatementNode statement) => statement.SourceLocation.Range.End.Line;
+    private static int FirstLineOf(SyntaxNode node) => node.SourceLocation.Range.Start.Line;
+
+    private static int LastLineOf(SyntaxNode node) => node.SourceLocation.Range.End.Line;
 
     // whether a line is one the statement is written on, outside the bodies of its blocks: its header, an ElseIf or Else, its closer.
-    private static bool OnHeaderOrCloser(StatementNode statement, int line) => line >= FirstLineOf(statement) && line <= LastLineOf(statement) && BlockHolding(statement, line) is null;
+    private static bool OnHeaderOrCloser(SyntaxNode statement, int line) => line >= FirstLineOf(statement) && line <= LastLineOf(statement) && BlockHolding(statement, line) is null;
 
     // the statements of the block of the statement that are written around the line, when the line is inside the body of one of its blocks.
-    private static IReadOnlyList<StatementNode>? BlockHolding(StatementNode statement, int line)
+    private static IReadOnlyList<SyntaxNode>? BlockHolding(SyntaxNode statement, int line)
         => BlocksOf(statement).FirstOrDefault(block => block.Count > 0 && line >= FirstLineOf(block[0]) && line <= LastLineOf(block[^1]));
 
     // the blocks a statement guards: its own, and those of the branches it holds (ElseIf, Else, Case).
-    private static IEnumerable<IReadOnlyList<StatementNode>> BlocksOf(SyntaxNode node)
+    private static IEnumerable<IReadOnlyList<SyntaxNode>> BlocksOf(SyntaxNode node)
     {
-        var own = node.SiblingLists().Skip(1).Select(list => (IReadOnlyList<StatementNode>)[.. list.OfType<StatementNode>()]).ToArray();
+        var own = node.SiblingLists().Skip(1).Select(list => (IReadOnlyList<SyntaxNode>)[.. list.Where(IsWrittenInTheBlock)]).ToArray();
         var inBlocks = own.SelectMany(block => block).ToHashSet(ReferenceEqualityComparer.Instance);
         var children = node.Children.ToHashSet(ReferenceEqualityComparer.Instance);
         var branches = node.ChildNodes().Where(child => !children.Contains(child) && !inBlocks.Contains(child));
