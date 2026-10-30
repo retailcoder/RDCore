@@ -6,7 +6,6 @@ using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
-using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Semantics.Instructions;
@@ -211,17 +210,15 @@ internal sealed class ProgramEdits
             }
         }
 
-        // a module variable given another type, or a Type given other fields, while the program is in progress is held as it was - the variable with its value,
-        // the Type with the fields its values are laid out by - and is declared as edited when the program is over. Its declaration reads as it was, which
-        // is why it is said here; the edit taken back drops the hold, and the program goes on. A Static is no symbol of its own that a definition replaces:
-        // its storage is kept as it is, and a Static retyped is said by its procedure (Classify).
-        foreach (var definition in session.Symbols.HeldDefinitions.Where(held => held is not VBUserDefinedTypeFieldSymbol))
+        // a module variable given another type while the program is in progress is held as it was, with its value, and is declared as edited when the program
+        // is over. Its declaration reads as it was, which is why it is said here; the edit taken back drops the hold, and the program goes on with the value. A
+        // Static is no symbol of its own that a definition replaces: its storage is kept as it is, and a Static retyped is said by its procedure (Classify).
+        foreach (var definition in session.Symbols.HeldDefinitions)
         {
             var name = NameOfHeld(definition);
             if (!edits.Any(edit => edit.Name == name && edit.Kind is not ProgramEditKind.Applies))
             {
-                var reason = definition is VBUserDefinedTypeMemberSymbol ? Resources.Host_Edit_TypeHeldUntilRun : Resources.Host_Edit_HeldUntilRun;
-                edits.Add(new ProgramEdit(name, ProgramEditKind.Restart, reason, definition.ParentUri, RangeOf(definition)));
+                edits.Add(new ProgramEdit(name, ProgramEditKind.Restart, Resources.Host_Edit_HeldUntilRun, definition.ParentUri, RangeOf(definition)));
             }
         }
 
@@ -264,58 +261,16 @@ internal sealed class ProgramEdits
         {
             // a local the edit added to the procedure is the activation's from now on, at its default; one it removed is held until the activation returns,
             // with nothing naming it.
-            if (frame.TryRebase(body, alignment, waits) && CurrentProcedureOf(session, frame) is { } procedure)
+            if (frame.TryRebase(body, alignment, waits)
+                && session.Symbols.MembersOf(frame.Procedure!.ParentUri).FirstOrDefault(member => member.SemanticId == frame.Procedure.SemanticId) is { } procedure)
             {
-                _ = RuntimeProcedureInvoker.DeclareAddedLocals(session, frame, procedure, goesOn: true);
+                _ = RuntimeProcedureInvoker.DeclareAddedLocals(session, frame, procedure);
             }
         }
 
         // an object the program holds has the fields its class was given.
         _ = session.Symbols.ExtendLiveInstances();
     }
-
-    // how many requests defined symbols or loaded code in a session, and how many had when its activations were last given what the code declares.
-    private sealed class Edits
-    {
-        public int Made;
-        public int PreparedAt;
-    }
-
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IRuntimeSession, Edits> EditsBySession = new();
-
-    /// <summary>
-    /// A request defined symbols or loaded code in <paramref name="session"/>: what its procedures declare may have changed.
-    /// </summary>
-    public static void Edited(IRuntimeSession session) => _ = Interlocked.Increment(ref EditsBySession.GetOrCreateValue(session).Made);
-
-    /// <summary>
-    /// Gives the activations of the program that waits the locals an edit added to their procedures, and the objects it holds the fields their classes were
-    /// given, before a statement typed at the stop runs: what the statement names, the code as edited declares. A local the activation holds already is kept
-    /// as it is - one the edit removed or gave another type too - so that an edit taken back before the program goes on loses nothing; what the program goes
-    /// on with is laid out when it goes on (<see cref="Rebase"/>). Done once for the edits made since it was last done.
-    /// </summary>
-    public static void Prepare(IRuntimeSession session)
-    {
-        var edits = EditsBySession.GetOrCreateValue(session);
-        var made = Volatile.Read(ref edits.Made);
-        if (made != edits.PreparedAt)
-        {
-            edits.PreparedAt = made;
-            foreach (var frame in session.CallStack.Frames.OfType<CallStackFrame>())
-            {
-                if (frame.Procedure is not null && CurrentProcedureOf(session, frame) is { } procedure)
-                {
-                    _ = RuntimeProcedureInvoker.DeclareAddedLocals(session, frame, procedure, goesOn: false);
-                }
-            }
-        }
-
-        _ = session.Symbols.ExtendLiveInstances();
-    }
-
-    // the procedure an activation is of, as the session defines it now.
-    private static VBTypeMemberSymbol? CurrentProcedureOf(IRuntimeSession session, CallStackFrame frame)
-        => session.Symbols.MembersOf(frame.Procedure!.ParentUri).FirstOrDefault(member => member.SemanticId == frame.Procedure.SemanticId);
 
     // the activations whose procedure's body is not the one they run - edited, or its module loaded again - each with that body, how the two align, and
     // whether it is the activation the program waits in.
@@ -385,9 +340,7 @@ internal sealed class ProgramEdits
             return Edit(ProgramEditKind.Applies, Resources.Host_Edit_Applies);
         }
 
-        // removed: its storage goes, and code that still names it does not compile. A procedure the program is in can't go, nor a field of a class whose objects
-        // the program may hold. The host keeps a declaration that is removed from a module defined again, so a removal is seen here only where the snapshot
-        // reads it as gone: a field of a class removed that way stays a field of the class, and code that names it runs.
+        // removed: its storage goes, and code that still names it does not compile. A procedure the program is in can't go, nor a field of an object it holds.
         if (after is null)
         {
             return active ? Edit(ProgramEditKind.Restart, Resources.Host_Edit_ActiveProcedureRemoved)
@@ -436,10 +389,11 @@ internal sealed class ProgramEdits
             case SymbolDescriptorKind.ModuleField:
                 return Edit(ProgramEditKind.Restart, Resources.Host_Edit_StoredValue);
 
-            // the values of a Type the program holds have the fields they were made with: a Type edited while the program is in progress is held as it was,
-            // and said as held (above). One that reads as edited all the same was replaced under the program.
+            // the values of a Type the program holds have the fields they were made with: a field added has no cell in them yet, and one removed or retyped
+            // would have to be converted under the program.
             case SymbolDescriptorKind.UserDefinedType:
-                return Edit(ProgramEditKind.Restart, Resources.Host_Edit_StoredValue);
+                var kept = before.Descriptor.Members.All(field => after.Descriptor.Members.Any(other => Text(other) == Text(field)));
+                return kept ? Edit(ProgramEditKind.NotYet, Resources.Host_Edit_FieldOfAType) : Edit(ProgramEditKind.Restart, Resources.Host_Edit_StoredValue);
 
             case SymbolDescriptorKind.Event:
                 return Edit(ProgramEditKind.Restart, Resources.Host_Edit_ClassInterface);
@@ -541,6 +495,7 @@ internal sealed class ProgramEdits
     // where a symbol is declared, as its definition says.
     private static SourceRange? RangeOf(Symbol symbol) => symbol switch
     {
+        AccessibleTypedSymbol declared => declared.Range,
         BoundTypedSymbol declared => declared.Range,
         _ => null,
     };

@@ -48,10 +48,7 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         public Stack<int>? GoSubReturns;
         public Dictionary<int, (int? End, ValueBindingHandle Cell)>? BlockHolders;
         public List<Symbol>? DeclaredAtAStop;
-        public List<Symbol>? EditedLocals;
-        public List<Symbol>? RetiredLocals;
-        public List<IBindingHandle>? RetiredCells;
-        public List<MemoryAddress>? RetiredAddresses;
+        public List<Symbol>? AddedByAnEdit;
         public Dictionary<SemanticId, MemoryAddress>? ReferenceVariants;
     }
 
@@ -1028,67 +1025,16 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
     public IReadOnlyList<Symbol> DeclaredAtAStop => (IReadOnlyList<Symbol>?)_occasional?.DeclaredAtAStop ?? [];
 
     /// <summary>
-    /// The locals the activation holds since an edit made while the program waited changed what its procedure declares, in the order the procedure now
-    /// declares them (<see cref="Relaid"/>); <see langword="null"/> while it holds those its procedure had when it began. What it lets go of when it returns,
-    /// in that order, with <see cref="RetiredLocals"/>.
+    /// The locals an edit made while the program waited added to the procedure this is an activation of, declared on it since
+    /// (<see cref="RecordAddedByAnEdit"/>): what the activation lets go of when it returns, beside the locals its procedure had when it began.
     /// </summary>
-    public IReadOnlyList<Symbol>? EditedLocals => _occasional?.EditedLocals;
+    public IReadOnlyList<Symbol> AddedByAnEdit => (IReadOnlyList<Symbol>?)_occasional?.AddedByAnEdit ?? [];
 
     /// <summary>
-    /// The locals an edit removed from the procedure this is an activation of while the activation holds them: nothing names them any more, and the activation
-    /// lets go of them when it returns.
+    /// Records that <paramref name="local"/>, a local an edit added to the procedure this is an activation of, was declared on it (<see cref="AddedByAnEdit"/>).
     /// </summary>
-    public IReadOnlyList<Symbol> RetiredLocals => (IReadOnlyList<Symbol>?)_occasional?.RetiredLocals ?? [];
-
-    /// <summary>
-    /// Says which locals the activation holds once an edit changed what its procedure declares (<see cref="EditedLocals"/>), and which it holds that the procedure
-    /// no longer declares (<see cref="RetiredLocals"/>).
-    /// </summary>
-    /// <param name="locals">The locals the procedure declares, in its order, each declared on the activation.</param>
-    /// <param name="retired">The locals it holds that the procedure no longer declares.</param>
-    public void Relaid(IReadOnlyList<Symbol> locals, IReadOnlyList<Symbol> retired)
-        => (Occasionally.EditedLocals, Occasionally.RetiredLocals) = ([.. locals], [.. retired]);
-
-    /// <summary>
-    /// Lets go of the name of <paramref name="local"/>, so that it can be declared again as another variable of the same name: the cell it named is held apart
-    /// (<see cref="RetiredCells"/>) and let go of when the activation returns, as the activation's own locals are, and so is the address it was given.
-    /// </summary>
-    /// <param name="local">The local.</param>
-    public void Retire(Symbol local)
-    {
-        if (TryResolve(local, out var cell))
-        {
-            (Occasionally.RetiredCells ??= []).Add(cell);
-        }
-
-        var retired = Occasionally.RetiredAddresses ??= [];
-        if (TryGetOwnSlot(local, out var index))
-        {
-            if (_slots[index] is { IsAlias: false, Cell: ScalarCell { Address: { } given } })
-            {
-                retired.Add(given);
-            }
-
-            _slots[index] = default;
-        }
-
-        if (_cells is not null && _cells.Remove(local.SemanticId, out var held) && held is { IsAlias: false, Cell: ScalarCell { Address: { } address } })
-        {
-            retired.Add(address);
-        }
-
-        if (_addresses?.Forget(local) is { } bound)
-        {
-            retired.Add(bound);
-        }
-
-        _ = _declared?.Remove(local.SemanticId);
-    }
-
-    /// <summary>
-    /// The cells of locals whose names the activation let go of (<see cref="Retire"/>): what they hold is let go of when the activation returns.
-    /// </summary>
-    public IReadOnlyList<IBindingHandle> RetiredCells => (IReadOnlyList<IBindingHandle>?)_occasional?.RetiredCells ?? [];
+    /// <param name="local">The local, declared already.</param>
+    public void RecordAddedByAnEdit(Symbol local) => (Occasionally.AddedByAnEdit ??= []).Add(local);
 
     /// <summary>
     /// Declares <paramref name="symbol"/> on this frame as a <c>ByRef</c> reference parameter binding
@@ -1316,12 +1262,6 @@ public sealed record class CallStackFrame(SyntaxNodeId NodeId, StaticSymbol Stat
         foreach (var (_, variant) in _occasional?.ReferenceVariants ?? [])
         {
             Storage.TryDeallocate(variant);
-        }
-
-        // the addresses of locals whose names an edit let go of (Retire).
-        foreach (var retired in _occasional?.RetiredAddresses ?? [])
-        {
-            Storage.TryDeallocate(retired);
         }
 
         // a variable of this activation that a parameter of a call it made was asked the address of, and that was not asked for it itself since: the
