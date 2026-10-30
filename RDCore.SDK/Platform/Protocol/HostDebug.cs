@@ -98,42 +98,6 @@ public record class HostDebugGotoParams : IRequest, IRequest<HostDebugGotoResult
 public record class HostDebugEditStatusParams : IRequest, IRequest<HostDebugEditStatusResult>;
 
 /// <summary>
-/// The edits made while a program waits that are not applied to it.
-/// </summary>
-public record class HostDebugEditStatusResult
-{
-    /// <summary>Whether a program waits. When none does, there is nothing for an edit to be applied to, and <see cref="Edits"/> is empty.</summary>
-    public bool Suspended { get; init; }
-
-    /// <summary>Each edit that is not applied to the program that waits; empty when the program can go on with every edit made.</summary>
-    public ImmutableArray<HostDebugEdit> Edits { get; init; } = [];
-}
-
-/// <summary>
-/// An edit made while a program waits that is not applied to it.
-/// </summary>
-public record class HostDebugEdit
-{
-    /// <summary>What was edited, as the user names it: <c>Module.Member</c>, or the module.</summary>
-    public string Name { get; init; } = string.Empty;
-
-    /// <summary>What the edit is to the program.</summary>
-    public HostDebugEditKind Kind { get; init; }
-
-    /// <summary>Why, in the user's words.</summary>
-    public string Reason { get; init; } = string.Empty;
-
-    /// <summary>The module the edit is in, as the host addresses it; <see langword="null"/> when it is not known.</summary>
-    public Uri? ModuleUri { get; init; }
-
-    /// <summary>
-    /// Where the edited declaration or procedure is now, zero-based; <see langword="null"/> for an edit of the module as a whole (its options) or of a declaration
-    /// that is gone.
-    /// </summary>
-    public SourceRange? Range { get; init; }
-}
-
-/// <summary>
 /// Request for <c>rdcore/host/debug/breakpoints</c>: sets the lines of a module a program that runs under a debugger waits at before it runs them. Replaces the
 /// breakpoints the module had (<see cref="HostDebugBreakpointsResult"/>).
 /// </summary>
@@ -173,37 +137,6 @@ public record class HostBreakpointLine
 /// </summary>
 [Method(RDCorePlatformProtocol.HostDebugStack, Direction.ClientToServer)]
 public record class HostDebugStackParams : IRequest, IRequest<HostDebugStackResult>;
-
-/// <summary>
-/// The call stack of a program that waits.
-/// </summary>
-public record class HostDebugStackResult
-{
-    /// <summary>The activations, innermost first. None when no program waits.</summary>
-    public IReadOnlyList<HostStackFrame> Frames { get; init; } = [];
-}
-
-/// <summary>
-/// One activation of a procedure.
-/// </summary>
-/// <param name="Id">Its place on the stack, with <c>0</c> the innermost: what the requests that are about a frame name it by, for as long as the program waits.</param>
-/// <param name="Procedure">The procedure's name.</param>
-/// <param name="Module">The name of the module that declares it.</param>
-/// <param name="Line">The zero-based line of the statement the activation is at: the one it waits before for the innermost, the one that is calling for the others. <c>-1</c> when it is not known.</param>
-/// <param name="Character">The zero-based column of that statement, or <c>-1</c>.</param>
-/// <param name="ReturnLines">
-/// The zero-based lines of the <c>GoSub</c> statements this activation has not <c>Return</c>ed from, innermost first: how it got to the line it is at. It is the GoSub
-/// Resumption List of the activation (<strong>MS-VBAL 5.4.2.14</strong>), and is empty - and so says nothing - for the code that does not use <c>GoSub</c>.
-/// </param>
-/// <param name="Handler">
-/// The label of the error handler this activation is running, when an error was caught by an <c>On Error GoTo</c> and the handler has not been left with a
-/// <c>Resume</c> (<strong>MS-VBAL 5.4.4</strong>); <see langword="null"/> otherwise. The error itself is in the error metadata of the session, not here.
-/// </param>
-public record class HostStackFrame(int Id, string Procedure, string Module, int Line, int Character, IReadOnlyList<int>? ReturnLines = null, string? Handler = null)
-{
-    /// <summary>The lines of the <c>GoSub</c> statements this activation will return to; none for a procedure that is not in one.</summary>
-    public IReadOnlyList<int> ReturnLines { get; init; } = ReturnLines ?? [];
-}
 
 /// <summary>
 /// Request for <c>rdcore/host/debug/variables</c>: the variables of an activation of the program that waits, or the parts of one of them.

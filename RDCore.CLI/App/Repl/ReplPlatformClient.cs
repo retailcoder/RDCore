@@ -187,35 +187,38 @@ internal sealed class ReplPlatformClient(IRDCoreClientApp client) : IReplPlatfor
 
     /// <inheritdoc/>
     public Task<ExecuteSessionResult> ResumeAsync(StepKind? step, CancellationToken token)
-        => Platform.DebugResumeAsync(new SessionDebugResumeParams { Step = step }, token);
+        => client.SendRequestAsync<SessionDebugResumeRequest, ExecuteSessionResult>(new SessionDebugResumeRequest { Step = step }, token);
 
     /// <inheritdoc/>
     public Task<HostDebugAck> PauseAsync(CancellationToken token)
-        => Platform.DebugPauseAsync(new SessionDebugPauseParams(), token);
+        => client.SendRequestAsync<SessionDebugPauseRequest, HostDebugAck>(new SessionDebugPauseRequest(), token);
 
     /// <inheritdoc/>
     public Task<HostDebugGotoResult> GotoAsync(string label, CancellationToken token)
-        => Platform.DebugGotoAsync(new SessionDebugGotoParams { Label = label }, token);
+        => client.SendRequestAsync<SessionDebugGotoRequest, HostDebugGotoResult>(new SessionDebugGotoRequest { Label = label }, token);
 
     /// <inheritdoc/>
     public Task<HostDebugEditStatusResult> GetEditStatusAsync(CancellationToken token)
-        => Platform.DebugEditStatusAsync(new SessionDebugEditStatusParams(), token);
+        => client.SendRequestAsync<SessionDebugEditStatusRequest, HostDebugEditStatusResult>(new SessionDebugEditStatusRequest(), token);
 
     /// <inheritdoc/>
     public Task<HostDebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token)
-        => Platform.DebugBreakpointsAsync(new SessionDebugBreakpointsParams { ModuleName = moduleName, Breakpoints = breakpoints }, token);
+        => client.SendRequestAsync<SessionDebugBreakpointsRequest, HostDebugBreakpointsResult>(
+            new SessionDebugBreakpointsRequest { ModuleName = moduleName, Breakpoints = breakpoints }, token);
 
     /// <inheritdoc/>
     public Task<HostDebugStackResult> GetStackAsync(CancellationToken token)
-        => Platform.DebugStackAsync(new SessionDebugStackParams(), token);
+        => client.SendRequestAsync<SessionDebugStackRequest, HostDebugStackResult>(new SessionDebugStackRequest(), token);
 
     /// <inheritdoc/>
     public Task<HostDebugVariablesResult> GetVariablesAsync(int frameId, HostVariableScope scope, int reference, CancellationToken token)
-        => Platform.DebugVariablesAsync(new SessionDebugVariablesParams { FrameId = frameId, Scope = scope, Reference = reference }, token);
+        => client.SendRequestAsync<SessionDebugVariablesRequest, HostDebugVariablesResult>(
+            new SessionDebugVariablesRequest { FrameId = frameId, Scope = scope, Reference = reference }, token);
 
     /// <inheritdoc/>
     public Task<HostDebugEvaluateResult> ExecuteInFrameAsync(int frameId, string statement, CancellationToken token)
-        => Platform.DebugExecuteAsync(new SessionDebugExecuteParams { FrameId = frameId, Statement = statement }, token);
+        => client.SendRequestAsync<SessionDebugExecuteRequest, HostDebugEvaluateResult>(
+            new SessionDebugExecuteRequest { FrameId = frameId, Statement = statement }, token);
 
     /// <inheritdoc/>
     public async Task<AnalyzeSessionResult> AnalyzeAsync(string source, string moduleName, CancellationToken token)
