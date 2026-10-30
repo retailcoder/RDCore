@@ -209,6 +209,11 @@ public interface ISessionSymbols
     /// was, with its value, until the held definition is applied (<see cref="ApplyHeldDefinitions"/>). A definition that declares it as it was again - the
     /// edit taken back - drops the hold.
     /// </para>
+    /// <para>
+    /// A procedure defined again is defined with its <c>Static</c> locals, whose storage is kept by their identity: a <c>Static</c> it declares as another
+    /// type, or no longer declares, has its storage freed as a variable's is, and the procedure's next call gives it storage of the type it is declared as.
+    /// While <see cref="HoldsStoredValues"/> is set, that too is held until the held definitions are applied.
+    /// </para>
     /// </remarks>
     /// <param name="symbol">The newest definition, which takes the place of the one with the same identity.</param>
     /// <param name="scope">The scope it was defined in.</param>
@@ -395,6 +400,17 @@ public interface ISessionSymbols
     /// <param name="objectId">The object's identity, minted by <see cref="ISessionObjects.CreateObject"/>.</param>
     /// <param name="classModule">The class module being instantiated.</param>
     IObjectInstance CreateInstance(VBRuntimeObjectId objectId, VBClassModuleSymbol classModule);
+
+    /// <summary>
+    /// Gives every live object each instance field its class declares now that the object has no storage for, at the field's default: a field added to
+    /// the class while the object lives - an edit made while the program waits.
+    /// </summary>
+    /// <remarks>
+    /// What <see cref="CreateInstance"/> allocates for a new object, allocated for one made before the edit. A field removed from the class keeps its
+    /// storage until the object is released: nothing names it any more.
+    /// </remarks>
+    /// <returns>How many fields were given, over every object.</returns>
+    int ExtendLiveInstances();
 
     /// <summary>
     /// Gets the <see cref="IObjectInstance"/> registered for <paramref name="objectId"/>, if any —

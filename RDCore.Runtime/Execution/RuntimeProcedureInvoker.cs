@@ -263,8 +263,14 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             ObjectReferences.Release(Session, frame.ResultCell);
         }
 
-        // the cells are read by the number of their slot when they have one (S1.4c), and looked up by their symbol otherwise.
+        // the cells are read by the number of their slot when they have one (S1.4c), and looked up by their symbol otherwise. An activation an edit relaid holds
+        // the locals the procedure declares now, in its order, and those the edit removed, each looked up by its symbol.
         var layout = frame.Layout;
+        if (frame.EditedLocals is { } edited)
+        {
+            (locals, layout) = ([.. edited.Concat(frame.RetiredLocals).OfType<BoundTypedSymbol>()], null);
+        }
+
         for (var i = 0; i < locals.Length; i++)
         {
             // a variable of a type that holds no object (a number, a String) has nothing to let go of, and is not looked up (S1.3).
@@ -277,9 +283,16 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
             ObjectReferences.Release(Session, handle);
         }
 
+        // a local whose name an edit gave another variable of the activation: what it held goes with the activation.
+        foreach (var retired in frame.RetiredCells)
+        {
+            ObjectReferences.Release(Session, retired);
+        }
+
         // a ByVal parameter is a local of the activation as much as a Dim is (MS-VBAL §5.3.1.11): what it holds it lets go of with it. Which parameters
         // were given a copy is read again from the arguments, rather than remembered in a list made for each call (IR lowering S1.3). Parameters given
         // payloads are all ByVal (InvokeScalars): a Variant one may have been Set to an object since (S1.7).
+        layout = frame.Layout;
         for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
@@ -318,10 +331,99 @@ public sealed class RuntimeProcedureInvoker(IRuntimeSession Session, IReadOnlyDi
     private static VBTypedValue DefaultValueOf(IRuntimeSession session, VBLocalVariableSymbol variable)
         => session.Symbols.Defaults?.DefaultValueOf(variable) ?? variable.ResolvedType.DefaultValue;
 
-    internal static void HoistLocals(IRuntimeSession session, CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals)
+    /// <summary>
+    /// Lays an activation out as its procedure, edited while the program waited, now declares its locals, each declared as the activation's own were when it
+    /// began: a <c>Dim</c> at its default, on the activation; a <c>Static</c> at its default, where the procedure's statics are, when it has no storage yet.
+    /// The <c>Dim</c>s it lets go of when it returns, in the order the procedure declares them (<see cref="CallStackFrame.EditedLocals"/>).
+    /// </summary>
+    /// <param name="session">The session the program is in.</param>
+    /// <param name="frame">The activation.</param>
+    /// <param name="procedure">The procedure the activation is of, as it is defined now.</param>
+    /// <param name="goesOn">
+    /// Whether the program goes on with the edit: a local the edit removed is retired then - held until the activation returns, with nothing naming it - and
+    /// a local declared again under the name of one the activation holds that is not it (one retired, or one a statement typed at a stop declared as
+    /// another type) is a variable of its own, at its default. A statement typed at the stop meanwhile (<see langword="false"/>) is only given the locals
+    /// the activation holds nothing of yet, so that an edit taken back before the program goes on loses nothing.
+    /// </param>
+    /// <returns>How many locals were declared.</returns>
+    public static int DeclareAddedLocals(IRuntimeSession session, CallStackFrame frame, VBTypeMemberSymbol procedure, bool goesOn)
+    {
+        // what the activation holds: the procedure's locals it began with and those declared at a stop, or, once an edit relaid it, those it was relaid with.
+        var held = (frame.EditedLocals ?? [.. GetLocals(frame.Procedure ?? procedure).OfType<VBLocalVariableSymbol>().Where(local => !local.IsStatic)])
+            .Concat(frame.DeclaredAtAStop).GroupBy(local => local.SemanticId).ToDictionary(group => group.Key, group => group.Last());
+        var retired = frame.RetiredLocals.ToDictionary(local => local.SemanticId);
+        var declared = GetLocals(procedure).OfType<VBLocalVariableSymbol>().ToList();
+
+        var fresh = new List<BoundTypedSymbol>();
+        var locals = new List<Symbol>();
+        foreach (var local in declared)
+        {
+            if (local.IsStatic)
+            {
+                // a Static declared under the name of a local the activation holds (one the edit removed, or the Dim it made a Static) is not that cell: the cell is
+                // held apart and let go of when the activation returns, and the Static is where the procedure's statics are.
+                if (goesOn && frame.TryResolve(local, out _))
+                {
+                    frame.Retire(local);
+                    _ = retired.Remove(local.SemanticId);
+                }
+
+                fresh.Add(local);
+                continue;
+            }
+
+            locals.Add(local);
+            var isRetired = retired.ContainsKey(local.SemanticId);
+            var stopDeclared = frame.DeclaredAtAStop.Any(other => other.SemanticId == local.SemanticId);
+            if (held.TryGetValue(local.SemanticId, out var was) && !isRetired
+                && !(goesOn && stopDeclared && !Equals(((ITypedSymbol)was).ResolvedType, local.ResolvedType)))
+            {
+                continue;
+            }
+
+            // a cell the activation has of the name that is no longer this local's is held apart, and let go of when the activation returns: the local is a
+            // variable of its own. One a statement typed at the stop declared stays the activation's until the program goes on with the edit, which may yet be
+            // taken back.
+            if (frame.TryResolve(local, out _))
+            {
+                if (!goesOn && !isRetired)
+                {
+                    continue;
+                }
+
+                frame.Retire(local);
+            }
+
+            _ = retired.Remove(local.SemanticId);
+            fresh.Add(local);
+        }
+
+        // a local the edit removed is held until the activation returns.
+        if (goesOn)
+        {
+            foreach (var (id, was) in held)
+            {
+                if (!declared.Any(local => local.SemanticId == id))
+                {
+                    retired[id] = was;
+                }
+            }
+        }
+        else
+        {
+            locals = [.. held.Values.Where(was => !frame.DeclaredAtAStop.Contains(was)), .. fresh.Where(local => local is VBLocalVariableSymbol { IsStatic: false })];
+        }
+
+        HoistLocals(session, frame, [.. fresh], numbered: false);
+        frame.Relaid(locals, [.. retired.Values]);
+        return fresh.Count;
+    }
+
+    // numbered: whether the locals are the procedure's own, which the frame's layout numbers; locals added by an edit are no part of its layout.
+    internal static void HoistLocals(IRuntimeSession session, CallStackFrame frame, ImmutableArray<BoundTypedSymbol> locals, bool numbered = true)
     {
         // the locals of the procedure the frame is laid out as are in its slots by number (S1.3).
-        var slots = frame.Layout is { LocalSlots: var numbered } && numbered.Length == locals.Length ? numbered : default;
+        var slots = numbered && frame.Layout is { LocalSlots: var slotted } && slotted.Length == locals.Length ? slotted : default;
         for (var i = 0; i < locals.Length; i++)
         {
             var local = locals[i];

@@ -26,5 +26,11 @@ public readonly record struct SourceRange(SourcePosition Start, SourcePosition E
     /// </summary>
     public bool IsEmpty => Start == End;
 
+    /// <summary>
+    /// Compares two ranges by where they start, in document order.
+    /// </summary>
+    /// <param name="other">The range to compare with.</param>
+    /// <returns>Less than zero when this range starts before <paramref name="other"/>, zero when they start at the same position, greater than zero when it
+    /// starts after.</returns>
     public int CompareTo(SourceRange other) => Start.CompareTo(other.Start);
 }

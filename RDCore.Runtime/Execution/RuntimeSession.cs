@@ -64,8 +64,10 @@ internal sealed class RuntimeSession(
     // the objects whose Terminate is running.
     private readonly HashSet<VBRuntimeObjectId> _terminating = [];
 
-    // while a variable a definition replaced lets go of what it held: nothing it destroys runs a Terminate.
-    private bool _resetting;
+    // while a variable a definition replaced lets go of what it held, on this thread: nothing that release destroys runs a Terminate. A release another thread
+    // makes meanwhile is no part of it, and runs the Terminate of what it destroys.
+    [ThreadStatic]
+    private static bool _resetting;
 
     /// <summary>
     /// Lets go of the objects <paramref name="cell"/> holds, its storage freed by a definition that replaces its variable: each reference it was is dropped,
@@ -549,15 +551,22 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     public IReadOnlyList<Symbol> ApplyHeldDefinitions()
     {
         ImmutableDictionary<string, (Symbol Symbol, ScopeKind Scope)> held;
+        ImmutableDictionary<SemanticId, VBLocalVariableSymbol> statics;
         lock (_resetLock)
         {
-            (held, _held, _holdsStoredValues) = (_held, _held.Clear(), false);
+            (held, _held, statics, _heldStatics, _holdsStoredValues) = (_held, _held.Clear(), _heldStatics, _heldStatics.Clear(), false);
+        }
+
+        foreach (var original in statics.Values)
+        {
+            Retired(original);
         }
 
         var applied = new List<Symbol>();
-        foreach (var (symbol, scope) in held.Values)
+        // a held Type before its fields, which a field held with it adds to or replaces.
+        foreach (var (symbol, scope) in held.Values.OrderBy(held => held.Symbol is VBUserDefinedTypeFieldSymbol))
         {
-            if (table.TryGet(symbol, scope, out var existing) && Replaced(existing, symbol, scope))
+            if (table.TryGet(symbol, scope, out var existing) ? Replaced(existing, symbol, scope) : TryDefine(symbol, scope))
             {
                 applied.Add(symbol);
             }
@@ -568,9 +577,19 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
     public bool TryDefine(Symbol symbol, ScopeKind scope)
     {
+        if (HeldWithItsType(symbol, scope))
+        {
+            return true;
+        }
+
         if (!table.TryAdd(symbol, scope))
         {
             return false;
+        }
+
+        if (scope is ScopeKind.Instance)
+        {
+            _ = Interlocked.Increment(ref _instanceFieldsDefined);
         }
 
         AllocateStorageOf(symbol, scope);
@@ -633,29 +652,72 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
             return false;
         }
 
-        // the same declaration, written again: a variable that holds storage and is declared as the type it was.
-        // Anything else is a different variable - or no variable - and is replaced the long way.
-        var sameDeclaration = existing is ITypedSymbol { ResolvedType: var before }
-            && symbol is ITypedSymbol { ResolvedType: var after }
-            && IsSameType(before, after)
-            && SessionBindings.TryGetAddress(existing, out _);
-        var key = existing.Uri.ToString();
-        if (!sameDeclaration)
+        // a Type defined again while a program is in progress keeps the fields it has: the values of it the program holds are laid out by them. Its definition
+        // is held, and is applied when the program is over; the Type declared as it was again takes the hold back.
+        if (existing is VBUserDefinedTypeMemberSymbol type && symbol is VBUserDefinedTypeMemberSymbol edited)
         {
-            // while a program is in progress, what the variable holds is not let go of: the definition is held, and the variable stays as it was. Whether one
-            // is, is told with the lock held, as the release at the program's end tells it.
-            if (existing is ITypedSymbol && SessionBindings.TryGetAddress(existing, out _))
+            var unchanged = HasTheFieldsOf(type, edited);
+            var typeKey = existing.Uri.ToString();
+            lock (_resetLock)
             {
-                lock (_resetLock)
+                if (unchanged)
                 {
-                    if (_holdsStoredValues)
-                    {
-                        _held = _held.SetItem(key, (symbol, scope));
-                        return true;
-                    }
+                    // the Type as it was: its fields held with it go with the hold.
+                    _held = _held.RemoveRange([typeKey, .. _held.Where(held => held.Value.Symbol is VBUserDefinedTypeFieldSymbol && held.Value.Symbol.ParentUri.ToString() == typeKey)
+                        .Select(held => held.Key)]);
+                }
+                else if (_holdsStoredValues)
+                {
+                    _held = _held.SetItem(typeKey, (symbol, scope));
+                    return true;
                 }
             }
+        }
 
+        if (HeldWithItsType(symbol, scope))
+        {
+            return true;
+        }
+
+        // a procedure defined again: its Statics are storage kept by their identity, which a Static declared as another type, or removed, is no storage of.
+        if (existing is VBTypeMemberSymbol procedure && symbol is VBTypeMemberSymbol editedProcedure)
+        {
+            RetireStatics(procedure, editedProcedure);
+        }
+
+        var key = existing.Uri.ToString();
+        var sameType = existing is ITypedSymbol { ResolvedType: var before } && symbol is ITypedSymbol { ResolvedType: var after } && IsSameType(before, after);
+
+        // while a program is in progress, what a variable holds is not let go of: a definition of another type is held, and the variable stays as it was. Held
+        // is told first, with the lock held, as the release at the program's end tells it - and before the session's storage is read, which a running program
+        // allocates its Statics in on its own thread. A variable of a module, or a global, was given its storage when it was defined; a field of a Type or of a
+        // class holds none of the session's.
+        if (existing is ITypedSymbol and not VBUserDefinedTypeFieldSymbol && existing.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
+            && scope is ScopeKind.Module or ScopeKind.Global)
+        {
+            lock (_resetLock)
+            {
+                if (_holdsStoredValues && !sameType)
+                {
+                    _held = _held.SetItem(key, (symbol, scope));
+                    return true;
+                }
+
+                if (_holdsStoredValues)
+                {
+                    // the variable declared as it was: a definition held for it is taken back, and it keeps its storage.
+                    _held = _held.Remove(key);
+                    table.Replace(symbol, scope);
+                    return true;
+                }
+            }
+        }
+
+        // the same declaration, written again: a variable that holds storage and is declared as the type it was.
+        // Anything else is a different variable - or no variable - and is replaced the long way.
+        var sameDeclaration = sameType && SessionBindings.TryGetAddress(existing, out _);
+        if (!sameDeclaration)
+        {
             return Replaced(existing, symbol, scope);
         }
 
@@ -669,6 +731,111 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         // symbol itself leaves what it holds where it is.
         table.Replace(symbol, scope);
         return true;
+    }
+
+    // a field of a Type held as it was is held with it: the table has the Type's fields as the Type has them, which are what the program's values of it are
+    // laid out by, and what the edits made while it waits are told by.
+    private bool HeldWithItsType(Symbol symbol, ScopeKind scope)
+    {
+        if (symbol is not VBUserDefinedTypeFieldSymbol)
+        {
+            return false;
+        }
+
+        lock (_resetLock)
+        {
+            if (!_held.ContainsKey(symbol.ParentUri.ToString()))
+            {
+                return false;
+            }
+
+            _held = _held.SetItem(symbol.Uri.ToString(), (symbol, scope));
+            return true;
+        }
+    }
+
+    // whether a Type, defined again, has the fields it had, in the order it had them, each of the type it was.
+    private static bool HasTheFieldsOf(VBUserDefinedTypeMemberSymbol type, VBUserDefinedTypeMemberSymbol edited)
+        => type.Members.Length == edited.Members.Length
+            && type.Members.Zip(edited.Members).All(pair => string.Equals(pair.First.Name, pair.Second.Name, StringComparison.OrdinalIgnoreCase)
+                && IsSameType(pair.First.ResolvedType, pair.Second.ResolvedType));
+
+    // the Statics held as they were while a program is in progress, by identity: each as it was declared when it was given its storage.
+    private ImmutableDictionary<SemanticId, VBLocalVariableSymbol> _heldStatics = ImmutableDictionary<SemanticId, VBLocalVariableSymbol>.Empty;
+
+    // the Statics of a procedure whose storage its edited definition no longer declares as it is - one given another type, or removed - let go of what they
+    // hold, as a variable a definition replaces does, and the procedure's next call gives one it declares storage of the type it is declared as. While a
+    // program is in progress, that is held until the program is over (ApplyHeldDefinitions), and the Static declared as it was again takes it back.
+    private void RetireStatics(VBTypeMemberSymbol procedure, VBTypeMemberSymbol edited)
+    {
+        static IEnumerable<VBLocalVariableSymbol> StaticsOf(VBTypeMemberSymbol member)
+            => RuntimeProcedureInvoker.GetLocals(member).OfType<VBLocalVariableSymbol>().Where(local => local.IsStatic);
+
+        var declared = StaticsOf(edited).ToDictionary(local => local.SemanticId);
+        foreach (var current in StaticsOf(procedure))
+        {
+            // a Static held as it was is what its storage was given as, whatever the procedure was defined as since.
+            VBLocalVariableSymbol original;
+            lock (_resetLock)
+            {
+                original = _heldStatics.GetValueOrDefault(current.SemanticId) ?? current;
+            }
+
+            if (declared.TryGetValue(original.SemanticId, out var now) && IsSameType(original.ResolvedType, now.ResolvedType))
+            {
+                lock (_resetLock)
+                {
+                    _heldStatics = _heldStatics.Remove(original.SemanticId);
+                }
+
+                continue;
+            }
+
+            // held or retired is told first, with the lock held, and before anything of the program's storage is read: a program in progress - running, on a
+            // thread of its own - allocates Statics and makes and lets go of objects as it goes, so whether anything holds this one is left for the release,
+            // which runs when the program is over (ApplyHeldDefinitions). A Static held that held nothing is retired as nothing.
+            lock (_resetLock)
+            {
+                if (_holdsStoredValues)
+                {
+                    _heldStatics = _heldStatics.SetItem(original.SemanticId, original);
+                    continue;
+                }
+
+                _heldStatics = _heldStatics.Remove(original.SemanticId);
+            }
+
+            // no program is in progress: a Static of a module's procedure has storage of the session's, and one of a class's member called on an object the
+            // object's (MS-VBA: each object has its own).
+            if (SessionBindings.TryGetAddress(original, out _) || _instances.Values.Any(instance => instance.HoldsStatic(original)))
+            {
+                Retired(original);
+            }
+        }
+    }
+
+    // a Static's storage freed, the session's and that of every object that holds one of its own: what it held is let go of, and the procedure's next call
+    // gives it storage again.
+    private void Retired(VBLocalVariableSymbol original)
+    {
+        if (LettingGo is { } letGo && SessionBindings.TryGetAddress(original, out var address) && SessionBindings.TryRead(address, out var cell) && cell is not null)
+        {
+            letGo(cell);
+        }
+
+        var freed = SessionBindings.TryDeallocate(original);
+        foreach (var instance in _instances.Values)
+        {
+            freed |= instance.ForgetStatic(original, LettingGo);
+        }
+
+        if (freed)
+        {
+            lock (_resetLock)
+            {
+                _valuesReset = _valuesReset.Add(original);
+            }
+        }
     }
 
     // a symbol replaced the long way, its storage freed and allocated again: what a variable held is let go of with it, the objects it held among it - each
@@ -713,6 +880,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         if (before is VBClassType beforeClass && after is VBClassType afterClass)
         {
             return beforeClass.Symbol.SemanticId == afterClass.Symbol.SemanticId;
+        }
+
+        // an array is of the type it was if it is the same kind of array of the same type: an array of a class is, when the class is.
+        if (before is VBArrayType beforeArray && after is VBArrayType afterArray)
+        {
+            return before.GetType() == after.GetType() && IsSameType(beforeArray.ItemType, afterArray.ItemType, comparing);
         }
 
         if (!Equals(before, after))
@@ -867,12 +1040,7 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
     public IObjectInstance CreateInstance(VBRuntimeObjectId objectId, VBClassModuleSymbol classModule)
     {
         var instance = new ObjectInstance(objectId, classModule, storage, table);
-        var fields = table.InstanceSymbols.Where(field =>
-            field.ParentUri.AbsoluteUri == classModule.Uri.AbsoluteUri
-            && field.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
-            && field is ITypedSymbol { ResolvedType: var _ });
-
-        foreach (var field in fields)
+        foreach (var field in InstanceFieldsOf(classModule))
         {
             instance.Push(field, DefaultValueOf(field));
         }
@@ -880,6 +1048,41 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         _instances[objectId] = instance;
         return instance;
     }
+
+    // how many instance fields were defined, and how many there were when the live objects were last given theirs: with none defined since, an object holds
+    // every field its class declares, and none is looked for.
+    private int _instanceFieldsDefined;
+    private int _instancesExtendedAt;
+
+    public int ExtendLiveInstances()
+    {
+        var defined = Volatile.Read(ref _instanceFieldsDefined);
+        if (defined == _instancesExtendedAt)
+        {
+            return 0;
+        }
+
+        _instancesExtendedAt = defined;
+        var given = 0;
+        foreach (var instance in _instances.Values)
+        {
+            var held = instance.Fields.Concat(instance.StaticLocals).Select(field => field.SemanticId).ToHashSet();
+            foreach (var field in InstanceFieldsOf(instance.ClassModule).Where(field => !held.Contains(field.SemanticId)))
+            {
+                instance.Push(field, DefaultValueOf(field));
+                given++;
+            }
+        }
+
+        return given;
+    }
+
+    // the instance fields a class declares, as the session has them now.
+    private IEnumerable<Symbol> InstanceFieldsOf(VBClassModuleSymbol classModule)
+        => table.InstanceSymbols.Where(field =>
+            field.ParentUri.AbsoluteUri == classModule.Uri.AbsoluteUri
+            && field.Kind is SymbolKindExt.Field or SymbolKindExt.Variable
+            && field is ITypedSymbol { ResolvedType: var _ });
 
     public bool TryGetInstance(VBRuntimeObjectId objectId, [NotNullWhen(true)][MaybeNullWhen(false)] out IObjectInstance? instance)
     {

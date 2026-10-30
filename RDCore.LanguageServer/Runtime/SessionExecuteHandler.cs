@@ -36,12 +36,12 @@ internal sealed class SessionExecuteHandler(
     IOptions<SdkAppOptions> options,
     ILogger<SessionExecuteHandler> logger,
     IEditStatusMonitor? editStatus = null)
-    : RDCoreRequestHandler<ExecuteSessionParams, ExecuteSessionResult>
+    : RDCoreRequestHandler<ExecuteSessionRequest, ExecuteSessionResult>
 {
     /// <summary>JSON-RPC 2.0 "Invalid Request".</summary>
     private const int InvalidRequestCode = -32600;
 
-    protected override async Task<ExecuteSessionResult> HandleAsync(ExecuteSessionParams request, CancellationToken token)
+    protected override async Task<ExecuteSessionResult> HandleAsync(ExecuteSessionRequest request, CancellationToken token)
     {
         if (!clientCapabilities.Expects(capabilities => capabilities.SessionExecute))
         {

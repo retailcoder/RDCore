@@ -172,8 +172,8 @@ public sealed class InteractionRelayTests
     {
         var client = Substitute.For<IInteractionClient>();
         client.ShowsDialogs.Returns(showsDialogs);
-        client.MessageBoxAsync(Arg.Any<SessionMessageBoxParams>(), Arg.Any<CancellationToken>()).Returns(new MessageBoxResult { Handled = true, Result = 7 });
-        client.InputBoxAsync(Arg.Any<SessionInputBoxParams>(), Arg.Any<CancellationToken>()).Returns(new InputBoxResult { Handled = true, Value = "typed" });
+        client.MessageBoxAsync(Arg.Any<SessionMessageBoxRequest>(), Arg.Any<CancellationToken>()).Returns(new MessageBoxResult { Handled = true, Result = 7 });
+        client.InputBoxAsync(Arg.Any<SessionInputBoxRequest>(), Arg.Any<CancellationToken>()).Returns(new InputBoxResult { Handled = true, Value = "typed" });
         return client;
     }
 
@@ -189,8 +189,8 @@ public sealed class InteractionRelayTests
 
         Assert.AreEqual(7, answer.Result);
         Assert.AreEqual("typed", typed.Value);
-        await client.Received().MessageBoxAsync(Arg.Is<SessionMessageBoxParams>(sent => sent.Prompt == "p" && sent.Title == "t" && sent.Style == 4 && sent.Output.Single() == "line"), Arg.Any<CancellationToken>());
-        await client.Received().InputBoxAsync(Arg.Is<SessionInputBoxParams>(sent => sent.Default == "d" && sent.XPos == 1), Arg.Any<CancellationToken>());
+        await client.Received().MessageBoxAsync(Arg.Is<SessionMessageBoxRequest>(sent => sent.Prompt == "p" && sent.Title == "t" && sent.Style == 4 && sent.Output.Single() == "line"), Arg.Any<CancellationToken>());
+        await client.Received().InputBoxAsync(Arg.Is<SessionInputBoxRequest>(sent => sent.Default == "d" && sent.XPos == 1), Arg.Any<CancellationToken>());
     }
 
     [TestMethod]

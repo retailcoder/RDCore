@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using RDCore.Runtime.Execution;
 using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics;
@@ -9,7 +10,9 @@ using RDCore.SDK.Semantics.Instructions;
 using RDCore.SDK.Semantics.Static;
 using RDCore.SDK.Semantics.Static.Abstract;
 using RDCore.SDK.Model;
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Errors.Abstract;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Types;
@@ -55,7 +58,8 @@ public enum ProgramState
 /// </para>
 /// </remarks>
 /// <param name="provider">The provider of the session, which is composed again from time to time, and with it this.</param>
-public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
+/// <param name="logger">Where a failure of the host itself, met while running something at a stop, is said.</param>
+public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogger? logger = null)
 {
     private readonly Lock _sync = new();
     private ProgramState _state;
@@ -502,7 +506,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
         provider.Output.Target = output;
         try
         {
-            var (value, failure) = run(session, stack, selected, procedure);
+            var (value, failure) = RunGuarded(session, stack, selected, procedure, run);
 
             lock (_sync)
             {
@@ -551,6 +555,24 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             {
                 _alongside = false;
             }
+        }
+    }
+
+    // a statement or an expression typed at the stop that throws is a failure of the host, not of the program's code: it is said with its stack, the statement is
+    // answered with the runtime's own internal error (51), and the program waits on. The request is answered, and never with the exception.
+    private (VBTypedValue? Value, string? Failure) RunGuarded(IRuntimeSession session, RuntimeCallStack stack, CallStackFrame selected, VBTypeMemberSymbol procedure,
+        Func<IRuntimeSession, RuntimeCallStack, CallStackFrame, VBTypeMemberSymbol, (VBTypedValue? Value, string? Failure)> run)
+    {
+        try
+        {
+            // what the code as edited declares, the statement names: the locals an edit added, the fields a class was given.
+            ProgramEdits.Prepare(session);
+            return run(session, stack, selected, procedure);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger?.LogError(exception, "❌ A statement typed at the stop in {procedure} failed in the host.", procedure.Name);
+            return (null, VBRuntimeErrorInfo.For(VBRuntimeErrorId.InternalError, new SourceLocation(procedure.Uri, procedure.Range), exception.Message).Description);
         }
     }
 
