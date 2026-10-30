@@ -192,6 +192,44 @@ public sealed class FrameStatementTests
             Assert.AreEqual(ProgramState.Suspended, provider.Execution.State);
         }, debug: true);
 
+    // MS-VBAL 5.4.3.3: a ReDim of a name the procedure does not see declares a dynamic array local to it, typed at a stop as in the procedure's code - one the
+    // next statement reads, and the program goes on with.
+    [TestMethod]
+    [DataRow("ReDim fresh(2)", "2", DisplayName = "ReDim")]
+    [DataRow("ReDim Preserve fresh(3)", "3", DisplayName = "ReDim Preserve")]
+    public async Task AReDim_OfANameTheProcedureDoesNotSee_DeclaresADynamicArray_ThatTheNextStatementSees(string redim, string upper)
+        => await DebugAsync(async provider =>
+        {
+            var declared = await Execute(provider, 0, redim);
+            var read = await Execute(provider, 0, "Debug.Print UBound(fresh)");
+
+            Assert.IsTrue(declared.Success, declared.Error);
+            Assert.IsTrue(read.Success, read.Error);
+            CollectionAssert.AreEqual(new[] { upper }, read.Output.Select(line => line.Trim()).ToArray());
+            Assert.AreEqual(ExecutionOutcome.Completed, (await ResumeAsync(provider)).Outcome, "the program goes on with a local it did not declare");
+        });
+
+    private static readonly string Arrays = Program(
+        "Public Sub Main()",
+        "    Dim f(2) As Long, a() As Long",
+        "    Stop",
+        "End Sub");
+
+    // MS-VBAL 5.6.13.1: `f()` typed at a stop is the array itself, as in the procedure's code.
+    [TestMethod]
+    [DataRow("Debug.Print UBound(f())", true, "2", DisplayName = "its bounds")]
+    [DataRow("Debug.Print f()", false, "Type mismatch", DisplayName = "printed, a fixed-size array")]
+    [DataRow("Debug.Print a()", false, "Type mismatch", DisplayName = "printed, a dynamic array")]
+    public async Task AnArrayWithAnEmptyArgumentList_TypedAtAStop_IsTheArray(string statement, bool succeeds, string said)
+        => await ModuleWorkspace.InspectAsync([], Arrays, async (provider, _, _) =>
+        {
+            var done = await Execute(provider, 0, statement);
+
+            Assert.AreEqual(succeeds, done.Success, done.Error);
+            StringAssert.Contains(succeeds ? string.Join("|", done.Output) : done.Error, said);
+            Assert.AreEqual(ProgramState.Suspended, provider.Execution.State);
+        }, debug: true);
+
     [TestMethod]
     public async Task InBasic_AStatement_WithANameTheProcedureDoesNotSee_DeclaresAVariableOfTheModule()
         => await ModuleWorkspace.InspectAsync([], Source, async (provider, _, _) =>

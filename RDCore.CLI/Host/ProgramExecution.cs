@@ -604,6 +604,23 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
             }
         }
 
+        // MS-VBAL 5.4.3.3: a ReDim of a name the procedure does not see declares a dynamic array local to it, as it does in the procedure's own code
+        // (SymbolBuilder.BuildRedimLocal), Option Explicit or not: on this activation.
+        var builder = new SymbolBuilder(procedure.WorkspaceRoot, procedure.ParentUri, ScopeKind.Module, resolver, VBVariantType.TypeInfo);
+        foreach (var redim in Descendants(statement).OfType<RedimDeclarationNode>().DistinctBy(redim => redim.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            if (redim.Target is not SimpleNameExpressionNode target || !resolver.ResolveValue(target, ScopeKind.Local, procedure.Uri).IsUnbound)
+            {
+                continue;
+            }
+
+            var array = (VBLocalVariableSymbol)builder.BuildRedimLocal(redim, procedure.Uri);
+            if (session.Symbols.TryDefine(array, ScopeKind.Local))
+            {
+                selected.PushDeclaredAtAStop(array, array.ResolvedType.DefaultValue);
+            }
+        }
+
         var undeclared = references.Where(name => resolver.ResolveValue(name, ScopeKind.Local, procedure.Uri).IsUnbound).ToArray();
         if (undeclared.Length == 0)
         {
@@ -615,7 +632,6 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
             return string.Format(Resources.Host_VariableNotDefined, undeclared[0].IdentifierName);
         }
 
-        var builder = new SymbolBuilder(procedure.WorkspaceRoot, procedure.ParentUri, ScopeKind.Module, resolver, VBVariantType.TypeInfo);
         var ofTheModule = session.Environment.Language.ImplicitDeclarationScope is ImplicitDeclarationScope.Module && selected.Target is null;
         foreach (var name in undeclared)
         {
