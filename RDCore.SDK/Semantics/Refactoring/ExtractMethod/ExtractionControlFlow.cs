@@ -156,8 +156,8 @@ internal static class ExtractionControlFlow
         var resumingNext = entry.Where(state => !state.IsHandling).Select(state => state.Policy is ErrorHandlingPolicy.ResumeNext).Distinct().ToArray();
         if (resumingNext is [true])
         {
-            // the On Error Resume Next the new procedure starts with clears Err, which the selection reads of an error before it, as far as is known: whether Err is
-            // what it was across a call is to be measured in Excel.
+            // the On Error Resume Next the new procedure starts with clears Err, which the selection reads of an error before it: a call does not, an On Error
+            // statement does (oracle s55 E01-E08).
             if (readsErr)
             {
                 changes.Add(new ExtractionBehaviourChange(ExtractionBehaviourChangeKind.ErrClearedOnEntry, [], [], IsNote: false));

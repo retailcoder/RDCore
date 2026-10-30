@@ -162,7 +162,8 @@ public enum ExtractionBehaviourChangeKind
 
     /// <summary>
     /// The selection runs under <c>On Error Resume Next</c> and reads <c>Err</c> or <c>Erl</c>, which may be about an error raised before it: the
-    /// <c>On Error Resume Next</c> the new procedure starts with clears them. Whether <c>Err</c> is what it was across a call is to be measured in Excel.
+    /// <c>On Error Resume Next</c> the new procedure starts with clears them. The call does not (MS-VBA, measured: oracle s55 E01-E08); any <c>On Error</c> statement
+    /// that runs does (E02, E03, E06, E07).
     /// </summary>
     ErrClearedOnEntry,
 }
