@@ -6,6 +6,7 @@ using RDCore.External;
 using RDCore.External.Interaction;
 using RDCore.External.Settings;
 using RDCore.LanguageServer.Runtime;
+using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -80,20 +81,61 @@ public sealed class InteractionRelayTests
         CollectionAssert.AreEqual(new[] { "before" }, output.Lines.ToArray());
     }
 
+    // overnight #75: a host the language server started is seen by nobody, so the platform's dialog is never shown after a client that shows them - it was, and the
+    // run waited on it forever (HexIDE answering a vbOKOnly box with vbYes).
     [TestMethod]
-    public void AnAnswerThatIsNoButtonOfTheDialog_IsNotTakenFromTheClient()
+    public void AnAnswerThatIsNoButtonOfTheDialog_FailsTheRun_AndShowsNoDialogOfThePlatforms()
     {
         var channel = Substitute.For<IHostInteractionChannel>();
         channel.MessageBoxAsync(Arg.Any<HostMessageBoxParams>(), Arg.Any<CancellationToken>()).Returns(new MessageBoxResult { Handled = true, Result = (int)VBMsgBoxResult.VBAbort });
-        Assert.AreEqual(VBMsgBoxResult.VBYes, Relay(channel).Relay.ShowMessage(YesNo));
+        var (relay, _, fallback, _) = Relay(channel);
+
+        var failed = Assert.ThrowsExactly<DialogNotAnsweredException>(() => relay.ShowMessage(YesNo));
+
+        Assert.AreEqual(VBRuntimeErrorId.UnusableDialogAnswer, failed.ErrorId);
+        StringAssert.Contains(failed.Message, "vbYesNo");
+        StringAssert.Contains(failed.Message, ((int)VBMsgBoxResult.VBAbort).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        fallback.DidNotReceiveWithAnyArgs().ShowMessage(default!, default);
     }
 
     [TestMethod]
-    public void AConnectionThatFails_LeavesTheDialogToThePlatform()
+    public void AFailureTheLanguageServerTells_FailsTheRun_WithItsMessage()
+    {
+        var channel = Substitute.For<IHostInteractionChannel>();
+        channel.MessageBoxAsync(Arg.Any<HostMessageBoxParams>(), Arg.Any<CancellationToken>()).Returns(new MessageBoxResult { Handled = true, Result = 6, Failure = "HexIDE answered 6" });
+
+        var failed = Assert.ThrowsExactly<DialogNotAnsweredException>(() => Relay(channel).Relay.ShowMessage(new MessageBoxRequest("x", "t", VBMsgBoxStyle.VBOKOnly)));
+
+        Assert.AreEqual(VBRuntimeErrorId.UnusableDialogAnswer, failed.ErrorId);
+        Assert.AreEqual("HexIDE answered 6", failed.Message);
+    }
+
+    [TestMethod]
+    public void ADialogTheClientDeclined_FailsTheRun_ForNobodyToAnswer()
+    {
+        var channel = Substitute.For<IHostInteractionChannel>();
+        channel.MessageBoxAsync(Arg.Any<HostMessageBoxParams>(), Arg.Any<CancellationToken>()).Returns(new MessageBoxResult { Declined = true });
+        channel.InputBoxAsync(Arg.Any<HostInputBoxParams>(), Arg.Any<CancellationToken>()).Returns(new InputBoxResult { Declined = true });
+        var (relay, _, fallback, _) = Relay(channel);
+
+        Assert.AreEqual(VBRuntimeErrorId.NobodyToAnswer, Assert.ThrowsExactly<DialogNotAnsweredException>(() => relay.ShowMessage(YesNo)).ErrorId);
+        Assert.AreEqual(VBRuntimeErrorId.NobodyToAnswer, Assert.ThrowsExactly<DialogNotAnsweredException>(() => relay.Prompt(new InputBoxRequest("x", "t"))).ErrorId);
+        fallback.DidNotReceiveWithAnyArgs().ShowMessage(default!, default);
+        fallback.DidNotReceiveWithAnyArgs().Prompt(default!, default);
+    }
+
+    [TestMethod]
+    public void AConnectionThatFails_FailsTheRun_AndShowsNoDialogOfThePlatforms()
     {
         var channel = Substitute.For<IHostInteractionChannel>();
         channel.InputBoxAsync(Arg.Any<HostInputBoxParams>(), Arg.Any<CancellationToken>()).ThrowsAsync(new IOException("lost"));
-        Assert.AreEqual("platform", Relay(channel).Relay.Prompt(new InputBoxRequest("x", "t")));
+        var (relay, _, fallback, _) = Relay(channel);
+
+        var failed = Assert.ThrowsExactly<DialogNotAnsweredException>(() => relay.Prompt(new InputBoxRequest("x", "t")));
+
+        Assert.AreEqual(VBRuntimeErrorId.UnusableDialogAnswer, failed.ErrorId);
+        StringAssert.Contains(failed.Message, "lost");
+        fallback.DidNotReceiveWithAnyArgs().Prompt(default!, default);
     }
 
     [TestMethod]
@@ -204,5 +246,36 @@ public sealed class InteractionRelayTests
         Assert.IsFalse((await relay.MessageBoxAsync(new HostMessageBoxParams(), CancellationToken.None)).Handled);
         Assert.IsFalse((await relay.InputBoxAsync(new HostInputBoxParams(), CancellationToken.None)).Handled);
         await client.DidNotReceiveWithAnyArgs().MessageBoxAsync(default!, default);
+    }
+
+    // overnight #75: what HexIDE's probe did - a vbOKOnly box answered with vbYes - is told to the host as the failure it is, naming the client.
+    [TestMethod]
+    public async Task TheLanguageServer_TellsAnAnswerThatIsNoButtonOfTheDialog_NamingTheClient()
+    {
+        var relay = new ClientInteractionRelay();
+        var client = Client(showsDialogs: true);
+        client.Name.Returns("HexIDE");
+        client.MessageBoxAsync(Arg.Any<SessionMessageBoxRequest>(), Arg.Any<CancellationToken>()).Returns(new MessageBoxResult { Handled = true, Result = 6 });
+        relay.Attach(client);
+
+        var answer = await relay.MessageBoxAsync(new HostMessageBoxParams { Prompt = "p", Style = (int)VBMsgBoxStyle.VBOKOnly }, CancellationToken.None);
+
+        Assert.IsNotNull(answer.Failure);
+        StringAssert.Contains(answer.Failure, "HexIDE");
+        StringAssert.Contains(answer.Failure, "vbOKOnly");
+        StringAssert.Contains(answer.Failure, "6");
+    }
+
+    [TestMethod]
+    public async Task TheLanguageServer_TellsADialogAClientThatShowsThemDidNotHandle_AsDeclined()
+    {
+        var relay = new ClientInteractionRelay();
+        var client = Client(showsDialogs: true);
+        client.MessageBoxAsync(Arg.Any<SessionMessageBoxRequest>(), Arg.Any<CancellationToken>()).Returns(MessageBoxResult.NotHandled);
+        client.InputBoxAsync(Arg.Any<SessionInputBoxRequest>(), Arg.Any<CancellationToken>()).Returns(InputBoxResult.NotHandled);
+        relay.Attach(client);
+
+        Assert.IsTrue((await relay.MessageBoxAsync(new HostMessageBoxParams(), CancellationToken.None)).Declined);
+        Assert.IsTrue((await relay.InputBoxAsync(new HostInputBoxParams(), CancellationToken.None)).Declined);
     }
 }

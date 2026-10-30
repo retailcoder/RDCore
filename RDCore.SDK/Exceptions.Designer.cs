@@ -1821,6 +1821,42 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to {1}, which shows the program's dialogs, declined to answer its {0}: nobody else will, and the run fails..
+        /// </summary>
+        public static string VBRuntimeError_NobodyToAnswer_Declined {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_NobodyToAnswer_Declined", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0} answered the program's MsgBox ({1}) with {2}, which is none of its buttons: the program cannot go on with that answer, and the run fails..
+        /// </summary>
+        public static string VBRuntimeError_UnusableDialogAnswer_NoSuchButton {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_UnusableDialogAnswer_NoSuchButton", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The program's {0} could not be relayed to the client that shows its dialogs ({1}): the run fails, rather than wait on a dialog nobody sees..
+        /// </summary>
+        public static string VBRuntimeError_UnusableDialogAnswer_NotRelayed {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_UnusableDialogAnswer_NotRelayed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The client.
+        /// </summary>
+        public static string UnnamedClient {
+            get {
+                return ResourceManager.GetString("UnnamedClient", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to This For loop counts in {0}, and its start, end or step is not a value of that type..
         /// </summary>
         public static string VBForLoopOperandNotOfLoopType_Verbose {

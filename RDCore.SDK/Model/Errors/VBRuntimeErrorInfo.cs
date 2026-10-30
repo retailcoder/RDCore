@@ -152,6 +152,7 @@ public record class VBRuntimeErrorInfo : VBErrorInfo, IVBRaisableError
         [VBRuntimeErrorId.CantSaveFileToTemp] = "Can't save file to TEMP",
         [VBRuntimeErrorId.SearchTextNotFound] = "Search text not found",
         [VBRuntimeErrorId.ReplacementsTooLong] = "Replacements too long",
-        [VBRuntimeErrorId.NobodyToAnswer] = "Nobody to answer: the program runs unattended"
+        [VBRuntimeErrorId.NobodyToAnswer] = "Nobody to answer: the program runs unattended",
+        [VBRuntimeErrorId.UnusableDialogAnswer] = "Unusable dialog answer: the client's answer is no answer the dialog has"
     };
 }
