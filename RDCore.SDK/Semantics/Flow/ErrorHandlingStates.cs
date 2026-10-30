@@ -9,33 +9,37 @@ namespace RDCore.SDK.Semantics.Flow;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The states are propagated from the start of the activation (<see cref="ErrorHandlingState.Initial"/>) along the code paths, including where a <c>Resume</c> can continue
-/// (an approximation: see <see cref="ControlFlowImprecision.Resumption"/>):
+/// The states are propagated from the start of the activation (<see cref="ErrorHandlingState.Initial"/>), as MS-VBA runs the statements (Excel-verified, oracle\s53):
 /// </para>
 /// <list type="bullet">
-/// <item><description>an <c>On Error</c> statement sets the policy (<strong>MS-VBAL §5.4.4.1</strong>);</description></item>
-/// <item><description>an error raised under <c>On Error GoTo</c> reaches the handler with the error active, and a <c>Resume</c> ends it (<strong>MS-VBAL §5.4.4.2</strong>),
-/// with the policy as it was;</description></item>
-/// <item><description>an <c>On Error</c> statement run while an error is active may or may not end it: MS-VBA keeps the active error through an <c>On Error GoTo</c> other than
-/// <c>-1</c>, where the runtime ends it with any of them, so both states are kept.</description></item>
+/// <item><description>an <c>On Error</c> statement sets the policy (<strong>MS-VBAL §5.4.4.1</strong>); inside a handler, before it resumes, it sets the policy for after the
+/// handler ends, and an error raised meanwhile is still raised to the caller;</description></item>
+/// <item><description>an error raised under <c>On Error GoTo</c> reaches the handler with the error active; a <c>Resume</c> ends it (<strong>MS-VBAL §5.4.4.2</strong>), and so
+/// does <c>On Error GoTo -1</c>, which keeps the policy: the handler is the next error's again;</description></item>
+/// <item><description>a <c>Resume</c> continues at an instruction that raised into a handler, and a <c>Resume Next</c> at the one after it, which only the run knows: every one
+/// that can is a place it may continue (<see cref="ControlFlowImprecision.Resumption"/>).</description></item>
 /// </list>
 /// <para>
-/// A state is in the set of an instruction when some code path in the graph reaches it in that state: the answer to "can an error raised here reach a handler?" is exact
-/// for those paths, and "it cannot" is true of every path the graph has.
+/// A state is in the set of an instruction when some code path in the graph reaches it in that state. The states are also where the data-flow analyses take the
+/// edges an error makes from: to the handler that takes it, to the next statement under <c>On Error Resume Next</c>, or out of the activation to the caller.
 /// </para>
 /// </remarks>
 public sealed class ErrorHandlingStates
 {
     private readonly ImmutableHashSet<ErrorHandlingState>[] _states;
 
-    private ErrorHandlingStates(ControlFlowGraph graph, ImmutableHashSet<ErrorHandlingState>[] states)
+    private ErrorHandlingStates(ControlFlowGraph graph, ImmutableHashSet<ErrorHandlingState>[] states, IReadOnlySet<int> faults)
     {
         Graph = graph;
         _states = states;
+        Edges = FlowEdges.Of(graph, states, faults);
     }
 
     /// <summary>The graph the states were propagated over.</summary>
     public ControlFlowGraph Graph { get; }
+
+    /// <summary>The edges a data-flow analysis walks: the graph's normal edges, and those errors and resumptions make, as the states say.</summary>
+    internal FlowEdges Edges { get; }
 
     /// <summary>
     /// The states the instruction at <paramref name="node"/> can run in: before it executes. Empty when control cannot reach it.
@@ -55,10 +59,31 @@ public sealed class ErrorHandlingStates
     /// <param name="graph">The code paths of the body.</param>
     public static ErrorHandlingStates Of(ControlFlowGraph graph)
     {
-        var edges = FlowEdges.Of(graph);
-        var states = Enumerable.Range(0, edges.Count).Select(_ => new HashSet<ErrorHandlingState>()).ToArray();
-        var items = graph.Instructions.Items;
+        // where a Resume continues depends on which instructions raise into a handler, which depends on the states a Resume brings back: until it is the same.
+        var faults = new HashSet<int>();
+        while (true)
+        {
+            var states = Propagate(graph, faults);
+            var found = FaultsOf(graph, states);
+            if (found.SetEquals(faults))
+            {
+                return new ErrorHandlingStates(graph, states, faults);
+            }
 
+            faults = found;
+        }
+    }
+
+    // the instructions that can raise an error into a handler: the fault statements a Resume may continue at.
+    private static HashSet<int> FaultsOf(ControlFlowGraph graph, ImmutableHashSet<ErrorHandlingState>[] states)
+        => [.. graph.Instructions.Items
+            .Where(instruction => ControlFlowGraph.CanRaiseError(instruction.Kind) && states[instruction.Offset].Any(state => state.CatchingHandler is not null))
+            .Select(instruction => instruction.Offset)];
+
+    private static ImmutableHashSet<ErrorHandlingState>[] Propagate(ControlFlowGraph graph, IReadOnlySet<int> faults)
+    {
+        var items = graph.Instructions.Items;
+        var states = Enumerable.Range(0, items.Length + 1).Select(_ => new HashSet<ErrorHandlingState>()).ToArray();
         var pending = new Queue<(int Node, ErrorHandlingState State)>();
         pending.Enqueue((graph.Entry, ErrorHandlingState.Initial));
         while (pending.TryDequeue(out var arrival))
@@ -69,50 +94,50 @@ public sealed class ErrorHandlingStates
             }
 
             var instruction = items[arrival.Node];
-            foreach (var edge in edges.SuccessorsOf(arrival.Node))
+
+            // an error raised in this state goes to the handler, which runs with the error active.
+            if (ControlFlowGraph.CanRaiseError(instruction.Kind) && arrival.State.CatchingHandler is { } handler)
             {
-                if (edge.Kind is ControlFlowEdgeKind.Error)
-                {
-                    // the handler is taken in this state only: the error is active until something resumes or ends it.
-                    if (arrival.State.CatchingHandler == edge.To)
-                    {
-                        pending.Enqueue((edge.To, arrival.State with { IsHandling = true }));
-                    }
+                pending.Enqueue((handler, arrival.State with { IsHandling = true }));
+            }
 
-                    continue;
-                }
-
-                foreach (var after in After(instruction, arrival.State))
-                {
-                    pending.Enqueue((edge.To, after));
-                }
+            var after = After(instruction, arrival.State);
+            foreach (var next in NormalSuccessorsOf(graph, instruction, faults))
+            {
+                pending.Enqueue((next, after));
             }
         }
 
-        return new ErrorHandlingStates(graph, [.. states.Select(set => set.ToImmutableHashSet())]);
+        return [.. states.Select(set => set.ToImmutableHashSet())];
     }
+
+    // where control goes when the instruction completes: the graph's edges, and the places a Resume may continue at.
+    internal static IEnumerable<int> NormalSuccessorsOf(ControlFlowGraph graph, Instruction instruction, IReadOnlySet<int> faults)
+    {
+        var successors = graph.SuccessorsOf(instruction.Offset).Where(edge => edge.Kind is not ControlFlowEdgeKind.Error).Select(edge => edge.To);
+        return instruction.Kind switch
+        {
+            InstructionKind.ResumeCurrentStatement => successors.Concat(faults),
+            InstructionKind.ResumeNext => successors.Concat(faults.SelectMany(fault => AfterFault(graph, fault))),
+            _ => successors,
+        };
+    }
+
+    // the statement after one that raised an error: where the instruction would have continued, or the next one in order.
+    private static IEnumerable<int> AfterFault(ControlFlowGraph graph, int fault)
+        => graph.SuccessorsOf(fault).Where(edge => edge.Kind is not ControlFlowEdgeKind.Error).Select(edge => edge.To).Append(fault + 1).Distinct();
 
     // what running the instruction to completion leaves.
-    private static IEnumerable<ErrorHandlingState> After(Instruction instruction, ErrorHandlingState before)
+    private static ErrorHandlingState After(Instruction instruction, ErrorHandlingState before) => instruction.Kind switch
     {
-        switch (instruction.Kind)
-        {
-            case InstructionKind.OnErrorGoTo:
-                return Set(new ErrorHandlingState(ErrorHandlingPolicy.GoTo, instruction.Target, false), before);
-            case InstructionKind.OnErrorResumeNext:
-                return Set(new ErrorHandlingState(ErrorHandlingPolicy.ResumeNext, null, false), before);
-            case InstructionKind.OnErrorDisable:
-                // On Error GoTo -1 ends the active error, and On Error GoTo 0 is lowered to the same instruction.
-                return Set(ErrorHandlingState.Initial, before);
-            case InstructionKind.ResumeCurrentStatement:
-            case InstructionKind.ResumeNext:
-            case InstructionKind.ResumeLabel:
-                return [before with { IsHandling = false }];
-            default:
-                return [before];
-        }
-    }
+        // inside a handler, the policy set is for after the handler ends: the error stays active (MS-VBA, oracle\s53 C01-C03).
+        InstructionKind.OnErrorGoTo => new ErrorHandlingState(ErrorHandlingPolicy.GoTo, instruction.Target, before.IsHandling),
+        InstructionKind.OnErrorResumeNext => new ErrorHandlingState(ErrorHandlingPolicy.ResumeNext, null, before.IsHandling),
+        InstructionKind.OnErrorDisable => new ErrorHandlingState(ErrorHandlingPolicy.Default, null, before.IsHandling),
 
-    private static IEnumerable<ErrorHandlingState> Set(ErrorHandlingState policy, ErrorHandlingState before)
-        => before.IsHandling ? [policy, policy with { IsHandling = true }] : [policy];
+        // On Error GoTo -1 ends the active error and keeps the policy (MS-VBA, oracle\s53 A05, C04).
+        InstructionKind.OnErrorReset => before with { IsHandling = false },
+        InstructionKind.ResumeCurrentStatement or InstructionKind.ResumeNext or InstructionKind.ResumeLabel => before with { IsHandling = false },
+        _ => before,
+    };
 }

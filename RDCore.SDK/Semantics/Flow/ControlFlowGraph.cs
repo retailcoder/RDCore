@@ -338,10 +338,13 @@ public sealed class ControlFlowGraph
 
             return protectedNodes;
         }
-
-        private static bool CanRaiseError(InstructionKind kind) => kind is
-            InstructionKind.Simple or InstructionKind.ConditionalBranch or InstructionKind.LoopBack or InstructionKind.ForOpener or InstructionKind.ForNext
-            or InstructionKind.ForEachOpener or InstructionKind.ForEachNext or InstructionKind.With or InstructionKind.Select or InstructionKind.JumpTable
-            or InstructionKind.GoSubTable or InstructionKind.RaiseError;
     }
+
+    /// <summary>
+    /// Whether an instruction of this kind can raise an error: it evaluates something, or is <c>Error n</c>.
+    /// </summary>
+    internal static bool CanRaiseError(InstructionKind kind) => kind is
+        InstructionKind.Simple or InstructionKind.ConditionalBranch or InstructionKind.LoopBack or InstructionKind.ForOpener or InstructionKind.ForNext
+        or InstructionKind.ForEachOpener or InstructionKind.ForEachNext or InstructionKind.With or InstructionKind.Select or InstructionKind.JumpTable
+        or InstructionKind.GoSubTable or InstructionKind.RaiseError;
 }

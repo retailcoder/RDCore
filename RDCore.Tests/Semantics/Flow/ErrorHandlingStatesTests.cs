@@ -104,32 +104,47 @@ public sealed class ErrorHandlingStatesTests
     }
 
     [TestMethod]
-    public void AfterResumeNext_TheHandlerIsInEffectAgain()
+    public void AfterResumeNext_WhatOnlyItReaches_RunsWithTheHandlerInEffect()
     {
-        // the handler resumes after the statement that failed: the next error goes to it as the first did.
-        var states = States("On Error GoTo Handler\nn = 1\nn = 2\nExit Sub\nHandler:\nResume Next");
+        // n = 2 is reached by no other path: Error 5 never completes. The handler resumes after it, and the next error goes to the handler as the first did.
+        var states = States("On Error GoTo Handler\nError 5\nn = 2\nExit Sub\nHandler:\nResume Next");
 
-        var state = states.At(At(states, 3)).Single(candidate => !candidate.IsHandling);
+        var state = states.At(At(states, 3)).Single();
         Assert.AreEqual(Label(states, "Handler"), state.CatchingHandler);
-        Assert.IsTrue(states.At(At(states, 3)).All(candidate => !candidate.IsHandling), "a resumed error is not active any more");
+        Assert.IsFalse(state.IsHandling, "a resumed error is not active any more");
     }
 
     [TestMethod]
-    public void AfterResume_TheFaultStatementRunsAgain_WithTheHandlerInEffect()
+    public void AfterResume_TheFaultStatementRunsAgain_WithThePolicyTheHandlerSet()
     {
-        var states = States("On Error GoTo Handler\nn = 1\nExit Sub\nHandler:\nn = 0\nResume");
+        // only the Resume brings n = 1 back under On Error Resume Next, which the handler set.
+        var states = States("On Error GoTo Handler\nn = 1\nExit Sub\nHandler:\nOn Error Resume Next\nResume");
 
-        Assert.IsTrue(states.At(At(states, 2)).All(state => state is { Policy: ErrorHandlingPolicy.GoTo, IsHandling: false }));
+        CollectionAssert.AreEquivalent(new[] { ErrorHandlingPolicy.GoTo, ErrorHandlingPolicy.ResumeNext }, states.At(At(states, 2)).Select(state => state.Policy).ToArray());
+        Assert.IsTrue(states.At(At(states, 2)).All(state => !state.IsHandling));
     }
 
     [TestMethod]
-    public void AnOnErrorInAHandler_MayOrMayNotEndTheActiveError()
+    public void AnOnErrorInAHandler_SetsThePolicyForAfterIt_TheErrorStaysActive()
     {
-        // MS-VBA keeps the active error through an On Error GoTo, the runtime ends it: both are kept.
+        // MS-VBA: an error raised in the handler after On Error GoTo Other is raised to the caller, not caught by Other (oracle\s53 C01).
         var states = States("On Error GoTo Handler\nn = 1\nExit Sub\nHandler:\nOn Error GoTo Other\nn = 2\nExit Sub\nOther:\nDebug.Print \"other\"");
 
-        var handling = states.At(At(states, 6)).Select(state => state.IsHandling).Order().ToArray();
-        CollectionAssert.AreEqual(new[] { false, true }, handling);
+        var state = states.At(At(states, 6)).Single();
+        Assert.IsTrue(state.IsHandling);
+        Assert.AreEqual(ErrorHandlingPolicy.GoTo, state.Policy);
+        Assert.IsTrue(state.RaisesToCaller);
+    }
+
+    [TestMethod]
+    public void OnErrorGoToMinusOne_EndsTheActiveError_AndKeepsThePolicy()
+    {
+        // MS-VBA: after On Error GoTo -1 in the handler, a second error goes to the handler again (oracle\s53 A05).
+        var states = States("On Error GoTo Handler\nn = 1\nExit Sub\nHandler:\nOn Error GoTo -1\nn = 2\nExit Sub");
+
+        var state = states.At(At(states, 6)).Single();
+        Assert.IsFalse(state.IsHandling);
+        Assert.AreEqual(Label(states, "Handler"), state.CatchingHandler);
     }
 
     [TestMethod]

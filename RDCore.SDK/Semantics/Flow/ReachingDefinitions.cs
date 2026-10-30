@@ -14,9 +14,10 @@ namespace RDCore.SDK.Semantics.Flow;
 /// (<see cref="VariableDefinitionKind.Entry"/>): an entry definition that reaches a use is a read of the argument, of the initial value, or of the value a field had.
 /// </para>
 /// <para>
-/// What may happen counts as happening, so that "does not reach" is true on every path the graph has: an instruction that raises an error into a handler may have
-/// written some of what it writes (a procedure it called may have written an argument before it failed), and replaced none of it; under <c>On Error Resume Next</c>,
-/// an instruction may stop part way, and replaces nothing; a <c>Resume</c> may continue at any instruction that raised into a handler.
+/// What may happen counts as happening, so that "does not reach" is true on every path the graph has (<see cref="ErrorHandlingStates"/> has the edges): an
+/// instruction that raises an error may have written some of what it writes (a procedure it called may have written an argument before it failed), and replaced
+/// none of it, whether the error goes to a handler, or to the next statement under <c>On Error Resume Next</c>; a <c>Resume</c> may continue at any instruction that
+/// raised into a handler.
 /// </para>
 /// </remarks>
 public sealed class ReachingDefinitions
@@ -64,10 +65,10 @@ public sealed class ReachingDefinitions
     /// </summary>
     /// <param name="graph">The code paths of the body.</param>
     /// <param name="accesses">The definitions and uses of its variables.</param>
-    public static ReachingDefinitions Of(ControlFlowGraph graph, DefinitionsAndUses accesses)
+    /// <param name="states">Its error-handling states, when they are already known: the edges errors make are theirs.</param>
+    public static ReachingDefinitions Of(ControlFlowGraph graph, DefinitionsAndUses accesses, ErrorHandlingStates? states = null)
     {
-        var edges = FlowEdges.Of(graph);
-        var resumesNext = LiveVariables.ResumesNext(graph);
+        var edges = (states ?? ErrorHandlingStates.Of(graph)).Edges;
         var definitions = accesses.Definitions;
         var indices = definitions.Select((definition, index) => (definition, index)).ToDictionary(pair => pair.definition, pair => pair.index, ReferenceEqualityComparer.Instance);
         var reaching = Enumerable.Range(0, edges.Count).Select(_ => new HashSet<int>()).ToArray();
@@ -84,9 +85,8 @@ public sealed class ReachingDefinitions
             }
 
             var own = accesses.DefinitionsAt(node).Select(definition => indices[definition]).ToArray();
-            HashSet<SemanticId> replaced = resumesNext[node]
-                ? []
-                : accesses.DefinitionsAt(node).Where(definition => definition.IsComplete).Select(definition => definition.Variable).ToHashSet();
+            // an error edge carries what reached the instruction, and what it may have written before it failed; only completing it replaces anything.
+            var replaced = accesses.DefinitionsAt(node).Where(definition => definition.IsComplete).Select(definition => definition.Variable).ToHashSet();
 
             var completed = new HashSet<int>(reaching[node].Where(index => !replaced.Contains(definitions[index].Variable)));
             completed.UnionWith(own);

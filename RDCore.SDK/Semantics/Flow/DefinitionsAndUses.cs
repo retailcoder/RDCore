@@ -92,6 +92,9 @@ public sealed class DefinitionsAndUses
         private readonly List<VariableDefinition> _definitions = [];
         private readonly List<VariableUse> _uses = [];
 
+        // the instructions that may run code of another procedure.
+        private readonly List<(int Offset, SyntaxNode Statement)> _runsCode = [];
+
         // the names the instruction being visited reads.
         private Dictionary<SimpleNameExpressionNode, SemanticId> _collected = [];
 
@@ -103,9 +106,35 @@ public sealed class DefinitionsAndUses
             }
 
             var variables = _definitions.Select(definition => definition.Variable).Concat(_uses.Select(use => use.Variable)).Distinct().ToArray();
+
+            // code that runs in another procedure - a call, a property, an event handler, a Class_Initialize or Class_Terminate - may read what it can see of this
+            // one's: its fields and globals, and its Static locals (a recursive call). Each instruction that may run some reads all of them.
+            var seenByCallees = variables.Where(SeenByCallees).ToArray();
+            foreach (var (offset, statement) in _runsCode)
+            {
+                _uses.AddRange(seenByCallees.Select(variable => new VariableUse(variable, offset, statement)));
+            }
+
             var entries = variables.Select(variable => new VariableDefinition(variable, -1, VariableDefinitionKind.Entry, IsComplete: true, Expression: null));
             return new DefinitionsAndUses(instructions, [.. entries, .. _definitions], [.. _uses], [.. variables.Where(OutlivesTheActivation)]);
         }
+
+        private bool SeenByCallees(SemanticId variable)
+            => variable != model.Procedure && SymbolOf(variable) is not VBLocalVariableSymbol { IsStatic: false };
+
+        // whether the statement may run code of another procedure: a call of any kind, an event raised, an object created, or released by a Set, a collection
+        // enumerated.
+        private bool RunsCode(StatementNode statement)
+            => statement is CallStatementNode or ForEachStatementNode or KeywordStatementNode { Token: Tokens.RaiseEvent } or AssignmentStatementNode { Kind: AssignmentKind.Set }
+               || ExpressionsOf(statement).SelectMany(expression => (IEnumerable<SyntaxNode>)[expression, .. Nested(expression)]).Any(node => node is NewExpressionNode
+                   || model.Expressions.TryGetValue(node.Identity, out var fact)
+                      && (fact.Classification is ExpressionClassification.Function or ExpressionClassification.Property or ExpressionClassification.Subroutine
+                              or ExpressionClassification.UnboundMember
+                          || (fact.Flags & (ValueExpressionSemanticFlags.ProcedureCall | ValueExpressionSemanticFlags.LateBound | ValueExpressionSemanticFlags.DefaultMember
+                              | ValueExpressionSemanticFlags.DictionaryAccess)) != 0));
+
+        private static IEnumerable<SyntaxNode> Nested(SyntaxNode node)
+            => node.Children.Where(child => child is not StatementNode).SelectMany(child => (IEnumerable<SyntaxNode>)[child, .. Nested(child)]);
 
         private void Visit(Instruction instruction)
         {
@@ -118,8 +147,9 @@ public sealed class DefinitionsAndUses
                     Write(instruction, loop.ControlExpression, VariableDefinitionKind.LoopControl, complete: true, reads: true);
                     return;
                 case InstructionKind.ForEachNext when OpenerOf(instruction) is ForEachStatementNode loop:
-                    // past the last element, nothing is assigned.
+                    // past the last element, nothing is assigned; the enumerator of an object runs its own code for the next one.
                     Write(instruction, loop.ControlExpression, VariableDefinitionKind.LoopControl, complete: false, reads: false);
+                    _runsCode.Add((instruction.Offset, loop));
                     return;
             }
 
@@ -132,7 +162,7 @@ public sealed class DefinitionsAndUses
             var notRead = new HashSet<SimpleNameExpressionNode>();
             foreach (var expression in ExpressionsOf(statement))
             {
-                Collect(instruction, expression, names, isMember: false);
+                Collect(instruction, expression, names, statement);
             }
 
             foreach (var (target, kind, complete, reads) in WritesOf(instruction, statement))
@@ -146,6 +176,11 @@ public sealed class DefinitionsAndUses
             foreach (var (name, variable) in names.Where(name => !notRead.Contains(name.Key)))
             {
                 _uses.Add(new VariableUse(variable, instruction.Offset, name));
+            }
+
+            if (RunsCode(statement))
+            {
+                _runsCode.Add((instruction.Offset, statement));
             }
         }
 
@@ -198,23 +233,28 @@ public sealed class DefinitionsAndUses
         }
 
         // the names of variables an expression reads, and the arguments it may pass by reference: the names a member access is written with are its owner's to resolve.
-        private void Collect(Instruction instruction, SyntaxNode node, Dictionary<SimpleNameExpressionNode, SemanticId> names, bool isMember)
+        private void Collect(Instruction instruction, SyntaxNode node, Dictionary<SimpleNameExpressionNode, SemanticId> names, SyntaxNode? parent)
         {
-            if (node is StatementNode)
+            if (node is StatementNode && parent is not null)
             {
                 return;
             }
 
-            if (node is SimpleNameExpressionNode name && !isMember && VariableOf(name, asTarget: false) is { } variable)
+            if (node is SimpleNameExpressionNode name && !IsMemberName(name, parent) && VariableOf(name, asTarget: false, IsCalled(name, parent)) is { } variable)
             {
                 names[name] = variable;
             }
 
+            // a member written relative to a With block on a Type reads the variable the block names.
+            if (node is MemberAccessExpressionNode { Owner: null } && WithOf(instruction) is var (with, block) && IsUserDefined(block.WithExpression)
+                && RootOf(with, block.WithExpression) is (not null, { } held, _))
+            {
+                _uses.Add(new VariableUse(held, instruction.Offset, node));
+            }
+
             foreach (var child in node.Children)
             {
-                var member = node is MemberAccessExpressionNode access && ReferenceEquals(child, access.Member)
-                    || node is DictionaryAccessExpressionNode dictionary && ReferenceEquals(child, dictionary.Member);
-                Collect(instruction, child, names, member);
+                Collect(instruction, child, names, node);
             }
 
             // once the names it is written with are collected: the variable it passes is read as well.
@@ -252,25 +292,39 @@ public sealed class DefinitionsAndUses
         // the variable an assignable expression writes to, and whether it writes all of it: an element of an array, a member of a Type, is a part.
         private (SimpleNameExpressionNode? Name, SemanticId? Variable, bool Whole) RootOf(Instruction instruction, ExpressionNode target)
         {
+            // what is written through is told by the type of the expression it is written through: an element of an array of Types is a Type, a member of a Type an array.
             switch (target)
             {
-                case SimpleNameExpressionNode name when VariableOf(name, asTarget: true) is { } variable:
+                case SimpleNameExpressionNode name when VariableOf(name, asTarget: true, isCalled: false) is { } variable:
                     return (name, variable, true);
-                case IndexExpressionNode index when RootOf(instruction, index.Callee) is ({ } name, { } variable, true) && HoldsElements(name):
+                case IndexExpressionNode index when HoldsElements(index.Callee) && RootOf(instruction, index.Callee) is ({ } name, { } variable, _):
                     return (name, variable, false);
-                case MemberAccessExpressionNode { Owner: { } owner } when RootOf(instruction, owner) is ({ } name, { } variable, _) && IsUserDefined(name):
+                case MemberAccessExpressionNode { Owner: { } owner } when IsUserDefined(owner) && RootOf(instruction, owner) is ({ } name, { } variable, _):
                     return (name, variable, false);
-                case MemberAccessExpressionNode { Owner: null } when instruction.EnclosingWith is { } with
-                                                                    && instructions.Items[with].Node is WithStatementNode block
-                                                                    && RootOf(instruction, block.WithExpression) is ({ } name, { } variable, _) && IsUserDefined(name):
-                    // a member of the Type the With block is of is written through the variable the block names.
+                case MemberAccessExpressionNode { Owner: null } when WithOf(instruction) is var (with, block) && IsUserDefined(block.WithExpression)
+                                                                    && RootOf(with, block.WithExpression) is ({ } name, { } variable, _):
+                    // a member of the Type the With block is of is written through the variable the block names - which is resolved where the block is, whose own
+                    // enclosing block is the outer one: a With nested in another is resolved outwards.
                     return (name, variable, false);
                 default:
                     return (null, null, false);
             }
         }
 
-        private SemanticId? VariableOf(SimpleNameExpressionNode name, bool asTarget)
+        // the With instruction a With-relative member of the instruction is relative to, and its statement.
+        private (Instruction With, WithStatementNode Block)? WithOf(Instruction instruction)
+            => instruction.EnclosingWith is { } offset && instructions.Items[offset] is { Node: WithStatementNode block } with ? (with, block) : null;
+
+        private static bool IsMemberName(SimpleNameExpressionNode name, SyntaxNode? parent)
+            => parent is MemberAccessExpressionNode access && ReferenceEquals(access.Member, name)
+               || parent is DictionaryAccessExpressionNode dictionary && ReferenceEquals(dictionary.Member, name);
+
+        // the callee of an index expression or of a call statement is a call: of the function itself, when it is the function's name.
+        private static bool IsCalled(SimpleNameExpressionNode name, SyntaxNode? parent)
+            => parent is IndexExpressionNode index && ReferenceEquals(index.Callee, name)
+               || parent is CallStatementNode call && ReferenceEquals(call.Callee, name);
+
+        private SemanticId? VariableOf(SimpleNameExpressionNode name, bool asTarget, bool isCalled)
         {
             if (!model.Expressions.TryGetValue(name.Identity, out var fact) || fact.Binding is not { } binding)
             {
@@ -282,16 +336,16 @@ public sealed class DefinitionsAndUses
                 return binding;
             }
 
-            // the name of the function, written to, is its result; read, it is a call of it.
-            return asTarget && binding == model.Procedure ? binding : null;
+            // the name of the function is its result, written to or read, unless it is called (MS-VBAL §5.3.1): a bare name is the result variable.
+            return binding == model.Procedure && (asTarget || !isCalled) ? binding : null;
         }
 
-        private VBType? TypeOf(SimpleNameExpressionNode name) => model.Expressions.TryGetValue(name.Identity, out var fact) ? fact.DeclaredType : null;
+        private VBType? TypeOf(ExpressionNode expression) => model.Expressions.TryGetValue(expression.Identity, out var fact) ? fact.DeclaredType : null;
 
         // an array, or a Variant that may hold one, has elements to write; an object's default member is the object's to write.
-        private bool HoldsElements(SimpleNameExpressionNode name) => TypeOf(name) is null or VBArrayType or VBVariantType;
+        private bool HoldsElements(ExpressionNode expression) => TypeOf(expression) is null or VBArrayType or VBVariantType;
 
-        private bool IsUserDefined(SimpleNameExpressionNode name) => TypeOf(name) is VBUserDefinedType;
+        private bool IsUserDefined(ExpressionNode expression) => TypeOf(expression) is VBUserDefinedType;
 
         private bool OutlivesTheActivation(SemanticId variable)
         {

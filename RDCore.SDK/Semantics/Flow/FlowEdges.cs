@@ -1,16 +1,26 @@
-using RDCore.SDK.Semantics.Instructions;
 using System.Collections.Immutable;
 
 namespace RDCore.SDK.Semantics.Flow;
 
 /// <summary>
-/// The edges a data-flow analysis walks: the <see cref="ControlFlowGraph"/>'s, and where a <c>Resume</c> can continue, which the graph has no edge for
-/// (<see cref="ControlFlowImprecision.Resumption"/>).
+/// The edges a data-flow analysis walks: the <see cref="ControlFlowGraph"/>'s normal edges, where a <c>Resume</c> can continue, and where an error goes, as the
+/// <see cref="ErrorHandlingStates"/> say.
 /// </summary>
 /// <remarks>
-/// An analysis that misses a path states facts that are false on it: a write a later <c>Resume</c> reads would look dead. So a <c>Resume</c> is given an edge to every
-/// instruction that can raise an error into a handler (it executes the fault statement again, <strong>MS-VBAL §5.4.4.2</strong>), and a <c>Resume Next</c> an edge to
-/// every instruction after one. Which of them is the fault statement is known only at run time: the edges are the ones that are possible, and some that are not.
+/// <para>
+/// An analysis that misses a path states facts that are false on it, so every way an error leaves an instruction is an edge, of kind
+/// <see cref="ControlFlowEdgeKind.Error"/>, along which the instruction has not completed:
+/// </para>
+/// <list type="bullet">
+/// <item><description>to the handler, when one takes it;</description></item>
+/// <item><description>to the next instruction, under <c>On Error Resume Next</c>;</description></item>
+/// <item><description>to <see cref="ControlFlowGraph.Exit"/>, when it is raised to the caller - under no policy, or while a handler runs - where what outlives the activation
+/// is what the caller may read.</description></item>
+/// </list>
+/// <para>
+/// A <c>Resume</c> is given an edge to every instruction that can raise into a handler, and a <c>Resume Next</c> to every one after one: which is the fault statement
+/// is known only at run time.
+/// </para>
 /// </remarks>
 internal sealed class FlowEdges
 {
@@ -36,32 +46,45 @@ internal sealed class FlowEdges
 
     public ImmutableArray<ControlFlowEdge> PredecessorsOf(int node) => _predecessors[node];
 
-    public static FlowEdges Of(ControlFlowGraph graph)
+    public static FlowEdges Of(ControlFlowGraph graph, ImmutableHashSet<ErrorHandlingState>[] states, IReadOnlySet<int> faults)
     {
         var items = graph.Instructions.Items;
-        var successors = Enumerable.Range(0, items.Length + 1).Select(node => graph.SuccessorsOf(node).ToList()).ToArray();
+        var successors = Enumerable.Range(0, items.Length + 1).Select(_ => new List<ControlFlowEdge>()).ToArray();
 
-        var faults = items.Where(instruction => graph.SuccessorsOf(instruction.Offset).Any(edge => edge.Kind is ControlFlowEdgeKind.Error)).ToArray();
-        var afterFaults = faults
-            .SelectMany(fault => graph.SuccessorsOf(fault.Offset).Where(edge => edge.Kind is not ControlFlowEdgeKind.Error).Select(edge => edge.To).Append(fault.Offset + 1))
-            .Distinct()
-            .ToArray();
-
-        foreach (var resume in items)
+        void Add(int from, int to, ControlFlowEdgeKind kind)
         {
-            var targets = resume.Kind switch
+            var edge = new ControlFlowEdge(from, to, kind);
+            if (!successors[from].Contains(edge))
             {
-                InstructionKind.ResumeCurrentStatement => faults.Select(fault => fault.Offset),
-                InstructionKind.ResumeNext => afterFaults,
-                _ => [],
-            };
+                successors[from].Add(edge);
+            }
+        }
 
-            foreach (var target in targets)
+        foreach (var instruction in items)
+        {
+            foreach (var next in ErrorHandlingStates.NormalSuccessorsOf(graph, instruction, faults))
             {
-                var edge = new ControlFlowEdge(resume.Offset, target, ControlFlowEdgeKind.Branch);
-                if (!successors[resume.Offset].Contains(edge))
+                Add(instruction.Offset, next, ControlFlowEdgeKind.Branch);
+            }
+
+            if (!ControlFlowGraph.CanRaiseError(instruction.Kind))
+            {
+                continue;
+            }
+
+            foreach (var state in states[instruction.Offset])
+            {
+                if (state.CatchingHandler is { } handler)
                 {
-                    successors[resume.Offset].Add(edge);
+                    Add(instruction.Offset, handler, ControlFlowEdgeKind.Error);
+                }
+                else if (state is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
+                {
+                    Add(instruction.Offset, instruction.Offset + 1, ControlFlowEdgeKind.Error);
+                }
+                else
+                {
+                    Add(instruction.Offset, graph.Exit, ControlFlowEdgeKind.Error);
                 }
             }
         }
