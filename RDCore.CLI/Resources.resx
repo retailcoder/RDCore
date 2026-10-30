@@ -512,7 +512,7 @@ Long Live the Cucumber (Latin)</comment>
     <value>a procedure the program is in, removed</value>
   </data>
   <data name="Host_Edit_LocalOfAnActiveProcedure" xml:space="preserve">
-    <value>a local of a procedure the program is in, given another type</value>
+    <value>a local of a procedure the program is in, given another type or made a Static</value>
   </data>
   <data name="Host_Edit_StoredValue" xml:space="preserve">
     <value>a variable or a field that holds a value, given another type or removed</value>
