@@ -101,6 +101,12 @@ public sealed class ErrorHandlingStates
                 pending.Enqueue((handler, arrival.State with { IsHandling = true }));
             }
 
+            // under On Error Resume Next it goes on at the next instruction, in the same state: the only way there for an Error statement, which never completes.
+            else if (ControlFlowGraph.CanRaiseError(instruction.Kind) && arrival.State is { Policy: ErrorHandlingPolicy.ResumeNext, IsHandling: false })
+            {
+                pending.Enqueue((arrival.Node + 1, arrival.State));
+            }
+
             var after = After(instruction, arrival.State);
             foreach (var next in NormalSuccessorsOf(graph, instruction, faults))
             {

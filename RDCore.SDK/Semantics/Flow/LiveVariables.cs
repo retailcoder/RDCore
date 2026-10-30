@@ -22,6 +22,11 @@ namespace RDCore.SDK.Semantics.Flow;
 /// <item><description>at the end of the activation, and where an error leaves it, what outlives it is live: a <c>ByRef</c> parameter, a field, a <c>Static</c> local, the
 /// result of a function (<see cref="DefinitionsAndUses.OutliveTheActivation"/>).</description></item>
 /// </list>
+/// <para>
+/// One path is not yet known to be the one MS-VBA takes: under <c>On Error Resume Next</c>, an error raised by the condition of a <c>Select Case</c>, an <c>If</c> or
+/// a loop goes on at the next instruction here - the first <c>Case</c>, the <c>Then</c> branch - which is to be measured in Excel. Until it is, "not live" holds on the
+/// paths of every other statement.
+/// </para>
 /// </remarks>
 public sealed class LiveVariables
 {

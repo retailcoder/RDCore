@@ -245,6 +245,12 @@ public sealed class DefinitionsAndUses
                 names[name] = variable;
             }
 
+            // a field named through its module or through Me is the field: told by the name of the member.
+            if (node is MemberAccessExpressionNode access && QualifiedVariableOf(access) is { } qualified)
+            {
+                names[access.Member] = qualified;
+            }
+
             // a member written relative to a With block on a Type reads the variable the block names.
             if (node is MemberAccessExpressionNode { Owner: null } && WithOf(instruction) is var (with, block) && IsUserDefined(block.WithExpression)
                 && RootOf(with, block.WithExpression) is (not null, { } held, _))
@@ -297,6 +303,8 @@ public sealed class DefinitionsAndUses
             {
                 case SimpleNameExpressionNode name when VariableOf(name, asTarget: true, isCalled: false) is { } variable:
                     return (name, variable, true);
+                case MemberAccessExpressionNode access when QualifiedVariableOf(access) is { } variable:
+                    return (access.Member, variable, true);
                 case IndexExpressionNode index when HoldsElements(index.Callee) && RootOf(instruction, index.Callee) is ({ } name, { } variable, _):
                     return (name, variable, false);
                 case MemberAccessExpressionNode { Owner: { } owner } when IsUserDefined(owner) && RootOf(instruction, owner) is ({ } name, { } variable, _):
@@ -339,6 +347,15 @@ public sealed class DefinitionsAndUses
             // the name of the function is its result, written to or read, unless it is called (MS-VBAL §5.3.1): a bare name is the result variable.
             return binding == model.Procedure && (asTarget || !isCalled) ? binding : null;
         }
+
+        // the field a member access names through its own module (`Main.field`, `VBAProject.Main.field`) or through the instance it is of (`Me.field`). Through any
+        // other object it is the field of that object, which is another variable.
+        private SemanticId? QualifiedVariableOf(MemberAccessExpressionNode access)
+            => access.Owner is { } owner
+               && (owner is InstanceExpressionNode || model.Expressions.TryGetValue(owner.Identity, out var qualifier) && qualifier.Classification is ExpressionClassification.Namespace)
+               && model.Expressions.TryGetValue(access.Identity, out var fact) && fact.Classification is ExpressionClassification.Variable
+                ? fact.Binding
+                : null;
 
         private VBType? TypeOf(ExpressionNode expression) => model.Expressions.TryGetValue(expression.Identity, out var fact) ? fact.DeclaredType : null;
 

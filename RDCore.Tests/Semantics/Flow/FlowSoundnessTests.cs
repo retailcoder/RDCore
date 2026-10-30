@@ -105,13 +105,26 @@ public sealed class FlowSoundnessTests
         return new Analyzed(instructions, model, DefinitionsAndUses.Of(instructions, model, composition.ScopeTree), graph, prefix.Split("\r\n").Length - 1);
     }
 
+    // the module or project that qualifies a member is no value and was never evaluated, so it had no fact: a procedure that named a member through one was
+    // not analyzed whole, and no flow analysis of it ran at all.
+    [TestMethod]
+    [DataRow("Debug.Print Strings.Len(\"x\")", DisplayName = "a library module")]
+    [DataRow("Debug.Print VBA.Strings.Len(\"x\")", DisplayName = "a library and its module")]
+    [DataRow("Debug.Print Main.field", DisplayName = "the procedure's own module")]
+    public void AProcedureThatQualifiesAMemberByItsModule_IsAnalyzedWhole(string body)
+    {
+        var analyzed = Analyze(body, others: PublicField);
+        Assert.IsTrue(analyzed.Model.IsFullyAnalyzed);
+    }
+
     // ---------------- soundness: errors ----------------
 
     [TestMethod]
-    public void S01_AnErrorRaisedToTheCaller_ExposesAByRefParameter_CallThatMayFail()
+    public void S01_AnErrorRaisedToTheCaller_ExposesAByRefParameter_AnExpressionThatMayFail()
     {
-        // Run's caller, with a handler, sees r = 1 when G() fails.
-        var analyzed = Analyze("r = 1\nr = G()", header: "Public Sub Run(ByRef r As Long)");
+        // Run's caller, with a handler, sees r = 1 when 10 \ n divides by zero. No call: a call reads whatever outlives the activation, and would keep r live
+        // whatever the exit edge does.
+        var analyzed = Analyze("r = 1\nr = 10 \\ n", header: "Public Sub Run(ByRef r As Long, ByVal n As Long)");
         Assert.Contains(analyzed.Variable("r"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)));
     }
 
@@ -155,8 +168,45 @@ public sealed class FlowSoundnessTests
     [TestMethod]
     public void S07_AnErrorInsideTheHandler_ExposesAByRefParameterToTheCaller()
     {
-        var analyzed = Analyze("On Error GoTo H\nr = G()\nExit Sub\nH:\nr = 1\nr = G()", header: "Public Sub Run(ByRef r As Long)");
+        var analyzed = Analyze("On Error GoTo H\nr = 10 \\ n\nExit Sub\nH:\nr = 1\nr = 10 \\ n", header: "Public Sub Run(ByRef r As Long, ByVal n As Long)");
         Assert.Contains(analyzed.Variable("r"), analyzed.Live.LiveAfter(analyzed.Lines(4, 4)));
+    }
+
+    [TestMethod]
+    public void S08_AnErrorInsideTheHandler_LeavesTheActivation()
+    {
+        var analyzed = Analyze("On Error GoTo H\nr = 10 \\ n\nExit Sub\nH:\nr = 10 \\ n", header: "Public Sub Run(ByRef r As Long, ByVal n As Long)");
+        var edges = analyzed.States.Edges.SuccessorsOf(analyzed.Line(4));
+        Assert.Contains(new ControlFlowEdge(analyzed.Line(4), analyzed.Graph.Exit, ControlFlowEdgeKind.Error), edges, "while the handler runs, an error is raised to the caller");
+    }
+
+    [TestMethod]
+    public void S09_AnErrorStatementUnderResumeNext_ReachesTheNextStatement_InTheSameState()
+    {
+        // the re-review's A: `Error 5` never completes, so the next statement is reached only by its error edge - and was unreachable.
+        var analyzed = Analyze("Dim x As Long\nOn Error Resume Next\nError 5\nx = 1\nx = 10 \\ n\nDebug.Print x");
+        Assert.IsNotEmpty(analyzed.States.At(analyzed.Line(3)), "x = 1 is reached");
+        Assert.Contains(analyzed.Variable("x"), analyzed.Live.LiveAfter(analyzed.Lines(3, 3)), "10 \\ n may fail, and Debug.Print reads x = 1");
+    }
+
+    // the re-review's E: a Return with no GoSub raises error 3, a Resume with no active error raises error 20.
+    [TestMethod]
+    [DataRow("Return", DisplayName = "a Return")]
+    [DataRow("Resume Next", DisplayName = "a Resume Next")]
+    public void S0A_AReturnOrAResume_CanRaise(string statement)
+    {
+        var analyzed = Analyze($"Dim x As Long\nOn Error Resume Next\nx = 1\n{statement}\nDebug.Print x");
+        Assert.Contains(analyzed.Variable("x"), analyzed.Live.LiveAfter(analyzed.Lines(2, 2)), $"{statement} raises, and Resume Next goes on to read x");
+    }
+
+    // the re-review's D, to measure in Excel before either side moves: RD-VBA's runtime continues at End Select (ProcedureExecutor), the analysis at the first Case.
+    [TestMethod]
+    [Ignore("measure in Excel: where MS-VBA goes on after an error in the expression of a Select Case under On Error Resume Next (overnight #64 D)")]
+    public void S0B_AnErrorInTheExpressionOfASelectCase_UnderResumeNext_GoesOnAtEndSelect()
+    {
+        var analyzed = Analyze("Dim x As Long\nOn Error Resume Next\nSelect Case 10 \\ n\nCase Else\nx = 2\nEnd Select\nDebug.Print x");
+        Assert.IsTrue(analyzed.Reaching.ReachingBefore(analyzed.Line(6), analyzed.Variable("x")).Any(definition => definition.Kind is VariableDefinitionKind.Entry),
+            "the Case Else is skipped, and x is still 0");
     }
 
     // ---------------- soundness: definitions ----------------
@@ -240,6 +290,42 @@ public sealed class FlowSoundnessTests
     {
         var analyzed = Analyze("field = 1\nShowField\nfield = 2");
         Assert.Contains(analyzed.Variable("field"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)), "ShowField reads it");
+    }
+
+    // the re-review's B: what is written in the argument list of a function that returns an array is an argument, not an index.
+    [TestMethod]
+    public void S22_AnArgumentOfAFunctionThatReturnsAnArray_IsADefinition()
+    {
+        const string parse = Others + "\n\nPrivate Function Parse(ByRef pos As Long) As String()\n    pos = pos + 1\nEnd Function";
+        var analyzed = Analyze("Dim parts() As String\nDim p As Long\nparts = Parse(p)\nDebug.Print p", others: parse);
+        Assert.IsTrue(analyzed.Defines(2, analyzed.Variable("p")));
+    }
+
+    // the re-review's F: a field named through its module, or through Me, is the field.
+    [TestMethod]
+    [DataRow("field = 1\nDebug.Print Main.field\nfield = 2", DisplayName = "read through the module")]
+    public void S23_AFieldReadThroughItsModule_IsAUse(string body)
+    {
+        var analyzed = Analyze(body, others: PublicField);
+        Assert.Contains(analyzed.Variable("field"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)));
+    }
+
+    // a member of the module, as its qualified name, or Me, sees it: a Public one.
+    private const string PublicField = "Public field As Long";
+
+    [TestMethod]
+    public void S24_AFieldWrittenThroughItsModule_IsADefinition()
+    {
+        var analyzed = Analyze("Main.field = 1\nDebug.Print field", others: PublicField);
+        Assert.IsTrue(analyzed.Defines(0, analyzed.Variable("field")));
+    }
+
+    [TestMethod]
+    public void S25_AFieldReadAndWrittenThroughMe_IsTheField()
+    {
+        var analyzed = Analyze("field = 1\nDebug.Print Me.field\nMe.field = 2", others: PublicField, moduleType: ModuleType.ClassModule);
+        Assert.Contains(analyzed.Variable("field"), analyzed.Live.LiveAfter(analyzed.Lines(0, 0)));
+        Assert.IsTrue(analyzed.Defines(2, analyzed.Variable("field")));
     }
 
     [TestMethod]

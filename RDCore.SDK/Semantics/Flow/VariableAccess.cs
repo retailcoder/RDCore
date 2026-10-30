@@ -51,13 +51,15 @@ public enum VariableDefinitionKind
 /// <remarks>
 /// <para>
 /// Every variable the procedure defines or uses has one <see cref="VariableDefinitionKind.Entry"/> definition, the value it has when the activation starts, and one
-/// definition for each instruction that may write it. A write to a part of it - <c>a(1) = 5</c>, <c>t.X = 1</c>, <c>a(1).X = 1</c>, <c>.X = 1</c> in a <c>With</c> block
-/// on a <c>Type</c> variable, <c>Mid(s, 1) = "x"</c> - is a definition of the variable the target is rooted at, of the kind
+/// definition for each place an instruction may write it: an instruction may have several of the same variable (<c>x = F(x)</c> assigns <c>x</c> and passes it
+/// by reference; <c>Input #1, a(1), a(2)</c> writes two parts of <c>a</c>). A write to a part of it - <c>a(1) = 5</c>, <c>t.X = 1</c>, <c>a(1).X = 1</c>,
+/// <c>.X = 1</c> in a <c>With</c> block on a <c>Type</c> variable, <c>Mid(s, 1) = "x"</c> - is a definition of the variable the target is rooted at, of the kind
 /// <see cref="VariableDefinitionKind.PartialWrite"/> whatever the statement is.
 /// </para>
 /// <para>
-/// A definition is made when its instruction <em>completes</em>. An instruction that raises an error does not complete: along its error edge (<see cref="FlowEdges"/>),
-/// the values before it are the ones that reach the handler, the next statement, or the caller.
+/// A definition replaces the value before it only when its instruction <em>completes</em>. An instruction that raises an error does not complete, and may have
+/// written some of what it writes all the same - a procedure it called may have written an argument before it failed: along its error edge (<see cref="FlowEdges"/>),
+/// what reached it and what it defines both reach the handler, the next statement, or the caller.
 /// </para>
 /// <para>
 /// What a procedure that is called writes is no definition here: a field, a global or a <c>Static</c> local that it may change is only a use where it is called, which
