@@ -31,7 +31,7 @@ public sealed class ClientWithoutOmniSharpTests
     private const string AsHexIdeDeclares = """
         {
             "textDocument": {
-                "publishDiagnostics": {},
+                "publishDiagnostics": { "relatedInformation": false },
                 "hover": { "contentFormat": ["plaintext"] },
                 "synchronization": { "didSave": true },
                 "codeLens": {},
@@ -39,7 +39,12 @@ public sealed class ClientWithoutOmniSharpTests
                 "documentSymbol": { "hierarchicalDocumentSymbolSupport": true },
                 "semanticTokens": { "requests": {}, "tokenTypes": ["keyword", "variable"], "tokenModifiers": ["declaration"], "formats": ["relative"] }
             },
-            "workspace": { "executeCommand": {}, "workspaceFolders": true, "diagnostics": {}, "fileOperations": {} },
+            "workspace": {
+                "executeCommand": {},
+                "workspaceFolders": true,
+                "diagnostics": { "refreshSupport": true },
+                "fileOperations": { "didCreate": true, "didRename": true, "didDelete": true }
+            },
             "window": { "workDoneProgress": true }
         }
         """;
@@ -132,6 +137,43 @@ public sealed class ClientWithoutOmniSharpTests
         platform.AssertTheProgramPrintedTheAnswer(executed);
         Assert.IsNull((await diagnostics)["error"]);
         await platform.ShutdownAsync(6);
+    }
+
+    // the second byte tap (C:\Dev\Claude\hexide-msgbox-tap2-2026-10-30.log): the language server asks the client to refresh its diagnostics while the program waits to
+    // run, and the client, as HexIDE does, answers and pulls the document's diagnostics again at once.
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public async Task AProgramRunWhileTheClientPullsItsDiagnosticsAgain_AsksTheClient_AndCompletesWithItsAnswer()
+    {
+        await using var platform = await Platform.StartAsync(others: 60);
+        var rpc = platform.Rpc;
+        Task<JsonObject>? pulledAgain = null;
+        rpc.Answered = method =>
+        {
+            if (method == "workspace/diagnostic/refresh")
+            {
+                pulledAgain ??= rpc.RequestAsync(6, "textDocument/diagnostic", new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri }, ["identifier"] = "rdcore" });
+            }
+        };
+
+        var initialize = await rpc.RequestAsync(2, "initialize", platform.InitializeParams(AsHexIdeDeclares));
+        Assert.IsNull(initialize["error"], initialize.ToJsonString());
+        await rpc.NotifyAsync("initialized", new JsonObject());
+        var handshake = rpc.RequestAsync(3, RDCorePlatformHandshake.Method, JsonNode.Parse(ClaimsDialogs)!.AsObject());
+        await rpc.NotifyAsync("textDocument/didOpen", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri, ["languageId"] = "vba", ["version"] = 1, ["text"] = ModuleText },
+        });
+        var diagnostics = rpc.RequestAsync(4, "textDocument/diagnostic", new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri }, ["identifier"] = "rdcore" });
+        Assert.IsNull((await handshake)["error"]);
+
+        var executed = await rpc.RequestAsync(5, RDCorePlatformProtocol.SessionExecute, new JsonObject { ["source"] = ModuleText, ["moduleName"] = "Program", ["entryPoint"] = "Main" });
+
+        platform.AssertTheProgramPrintedTheAnswer(executed);
+        Assert.IsNull((await diagnostics)["error"]);
+        Assert.IsNotNull(pulledAgain, "the server asked for a refresh: " + string.Join(", ", platform.Asked));
+        Assert.IsNull((await pulledAgain)["error"], "and the second pull is answered");
+        await platform.ShutdownAsync(7);
     }
 
     // the platform as a deployment has it, with a workspace of one module, and the language server started from it as an IDE starts it.
@@ -285,6 +327,9 @@ public sealed class ClientWithoutOmniSharpTests
         /// <summary>What the server logged to the client (<c>window/logMessage</c>).</summary>
         public ConcurrentQueue<string> Logged { get; } = [];
 
+        /// <summary>What the client does once it has answered a request of the server, given its method.</summary>
+        public Action<string>? Answered { get; set; }
+
         public Task NotifyAsync(string method, JsonObject parameters) => WriteAsync(new JsonObject { ["jsonrpc"] = "2.0", ["method"] = method, ["params"] = parameters });
 
         public async Task<JsonObject> RequestAsync(int id, string method, JsonObject parameters)
@@ -309,6 +354,7 @@ public sealed class ClientWithoutOmniSharpTests
                         {
                             // a request from the server is answered: what the client does with it, or nothing.
                             await WriteAsync(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = asked.DeepClone(), ["result"] = _answer(method, message["params"])?.DeepClone() });
+                            Answered?.Invoke(method);
                         }
                         else if (method == "window/logMessage")
                         {
