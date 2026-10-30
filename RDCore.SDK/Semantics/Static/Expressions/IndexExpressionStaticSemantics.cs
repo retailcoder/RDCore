@@ -66,8 +66,16 @@ public sealed record class IndexExpressionStaticSemantics : IStaticSemantics
 
         if (callee is VBArrayType array)
         {
+            // MS-VBAL 5.6.13.1: an empty argument list, of an array that was not already given one, is the array itself - `f()` is `f`, as `UBound(f())` and
+            // `Erase f()` read it.
+            if (IndexExpressionNode.IsEmptyArgumentList(index.Arguments)
+                && !(index.Callee is IndexExpressionNode given && IndexExpressionNode.IsEmptyArgumentList(given.Arguments)))
+            {
+                return StaticSemanticsEvaluationResult.Success(array);
+            }
+
             // classified as a variable with the array's element type. MS-VBAL 5.6.13 also requires the
-            // argument count to match the array's rank (or be empty) — VBArrayType carries no rank.
+            // argument count to match the array's rank — VBArrayType carries no rank.
             return StaticSemanticsEvaluationResult.Success(array.ItemType);
         }
 
