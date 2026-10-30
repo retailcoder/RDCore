@@ -482,5 +482,7 @@
   href: rdc11023.md
 - name: RDC11024 — Implements in a document module
   href: rdc11024.md
+- name: RDC11025 — Array given a second empty argument list
+  href: rdc11025.md
 - name: RDC20001 — Edit not applied to the waiting program
   href: rdc20001.md

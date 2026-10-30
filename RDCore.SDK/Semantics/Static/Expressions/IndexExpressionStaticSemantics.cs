@@ -26,6 +26,14 @@ public sealed record class IndexExpressionStaticSemantics : IStaticSemantics
     public static IndexExpressionStaticSemantics Instance => _instance.Value;
 
     /// <summary>
+    /// Whether <paramref name="index"/> is an empty argument list given to what was already given one, <c>f()()</c>: of an array, <strong>MS-VBAL 5.6.13.1</strong>
+    /// makes it invalid, and <strong>MS-VBA</strong> compiles it.
+    /// </summary>
+    /// <param name="index">The index expression.</param>
+    public static bool IsASecondEmptyArgumentList(IndexExpressionNode index)
+        => IndexExpressionNode.IsEmptyArgumentList(index.Arguments) && index.Callee is IndexExpressionNode given && IndexExpressionNode.IsEmptyArgumentList(given.Arguments);
+
+    /// <summary>
     /// Determines the declared type of an <see cref="IndexExpressionNode"/> from its
     /// <see cref="IndexExpressionNode.Callee"/>'s already-determined declared type.
     /// </summary>
@@ -67,9 +75,10 @@ public sealed record class IndexExpressionStaticSemantics : IStaticSemantics
         if (callee is VBArrayType array)
         {
             // MS-VBAL 5.6.13.1: an empty argument list, of an array that was not already given one, is the array itself - `f()` is `f`, as `UBound(f())` and
-            // `Erase f()` read it.
-            if (IndexExpressionNode.IsEmptyArgumentList(index.Arguments)
-                && !(index.Callee is IndexExpressionNode given && IndexExpressionNode.IsEmptyArgumentList(given.Arguments)))
+            // `Erase f()` read it. A second one, `f()()`, the specification makes invalid; MS-VBA compiles it as the array (`UBound(f()())` compiles), and
+            // raises 9 when it runs (Excel-verified, oracle\s53 E07, E08, F07, F08). RD-VBA does too, and warns (RDC11025,
+            // ValueExpressionSemanticFlags.ArrayGivenASecondEmptyArgumentList).
+            if (IndexExpressionNode.IsEmptyArgumentList(index.Arguments))
             {
                 return StaticSemanticsEvaluationResult.Success(array);
             }

@@ -403,6 +403,15 @@ namespace RDCore.SDK {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to An array is printed: Debug.Print writes values, and an array is none - print its elements, one at a time..
+        /// </summary>
+        public static string VBCompileError_ArrayPrinted_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_ArrayPrinted_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Implicit let-coercion is statically invalid for the specified inputs of this expression..
         /// </summary>
         public static string VBCompileError_LetCoercionTypeMismatch_Verbose {
@@ -1898,6 +1907,15 @@ namespace RDCore.SDK {
         public static string VBTypeOf_ObjectVariableNotSet_Verbose {
             get {
                 return ResourceManager.GetString("VBTypeOf_ObjectVariableNotSet_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The array is given a second empty argument list, f()(): the first is the array itself, and the second selects no element of it..
+        /// </summary>
+        public static string VBIndex_SecondEmptyArgumentList_Verbose {
+            get {
+                return ResourceManager.GetString("VBIndex_SecondEmptyArgumentList_Verbose", resourceCulture);
             }
         }
 

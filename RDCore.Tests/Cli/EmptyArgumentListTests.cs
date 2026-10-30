@@ -34,15 +34,39 @@ public sealed class EmptyArgumentListTests
         CollectionAssert.AreEqual(new[] { printed }, output);
     }
 
-    // what `f` is printed as, `f()` is printed as: an array is no value Print can write (13).
+    // an array is no value Debug.Print writes, written `f` or `f()`: MS-VBA refuses it when it compiles (oracle\s53 E02, E03, F02, F03).
     [TestMethod]
     [DataRow("f", DisplayName = "f")]
     [DataRow("f()", DisplayName = "f()")]
     [DataRow("a()", DisplayName = "a()")]
-    public async Task AnArrayPrinted_WithOrWithoutTheEmptyArgumentList_IsATypeMismatch(string printed)
+    [DataRow("a", DisplayName = "a")]
+    public async Task AnArrayPrinted_WithOrWithoutTheEmptyArgumentList_IsATypeMismatch_WhenItCompiles(string printed)
     {
-        var output = await RunAsync([], Program("On Error Resume Next", $"Debug.Print {printed}", "Debug.Print Err.Number"));
+        var errors = await LoadErrorsAsync([], Program($"Debug.Print {printed}"));
 
-        CollectionAssert.AreEqual(new[] { "13" }, output);
+        StringAssert.StartsWith(Assert.ContainsSingle(errors), "Type mismatch");
+    }
+
+    // `Erase f()` erases `f`: a dynamic array loses its dimensions (9 for its bounds after), a fixed-size one its values (oracle\s53 E06, F06).
+    [TestMethod]
+    [DataRow(new[] { "ReDim a(2)", "Erase a()", "On Error Resume Next", "Debug.Print UBound(a)", "Debug.Print Err.Number" }, new[] { "9" }, DisplayName = "dynamic")]
+    [DataRow(new[] { "f(1) = 7", "Erase f()", "Debug.Print f(1)", "Debug.Print UBound(f)" }, new[] { "0", "2" }, DisplayName = "fixed")]
+    public async Task AnArrayErased_WithTheEmptyArgumentList_IsTheArrayErased(string[] body, string[] printed)
+    {
+        var output = await RunAsync([], Program(body));
+
+        CollectionAssert.AreEqual(printed, output);
+    }
+
+    // `f()()` compiles in MS-VBA, as the array, and raises 9 whenever it runs (oracle\s53 E07, E08, F07, F08); RDC11025 warns of it.
+    [TestMethod]
+    [DataRow("Debug.Print UBound(f()())", DisplayName = "its bounds, a fixed-size array")]
+    [DataRow("Dim v As Variant: v = f()()", DisplayName = "assigned, a fixed-size array")]
+    [DataRow("ReDim a(2): Debug.Print UBound(a()())", DisplayName = "its bounds, a dynamic array")]
+    public async Task AnArrayGivenASecondEmptyArgumentList_Compiles_AndIsASubscriptOutOfRange(string statement)
+    {
+        var output = await RunAsync([], Program("On Error Resume Next", statement, "Debug.Print \"err \" & Err.Number"));
+
+        CollectionAssert.AreEqual(new[] { "err 9" }, output);
     }
 }
