@@ -346,20 +346,25 @@ public static class StatementStaticSemanticsEvaluator
             return;
         }
 
-        // MS-VBAL §5.4.3.5.
+        // MS-VBAL §5.4.3.5: the string it replaces a part of is written to.
         if (statement is MidStatementNode mid)
         {
             if (!walk.Structural)
             {
                 walk.Errors.AddRange(MidStatementStaticSemantics.Evaluate(context, mid));
+                MarkWritten(context, mid.Target);
             }
             return;
         }
 
-        // MS-VBAL §5.4.5, and Name.
+        // MS-VBAL §5.4.5, and Name. The variables a file statement reads into are written to.
         if (!walk.Structural && FileStatementStaticSemantics.TryEvaluate(context, statement, out var fileStatementErrors))
         {
             walk.Errors.AddRange(fileStatementErrors);
+            foreach (var read in ReadIntoBy(statement))
+            {
+                MarkWritten(context, read);
+            }
             return;
         }
 
@@ -392,8 +397,8 @@ public static class StatementStaticSemanticsEvaluator
                 }
             }
 
-            // what a statement writes to, apart from an assignment's target: the counter or the control variable of a loop, the string a Mid statement
-            // replaces a part of, the array a ReDim gives its dimensions, and the arrays an Erase empties. The control variable of a loop is a bound
+            // what a statement writes to, apart from an assignment's target: the counter or the control variable of a loop, the array a ReDim gives its
+            // dimensions, and the arrays an Erase empties (a Mid statement's target, and a file statement's variables, are marked where they are evaluated). The control variable of a loop is a bound
             // variable expression, which is "invalid if it is classified as something other than a variable expression" (MS-VBAL §5.4.2.3, §5.4.2.4,
             // §5.6.16.6); the name a ReDim matches is the "redimensioned variable" (§5.4.3.3); and an element of an Erase "MUST be classified as a
             // variable, property, function or unbound member" (§5.4.3.4). None of them is ever a constant.
@@ -408,9 +413,6 @@ public static class StatementStaticSemanticsEvaluator
                     RequireVariable(context, forEachStatement.ControlExpression, "The control variable of a For Each statement", "5.6.16.6", walk);
                     MarkWritten(context, forEachStatement.ControlExpression);
                     RequireNextOfControl(forEachStatement.ControlExpression, forEachStatement.NextExpression, walk);
-                    break;
-                case MidStatementNode midStatement:
-                    MarkWritten(context, midStatement.Target);
                     break;
                 case RedimDeclarationNode redim:
                     // the target is the array, which is not one of the statement's operands: it is evaluated here.
@@ -485,6 +487,11 @@ public static class StatementStaticSemanticsEvaluator
                         {
                             walk.Errors.Add(VBCompileErrorInfo.For(VBCompileErrorId.ExpectedArray, element.Location, element is SimpleNameExpressionNode erased ? erased.IdentifierName : string.Empty));
                         }
+                    }
+
+                    foreach (var element in erase.Inputs.OfType<ExpressionNode>())
+                    {
+                        MarkWritten(context, element);
                     }
                     break;
             }
@@ -673,6 +680,15 @@ public static class StatementStaticSemanticsEvaluator
             ? VBCompileErrorInfo.For(VBCompileErrorId.ExpectedSubFunctionOrProperty, call.Callee.Location, name)
             : VBCompileErrorInfo.For(VBCompileErrorId.ExpectedProcedureNotVariable, call.Callee.Location, name);
     }
+
+    // the variables a file statement reads into (MS-VBAL §5.4.5): every variable of an Input #, the variable of a Line Input # and of a Get #, which is its last
+    // operand, after the file number and the record number, written or not.
+    private static IEnumerable<ExpressionNode> ReadIntoBy(StatementNode statement) => statement switch
+    {
+        KeywordStatementNode { Token: Tokens.Input, Inputs: [_, .. var variables] } => variables.OfType<ExpressionNode>(),
+        KeywordStatementNode { Token: Tokens.LineInput or Tokens.Get, Inputs: [_, .., ExpressionNode variable] } => [variable],
+        _ => [],
+    };
 
     // an expression a statement writes to is a fact of it: the element of an array is written through the array it is an element of.
     private static void MarkWritten(StaticEvaluationContext context, ExpressionNode target)
