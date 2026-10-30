@@ -524,4 +524,54 @@ public sealed class CompiledDirectCallTests
         }
     }
 
+    // a call stack as deep as it goes is error 28 (Out of stack space), with the call made directly and the interpreter making it: never the host's own stack
+    // overflowing first, which a thread's default stack did at about 80 interpreted activations, crashing the host.
+    [TestMethod]
+    public async Task ARecursionThatNeverEnds_IsOutOfStackSpace()
+    {
+        var (observed, _, _) = await AssertAlikeAsync(Program(
+            "Public Sub Main()",
+            "    On Error GoTo Failed",
+            "    Debug.Print Deep(1)",
+            "    Exit Sub",
+            "Failed:",
+            "    Debug.Print \"error \"; Err.Number",
+            "End Sub",
+            "Private Function Deep(ByVal n As Long) As Long",
+            "    Dim r As Long",
+            "    r = Deep(n + 1)",
+            "    Deep = r",
+            "End Function"), "Deep");
+
+        StringAssert.Contains(observed, "error  28");
+    }
+
+    // the stack trace of an error is the one captured where it was raised: every activation it unwinds, and the location in the innermost one only - not what
+    // is left of the stack where a handler catches it.
+    [TestMethod]
+    public async Task TheStackTraceOfAnError_IsTheOneWhereItWasRaised()
+    {
+        CompiledExecutionTests.RequirePayloads();
+        foreach (var engine in new[] { VBExecutionEngine.Interpreter, VBExecutionEngine.Compiled })
+        {
+            using var running = CompiledExecution.Running(engine);
+            await ModuleWorkspace.InspectAsync([], Program(
+                "Public Sub Main()",
+                "    Debug.Print Outer(3)",
+                "End Sub",
+                "Private Function Outer(ByVal n As Long) As Long",
+                "    Dim u As Long",
+                "    u = Divide(n)",
+                "    Outer = u",
+                "End Function",
+                "Private Function Divide(ByVal x As Long) As Long",
+                "    Divide = 10 \\ (x - 3)",
+                "End Function"), (_, result, _) =>
+                {
+                    Assert.AreEqual(ExecutionOutcome.RuntimeError, result.Outcome, engine.ToString());
+                    CollectionAssert.AreEqual(new[] { "Divide", "Outer", "Main" }, result.StackTrace.Select(frame => frame.Procedure).ToArray(), engine.ToString());
+                    return Task.CompletedTask;
+                }, engine: engine);
+        }
+    }
 }
