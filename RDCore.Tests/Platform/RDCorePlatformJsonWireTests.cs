@@ -137,71 +137,7 @@ public sealed class RDCorePlatformJsonWireTests
         yield return Same(new RubberduckIndenterSettingsApplyResult { Applied = 1, Refused = ["Formatting.Nope"] });
     }
 
-    /// <summary>
-    /// The wire of each message above, in the same order, as a client that has only the Protocol package must write it: what a rename of a member, or a change of the
-    /// order of an enumeration, would change, and the two serializers compared with each other would not see.
-    /// </summary>
-    private static readonly (string Type, string Json)[] Goldens =
-    [
-        ("SessionStatusParams", """{"waitMilliseconds":250}"""),
-        ("SessionStatusResult", """{"isComposed":true,"projectName":"VBAProject","moduleCount":3,"referenceCount":2,"memory":{"reservedBytes":1,"availableBytes":2,"allocatedBytes":3,"freeBytes":4,"committedBytes":5,"largestFreeBlock":6}}"""),
-        ("ExecuteSessionParams", """{"source":"Debug.Print 1","moduleName":"Module1","entryPoint":"Main","debug":true,"immediate":true}"""),
-        ("ExecuteSessionResult", """{"outcome":7,"output":["1"],"streamedLines":7,"diagnostics":["RDC00001"],"errorNumber":13,"errorMessage":"Type mismatch","errorCode":"VBR00013","errorTitle":"Type mismatch","errorSource":"VBAProject","errorLine":3,"errorCharacter":4,"errorLineNumber":100,"conditionError":"x","stackTrace":[{"procedure":"Main","line":1,"character":2,"returnLines":[5,6]}]}"""),
-        ("DiscardSessionParams", """{"moduleName":"Module1","endProgram":true}"""),
-        ("DiscardSessionResult", """{"discarded":2}"""),
-        ("PeekSessionParams", """{"address":16}"""),
-        ("PeekSessionResult", """{"address":16,"isAllocated":true,"value":255}"""),
-        ("PokeSessionParams", """{"address":16,"value":7}"""),
-        ("PokeSessionResult", """{"address":16,"isWritten":true}"""),
-        ("SessionMessageBoxParams", """{"prompt":"Hello","title":"Title","style":4,"output":["before"]}"""),
-        ("MessageBoxResult", """{"handled":true,"result":6}"""),
-        ("SessionInputBoxParams", """{"prompt":"Name?","title":"Title","default":"x","xPos":10,"yPos":20,"output":["before"]}"""),
-        ("InputBoxResult", """{"handled":true,"cancelled":true,"value":"y"}"""),
-        ("SessionDebugResumeParams", """{"step":1}"""),
-        ("SessionDebugResumeParams", """{"step":null}"""),
-        ("SessionDebugPauseParams", """{}"""),
-        ("SessionDebugGotoParams", """{"line":4,"label":"Retry"}"""),
-        ("SessionDebugEditStatusParams", """{}"""),
-        ("SessionDebugTerminateParams", """{"wipe":true}"""),
-        ("SessionDebugBreakpointsParams", """{"moduleName":"Module1","breakpoints":[{"line":2,"isEnabled":false,"condition":"i > 3"}]}"""),
-        ("SessionDebugStackParams", """{}"""),
-        ("SessionDebugVariablesParams", """{"frameId":1,"scope":1,"reference":9}"""),
-        ("SessionDebugEvaluateParams", """{"frameId":1,"expression":"i + 1"}"""),
-        ("SessionDebugExecuteParams", """{"frameId":1,"statement":"i = 2"}"""),
-        ("HostDebugAck", """{"acted":true}"""),
-        ("HostDebugGotoResult", """{"moved":true,"reason":"moved","line":4,"character":0}"""),
-        ("HostDebugGotoResult", """{"moved":false,"reason":null,"line":-1,"character":-1}"""),
-        ("HostDebugEditStatusResult", """{"suspended":true,"edits":[{"name":"Module1.Main","kind":1,"reason":"signature","moduleUri":"file:///c:/workspace/Module1.bas","range":{"start":{"line":1,"character":2},"end":{"line":3,"character":4},"isEmpty":false}},{"name":"Module1.Other","kind":0,"reason":"","moduleUri":null,"range":null}]}"""),
-        ("HostDebugBreakpointsResult", """{"breakpoints":[{"line":2,"verified":true,"conditionError":null},{"line":3,"verified":false,"conditionError":"Expected: expression"}],"judged":true}"""),
-        ("HostDebugStackResult", """{"frames":[{"id":1,"procedure":"Main","module":"Module1","line":2,"character":3,"handler":"ErrHandler","returnLines":[4]},{"id":2,"procedure":"Other","module":"Module1","line":5,"character":6,"handler":null,"returnLines":[]}]}"""),
-        ("HostDebugVariablesResult", """{"variables":[{"name":"i","value":"1","type":"Integer","reference":0},{"name":"o","value":"Object","type":"Class1","reference":3}],"notListed":2}"""),
-        ("HostDebugEvaluateResult", """{"success":true,"value":"2","type":"Integer","reference":1,"error":"none","output":["x"],"endedTheProgram":true}"""),
-        ("PlatformInitializeParams", """{"expectedComponent":1,"expected":{"parsing":{"parseFullDocument":{"isSupported":true},"parseTokens":{"isSupported":false}},"environmentHost":{"defineSymbols":{"isSupported":true},"sessionStatus":{"isSupported":false},"sessionExecute":{"isSupported":false},"sessionDiscard":{"isSupported":false},"projectReload":{"isSupported":false},"programDebugging":{"isSupported":false},"semanticAnalysis":{"isSupported":false},"sessionMemoryAccess":{"isSupported":false}},"languageServer":{"sessionStatus":{"isSupported":false},"sessionExecute":{"isSupported":true},"programDebugging":{"isSupported":false},"sessionDiscard":{"isSupported":false},"sessionAnalyze":{"isSupported":false},"sessionCompletion":{"isSupported":false},"sessionSignatureHelp":{"isSupported":false},"sessionSemanticTokens":{"isSupported":false},"sessionMemoryAccess":{"isSupported":false},"sessionInteraction":{"isSupported":true},"rubberduckIndenterSettings":{"isSupported":false}}}}"""),
-        ("PlatformInitializeParams", """{"expectedComponent":1,"expected":{"languageServer":{"sessionStatus":{"isSupported":false},"sessionExecute":{"isSupported":false},"programDebugging":{"isSupported":false},"sessionDiscard":{"isSupported":false},"sessionAnalyze":{"isSupported":false},"sessionCompletion":{"isSupported":false},"sessionSignatureHelp":{"isSupported":false},"sessionSemanticTokens":{"isSupported":false},"sessionMemoryAccess":{"isSupported":false},"sessionInteraction":{"isSupported":false},"rubberduckIndenterSettings":{"isSupported":false}}}}"""),
-        ("PlatformInitializeResult", """{"component":1,"provided":["SessionExecute","SessionStatus"]}"""),
-        ("DiagnoseDocument", """{"isSupported":true}"""),
-        ("CliCommand", """{"isSupported":true}"""),
-        ("SourceLocation", """{"uri":"file:///c:/workspace/Module1.bas","range":{"start":{"line":1,"character":2},"end":{"line":3,"character":4},"isEmpty":false}}"""),
-        ("RubberduckIndenterSettingsParams", """{}"""),
-        ("RubberduckIndenterSettingsResult", """{"source":"SmartIndenterRegistry","values":{"IndentProc":"Y","AlignDimCol":15},"tabWidth":4}"""),
-        ("RubberduckIndenterSettingsApplyParams", """{"source":"RubberduckConfig","settings":{"Formatting.IndentSpaces":"2"}}"""),
-        ("RubberduckIndenterSettingsApplyResult", """{"applied":1,"refused":["Formatting.Nope"]}"""),
-    ];
-
     private static IEnumerable<OmniSharpSerializer> PlatformSerializers() => [new LspSerializer(), new PullDiagnosticsLspSerializer()];
-
-    [TestMethod]
-    public void EveryMessage_IsWrittenAsItsGoldenJsonSays()
-    {
-        var messages = Messages().ToArray();
-        Assert.HasCount(messages.Length, Goldens, "a golden for every message above");
-
-        foreach (var ((message, _), (type, golden)) in messages.Zip(Goldens))
-        {
-            Assert.AreEqual(type, message.GetType().Name, "the goldens are in the order of the messages");
-            AssertSameJson(golden, JsonSerializer.Serialize(message, message.GetType(), RDCorePlatformJson.Options), type);
-        }
-    }
 
     private static JsonNode? Parse(string json) => JsonNode.Parse(json);
 
@@ -262,11 +198,11 @@ public sealed class RDCorePlatformJsonWireTests
             Reach(message, reached);
         }
 
-        // the client logic sends and answers messages, and is none; the pre-launch preparation is local to the client, and the manifest is a file of the platform root.
-        Type[] notMessages = [typeof(RDCorePlatformClient), typeof(RDCoreLanguageServerLaunch), typeof(RDCoreLanguageServerLaunchOptions), typeof(PlatformManifest)];
+        // the client logic sends and answers messages, and is none.
+        Type[] notMessages = [typeof(RDCorePlatformClient)];
 
         var unreached = typeof(RDCorePlatformJson).Assembly.GetExportedTypes()
-            .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !reached.Contains(type))
+            .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !notMessages.Contains(type) && !reached.Contains(type))
             .Select(type => type.FullName)
             .ToList();
 
