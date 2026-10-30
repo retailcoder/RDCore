@@ -131,7 +131,6 @@ public sealed class ClientWithoutOmniSharpTests
 
         platform.AssertTheProgramPrintedTheAnswer(executed);
         Assert.IsNull((await diagnostics)["error"]);
-        Assert.Fail("PROBE asked: " + string.Join(", ", platform.Asked) + "\n" + string.Join("\n",WholeLogOf(platform.Root).Split('\n').Where(line => line.Contains("📤") || line.Contains("host/execute") || line.Contains("parse completed") || line.Contains("composed") || line.Contains("symbols defined") || line.Contains("diagnostic"))));
         await platform.ShutdownAsync(6);
     }
 
