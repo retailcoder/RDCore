@@ -326,6 +326,18 @@ public sealed class FlowSoundnessTests
         Assert.IsTrue(analyzed.Defines(2, analyzed.Variable("p")));
     }
 
+    // MS-VBAL §5.3.1.2: every local variable of a Static procedure has module extent, as if it were declared Static: its value outlives the activation.
+    [TestMethod]
+    [DataRow("Public Static Sub Run(ByVal n As Long)", "End Sub", DisplayName = "a Static Sub")]
+    [DataRow("Public Static Function Run(ByVal n As Long) As Long", "End Function", DisplayName = "a Static Function")]
+    [DataRow("Static Sub Run(ByVal n As Long)", "End Sub", DisplayName = "a Static Sub with no access modifier")]
+    public void S28_ALocalOfAStaticProcedure_OutlivesTheActivation(string header, string end)
+    {
+        var analyzed = Analyze("Dim k As Long\nk = k + n", header: header, end: end);
+        Assert.Contains(analyzed.Variable("k"), analyzed.Accesses.OutliveTheActivation);
+        Assert.DoesNotContain(analyzed.Variable("n"), analyzed.Accesses.OutliveTheActivation, "a ByVal parameter is not one of them");
+    }
+
     // the second review's 3: a function that returns an array and has no parameters is called with none, and what is written after its name indexes the result.
     [TestMethod]
     public void S26_AnIndexOfWhatAParameterlessArrayFunctionReturns_IsNoDefinition()
