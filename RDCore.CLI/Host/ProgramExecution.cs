@@ -502,7 +502,9 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
         provider.Output.Target = output;
         try
         {
-            var (value, failure) = run(session, stack, selected, procedure);
+            // what the code as edited declares, the statement names: the locals an edit added, the fields a class was given.
+            ProgramEdits.Prepare(session);
+            var (value, failure) = RunGuarded(session, stack, selected, procedure, run);
 
             lock (_sync)
             {
@@ -551,6 +553,21 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider)
             {
                 _alongside = false;
             }
+        }
+    }
+
+    // a statement or an expression typed at the stop that fails in a way no VBA error says - a name the runtime has no storage for - is said not to run, and the
+    // request that asked for it is answered: the program waits on.
+    private static (VBTypedValue? Value, string? Failure) RunGuarded(IRuntimeSession session, RuntimeCallStack stack, CallStackFrame selected, VBTypeMemberSymbol procedure,
+        Func<IRuntimeSession, RuntimeCallStack, CallStackFrame, VBTypeMemberSymbol, (VBTypedValue? Value, string? Failure)> run)
+    {
+        try
+        {
+            return run(session, stack, selected, procedure);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or InvalidCastException or InvalidOperationException)
+        {
+            return (null, Resources.Host_CannotRunYet);
         }
     }
 

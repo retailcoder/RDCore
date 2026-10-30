@@ -27,7 +27,7 @@ the edit back and go on, or run the program again.
   was (see below).
 - Lines can move: an edit that adds or removes lines above the stop is applied, and breakpoints follow the lines they were on.
 - Add a local variable, `Dim` or `Static`, to the procedure you're in or to one that called it: it starts at its default, and the others keep their
-  values. A local you remove is no longer there for the code, and goes when its procedure returns.
+  values. A `Dim` you remove is no longer there for the code, and goes when its procedure returns. A `Static` you remove waits (see below).
 
 **Declarations you add:**
 - A procedure, in a module or a class.
@@ -61,7 +61,8 @@ with its reason. Take the edit back and go on, or run the program again to have 
 
 | You changed… | Why it waits |
 |---|---|
-| A field added to a `Type` whose values the program holds | Those values are laid out already, at the size the `Type` had. |
+| A `Type` whose values the program may hold, a field added to it or changed in it | Those values are laid out already, by the fields the `Type` had. The `Type` keeps those fields for as long as the program is in progress: take the edit back and go on, or end the program, and the edit applies. |
+| A `Static` removed from a procedure | What the procedure stored in it outlives the call: run the program again to have it gone. |
 | A local's type, or a variable's type, while it holds a value | The value would have to be converted under the program. A module variable or a `Static` keeps its value, as it was declared, for as long as the program is in progress: take the edit back and go on with it, or end the program, and the edit applies. |
 | A `Const` (or `Enum` member) that sizes an array or a `String * N`, given another value, directly or through another `Const` | What it sizes exists already, at its old size. |
 | A `Const` or `Enum` member that a procedure the program is in reads | That procedure read the old value already. |

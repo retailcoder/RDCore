@@ -241,7 +241,7 @@ public sealed class EditAndContinueTests
         DisplayName = "a local of a procedure the program is in, retyped")]
     [DataRow(new[] { "Program|Replace|Public G As Long|Public G As Integer" }, "a variable that holds a value, given another type",
         DisplayName = "a module variable that holds a value, retyped")]
-    [DataRow(new[] { "Program|Replace|    X As Long|    X As Integer" }, "a variable or a field that holds a value", DisplayName = "a field of a Type a local holds, retyped")]
+    [DataRow(new[] { "Program|Replace|    X As Long|    X As Integer" }, "a Type whose values the program may hold, given other fields", DisplayName = "a field of a Type a local holds, retyped")]
     [DataRow(new[] { "Program|Replace|Public Sub Callee(ByVal p As Long)|Public Sub Callee(ByVal p As Long, Optional ByVal q As Long)" },
         "the signature of a procedure the program is in", DisplayName = "the signature of the procedure the program is in")]
     [DataRow(new[] { "Program|Replace|Static S As Long|    Static S As Integer" }, "a variable or a field that holds a value", DisplayName = "a Static retyped")]
@@ -255,7 +255,7 @@ public sealed class EditAndContinueTests
         DisplayName = "an Enum member a procedure the program is in reads, revalued")]
     [DataRow(new[] { "Program|InsertBefore|Private Declare PtrSafe|Option Compare Text" }, "an option of the module the program is in",
         DisplayName = "an Option added to the module the program is in")]
-    [DataRow(new[] { "Program|InsertAfter|    X As Long|    Z As Long" }, "a field added to a Type", DisplayName = "a field added to a Type a local holds")]
+    [DataRow(new[] { "Program|InsertAfter|    X As Long|    Z As Long" }, "a Type whose values the program may hold, given other fields", DisplayName = "a field added to a Type a local holds")]
     [DataRow(new[] { "Program|Replace|    Callee 5|    Callee 6" }, "the call a procedure the program is in is in the middle of",
         DisplayName = "the call a caller is in the middle of")]
     public async Task AnEditThatIsNotApplied_IsRefused_AndTheProgramStillWaits(string[] edits, string reason)
@@ -854,6 +854,68 @@ public sealed class EditAndContinueTests
         Assert.AreEqual(ExecutionOutcome.Suspended, again!.Outcome, string.Join("; ", again.Diagnostics ?? []));
         Assert.AreEqual(ExecutionOutcome.Completed, done!.Outcome, done.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "G=0" }, Output(done));
+    }
+
+    // a program that holds a value of a Type: a module variable of it.
+    private static readonly string Recording = Lines(
+        "Option Explicit",
+        "Public Type P",
+        "    X As Long",
+        "End Type",
+        "Public R As P",
+        "Public Sub Main()",
+        "    R.X = 1",
+        "    Stop",
+        "    Debug.Print \"X=\" & R.X",
+        "End Sub");
+
+    // the program goes on with R as it was, and its code reads a field the Type was given.
+    private static readonly string Extended = Recording
+        .Replace("    X As Long\r\n", "    X As Long\r\n    Y As Long\r\n", StringComparison.Ordinal)
+        .Replace("\"X=\" & R.X", "\"X=\" & R.X & \" Y=\" & R.Y", StringComparison.Ordinal);
+
+    // a Type given a field while the program holds a value of it is held as it was: the one edit said, the program is not resumed on it, and the edit taken
+    // back, the program goes on with the value.
+    [TestMethod]
+    public async Task ATypeGivenAFieldWhileTheProgramHoldsAValueOfIt_IsHeld_AndTheEditTakenBack_GoesOn()
+    {
+        HostDebugEditStatusResult? status = null;
+        ExecuteSessionResult? refused = null, takenBack = null;
+        await ModuleWorkspace.InspectAsync([], Recording, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, Extended));
+            status = provider.Execution.EditStatus();
+            refused = await Resume(provider);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, Recording));
+            takenBack = await Resume(provider);
+        }, debug: true);
+
+        var held = Assert.ContainsSingle(status!.Edits, string.Join("; ", status.Edits.Select(listed => $"{listed.Name} ({listed.Reason})")));
+        Assert.AreEqual(("Program.P", HostDebugEditKind.Restart), (held.Name, held.Kind));
+        StringAssert.Contains(held.Reason, "a Type whose values the program may hold, given other fields");
+        Assert.AreEqual(ExecutionOutcome.Refused, refused!.Outcome, refused.ErrorMessage);
+        Assert.AreEqual(ExecutionOutcome.Completed, takenBack!.Outcome, takenBack.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "X=1" }, Output(takenBack));
+    }
+
+    // the Type held while the program waited is applied when the program is over, and what was defined against it while it was held is defined again: run
+    // again, a variable of it has the field it was given, which the code reads.
+    [TestMethod]
+    public async Task ATypeHeldWhileTheProgramWaited_IsAppliedWithWhatWasDefinedAgainstIt_WhenTheProgramIsRunAgain()
+    {
+        ExecuteSessionResult? again = null, done = null;
+        await ModuleWorkspace.InspectAsync([], Recording, async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Program"], ("Program", ModuleType.StdModule, Extended));
+            again = await RunWithAsync(provider, Extended);
+            done = await Resume(provider);
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.Suspended, again!.Outcome, string.Join("; ", again.Diagnostics ?? []));
+        Assert.AreEqual(ExecutionOutcome.Completed, done!.Outcome, done.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "X=1 Y=0" }, Output(done));
     }
 
     // a variable held as it was holds the reference to its object it held: the held definition applied, that reference is let go of, once - the object is

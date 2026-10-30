@@ -154,6 +154,12 @@ internal sealed class SymbolAddressTable(ISessionStorage storage)
         => _addressBySymbol.Remove(symbol.SemanticId, out var address) && storage.TryDeallocate(address);
 
     /// <summary>
+    /// Removes the address mapping of <paramref name="symbol"/> without freeing its storage, which the caller frees: the name is another variable's from then on.
+    /// </summary>
+    /// <returns>The address it was bound to; none when it was bound to none.</returns>
+    public MemoryAddress? Forget(Symbol symbol) => _addressBySymbol.Remove(symbol.SemanticId, out var address) ? address : null;
+
+    /// <summary>
     /// Gets the <see cref="IBindingHandle"/> currently bound to <paramref name="symbol"/>.
     /// </summary>
     public IBindingHandle GetValue(Symbol symbol)

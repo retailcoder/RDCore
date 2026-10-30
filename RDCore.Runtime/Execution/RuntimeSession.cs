@@ -555,9 +555,10 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         }
 
         var applied = new List<Symbol>();
-        foreach (var (symbol, scope) in held.Values)
+        // a held Type before its fields, which a field held with it adds to or replaces.
+        foreach (var (symbol, scope) in held.Values.OrderBy(held => held.Symbol is VBUserDefinedTypeFieldSymbol))
         {
-            if (table.TryGet(symbol, scope, out var existing) && Replaced(existing, symbol, scope))
+            if (table.TryGet(symbol, scope, out var existing) ? Replaced(existing, symbol, scope) : TryDefine(symbol, scope))
             {
                 applied.Add(symbol);
             }
@@ -568,9 +569,19 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
     public bool TryDefine(Symbol symbol, ScopeKind scope)
     {
+        if (HeldWithItsType(symbol, scope))
+        {
+            return true;
+        }
+
         if (!table.TryAdd(symbol, scope))
         {
             return false;
+        }
+
+        if (scope is ScopeKind.Instance)
+        {
+            _ = Interlocked.Increment(ref _instanceFieldsDefined);
         }
 
         AllocateStorageOf(symbol, scope);
@@ -633,6 +644,33 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
             return false;
         }
 
+        // a Type defined again while a program is in progress keeps the fields it has: the values of it the program holds are laid out by them. Its definition
+        // is held, and is applied when the program is over; the Type declared as it was again takes the hold back.
+        if (existing is VBUserDefinedTypeMemberSymbol type && symbol is VBUserDefinedTypeMemberSymbol edited)
+        {
+            var unchanged = HasTheFieldsOf(type, edited);
+            var typeKey = existing.Uri.ToString();
+            lock (_resetLock)
+            {
+                if (unchanged)
+                {
+                    // the Type as it was: its fields held with it go with the hold.
+                    _held = _held.RemoveRange([typeKey, .. _held.Where(held => held.Value.Symbol is VBUserDefinedTypeFieldSymbol && held.Value.Symbol.ParentUri.ToString() == typeKey)
+                        .Select(held => held.Key)]);
+                }
+                else if (_holdsStoredValues)
+                {
+                    _held = _held.SetItem(typeKey, (symbol, scope));
+                    return true;
+                }
+            }
+        }
+
+        if (HeldWithItsType(symbol, scope))
+        {
+            return true;
+        }
+
         // the same declaration, written again: a variable that holds storage and is declared as the type it was.
         // Anything else is a different variable - or no variable - and is replaced the long way.
         var sameDeclaration = existing is ITypedSymbol { ResolvedType: var before }
@@ -670,6 +708,33 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         table.Replace(symbol, scope);
         return true;
     }
+
+    // a field of a Type held as it was is held with it: the table has the Type's fields as the Type has them, which are what the program's values of it are
+    // laid out by, and what the edits made while it waits are told by.
+    private bool HeldWithItsType(Symbol symbol, ScopeKind scope)
+    {
+        if (symbol is not VBUserDefinedTypeFieldSymbol)
+        {
+            return false;
+        }
+
+        lock (_resetLock)
+        {
+            if (!_held.ContainsKey(symbol.ParentUri.ToString()))
+            {
+                return false;
+            }
+
+            _held = _held.SetItem(symbol.Uri.ToString(), (symbol, scope));
+            return true;
+        }
+    }
+
+    // whether a Type, defined again, has the fields it had, in the order it had them, each of the type it was.
+    private static bool HasTheFieldsOf(VBUserDefinedTypeMemberSymbol type, VBUserDefinedTypeMemberSymbol edited)
+        => type.Members.Length == edited.Members.Length
+            && type.Members.Zip(edited.Members).All(pair => string.Equals(pair.First.Name, pair.Second.Name, StringComparison.OrdinalIgnoreCase)
+                && IsSameType(pair.First.ResolvedType, pair.Second.ResolvedType));
 
     // a symbol replaced the long way, its storage freed and allocated again: what a variable held is let go of with it, the objects it held among it - each
     // reference it was is dropped, once.
@@ -713,6 +778,12 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         if (before is VBClassType beforeClass && after is VBClassType afterClass)
         {
             return beforeClass.Symbol.SemanticId == afterClass.Symbol.SemanticId;
+        }
+
+        // an array is of the type it was if it is the same kind of array of the same type: an array of a class is, when the class is.
+        if (before is VBArrayType beforeArray && after is VBArrayType afterArray)
+        {
+            return before.GetType() == after.GetType() && IsSameType(beforeArray.ItemType, afterArray.ItemType, comparing);
         }
 
         if (!Equals(before, after))
@@ -876,8 +947,20 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
         return instance;
     }
 
+    // how many instance fields were defined, and how many there were when the live objects were last given theirs: with none defined since, an object holds
+    // every field its class declares, and none is looked for.
+    private int _instanceFieldsDefined;
+    private int _instancesExtendedAt;
+
     public int ExtendLiveInstances()
     {
+        var defined = Volatile.Read(ref _instanceFieldsDefined);
+        if (defined == _instancesExtendedAt)
+        {
+            return 0;
+        }
+
+        _instancesExtendedAt = defined;
         var given = 0;
         foreach (var instance in _instances.Values)
         {
