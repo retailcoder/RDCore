@@ -237,6 +237,9 @@
   <data name="VBForLoopOperandIsNotANumber_Verbose" xml:space="preserve">
     <value>The start, the end and the step of a For loop are numbers: this one cannot be read as a number (MS-VBAL 5.4.2.3).</value>
   </data>
+  <data name="VBRuntimeError_NobodyToAnswer_Verbose" xml:space="preserve">
+    <value>{0} in a program run unattended (--unattended): nobody is there to answer it, and the run fails.</value>
+  </data>
   <data name="VBForLoopOperandNotOfLoopType_Verbose" xml:space="preserve">
     <value>This For loop counts in {0}, and its start, end or step is not a value of that type.</value>
   </data>
