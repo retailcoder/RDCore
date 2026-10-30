@@ -266,7 +266,7 @@ public sealed class RDCorePlatformJsonWireTests
         Type[] notMessages = [typeof(RDCorePlatformClient), typeof(RDCoreLanguageServerLaunch), typeof(RDCoreLanguageServerLaunchOptions), typeof(PlatformManifest)];
 
         var unreached = typeof(RDCorePlatformJson).Assembly.GetExportedTypes()
-            .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !typeof(Exception).IsAssignableFrom(type) && !notMessages.Contains(type) && !reached.Contains(type))
+            .Where(type => !type.IsAbstract && !type.IsEnum && !type.IsInterface && !reached.Contains(type))
             .Select(type => type.FullName)
             .ToList();
 
