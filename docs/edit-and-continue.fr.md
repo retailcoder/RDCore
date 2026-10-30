@@ -28,11 +28,14 @@ ou relancer le programme.
   d'appel doit rester telle qu'elle était (voir plus bas).
 - Les lignes peuvent bouger : une modification qui ajoute ou retire des lignes au-dessus de l'interruption est appliquée, et les points d'arrêt suivent les
   lignes où ils étaient.
+- Ajoutez une variable locale, `Dim` ou `Static`, à la procédure où vous êtes ou à une procédure qui l'a appelée : elle commence à sa valeur par défaut, et
+  les autres gardent leurs valeurs. Une variable locale que vous retirez n'existe plus pour le code, et disparaît au retour de sa procédure.
 
 **Les déclarations que vous ajoutez :**
 - Une procédure, dans un module ou une classe.
 - Une variable de module (`Public` ou `Private`), une `Const`, un `Declare`.
 - Un `Type` ou un `Enum`, ou un membre ajouté à un `Enum`.
+- Un champ d'une classe, même quand des objets de la classe existent : chacun d'eux le reçoit, à sa valeur par défaut.
 
 **Les autres changements que le programme relit :**
 - Une procédure, une variable, une `Const` ou un `Type` retiré, quand rien de ce que le programme exécute ne s'en sert encore.
@@ -64,8 +67,7 @@ pour l'avoir.
 
 | Vous avez changé… | Pourquoi cela attend |
 |---|---|
-| Une variable locale ajoutée à une procédure où se trouve le programme, ou retirée | Les variables de la procédure sont déjà disposées. L'appliquer est prévu pour une version ultérieure. |
-| Un champ ajouté à une classe dont le programme peut détenir des objets | Les objets créés avant la modification n'auraient pas de place pour lui. L'appliquer est prévu pour une version ultérieure. |
+| Un champ ajouté à un `Type` dont le programme détient des valeurs | Ces valeurs sont déjà disposées, à la taille qu'avait le `Type`. |
 | Le type d'une variable locale, ou d'une variable, pendant qu'elle détient une valeur | Il faudrait convertir la valeur sous le programme. Une variable de module ou une `Static` garde sa valeur, telle qu'elle était déclarée, tant que le programme est en cours : annulez la modification et poursuivez avec elle, ou terminez le programme, et la modification s'applique. |
 | Une `Const` (ou un membre d'un `Enum`) qui dimensionne un tableau ou une `String * N`, changée de valeur, directement ou par une autre `Const` | Ce qu'elle dimensionne existe déjà, à son ancienne taille. |
 | Une `Const` ou un membre d'un `Enum` que lit une procédure où se trouve le programme | Cette procédure a déjà lu l'ancienne valeur. |
@@ -94,6 +96,7 @@ la modification, ou quand le programme se termine.
 `CONT` et `STEP` disent quelles modifications font obstacle, chacune avec sa raison, et le programme continue d'attendre :
 
 ```text
+> 5 Dim Total As Long
 > 10 Debug.Print "avant"
 > 20 Stop
 > 30 Debug.Print "après"
@@ -101,11 +104,11 @@ la modification, ou quand le programme se termine.
   avant
   INTERRUPTION À LA LIGNE 20
   ✅ PRÊT.
-> 15 Dim Ajout As Long
+> 5 Dim Total As Integer
 > CONT
   ⛔ IMPOSSIBLE DE POURSUIVRE
     Des modifications faites pendant que le programme attendait ne lui sont pas appliquées :
-    Program.Main: une variable locale ajoutée à une procédure où se trouve le programme, ou retirée, ce qui n'est pas encore appliqué à un programme en attente
+    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé
   RUN pour recommencer.
   ✅ PRÊT.
 ```
@@ -115,7 +118,7 @@ la modification, ou quand le programme se termine.
 ```text
 > EDITS
   ⚠️ Des modifications faites pendant que le programme attendait ne lui sont pas appliquées :
-    Program.Main: une variable locale ajoutée à une procédure où se trouve le programme, ou retirée, ce qui n'est pas encore appliqué à un programme en attente
+    Program.Main: une variable locale d'une procédure où se trouve le programme, dont le type a changé
   RUN pour recommencer.
   ✅ PRÊT.
 ```
@@ -153,8 +156,8 @@ gère :
 | Des instructions de la procédure où vous êtes interrompu, au-dessus, à ou au-dessous de l'interruption | poursuit | poursuit |
 | Des instructions d'un appelant, hors de sa ligne d'appel | poursuit | poursuit |
 | La ligne d'appel d'un appelant | **réinitialise** | attend, et nomme la modification |
-| Une variable locale ajoutée (`Dim`) | poursuit | attend, et nomme la modification (pour l'instant) |
-| Une variable locale retirée; une `Static` ajoutée | **réinitialise** | attend, et nomme la modification (pour l'instant) |
+| Une variable locale ajoutée (`Dim`) | poursuit | poursuit |
+| Une variable locale retirée; une `Static` ajoutée | **réinitialise** | poursuit |
 | Une variable locale changée de type | **réinitialise** | attend, et nomme la modification |
 | Une variable de module `Private`, une `Const` ou un `Declare` ajoutés | poursuit | poursuit |
 | Une variable de module `Public` ajoutée | **réinitialise** | poursuit |
@@ -165,7 +168,7 @@ gère :
 | La même chose, pour celle où vous êtes | **réinitialise** | attend, et nomme la modification |
 | Un `Declare` changé; une ligne `Option` ajoutée ou retirée | **réinitialise** | poursuit (une ligne `Option` : dans un module où le programme ne se trouve pas) |
 | Le corps d'une méthode d'une classe dont des objets existent | poursuit | poursuit |
-| Un champ ajouté à une classe dont des objets existent | poursuit | attend, et nomme la modification (pour l'instant) |
+| Un champ ajouté à une classe dont des objets existent | poursuit | poursuit |
 | La ligne où une erreur a arrêté le programme, corrigée | poursuit après elle, sans exécuter votre correction | s'exécute telle que vous l'avez corrigée |
 
 Là où l'éditeur VBA réinitialise, il demande d'abord, et **Annuler** défait la modification. Là où RD-VBA attend, rien n'est perdu : une variable dont vous avez
