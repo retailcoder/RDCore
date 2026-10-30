@@ -12,12 +12,12 @@ namespace RDCore.Tests.Semantics.Refactoring;
 public sealed class ExtractionAnalysisTests
 {
     // the plan of extracting the lines of the body from `first` to `last` (zero-based).
-    private static ExtractionPlan Plan(string body, int first, int last, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub")
+    private static ExtractionPlan Plan(string body, int first, int last, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub", bool optionExplicit = true)
     {
-        var analyzed = FlowFixture.Analyze(body, header, end);
+        var analyzed = FlowFixture.Analyze(body, header, end, optionExplicit);
         var requested = new SourceRange(analyzed.FirstBodyLine + first, 0, analyzed.FirstBodyLine + last, 1);
         Assert.IsTrue(ExtractionSelection.TrySnap(analyzed.Procedure, analyzed.Instructions, requested, out var selection, out var refusal, out _), $"refused: {refusal}");
-        return ExtractionAnalysis.Plan(selection!, analyzed.Graph, analyzed.Accesses, analyzed.Model.Procedure, analyzed.Scopes);
+        return ExtractionAnalysis.Plan(selection!, analyzed.Graph, analyzed.Accesses, analyzed.Model, analyzed.Scopes);
     }
 
     private static ExtractionParameter Parameter(ExtractionPlan plan, string name) => plan.Parameters.Single(parameter => parameter.Name == name);
@@ -108,6 +108,108 @@ public sealed class ExtractionAnalysisTests
 
         Assert.IsTrue(plan.AssignsResult);
         Assert.IsFalse(plan.Parameters.Any(parameter => parameter.Name == "Run"));
+    }
+
+    [TestMethod]
+    public void AReadOfTheFunctionsResult_GivenBeforeTheSelection_IsSaidOf()
+    {
+        var plan = Plan("Run = n\nRun = Run * 2", 1, 1, header: "Public Function Run(ByVal n As Long) As Long", end: "End Function");
+
+        Assert.IsTrue(plan.AssignsResult);
+        Assert.IsTrue(plan.ReadsResult);
+    }
+
+    [TestMethod]
+    public void AnAssignmentOfTheFunctionsResult_ReadsNoneOfIt()
+        => Assert.IsFalse(Plan("Run = n * 2", 0, 0, header: "Public Function Run(ByVal n As Long) As Long", end: "End Function").ReadsResult);
+
+    // §3.2: the lifetime of a Static is the source procedure's, so its declaration stays there even when only the selection uses it.
+    [TestMethod]
+    public void AStaticDeclaredInTheSelection_KeepsItsDeclarationInTheSourceProcedure()
+    {
+        var analyzed = FlowFixture.Analyze("Static k As Long\nk = k + n");
+        var plan = Plan("Static k As Long\nk = k + n", 0, 1);
+
+        CollectionAssert.AreEqual(new[] { analyzed.Variable("k") }, plan.MovedOut.ToArray());
+        Assert.AreEqual(ExtractionPassingReason.Static, Parameter(plan, "k").Reason);
+    }
+
+    [TestMethod]
+    public void AnUndeclaredVariable_IsDeclaredByTheNewProcedure()
+    {
+        var plan = Plan("t = n\nDebug.Print t", 0, 1, optionExplicit: false);
+
+        var t = plan.Locals.Single(local => local.Name == "t");
+        Assert.IsTrue(t.IsUndeclared);
+        Assert.IsFalse(t.MovesDeclaration, "it has no declaration to move");
+        Assert.IsNull(t.Type, "a Variant");
+    }
+
+    [TestMethod]
+    public void AnUndeclaredVariable_ReadAfter_IsAnUndeclaredParameter()
+        => Assert.IsTrue(Parameter(Plan("t = n\nDebug.Print t", 0, 0, optionExplicit: false), "t").IsUndeclared);
+
+    [TestMethod]
+    public void AParamArrayTheSelectionReads_IsPassedAsAVariant()
+    {
+        var plan = Plan("Debug.Print args(0)", 0, 0, header: "Public Sub Run(ParamArray args() As Variant)");
+
+        var args = Parameter(plan, "args");
+        Assert.AreEqual(ExtractionPassingReason.ParamArray, args.Reason);
+        Assert.AreEqual(ExtractionPassing.ByVal, args.Passing);
+        Assert.IsTrue(args.MayBeMissing);
+        Assert.IsTrue(plan.IsExtractable);
+    }
+
+    // MS-VBAL §5.3.1.5: the elements of a ParamArray are the caller's variables, which the copy a new procedure is given cannot write.
+    [TestMethod]
+    [DataRow("args(0) = 1", DisplayName = "an element assigned")]
+    [DataRow("Bump args(0)", DisplayName = "an element passed by reference")]
+    public void AParamArrayTheSelectionWrites_IsRefused(string body)
+    {
+        var plan = Plan(body, 0, 0, header: "Public Sub Run(ParamArray args() As Variant)");
+
+        var refusal = plan.Refusals.Single();
+        Assert.AreEqual(ExtractionRefusalKind.ParamArrayWritten, refusal.Kind);
+        Assert.AreEqual("args", refusal.Name);
+        Assert.IsNotNull(refusal.Location);
+    }
+
+    [TestMethod]
+    [DataRow("Optional ByVal v As Variant", true, DisplayName = "an Optional Variant")]
+    [DataRow("Optional ByVal v As Variant = 1", false, DisplayName = "an Optional Variant with a default value")]
+    [DataRow("Optional ByVal v As Long", false, DisplayName = "an Optional Long")]
+    [DataRow("ByVal v As Variant", false, DisplayName = "a required Variant")]
+    public void AParameterThatCanBeMissing_IsSaidOf(string parameter, bool mayBeMissing)
+        => Assert.AreEqual(mayBeMissing, Parameter(Plan("Debug.Print IsMissing(v)", 0, 0, header: $"Public Sub Run({parameter})"), "v").MayBeMissing);
+
+    [TestMethod]
+    [DataRow("Dim p As Point\nWith p\n.X = n\nEnd With", "p", ExtractionPassing.ByRef, DisplayName = "a variable of a Type, whose members the selection writes")]
+    [DataRow("Dim c As Collection\nSet c = New Collection\nWith c\n.Add n\nEnd With", "c", ExtractionPassing.ByVal, DisplayName = "an object")]
+    public void TheVariableOfTheWithBlockTheSelectionIsInside_IsGivenToTheNewProcedure(string body, string name, ExtractionPassing passing)
+    {
+        var lines = body.Split('\n');
+        var inside = Array.FindIndex(lines, line => line.StartsWith('.'));
+        var plan = Plan(body, inside, inside);
+
+        Assert.IsNotNull(plan.WithTarget);
+        Assert.AreEqual(name, plan.WithTarget.Name);
+        Assert.AreEqual(passing, plan.WithTarget.Passing);
+        Assert.IsTrue(plan.IsExtractable);
+    }
+
+    [TestMethod]
+    public void AWithBlockTheSelectionHoldsWhole_IsExtractedAsItIs()
+        => Assert.IsNull(Plan("Dim p As Point\nWith p\n.X = n\nEnd With", 1, 3).WithTarget);
+
+    // the block evaluates its expression once; a copy of it at the call site would evaluate it again, and give the new procedure another object.
+    [TestMethod]
+    public void AWithBlockOfAnExpression_TheSelectionUsesAMemberOf_IsRefused()
+    {
+        var plan = Plan("With New Collection\n.Add n\nEnd With", 1, 1);
+
+        Assert.AreEqual(ExtractionRefusalKind.WithTargetIsNotAVariable, plan.Refusals.Single().Kind);
+        Assert.IsNull(plan.WithTarget);
     }
 
     [TestMethod]
