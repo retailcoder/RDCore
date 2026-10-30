@@ -40,7 +40,7 @@ public sealed class ClientWithoutOmniSharpTests
                 "semanticTokens": { "requests": {}, "tokenTypes": ["keyword", "variable"], "tokenModifiers": ["declaration"], "formats": ["relative"] }
             },
             "workspace": { "executeCommand": {}, "workspaceFolders": true, "diagnostics": {}, "fileOperations": {} },
-            "window": {}
+            "window": { "workDoneProgress": true }
         }
         """;
 
@@ -100,6 +100,41 @@ public sealed class ClientWithoutOmniSharpTests
         await platform.ShutdownAsync(6);
     }
 
+    // a module of the workspace with enough code to take the language server a while to parse, bind and define.
+    private static string OtherModule(int index)
+        => $"Attribute VB_Name = \"Other{index}\"\r\nOption Explicit\r\n"
+            + string.Concat(Enumerable.Range(0, 20).Select(procedure =>
+                $"Public Function F{procedure}(ByVal a As Long, ByVal b As String) As Long\r\n    Dim i As Long, s As String\r\n    For i = 1 To a\r\n        s = s & b & CStr(i)\r\n        If Len(s) > 10 Then s = Left$(s, 5)\r\n    Next\r\n    F{procedure} = Len(s) + i\r\nEnd Function\r\n"));
+
+    // the order HexIDE's add-in sent its messages in when the reply was lost (C:\Dev\Claude\hexide-msgbox-tap-2026-10-30.log): the program run as soon as the client
+    // is connected, while the language server is still parsing the workspace and composing the session - which replaces the module just before it runs it.
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public async Task AProgramRunWhileTheWorkspaceIsComposed_AsksTheClient_AndCompletesWithItsAnswer()
+    {
+        await using var platform = await Platform.StartAsync(others: 60);
+        var rpc = platform.Rpc;
+
+        var initialize = await rpc.RequestAsync(2, "initialize", platform.InitializeParams(AsHexIdeDeclares));
+        Assert.IsNull(initialize["error"], initialize.ToJsonString());
+        await rpc.NotifyAsync("initialized", new JsonObject());
+        await rpc.NotifyAsync("textDocument/didOpen", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri, ["languageId"] = "vba", ["version"] = 1, ["text"] = ModuleText },
+        });
+
+        var handshake = rpc.RequestAsync(3, RDCorePlatformHandshake.Method, JsonNode.Parse(ClaimsDialogs)!.AsObject());
+        var diagnostics = rpc.RequestAsync(4, "textDocument/diagnostic", new JsonObject { ["textDocument"] = new JsonObject { ["uri"] = platform.ModuleUri }, ["identifier"] = "rdcore" });
+        Assert.IsNull((await handshake)["error"]);
+
+        var executed = await rpc.RequestAsync(5, RDCorePlatformProtocol.SessionExecute, new JsonObject { ["source"] = ModuleText, ["moduleName"] = "Program", ["entryPoint"] = "Main" });
+
+        platform.AssertTheProgramPrintedTheAnswer(executed);
+        Assert.IsNull((await diagnostics)["error"]);
+        Assert.Fail("PROBE asked: " + string.Join(", ", platform.Asked) + "\n" + string.Join("\n",WholeLogOf(platform.Root).Split('\n').Where(line => line.Contains("📤") || line.Contains("host/execute") || line.Contains("parse completed") || line.Contains("composed") || line.Contains("symbols defined") || line.Contains("diagnostic"))));
+        await platform.ShutdownAsync(6);
+    }
+
     // the platform as a deployment has it, with a workspace of one module, and the language server started from it as an IDE starts it.
     private sealed class Platform : IAsyncDisposable
     {
@@ -131,12 +166,18 @@ public sealed class ClientWithoutOmniSharpTests
 
         public ConcurrentQueue<string> Asked { get; } = [];
 
-        public static async Task<Platform> StartAsync()
+        // the workspace has `others` modules besides Program, which the language server parses and composes the session of before it runs anything.
+        public static async Task<Platform> StartAsync(int others = 0)
         {
             var root = Path.Combine(Path.GetTempPath(), "RDCore", "raw-client", Guid.NewGuid().ToString("N"));
             var workspace = Path.Combine(root, "Workspace");
             Directory.CreateDirectory(workspace);
             File.WriteAllText(Path.Combine(workspace, "Program.bas"), ModuleText);
+            for (var index = 0; index < others; index++)
+            {
+                File.WriteAllText(Path.Combine(workspace, $"Other{index}.bas"), OtherModule(index));
+            }
+
             File.WriteAllText(Path.Combine(root, PlatformManifest.FileName), JsonSerializer.Serialize(new PlatformManifest
             {
                 PlatformVersion = "0.1",
