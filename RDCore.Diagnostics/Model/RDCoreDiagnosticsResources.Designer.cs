@@ -646,6 +646,15 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to This array is given a second empty argument list, f()(): MS-VBAL makes it invalid, and MS-VBA compiles it, and raises run-time error 9 (Subscript out of range) whenever it runs. Write f(), or f..
+        /// </summary>
+        public static string ArrayGivenASecondEmptyArgumentList_Message {
+            get {
+                return ResourceManager.GetString("ArrayGivenASecondEmptyArgumentList_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to The type character of this function does not match its declared type ({1}): MS-VBAL makes the name invalid, and MS-VBA ignores the character. Write &apos;{0}&apos; without it..
         /// </summary>
         public static string IgnoredTypeCharacter_Message {
