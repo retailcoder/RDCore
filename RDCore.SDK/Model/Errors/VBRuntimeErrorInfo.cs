@@ -151,6 +151,7 @@ public record class VBRuntimeErrorInfo : VBErrorInfo, IVBRaisableError
         [VBRuntimeErrorId.PrinterError] = "Printer error",
         [VBRuntimeErrorId.CantSaveFileToTemp] = "Can't save file to TEMP",
         [VBRuntimeErrorId.SearchTextNotFound] = "Search text not found",
-        [VBRuntimeErrorId.ReplacementsTooLong] = "Replacements too long"
+        [VBRuntimeErrorId.ReplacementsTooLong] = "Replacements too long",
+        [VBRuntimeErrorId.NobodyToAnswer] = "Nobody to answer: the program runs unattended"
     };
 }

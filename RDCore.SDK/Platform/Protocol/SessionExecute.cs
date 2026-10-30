@@ -55,6 +55,12 @@ public record class HostExecuteParams : IRequest, IRequest<ExecuteSessionResult>
     /// the requests that resume the program too. Only a program run under a debugger streams.
     /// </summary>
     public bool StreamOutput { get; init; }
+
+    /// <summary>
+    /// Whether the program runs unattended (<see cref="Runtime.Abstract.Execution.IRuntimeSession.RunsUnattended"/>): nobody is there to answer a dialog it opens,
+    /// which fails the run. Ignored for a statement run alongside a program that waits, which runs as that program does.
+    /// </summary>
+    public bool Unattended { get; init; }
 }
 
 /// <summary>

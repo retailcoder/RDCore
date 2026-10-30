@@ -11,7 +11,10 @@ namespace RDCore.LanguageServer.Runtime;
 /// </summary>
 internal interface IInteractionClient
 {
-    /// <summary>Whether the client said it answers a program's dialogs (<see cref="SDK.Client.SessionInteraction"/>).</summary>
+    /// <summary>
+    /// Whether the client said it answers a program's dialogs (<see cref="SDK.Client.SessionInteraction"/>), and not that nobody is there to
+    /// (<see cref="SDK.Client.Unattended"/>), which wins.
+    /// </summary>
     bool ShowsDialogs { get; }
 
     /// <summary>Asks the client to answer a <c>MsgBox</c> (<c>rdcore/session/interaction/msgBox</c>).</summary>
@@ -68,7 +71,8 @@ internal sealed class ClientInteractionRelay : IClientInteractionRelay
 /// <param name="server">The language server, connected to its client.</param>
 internal sealed class LanguageServerInteractionClient(ILanguageServer server) : IInteractionClient
 {
-    public bool ShowsDialogs => server.Services.GetService<IPlatformClientCapabilitiesService>()?.Expects(capabilities => capabilities.SessionInteraction) == true;
+    public bool ShowsDialogs => server.Services.GetService<IPlatformClientCapabilitiesService>() is { } expected
+        && expected.Expects(capabilities => capabilities.SessionInteraction) && !expected.Expects(capabilities => capabilities.Unattended);
 
     public Task<MessageBoxResult> MessageBoxAsync(SessionMessageBoxRequest request, CancellationToken token) => server.SendRequest(request, token);
 
