@@ -231,6 +231,21 @@
   <data name="VBForLoopOperandIsNotANumber_Verbose" xml:space="preserve">
     <value>Le début, la fin et le pas d'une boucle For sont des nombres : celui-ci ne peut pas être lu comme un nombre (MS-VBAL 5.4.2.3).</value>
   </data>
+  <data name="VBRuntimeError_NobodyToAnswer_Verbose" xml:space="preserve">
+    <value>{0} dans un programme exécuté sans surveillance (--unattended) : personne n'est là pour y répondre, et l'exécution échoue.</value>
+  </data>
+  <data name="VBRuntimeError_NobodyToAnswer_Declined" xml:space="preserve">
+    <value>{1}, qui affiche les dialogues du programme, a refusé de répondre à son {0} : personne d'autre ne le fera, et l'exécution échoue.</value>
+  </data>
+  <data name="VBRuntimeError_UnusableDialogAnswer_NoSuchButton" xml:space="preserve">
+    <value>{0} a répondu au MsgBox du programme ({1}) par {2}, qui n'est aucun de ses boutons : le programme ne peut pas continuer avec cette réponse, et l'exécution échoue.</value>
+  </data>
+  <data name="VBRuntimeError_UnusableDialogAnswer_NotRelayed" xml:space="preserve">
+    <value>Le {0} du programme n'a pas pu être relayé au client qui affiche ses dialogues ({1}) : l'exécution échoue, plutôt que d'attendre un dialogue que personne ne voit.</value>
+  </data>
+  <data name="UnnamedClient" xml:space="preserve">
+    <value>Le client</value>
+  </data>
   <data name="VBForLoopOperandNotOfLoopType_Verbose" xml:space="preserve">
     <value>Cette boucle For compte en {0}, et son début, sa fin ou son pas n'est pas une valeur de ce type.</value>
   </data>
@@ -248,6 +263,9 @@
   </data>
   <data name="VBTypeOf_ObjectVariableNotSet_Verbose" xml:space="preserve">
     <value>Ce que TypeOf teste est Nothing : une variable objet qui n'a jamais été définie, ou qui a été définie à Nothing, n'a aucun objet dont le type pourrait être testé. Testez-la d'abord avec 'Is Nothing'.</value>
+  </data>
+  <data name="VBIndex_SecondEmptyArgumentList_Verbose" xml:space="preserve">
+    <value>Le tableau reçoit une deuxième liste d'arguments vide, f()() : la première est le tableau lui-même, et la deuxième n'en choisit aucun élément.</value>
   </data>
   <data name="VBIndex_NothingToIndex_Verbose" xml:space="preserve">
     <value>Un {0} n'est ni un tableau ni un objet : il n'y a rien à indexer.</value>
@@ -317,6 +335,9 @@
   </data>
   <data name="VBCompileError_TypeMismatch_Verbose" xml:space="preserve">
     <value>Aucune des règles sémantiques applicables pour cette opération ne correspond au(x) type(s) spécifié(s) en intrant : {$INPUTS}</value>
+  </data>
+  <data name="VBCompileError_ArrayPrinted_Verbose" xml:space="preserve">
+    <value>Un tableau est imprimé : Debug.Print écrit des valeurs, et un tableau n'en est pas une - imprimez ses éléments, un à la fois.</value>
   </data>
   <data name="VBCompileError_LetCoercionTypeMismatch_Verbose" xml:space="preserve">
     <value>La coercion implicite (let-coercion) est statiquement invalide pour les intrants spécifiés pour cette expression.</value>

@@ -478,6 +478,12 @@ public sealed class StdInteraction(
             return RuntimeSemanticsEvaluationResult<VBLongValue>.Error(caption.ErrorInfo!);
         }
 
+        // a program run unattended has nobody to answer it, and fails (IRuntimeSession.RunsUnattended).
+        if (session.RunsUnattended)
+        {
+            return RuntimeSemanticsEvaluationResult<VBLongValue>.Error(Execution.Unattended.NobodyToAnswer(session, "MsgBox"));
+        }
+
         var request = new MessageBoxRequest(text.Result!.ToString()!, caption.Result!.ToString()!, buttons);
         try
         {
@@ -487,6 +493,10 @@ public sealed class StdInteraction(
         {
             // the run is being stopped, and stops at the next instruction: what the dialog answers in the meantime is the one a window closed without a choice answers.
             return Succeed(new VBLongValue((int)(request.EscapeResult ?? request.Choices[request.DefaultChoice])));
+        }
+        catch (DialogNotAnsweredException unanswered)
+        {
+            return RuntimeSemanticsEvaluationResult<VBLongValue>.Error(Unanswered(unanswered));
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
@@ -509,6 +519,11 @@ public sealed class StdInteraction(
             return RuntimeSemanticsEvaluationResult<VBStringValue>.Error(failed.ErrorInfo!);
         }
 
+        if (session.RunsUnattended)
+        {
+            return RuntimeSemanticsEvaluationResult<VBStringValue>.Error(Execution.Unattended.NobodyToAnswer(session, "InputBox"));
+        }
+
         var request = new InputBoxRequest(
             text.Result!.ToString()!, caption.Result!.ToString()!, initial.Result!.ToString()!,
             x is { Result: VBLongValue left } ? left.Value : null, y is { Result: VBLongValue top } ? top.Value : null);
@@ -521,10 +536,22 @@ public sealed class StdInteraction(
         {
             return Succeed(VBStringValue.VBNullString);
         }
+        catch (DialogNotAnsweredException unanswered)
+        {
+            return RuntimeSemanticsEvaluationResult<VBStringValue>.Error(Unanswered(unanswered));
+        }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             return Fail<VBStringValue>(VBRuntimeErrorId.CantPerformRequestedOperation, $"The input box could not be shown: {exception.Message}");
         }
+    }
+
+    // a dialog that cannot be answered fails the run, whatever handler the program has: the fault is not the program's to handle (VBR50001, VBR50002).
+    private VBRuntimeErrorInfo Unanswered(DialogNotAnsweredException unanswered)
+    {
+        var error = VBRuntimeErrorInfo.For(unanswered.ErrorId, default, unanswered.Message);
+        session.Errors.RaiseUntrappable(error);
+        return error;
     }
 
     private RuntimeSemanticsEvaluationResult<VBTypedValue> TitleOf(VBVariantValue? title)

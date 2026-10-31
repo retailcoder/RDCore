@@ -403,6 +403,15 @@ namespace RDCore.SDK {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to An array is printed: Debug.Print writes values, and an array is none - print its elements, one at a time..
+        /// </summary>
+        public static string VBCompileError_ArrayPrinted_Verbose {
+            get {
+                return ResourceManager.GetString("VBCompileError_ArrayPrinted_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Implicit let-coercion is statically invalid for the specified inputs of this expression..
         /// </summary>
         public static string VBCompileError_LetCoercionTypeMismatch_Verbose {
@@ -1812,6 +1821,51 @@ namespace RDCore.SDK {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to {0} in a program run unattended (--unattended): nobody is there to answer it, and the run fails..
+        /// </summary>
+        public static string VBRuntimeError_NobodyToAnswer_Verbose {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_NobodyToAnswer_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {1}, which shows the program's dialogs, declined to answer its {0}: nobody else will, and the run fails..
+        /// </summary>
+        public static string VBRuntimeError_NobodyToAnswer_Declined {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_NobodyToAnswer_Declined", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0} answered the program's MsgBox ({1}) with {2}, which is none of its buttons: the program cannot go on with that answer, and the run fails..
+        /// </summary>
+        public static string VBRuntimeError_UnusableDialogAnswer_NoSuchButton {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_UnusableDialogAnswer_NoSuchButton", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The program's {0} could not be relayed to the client that shows its dialogs ({1}): the run fails, rather than wait on a dialog nobody sees..
+        /// </summary>
+        public static string VBRuntimeError_UnusableDialogAnswer_NotRelayed {
+            get {
+                return ResourceManager.GetString("VBRuntimeError_UnusableDialogAnswer_NotRelayed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The client.
+        /// </summary>
+        public static string UnnamedClient {
+            get {
+                return ResourceManager.GetString("UnnamedClient", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to This For loop counts in {0}, and its start, end or step is not a value of that type..
         /// </summary>
         public static string VBForLoopOperandNotOfLoopType_Verbose {
@@ -1853,6 +1907,15 @@ namespace RDCore.SDK {
         public static string VBTypeOf_ObjectVariableNotSet_Verbose {
             get {
                 return ResourceManager.GetString("VBTypeOf_ObjectVariableNotSet_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The array is given a second empty argument list, f()(): the first is the array itself, and the second selects no element of it..
+        /// </summary>
+        public static string VBIndex_SecondEmptyArgumentList_Verbose {
+            get {
+                return ResourceManager.GetString("VBIndex_SecondEmptyArgumentList_Verbose", resourceCulture);
             }
         }
 

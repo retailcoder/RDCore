@@ -134,12 +134,17 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
     /// Whether the program's output is said as it is printed (<see cref="IEnvironmentSessionProvider.OutputStreamed"/>), for the whole of a run under a debugger, and not
     /// kept for the answers. Ignored for a run that is not.
     /// </param>
+    /// <param name="unattended">
+    /// Whether nobody is there to answer a dialog the program opens, which fails the run (<see cref="IRuntimeSession.RunsUnattended"/>), for the whole of the run.
+    /// Ignored for a statement run alongside a program that waits, which runs as that program does.
+    /// </param>
     /// <returns>
     /// How it ended, or where it waits. A program that is suspended is let go of, and not refused: running one is what <c>RUN</c> does, and in BASIC it starts the
     /// program over. A program that is running is refused.
     /// </returns>
     public Task<ExecuteSessionResult> RunAsync(
-        RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, bool debug, CancellationToken token, bool immediate = false, bool streamOutput = false)
+        RuntimeExecutionPipeline pipeline, VBTypeMemberSymbol entryPoint, bool debug, CancellationToken token, bool immediate = false, bool streamOutput = false,
+        bool unattended = false)
     {
         var session = provider.Session;
         lock (_sync)
@@ -164,6 +169,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
             _idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _terminating = false;
             _streaming = debug && streamOutput;
+            session.RunsUnattended = unattended;
         }
 
         // the program is in its turn for as long as it runs or waits at a Stop: an event that something outside the workspace raises is handled between two programs and not
@@ -598,6 +604,23 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
             }
         }
 
+        // MS-VBAL 5.4.3.3: a ReDim of a name the procedure does not see declares a dynamic array local to it, as it does in the procedure's own code
+        // (SymbolBuilder.BuildRedimLocal), Option Explicit or not: on this activation.
+        var builder = new SymbolBuilder(procedure.WorkspaceRoot, procedure.ParentUri, ScopeKind.Module, resolver, VBVariantType.TypeInfo);
+        foreach (var redim in Descendants(statement).OfType<RedimDeclarationNode>().DistinctBy(redim => redim.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            if (redim.Target is not SimpleNameExpressionNode target || !resolver.ResolveValue(target, ScopeKind.Local, procedure.Uri).IsUnbound)
+            {
+                continue;
+            }
+
+            var array = (VBLocalVariableSymbol)builder.BuildRedimLocal(redim, procedure.Uri);
+            if (session.Symbols.TryDefine(array, ScopeKind.Local))
+            {
+                selected.PushDeclaredAtAStop(array, array.ResolvedType.DefaultValue);
+            }
+        }
+
         var undeclared = references.Where(name => resolver.ResolveValue(name, ScopeKind.Local, procedure.Uri).IsUnbound).ToArray();
         if (undeclared.Length == 0)
         {
@@ -609,7 +632,6 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
             return string.Format(Resources.Host_VariableNotDefined, undeclared[0].IdentifierName);
         }
 
-        var builder = new SymbolBuilder(procedure.WorkspaceRoot, procedure.ParentUri, ScopeKind.Module, resolver, VBVariantType.TypeInfo);
         var ofTheModule = session.Environment.Language.ImplicitDeclarationScope is ImplicitDeclarationScope.Module && selected.Target is null;
         foreach (var name in undeclared)
         {

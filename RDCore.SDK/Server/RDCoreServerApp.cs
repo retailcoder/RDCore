@@ -339,8 +339,9 @@ public abstract class RDCoreServerApp(
             }
 
             // the other half of the platform handshake: what the connected client expects of us.
-            // A handler serving an optional, client-driven request family consults it.
-            services.AddSingleton<IPlatformClientCapabilitiesService, PlatformClientCapabilitiesService>();
+            // A handler serving an optional, client-driven request family consults it. It logs what it
+            // is told with this app's logger, which writes to the file; this container's write to the client.
+            services.AddSingleton<IPlatformClientCapabilitiesService>(new PlatformClientCapabilitiesService(logger));
 
             // OmniSharp's own AddOptions() hands handlers an unconfigured SdkServerOptions; bridge the
             // configured instance so a closed-type registration wins over the open generic.
@@ -351,6 +352,8 @@ public abstract class RDCoreServerApp(
                 // not AddLanguageProtocolLogging(): OmniSharp's protocol logger forwards a caught
                 // exception's raw ToString() over window/logMessage. Forward the same records scrubbed.
                 builder.Services.AddSingleton<ILoggerProvider, ScrubbingLanguageServerLoggerProvider>();
+                // and to the file, which otherwise has nothing of the connection's own failures.
+                builder.Services.AddSingleton<ILoggerProvider>(new ContainerFileLoggerProvider(logger));
             });
 
             // app-specific service registrations:

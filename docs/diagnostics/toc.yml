@@ -376,6 +376,10 @@
   href: vbr00744.md
 - name: VBR00746 — Replacements too long
   href: vbr00746.md
+- name: VBR50001 — Nobody to answer
+  href: vbr50001.md
+- name: VBR50002 — Unusable dialog answer
+  href: vbr50002.md
 - name: RDC00101 — Implicit declarations enabled
   href: rdc00101.md
 - name: RDC00102 — Implicit non-default array base
@@ -478,5 +482,7 @@
   href: rdc11023.md
 - name: RDC11024 — Implements in a document module
   href: rdc11024.md
+- name: RDC11025 — Array given a second empty argument list
+  href: rdc11025.md
 - name: RDC20001 — Edit not applied to the waiting program
   href: rdc20001.md

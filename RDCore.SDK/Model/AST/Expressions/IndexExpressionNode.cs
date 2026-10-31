@@ -19,7 +19,16 @@ namespace RDCore.SDK.Model.AST.Expressions;
 /// forms.
 /// </param>
 public sealed record class IndexExpressionNode(SyntaxNodeId Identity, SourceLocation Location, ExpressionNode Callee, ImmutableArray<ExpressionNode> Arguments)
-    : ExpressionNode(Identity, Location, [Callee, .. Arguments]);
+    : ExpressionNode(Identity, Location, [Callee, .. Arguments])
+{
+    /// <summary>
+    /// Whether <paramref name="arguments"/> is an empty argument list (<strong>MS-VBAL 5.6.13.1</strong>): no argument at all, or the parentheses of <c>F()</c>,
+    /// which the parser reads as one <see cref="MissingArgumentNode"/>.
+    /// </summary>
+    /// <param name="arguments">The arguments of an index expression, or of a call statement.</param>
+    /// <returns><see langword="true"/> when nothing is passed: <c>F</c>, <c>F()</c>; <see langword="false"/> for <c>F(1)</c> or <c>F(, 2)</c>.</returns>
+    public static bool IsEmptyArgumentList(ImmutableArray<ExpressionNode> arguments) => arguments.IsDefaultOrEmpty || arguments is [MissingArgumentNode];
+}
 
 /// <summary>
 /// <strong>MS-VBAL 5.6.13.1</strong> a named argument (<c>name:=value</c>) in an

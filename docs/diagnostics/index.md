@@ -228,6 +228,8 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[VBR00735](vbr00735.md)|Can't save file to TEMP — a file cannot be saved to the temporary directory|
 |[VBR00744](vbr00744.md)|Search text not found — the text searched for is not found|
 |[VBR00746](vbr00746.md)|Replacements too long — the replacement text is too long|
+|[VBR50001](vbr50001.md)|Nobody to answer — a program run unattended opens a dialog, or the client that shows its dialogs declines one (untrappable; RD-VBA's own run-time errors are VBR50000-50999)|
+|[VBR50002](vbr50002.md)|Unusable dialog answer — the client that shows a program's dialogs answers one with what it can't be answered with, or can't be reached (untrappable)|
 
 ### Rubberduck Core diagnostics
 
@@ -284,6 +286,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC11022](rdc11022.md)|ReDim of a variable declared implicitly — the specification and VB6 re-dimension it, MS-VBA refuses it (Invalid ReDim)|
 |[RDC11023](rdc11023.md)|Procedure MS-VBA refuses as too large — more than 5,000 statements, which RD-VBA runs and MS-VBA refuses (Procedure too large)|
 |[RDC11024](rdc11024.md)|Implements in a document module — MS-VBAL forbids it in an extension module, MS-VBA compiles it|
+|[RDC11025](rdc11025.md)|Array given a second empty argument list — `f()()`, which MS-VBAL makes invalid, MS-VBA compiles and fails with 9 when it runs|
 |[RDC20001](rdc20001.md)|Edit not applied to the waiting program — made while it waits in the debugger, which can't go on with it|
 
 ---

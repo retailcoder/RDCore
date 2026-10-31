@@ -147,6 +147,7 @@ public sealed class DiagnosticDocumentationTests
         (RDCoreDiagnosticId.ReDimOfAnImplicitVariant, 11022),
         (RDCoreDiagnosticId.ProcedureTooLarge, 11023),
         (RDCoreDiagnosticId.ImplementsInDocumentModule, 11024),
+        (RDCoreDiagnosticId.ArrayGivenASecondEmptyArgumentList, 11025),
     ];
 
     [TestMethod]
