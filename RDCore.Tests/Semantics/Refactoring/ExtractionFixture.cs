@@ -18,8 +18,36 @@ internal static class ExtractionFixture
     public static ExtractionPlan Plan(
         string body, SourcePosition start, SourcePosition end, string header = "Public Sub Run(ByVal n As Long)", string close = "End Sub", bool optionExplicit = true,
         string declarations = "")
+        => PlanOf(FlowFixture.Analyze(body, header, close, optionExplicit, declarations), start, end);
+
+    /// <summary>
+    /// The module after extracting the lines of the body from <paramref name="first"/> to <paramref name="last"/> (zero-based) as a procedure
+    /// <paramref name="name"/>, returning the variable <paramref name="returnValue"/> names; and the edit.
+    /// </summary>
+    public static (string Module, ExtractionEdit Edit) Extract(
+        string body, int first, int last, string name = "Extracted", string? returnValue = null, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub",
+        bool optionExplicit = true, string declarations = "")
     {
-        var analyzed = FlowFixture.Analyze(body, header, close, optionExplicit, declarations);
+        var analyzed = FlowFixture.Analyze(body, header, end, optionExplicit, declarations);
+        var plan = PlanOf(analyzed, new SourcePosition(first, 0), new SourcePosition(last, 1));
+        var source = new ExtractionSource(analyzed.Module, analyzed.Procedure, analyzed.Model.Procedure, analyzed.Text, analyzed.Scopes);
+        var choices = new ExtractionChoices(name) { ReturnValue = returnValue is null ? null : analyzed.Variable(returnValue) };
+        var edit = ExtractMethodEdit.Of(plan, source, choices);
+        return (edit.ApplyTo(analyzed.Text), edit);
+    }
+
+    /// <summary>What a name for the procedure extracted from the lines <paramref name="first"/> to <paramref name="last"/> is checked against.</summary>
+    public static (ExtractionPlan Plan, ExtractionSource Source, RDCore.SDK.Semantics.Refactoring.RenameContext Context, Uri Module, FlowFixture.Analyzed Analyzed) Naming(
+        string body, int first, int last, string declarations = "", string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub")
+    {
+        var analyzed = FlowFixture.Analyze(body, header, end, declarations: declarations);
+        var plan = PlanOf(analyzed, new SourcePosition(first, 0), new SourcePosition(last, 1));
+        var source = new ExtractionSource(analyzed.Module, analyzed.Procedure, analyzed.Model.Procedure, analyzed.Text, analyzed.Scopes);
+        return (plan, source, analyzed.Context, analyzed.ModuleAddress, analyzed);
+    }
+
+    private static ExtractionPlan PlanOf(FlowFixture.Analyzed analyzed, SourcePosition start, SourcePosition end)
+    {
         var requested = new SourceRange(analyzed.FirstBodyLine + start.Line, start.Character, analyzed.FirstBodyLine + end.Line, end.Character);
         Assert.IsTrue(ExtractionSelection.TrySnap(analyzed.Procedure, analyzed.Instructions, requested, out var selection, out var refusal, out _), $"refused: {refusal}");
         return ExtractionAnalysis.Plan(selection!, analyzed.Graph, analyzed.Accesses, analyzed.Model, analyzed.Scopes);
