@@ -72,7 +72,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RDCore.SDK\RDCore.SDK.csproj" />
+    <PackageReference Include="RDCore.SDK" Version="$(RDCoreSdkVersion)" />
     <!-- environment-host mode composes the RD-VBA runtime session; RDCore.Runtime is GPLv3, as is this app. -->
     <ProjectReference Include="..\RDCore.Runtime\RDCore.Runtime.csproj" />
     <!-- the host composes the session with the outside world of the platform it runs on. -->

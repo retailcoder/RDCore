@@ -50,7 +50,6 @@ public sealed class AssemblyDisplayVersionTests
     }
 
     [TestMethod]
-    [DataRow("RDCore.SDK")]
     [DataRow("RDCore.Runtime")]
     [DataRow("RDCore.LanguageServer")]
     [DataRow("RDCore.ParseServer")]
@@ -58,11 +57,12 @@ public sealed class AssemblyDisplayVersionTests
     [DataRow("rdc")]
     public void ProductAssembly_FollowsTheSingleVersionSource(string assemblyName)
     {
-        // Directory.Build.props' VersionPrefix feeds both versions of every product assembly: a csproj that sets its own
-        // <Version> or <AssemblyVersion> breaks one of these. No "+<sha>" check: a build from a source tarball has none.
+        // Directory.Build.props' VersionPrefix feeds both versions of every product assembly, and of this test assembly: a csproj
+        // that sets its own <Version> or <AssemblyVersion> breaks one of these. RDCore.SDK is a package, versioned on its own.
+        // No "+<sha>" check: a build from a source tarball has none.
 
         // arrange
-        var expected = typeof(AssemblyDisplayVersion).Assembly.GetName().Version;
+        var expected = typeof(AssemblyDisplayVersionTests).Assembly.GetName().Version;
         var assembly = Assembly.Load(assemblyName);
 
         // act
