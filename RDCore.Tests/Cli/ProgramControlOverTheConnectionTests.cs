@@ -13,6 +13,8 @@ using OmniSharpLanguageServer = OmniSharp.Extensions.LanguageServer.Server.Langu
 
 namespace RDCore.Tests.Cli;
 
+#if SDK_SEAM // the server's own lifecycle receiver, registered as the language server registers it: ArrivalRequests and RDCoreLifecycleReceiver are internal to RDCore.SDK
+
 /// <summary>
 /// A program that runs under a debugger is paused and ended over the host's connection while the request that runs it runs. Each request waited for the one
 /// before it, and the request that runs a program is done when the program is: a pause or an end sent to a program that never ends waited forever.
@@ -191,3 +193,4 @@ public sealed class ProgramControlOverTheConnectionTests
         }
     }
 }
+#endif

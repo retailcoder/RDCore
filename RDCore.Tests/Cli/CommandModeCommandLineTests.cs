@@ -3,6 +3,8 @@ using RDCore.SDK.Server;
 
 namespace RDCore.Tests.Cli;
 
+#if SDK_SEAM // the hosts' answer asked of them: AppHost.TryAnswerCommandLine is protected internal in RDCore.SDK
+
 /// <summary>
 /// <c>rdc.exe &lt;verb&gt; …</c>: command mode. Its command line is a verb and the verb's own options, which is not the
 /// platform's command line, so the platform's parser has no business answering it.
@@ -49,3 +51,4 @@ public sealed class CommandModeCommandLineTests
         Assert.AreEqual(0, exitCode);
     }
 }
+#endif

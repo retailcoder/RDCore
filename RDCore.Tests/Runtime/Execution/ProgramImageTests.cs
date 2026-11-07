@@ -4,6 +4,8 @@ using RDCore.SDK.Semantics.Instructions;
 
 namespace RDCore.Tests.Runtime.Execution;
 
+#if SDK_SEAM // empty bodies, built by hand: InstructionList's constructor is internal to RDCore.SDK
+
 [TestClass]
 public sealed class ProgramImageTests
 {
@@ -66,3 +68,4 @@ public sealed class ProgramImageTests
         Assert.IsFalse(image.Unload(ModuleA));
     }
 }
+#endif

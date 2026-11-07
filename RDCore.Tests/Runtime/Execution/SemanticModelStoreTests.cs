@@ -170,6 +170,7 @@ public sealed class SemanticModelStoreTests
         Assert.IsNotNull(RuntimeOf(store));
     }
 
+#if SDK_SEAM // a thread count of the test's own: LargeStackThread.Start(work, threads, token) is internal to RDCore.SDK
     private static readonly TimeSpan HangGuard = TimeSpan.FromSeconds(30);
 
     // the evaluations run on one thread the test counts itself, and holds: the module's evaluation waits for it, as it waits when every LargeStackThread is busy.
@@ -237,4 +238,5 @@ public sealed class SemanticModelStoreTests
         Assert.AreEqual((0, 1), (first, second), "each evaluation runs at most once, and the replaced one never");
         Assert.IsFalse(RuntimeOf(store)!.IsFullyAnalyzed);
     }
+#endif
 }

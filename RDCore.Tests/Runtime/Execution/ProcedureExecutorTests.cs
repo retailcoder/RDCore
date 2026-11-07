@@ -390,6 +390,7 @@ public sealed class ProcedureExecutorTests
         Assert.AreEqual(2, session.Symbols.Resolver.GetValue(s).Value.BoxedValue); // last completed iteration
     }
 
+#if SDK_SEAM // a list lowering never makes, built by hand: InstructionList's constructor is internal to RDCore.SDK
     [TestMethod]
     public void ForNext_WithNoEnclosingForOpener_ReportsForLoopNotInitialized()
         // MS-VBAL 5.4.2.3: a GoTo landing directly on Next without its own For header ever running is
@@ -407,6 +408,7 @@ public sealed class ProcedureExecutorTests
         Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
         Assert.AreEqual((int)VBRuntimeErrorId.ForLoopNotInitialized, outcome.ErrorInfo!.ErrorId);
     }
+#endif
 
     private static VBFixedSizeArrayValue LongArray(params int[] values)
     {
@@ -600,6 +602,7 @@ public sealed class ProcedureExecutorTests
         Assert.AreEqual((int)VBRuntimeErrorId.TypeMismatch, outcome.ErrorInfo!.ErrorId);
     }
 
+#if SDK_SEAM // a list lowering never makes, built by hand: InstructionList's constructor is internal to RDCore.SDK
     [TestMethod]
     public void ForEachNext_WithNoEnclosingForEachOpener_ReportsForLoopNotInitialized()
         // Same shape as ForNext_WithNoEnclosingForOpener_ReportsForLoopNotInitialized - a GoTo landing
@@ -615,6 +618,7 @@ public sealed class ProcedureExecutorTests
         Assert.AreEqual(RuntimeExecutionOutcomeKind.Error, outcome.Kind);
         Assert.AreEqual((int)VBRuntimeErrorId.ForLoopNotInitialized, outcome.ErrorInfo!.ErrorId);
     }
+#endif
 
     [TestMethod]
     public void WhileWendLoop_RunsWhileTheConditionIsTrue()
