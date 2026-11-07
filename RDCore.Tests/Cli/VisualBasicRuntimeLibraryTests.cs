@@ -198,4 +198,28 @@ public sealed class VisualBasicRuntimeLibraryTests
         Assert.IsFalse(libraries.Priorities.ContainsKey("VB"));
         Assert.IsTrue(libraries.Priorities.ContainsKey("VBRUN"));
     }
+
+    // VB6.OLB and VBRUN each describe Licenses, as one dispatch interface of one identifier. The descriptions do not carry it: each is a class of its own
+    // library, and a variable of either takes the other.
+    [TestMethod]
+    public async Task AVariableOfTheLicensesOfEitherLibrary_TakesTheOther()
+    {
+        var ran = await RunVB6Async("Dim l As VB.Licenses", "Dim r As VBRUN.Licenses", "Set l = r", "Set r = l", "Debug.Print TypeName(l); TypeName(r); l Is r");
+
+        CollectionAssert.AreEqual(new[] { "NothingNothingTrue" }, ran.Output.ToArray());
+    }
+
+    // the class of VB6.OLB that its host is: its members are no names of the project (LibraryDescription.IsApplication). vb6.exe builds each of these, the
+    // name being a property of VB's Global.
+    [TestMethod]
+    [DataRow("Licenses")]
+    [DataRow("App")]
+    [DataRow("Screen")]
+    [DataRow("Forms")]
+    public async Task AVB6Project_APropertyOfVisualBasicsGlobal_IsNoNameOfTheProject(string name)
+    {
+        var errors = await LoadErrorsAsync([], Program("Dim o As Object", $"Set o = {name}"), NoneListed, SupportedLanguages.VB6);
+
+        CollectionAssert.AreEqual(new[] { $"Variable not defined: {name}" }, errors);
+    }
 }
