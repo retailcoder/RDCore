@@ -135,7 +135,11 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IV
                     Environment: new StaticEnvironment(session.Environment.Is64Bit) { Libraries = session.Libraries }));
 
             // the code paths are those of the lowered body, which only the loader has next to what the static pass found out about it.
-            procedureModels.Add(model with { ReturnValue = ReturnValueAnalysis.Of(declaration, model, lowering.InstructionList) });
+            procedureModels.Add(model with
+            {
+                ReturnValue = ReturnValueAnalysis.Of(declaration, model, lowering.InstructionList),
+                JumpsIntoLoops = JumpIntoLoopAnalysis.Of(lowering.InstructionList),
+            });
             procedures.Add(new(procedure.SemanticId, lowering.InstructionList));
             // a declaration that repeats another resolves to the symbol of the first, whose code is the one the session has: the repeat is an error of
             // the declarations, and its code is not evaluated for it.

@@ -149,6 +149,7 @@ public sealed class DiagnosticDocumentationTests
         (RDCoreDiagnosticId.ImplementsInDocumentModule, 11024),
         (RDCoreDiagnosticId.ArrayGivenASecondEmptyArgumentList, 11025),
         (RDCoreDiagnosticId.ObjectVariablePassedByRefIsACopy, 11026),
+        (RDCoreDiagnosticId.JumpIntoForLoop, 11030),
     ];
 
     [TestMethod]
