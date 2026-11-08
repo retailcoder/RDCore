@@ -251,7 +251,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                     observation?.Assume();
                 }
 
-                outcome = SweepInstruction(session, instructionContext, instruction, activation);
+                outcome = SweepInstruction(session, instructionContext, list, instruction, activation);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -287,7 +287,8 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
 
     // the outcome of evaluating the instruction, or null when there was nothing to evaluate. What an instruction does to the program counter is of
     // no interest here, and a Return, a Resume or an On Error evaluates no expression of the code.
-    private RuntimeExecutionOutcome? SweepInstruction(IRuntimeSession session, RuntimeEvaluationContext context, Instruction instruction, CallStackFrame activation)
+    private RuntimeExecutionOutcome? SweepInstruction(IRuntimeSession session, RuntimeEvaluationContext context, InstructionList list, Instruction instruction,
+        CallStackFrame activation)
         => instruction.Kind switch
         {
             InstructionKind.Simple => statements.Execute(session, context, instruction.Node!),
@@ -297,7 +298,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
             InstructionKind.EndWith => EndWithInSweep(session, instruction, activation),
             InstructionKind.Select => ExecuteSelect(session, context, instruction, activation),
             InstructionKind.ForOpener => ExecuteForOpener(session, context, instruction, activation),
-            InstructionKind.ForNext => ExecuteForNext(session, context, instruction, activation),
+            InstructionKind.ForNext => ExecuteForNext(session, context, list, instruction, activation),
             InstructionKind.ForEachOpener => ExecuteForEachOpener(session, context, instruction, activation),
             InstructionKind.ForEachNext => ExecuteForEachNext(session, context, instruction, activation),
             InstructionKind.RaiseError => ExecuteRaiseError(session, context, instruction),
@@ -526,7 +527,7 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
                     break;
 
                 case InstructionKind.ForNext:
-                    var forNextOutcome = ExecuteForNext(session, instructionContext, instruction, activation);
+                    var forNextOutcome = ExecuteForNext(session, instructionContext, list, instruction, activation);
                     if (forNextOutcome is { } stopForNext && InterceptError(session, activation, list, instruction.Offset, stopForNext) is { } unhandledForNext)
                     {
                         return unhandledForNext;
@@ -1098,31 +1099,77 @@ public sealed class ProcedureExecutor(IStatementRuntimeSemanticsProvider stateme
     private RuntimeExecutionOutcome Unevaluated(IRuntimeSession session, Instruction instruction, CallStackFrame activation, ForStatementNode forStatement,
         Symbol counterSymbol, VBType counterType, RuntimeExecutionOutcome failure)
     {
-        if (!activation.TryGetForLoopState(instruction.Offset, out _)
-            && forLoop.Operands(session, forStatement, counterType, new VBIntegerValue(0), new VBIntegerValue(0),
-                forStatement.StepExpression is null ? null : new VBIntegerValue(0), out var unset) is null)
+        if (!activation.TryGetForLoopState(instruction.Offset, out _))
         {
-            activation.SetForLoopState(instruction.Offset, new ForLoopState(counterSymbol, forStatement.ControlExpression, unset.End, unset.Step)
-            {
-                CountsDown = ForLoopEvaluator.CountsDown(unset.Step),
-                RuntimeState = new ForLoopPayloads(),
-            });
+            _ = TrySetUnsetState(session, instruction.Offset, activation, forStatement, counterSymbol, counterType, out _);
         }
 
         return failure;
     }
 
+    // the loop state of a For whose operands were never given to it: a 0 end, and a 0 step, or a step of 1 for a loop that writes none.
+    private bool TrySetUnsetState(IRuntimeSession session, int openerOffset, CallStackFrame activation, ForStatementNode forStatement,
+        Symbol counterSymbol, VBType counterType, out ForLoopState state)
+    {
+        if (forLoop.Operands(session, forStatement, counterType, new VBIntegerValue(0), new VBIntegerValue(0),
+                forStatement.StepExpression is null ? null : new VBIntegerValue(0), out var unset) is not null)
+        {
+            state = default;
+            return false;
+        }
+
+        state = new ForLoopState(counterSymbol, forStatement.ControlExpression, unset.End, unset.Step)
+        {
+            CountsDown = ForLoopEvaluator.CountsDown(unset.Step),
+            RuntimeState = new ForLoopPayloads(),
+        };
+        activation.SetForLoopState(openerOffset, state);
+        return true;
+    }
+
+    // MS-VBAL §5.4.2.3 has a Next whose For never ran raise error 92. MS-VBA raises it only for a counter declared Variant: a Next of any other counter
+    // steps it on the loop state of a For that was never given its operands, as a For whose operands raised an error leaves it (RD-VBAL §5.4.2.3; MS-VBA,
+    // recorded in Excel: oracle\s78).
+    private RuntimeExecutionOutcome? NeverOpened(IRuntimeSession session, RuntimeEvaluationContext context, InstructionList list, Instruction instruction,
+        CallStackFrame activation, out ForLoopState state)
+    {
+        state = default;
+        if (instruction.Matching is { } openerOffset && list.Items.ElementAtOrDefault(openerOffset)?.Node is ForStatementNode
+            {
+                ControlExpression: SimpleNameExpressionNode simpleName,
+            } forStatement)
+        {
+            if (session.Symbols.Resolver.ResolveValue(simpleName, ScopeKind.Local, context.Scope).Symbol is not { } counterSymbol)
+            {
+                return RuntimeExecutionOutcome.InternalError;
+            }
+
+            var counterType = counterSymbol is ITypedSymbol typed ? typed.ResolvedType : VBVariantType.TypeInfo;
+            if (counterType is not VBVariantType && TrySetUnsetState(session, openerOffset, activation, forStatement, counterSymbol, counterType, out state))
+            {
+                return null;
+            }
+        }
+
+        return RuntimeExecutionOutcome.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ForLoopNotInitialized,
+            instruction.Location ?? default, Exceptions.VBForLoopNotInitialized_Verbose));
+    }
+
     // Returns null when the counter was incremented and re-tested successfully and the loop should keep
     // running (activation.Pc branched back to the body, or fallen through past the loop); returns a
     // non-null outcome only when execution must stop.
-    private RuntimeExecutionOutcome? ExecuteForNext(IRuntimeSession session, RuntimeEvaluationContext context, Instruction instruction, CallStackFrame activation)
+    private RuntimeExecutionOutcome? ExecuteForNext(IRuntimeSession session, RuntimeEvaluationContext context, InstructionList list, Instruction instruction,
+        CallStackFrame activation)
     {
         if (instruction.Matching is not { } openerOffset || !activation.TryGetForLoopState(openerOffset, out var state))
         {
-            // MS-VBAL §5.4.2.3: a GoTo landed directly on this Next without its own ForOpener ever
-            // running this activation - error 92, "For loop not initialized".
-            return RuntimeExecutionOutcome.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ForLoopNotInitialized,
-                instruction.Location ?? default, Exceptions.VBForLoopNotInitialized_Verbose));
+            // a jump landed in the body, or on this Next, without its For ever running this activation.
+            if (NeverOpened(session, context, list, instruction, activation, out var unset) is { } notInitialized)
+            {
+                return notInitialized;
+            }
+
+            state = unset;
         }
 
         // a counter that holds a payload is stepped on payloads (IR lowering S1.2); a step that would raise an error is the boxed path's to raise.
