@@ -23,6 +23,9 @@ public sealed record class FormCreateParams : AutomationRequest
     /// <summary>Where a manual form's window is, from the top of the desktop, in points.</summary>
     public double Top { get; init; }
 
+    /// <summary>The controls the form's designer declares.</summary>
+    public SDK.Workspace.Forms.FormControlDescriptor[] Controls { get; init; } = [];
+
     /// <summary>The request for <paramref name="form"/>.</summary>
     /// <param name="form">The form.</param>
     /// <param name="handlingEvent">The event whose handler asks for it, if one does.</param>
@@ -34,11 +37,12 @@ public sealed record class FormCreateParams : AutomationRequest
         StartUpPosition = form.StartUpPosition,
         Left = form.Left,
         Top = form.Top,
+        Controls = [.. form.Controls],
         HandlingEvent = handlingEvent,
     };
 
     /// <summary>The form this request is for.</summary>
-    public FormDefinition ToDefinition() => new(Name, State) { Caption = Caption, StartUpPosition = StartUpPosition, Left = Left, Top = Top };
+    public FormDefinition ToDefinition() => new(Name, State) { Caption = Caption, StartUpPosition = StartUpPosition, Left = Left, Top = Top, Controls = Controls };
 }
 
 /// <summary>Request for <see cref="ExternalProtocol.FormShow"/>: <see cref="IFormHost.Show"/>.</summary>

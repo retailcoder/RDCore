@@ -49,6 +49,12 @@ public sealed record class FormDefinition(string Name, ReadOnlyMemory<byte> Stat
     public bool ShowModal { get; init; } = true;
 
     /// <summary>
+    /// The controls the form's designer declares, as the language server read them: what a form host that does not read the designer's state itself builds the
+    /// form from.
+    /// </summary>
+    public IReadOnlyList<SDK.Workspace.Forms.FormControlDescriptor> Controls { get; init; } = [];
+
+    /// <summary>
     /// The definition of the form a form module's designer declares: its state, and what its designer block says of its window.
     /// </summary>
     /// <param name="name">The name of the form's module.</param>
@@ -60,6 +66,7 @@ public sealed record class FormDefinition(string Name, ReadOnlyMemory<byte> Stat
         Left = PointsOf(designer.Properties.GetValueOrDefault("Left")),
         Top = PointsOf(designer.Properties.GetValueOrDefault("Top")),
         ShowModal = designer.ShowModal ?? true,
+        Controls = designer.Controls,
     };
 
     private static double PointsOf(string? value)

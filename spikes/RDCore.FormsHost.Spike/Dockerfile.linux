@@ -1,0 +1,22 @@
+# Spike S3 on Linux: the Avalonia forms host under Xvfb (X11), driven by the spike test. Build from the repository root:
+#   docker build -f spikes/RDCore.FormsHost.Spike/Dockerfile.linux -t rdforms-spike .
+#   docker run --rm rdforms-spike            (X11 under Xvfb)
+#   docker run --rm -e RDFORMS_SPIKE_HEADLESS=1 rdforms-spike    (Avalonia's headless platform)
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends xvfb xauth libx11-6 libice6 libsm6 libfontconfig1 libxrandr2 libxi6 libxcursor1 libxext6 fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN dotnet build spikes/RDCore.FormsHost.Spike/RDCore.FormsHost.Spike.csproj -c Debug -v q -nologo \
+ && dotnet build RDCore.Tests/RDCore.Tests.csproj -c Debug -v q -nologo
+
+ENV RDFORMS_SPIKE_HOST_DIR=/src/spikes/RDCore.FormsHost.Spike/bin/Debug/net10.0 \
+    RDFORMS_SPIKE_TRACE=/tmp/trace.txt
+
+CMD xvfb-run -a -s "-screen 0 1280x1024x24" \
+      dotnet test RDCore.Tests/RDCore.Tests.csproj --no-build -nologo --filter "FullyQualifiedName~AvaloniaFormsHostSpikeTests" --logger "console;verbosity=detailed"; \
+    status=$?; echo "----- host trace -----"; cat /tmp/trace.txt; exit $status
