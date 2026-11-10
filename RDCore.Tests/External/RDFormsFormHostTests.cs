@@ -221,6 +221,18 @@ public sealed class RDFormsFormHostTests
     }
 
     [TestMethod]
+    public void AFormLetGoOfByItsServer_IsDestroyed_AsAnExternalHostsRemoteFormHostDestroysIt()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        host.Show(form, modal: false);
+
+        host.Server.Release(form);
+
+        Assert.ThrowsExactly<AutomationException>(() => host.IsShown(form));
+    }
+
+    [TestMethod]
     public void AUserForm_IsNotRDFormsToHost()
     {
         var failure = Assert.ThrowsExactly<AutomationException>(() => Host().Create(new FormDefinition("UserForm1", ReadOnlyMemory<byte>.Empty)));

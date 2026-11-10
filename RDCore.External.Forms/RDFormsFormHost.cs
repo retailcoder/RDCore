@@ -21,9 +21,6 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
     private const int ClassNotRegistered = unchecked((int)0x80040154);
     private const int Failed = unchecked((int)0x80004005);
 
-    // the forms that are not destroyed, which a modal one keeps from being used. Touched on the UI thread only.
-    private readonly List<RDFormsForm> _forms = [];
-
     /// <summary>
     /// The server the forms are objects of.
     /// </summary>
@@ -51,17 +48,24 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
         return RDFormsUI.Run(() =>
         {
             var hosted = new RDFormsForm(new Model.FormDefinition(root));
-            _forms.Add(hosted);
+            Server.Forms.Add(hosted);
             return hosted.Handle;
         });
     }
 
-    // the form's model: the one its designer's text declares, or, with no text, an empty form with the caption its designer gives it.
+    // the size of a new Visual Basic 6.0 form's client area, in twips: what the designer writes for one (ClientWidth = 4680, ClientHeight = 3195).
+    private const double NewFormWidth = 4680;
+    private const double NewFormHeight = 3195;
+
+    // the form's model: the one its designer's text declares, or, with no text, an empty form of a new form's size, with the caption its designer gives it.
     private static ComponentInstance RootOf(FormDefinition form)
     {
         if (form.DesignerText is not { } text)
         {
-            return new ComponentInstance(VBClasses.Form, form.Name).Set(VBProperties.Caption, form.Caption ?? form.Name);
+            return new ComponentInstance(VBClasses.Form, form.Name)
+                .Set(VBProperties.Caption, form.Caption ?? form.Name)
+                .Set(VBProperties.Width, NewFormWidth)
+                .Set(VBProperties.Height, NewFormHeight);
         }
 
         var import = VB6FormReader.Read(text, form.State.IsEmpty ? null : form.State.ToArray());
@@ -88,7 +92,7 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
             RDFormsAutomationServer.Alive(hosted.Handle);
             if (modal)
             {
-                hosted.ShowModal(_forms.Where(other => !ReferenceEquals(other, hosted)));
+                hosted.ShowModal(Server.Forms.Where(other => !ReferenceEquals(other, hosted)));
             }
             else
             {
@@ -155,22 +159,16 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
     /// <inheritdoc/>
     public void Destroy(object form)
     {
-        if (form is not RDFormsObject { IsForm: true } handle)
+        if (form is RDFormsObject { IsForm: true } handle)
         {
-            return;
+            Server.Destroy(handle.Form);
         }
-
-        RDFormsUI.Run(() =>
-        {
-            handle.Form.Destroy();
-            _ = _forms.Remove(handle.Form);
-        });
     }
 
     /// <inheritdoc/>
     public void DoEvents()
     {
-        if (_forms.Count > 0)
+        if (Server.Forms.Count > 0)
         {
             RDFormsUI.Run(RDFormsUI.Pump);
         }

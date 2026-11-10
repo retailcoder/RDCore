@@ -135,8 +135,21 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     /// <inheritdoc/>
     public void Release(object handle)
     {
-        // a form's objects are the form's, and go with it when its host destroys it.
+        // a form is destroyed when it is let go of, as a UserForm of the platform's own server is; a control is the form's, and goes with it.
+        if (handle is RDFormsObject { IsForm: true } form)
+        {
+            Destroy(form.Form);
+        }
     }
+
+    // the forms that are not destroyed, which a modal one keeps from being used. Touched on the UI thread only.
+    internal List<RDFormsForm> Forms { get; } = [];
+
+    internal void Destroy(RDFormsForm form) => RDFormsUI.Run(() =>
+    {
+        form.Destroy();
+        _ = Forms.Remove(form);
+    });
 
     internal static RDFormsObject HandleOf(object target)
         => target as RDFormsObject ?? throw new AutomationException(unchecked((int)0x80020005), "The object is not one of RDForms.");
