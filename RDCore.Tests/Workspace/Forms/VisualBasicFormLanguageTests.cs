@@ -275,6 +275,55 @@ public sealed class VisualBasicFormLanguageTests
         Assert.AreNotEqual("0", error.Split('|')[0], error);
     }
 
+    // the outside world of an external host that hosts its VB6 forms with RDForms, headless, and has no other server: the composition rdc's external host makes.
+    private static RDCore.External.ExternalWorld RDFormsWorld(RDCore.External.Forms.RDForms.VisualBasicFormsHost host = RDCore.External.Forms.RDForms.VisualBasicFormsHost.RDForms)
+    {
+        var (automation, forms) = RDCore.External.Forms.RDForms.RDFormsHosting.Compose(
+            RDCore.External.Automation.UnavailableAutomationServer.Instance,
+            RDCore.External.Forms.UnavailableFormHost.Instance,
+            new RDCore.External.Forms.RDForms.FormsOptions { VB = host, Headless = true });
+        return new RDCore.External.ExternalWorld(automation, RDCore.External.Native.UnavailableNativeLibraryHost.Instance) { Forms = forms };
+    }
+
+    private static Task<string[]> RunWithRDFormsAsync(string main, RDCore.External.ExternalWorld? world = null)
+        => ModuleWorkspace.RunAsync(
+            [], $"Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\n{main}\r\nEnd Sub\r\n",
+            Libraries() with { Outside = world ?? RDFormsWorld() }, [FormModule(Form())], SupportedLanguages.VB6);
+
+    [TestMethod]
+    public async Task AVB6Form_HostedByRDForms_IsShownModelessByAShowThatSaysNothing_AndHidden()
+    {
+        var printed = await RunWithRDFormsAsync("Form1.Show\r\nDebug.Print Form1.Visible\r\nForm1.Hide\r\nDebug.Print Form1.Visible\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "True", "False" }, printed);
+    }
+
+    [TestMethod]
+    public async Task AVB6FormsCaption_HostedByRDForms_IsItsDesignersUntilTheProgramSetsIt()
+    {
+        var printed = await RunWithRDFormsAsync("Debug.Print Form1.Caption\r\nForm1.Caption = \"Hello\"\r\nDebug.Print Form1.Caption\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "Form1", "Hello" }, printed);
+    }
+
+    [TestMethod]
+    public async Task AVB6FormsOwnProperty_HostedByRDForms_IsReadAndWrittenOnItsModel()
+    {
+        var printed = await RunWithRDFormsAsync("Form1.Tag = \"tagged\"\r\nDebug.Print Form1.Tag\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "tagged" }, printed);
+    }
+
+    [TestMethod]
+    public async Task AVB6Form_WithRDFormsTurnedOff_IsATrappableRunTimeError_AsWithNothingToHostIt()
+    {
+        var printed = await RunWithRDFormsAsync(
+            "On Error Resume Next\r\nForm1.Show\r\nDebug.Print Err.Number",
+            RDFormsWorld(RDCore.External.Forms.RDForms.VisualBasicFormsHost.Off));
+
+        Assert.AreNotEqual("0", Assert.ContainsSingle(printed));
+    }
+
     // ---- completion ----
 
     private static async Task<string[]> CompletionAtAsync(string form)

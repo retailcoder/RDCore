@@ -257,13 +257,14 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
         return created;
     }
 
-    // Show [Modal]: vbModal unless it says vbModeless, and as the designer's ShowModal says when it says nothing. A modal form is waited for, and the program gives its
-    // turn up while it does: what the form raises meanwhile is the answer to the call.
+    // Show [Modal]: modal when it says vbModal, and as the designer's ShowModal says when it says nothing: a UserForm's is True unless its designer says otherwise,
+    // and a Visual Basic 6.0 form has none, and is shown modeless (vbModeless). A modal form is waited for, and the program gives its turn up while it does: what the
+    // form raises meanwhile is the answer to the call.
     private RuntimeSemanticsEvaluationResult Show(object hosted, ExternalCallRequest request, string form)
     {
         var modal = request.Arguments.Length > 1 && VariantOf(request.Arguments[1]) is { } argument and not VBMissingValue
             ? Convert.ToInt32(argument.RuntimeValue.BoxedValue, System.Globalization.CultureInfo.InvariantCulture) != 0
-            : !forms.TryGetValue(form, out var designer) || (designer.ShowModal ?? true);
+            : !forms.TryGetValue(form, out var designer) || (designer.ShowModal ?? designer.Kind != SDK.Workspace.Forms.FormDesignerKind.VisualBasic6);
 
         using (session.Turn.Yield())
         {
