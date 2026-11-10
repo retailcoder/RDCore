@@ -252,7 +252,7 @@ public sealed class RDFormsFormHostTests
                 automation.Invoke(form, "Text1", AutomationInvocation.Get, [], [], CultureInfo.InvariantCulture)!, "Text", AutomationInvocation.Get, [], [],
                 CultureInfo.InvariantCulture));
             Assert.AreEqual("Designed", forms.GetCaption(form));
-            Assert.IsFalse(automation.IsAvailable, "the platform's servers are what an environment host is told of");
+            Assert.IsTrue(automation.IsAvailable, "RDForms' objects are there to reach, with no automation server on the platform");
 
             var userForm = Assert.ThrowsExactly<AutomationException>(() => forms.Create(new FormDefinition("UserForm1", ReadOnlyMemory<byte>.Empty)));
             var created = Assert.ThrowsExactly<AutomationException>(() => automation.CreateObject("Scripting.Dictionary"));
