@@ -20,6 +20,8 @@ using RDCore.CLI.Themes;
 using RDCore.External;
 using RDCore.External.Automation;
 using RDCore.External.Client;
+using RDCore.External.Forms;
+using RDCore.External.Forms.RDForms;
 using RDCore.External.Hosting;
 using RDCore.External.Native;
 using RDCore.External.Windows.Automation;
@@ -569,21 +571,24 @@ internal class RDCoreConsoleExternalHost : RDCorePlatformServerHost<ExternalHost
     {
         base.ConfigureAdditionalExternalServices(services, configuration);
         services
-            .AddSingleton(AutomationService())
+            .AddSingleton(AutomationService(configuration.GetSection("Configuration:Forms").Get<FormsOptions>() ?? new FormsOptions()))
             .AddSingleton(new NativeCallService(
                 OperatingSystem.IsWindows() ? new WindowsNativePlatform() : UnsupportedNativePlatform.Instance));
     }
 
-    // on Windows, the servers and the form host live on one apartment: a form's controls are objects of the servers, called on the thread its window is pumped on.
-    private static ExternalAutomationService AutomationService()
+    // on Windows, the servers and the UserForms' host live on one apartment: a UserForm's controls are objects of the servers, called on the thread its window is
+    // pumped on. The RDForms forms are beside them, on a UI thread of their own, and their objects need no apartment.
+    private static ExternalAutomationService AutomationService(FormsOptions options)
     {
         if (!OperatingSystem.IsWindows())
         {
-            return new ExternalAutomationService(UnavailableAutomationServer.Instance);
+            var (anywhere, forms) = RDFormsHosting.Compose(UnavailableAutomationServer.Instance, UnavailableFormHost.Instance, options);
+            return new ExternalAutomationService(anywhere, forms);
         }
 
         var apartment = new ComApartment();
-        return new ExternalAutomationService(new ComAutomationServer(apartment), new WindowsFormHost(apartment));
+        var (automation, host) = RDFormsHosting.Compose(new ComAutomationServer(apartment), new WindowsFormHost(apartment), options);
+        return new ExternalAutomationService(automation, host);
     }
 
     protected override string? LogFileName => "RDCore.ExternalHost.log";

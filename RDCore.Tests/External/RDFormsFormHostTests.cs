@@ -1,0 +1,265 @@
+using RDCore.External.Automation;
+using RDCore.External.Forms;
+using RDCore.External.Forms.RDForms;
+using RDCore.SDK.Workspace.Forms;
+using System.Globalization;
+
+namespace RDCore.Tests.External;
+
+/// <summary>
+/// The RDForms form host and its automation server: a Visual Basic 6.0 form read from its designer's text, in a headless RDForms window, its controls reached by
+/// name, their properties read and written, their events raised to the sink a program advises; and how an external host routes forms and objects between RDForms
+/// and its platform's own servers.
+/// </summary>
+[TestClass]
+[TestCategory("External host")]
+public sealed class RDFormsFormHostTests
+{
+    private const string Designer =
+        "VERSION 5.00\r\n" +
+        "Begin VB.Form Form1 \r\n" +
+        "   Caption         =   \"Designed\"\r\n" +
+        "   ClientHeight    =   3195\r\n" +
+        "   ClientWidth     =   4680\r\n" +
+        "   Begin VB.TextBox Text1 \r\n" +
+        "      Height          =   285\r\n" +
+        "      Left            =   120\r\n" +
+        "      TabIndex        =   0\r\n" +
+        "      Text            =   \"Text1\"\r\n" +
+        "      Top             =   120\r\n" +
+        "      Width           =   1215\r\n" +
+        "   End\r\n" +
+        "End\r\n" +
+        "Attribute VB_Name = \"Form1\"\r\n";
+
+    private sealed class Recorder : IAutomationEventSink
+    {
+        public List<(string Name, bool IsSynchronous)> Raised { get; } = [];
+
+        public Action<AutomationEvent>? Handler { get; init; }
+
+        public void OnEvent(AutomationEvent raised)
+        {
+            lock (Raised)
+            {
+                Raised.Add((raised.Name, raised.IsSynchronous));
+            }
+
+            Handler?.Invoke(raised);
+        }
+    }
+
+    private static RDFormsFormHost Host() => new(new RDFormsAutomationServer(RDFormsPlatform.Headless));
+
+    private static FormDefinition VisualBasicForm(string? designer = Designer)
+        => new("Form1", ReadOnlyMemory<byte>.Empty) { Kind = FormDesignerKind.VisualBasic6, Caption = "Form1", DesignerText = designer };
+
+    private static object? Get(RDFormsFormHost host, object target, string member)
+        => host.Server.Invoke(target, member, AutomationInvocation.Get, [], [], CultureInfo.InvariantCulture);
+
+    private static void Let(RDFormsFormHost host, object target, string member, object? value)
+        => host.Server.Invoke(target, member, AutomationInvocation.Let, [value], [false], CultureInfo.InvariantCulture);
+
+    [TestMethod]
+    public void AVisualBasicForm_IsReadFromItsDesignerText_AndItsControlsAreReachedByName()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            var text = Get(host, form, "Text1")!;
+
+            Assert.AreEqual("Designed", host.GetCaption(form));
+            Assert.AreEqual("Text1", Get(host, text, "Text"));
+            Assert.AreEqual("VB.TextBox", host.Server.ClassNameOf(text));
+            Assert.AreEqual("VB.Form", host.Server.ClassNameOf(form));
+            Assert.IsTrue(host.Server.IsInstanceOf(text, "VB", "TextBox"));
+            Assert.AreSame(text, Get(host, form, "Text1"), "a control asked for twice is one object");
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AVisualBasicForm_WithNoDesignerText_IsAnEmptyForm_WithTheCaptionItIsGiven()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm(designer: null));
+        try
+        {
+            Assert.AreEqual("Form1", host.GetCaption(form));
+            var failure = Assert.ThrowsExactly<AutomationException>(() => Get(host, form, "Text1"));
+            Assert.AreEqual(unchecked((int)0x80020006), failure.HResult, "DISP_E_UNKNOWNNAME: error 438");
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AFormsCaption_IsItsOwnCaptionProperty()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            host.SetCaption(form, "Set by the host");
+            Assert.AreEqual("Set by the host", Get(host, form, "Caption"));
+
+            Let(host, form, "Caption", "Set by the program");
+            Assert.AreEqual("Set by the program", host.GetCaption(form));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AssigningAControlsProperty_RaisesItsEvent_InsideTheCall()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            host.Show(form, modal: false);
+            var text = Get(host, form, "Text1")!;
+            var sink = new Recorder();
+            host.Server.Advise(text, sink);
+
+            Let(host, text, "Text", "typed");
+
+            Assert.AreEqual("typed", Get(host, text, "Text"));
+            Assert.AreEqual(("Change", true), Assert.ContainsSingle(sink.Raised), "raised by the program's own call, the event is its answer");
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AValueAPropertyCannotTake_IsError380_AndOneOfTheWrongType_Error13()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            var text = Get(host, form, "Text1")!;
+
+            var invalid = Assert.ThrowsExactly<AutomationException>(() => Let(host, text, "Alignment", 7));
+            var mismatch = Assert.ThrowsExactly<AutomationException>(() => Let(host, text, "Width", "wide"));
+
+            Assert.AreEqual(unchecked((int)0x800A017C), invalid.HResult, "error 380");
+            Assert.AreEqual(unchecked((int)0x80020005), mismatch.HResult, "DISP_E_TYPEMISMATCH: error 13");
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public async Task AFormShownModal_WaitsUntilItIsHidden()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            // the window raises Resize inside its first Show, before the wait begins: the hide asked for once it has is made while the form waits.
+            using var shown = new ManualResetEventSlim();
+            host.Server.Advise(form, new Recorder { Handler = raised => { if (raised.Name == "Resize") { shown.Set(); } } });
+
+            var showing = Task.Run(() => host.Show(form, modal: true));
+            shown.Wait();
+            Assert.IsTrue(host.IsShown(form), "asked while the form waits");
+            host.Hide(form);
+            await showing;
+
+            Assert.IsFalse(host.IsShown(form));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AFormHiddenByAHandlerOfItsFirstResize_IsNotWaitedFor()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            host.Server.Advise(form, new Recorder { Handler = raised => { if (raised.Name == "Resize") { host.Hide(form); } } });
+
+            host.Show(form, modal: true);
+
+            Assert.IsFalse(host.IsShown(form));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void ADestroyedForm_IsNoLongerAnObject()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        var text = Get(host, form, "Text1")!;
+
+        host.Destroy(form);
+        host.Destroy(form);
+
+        Assert.ThrowsExactly<AutomationException>(() => Get(host, text, "Text"));
+        Assert.ThrowsExactly<AutomationException>(() => host.Show(form, modal: false));
+    }
+
+    [TestMethod]
+    public void AUserForm_IsNotRDFormsToHost()
+    {
+        var failure = Assert.ThrowsExactly<AutomationException>(() => Host().Create(new FormDefinition("UserForm1", ReadOnlyMemory<byte>.Empty)));
+
+        Assert.AreEqual(unchecked((int)0x80040154), failure.HResult, "REGDB_E_CLASSNOTREG: error 429");
+    }
+
+    [TestMethod]
+    public void AnExternalHost_HostsVisualBasicFormsWithRDForms_AndUserFormsWithItsPlatform()
+    {
+        var (automation, forms) = RDFormsHosting.Compose(UnavailableAutomationServer.Instance, UnavailableFormHost.Instance, new FormsOptions { Headless = true });
+
+        var form = forms.Create(VisualBasicForm());
+        try
+        {
+            Assert.AreEqual("Text1", automation.Invoke(
+                automation.Invoke(form, "Text1", AutomationInvocation.Get, [], [], CultureInfo.InvariantCulture)!, "Text", AutomationInvocation.Get, [], [],
+                CultureInfo.InvariantCulture));
+            Assert.AreEqual("Designed", forms.GetCaption(form));
+            Assert.IsFalse(automation.IsAvailable, "the platform's servers are what an environment host is told of");
+
+            var userForm = Assert.ThrowsExactly<AutomationException>(() => forms.Create(new FormDefinition("UserForm1", ReadOnlyMemory<byte>.Empty)));
+            var created = Assert.ThrowsExactly<AutomationException>(() => automation.CreateObject("Scripting.Dictionary"));
+            Assert.AreEqual(unchecked((int)0x80040154), userForm.HResult);
+            Assert.AreEqual(unchecked((int)0x80040154), created.HResult);
+        }
+        finally
+        {
+            forms.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AnExternalHost_WithRDFormsTurnedOff_HostsNoVisualBasicForm()
+    {
+        var (_, forms) = RDFormsHosting.Compose(UnavailableAutomationServer.Instance, UnavailableFormHost.Instance, new FormsOptions { VB = VisualBasicFormsHost.Off });
+
+        var failure = Assert.ThrowsExactly<AutomationException>(() => forms.Create(VisualBasicForm()));
+
+        Assert.AreEqual(unchecked((int)0x80040154), failure.HResult);
+    }
+}
