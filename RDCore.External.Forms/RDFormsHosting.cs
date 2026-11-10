@@ -65,8 +65,8 @@ public static class RDFormsHosting
     // the objects of RDForms to RDForms, by their handles, and everything else to the platform's server: creating an object by its name included.
     private sealed class RoutingAutomationServer(RDFormsAutomationServer forms, IAutomationServer platform) : IAutomationServer
     {
-        // RDForms' objects are there to reach on any platform, the controls of its forms included; what the platform's server cannot do, it says when asked
-        // (429, as on a machine with no automation servers).
+        // RDForms' objects are there to reach on any platform, the controls of its forms included; an object the platform's server cannot create raises 429
+        // when it is asked for, as on a machine with no automation servers.
         public bool IsAvailable => true;
 
         public void Prepare() => platform.Prepare();
