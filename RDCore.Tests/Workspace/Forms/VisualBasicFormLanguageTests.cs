@@ -285,10 +285,10 @@ public sealed class VisualBasicFormLanguageTests
         return new RDCore.External.ExternalWorld(automation, RDCore.External.Native.UnavailableNativeLibraryHost.Instance) { Forms = forms };
     }
 
-    private static Task<string[]> RunWithRDFormsAsync(string main, RDCore.External.ExternalWorld? world = null)
+    private static Task<string[]> RunWithRDFormsAsync(string main, RDCore.External.ExternalWorld? world = null, string? form = null)
         => ModuleWorkspace.RunAsync(
             [], $"Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\n{main}\r\nEnd Sub\r\n",
-            Libraries() with { Outside = world ?? RDFormsWorld() }, [FormModule(Form())], SupportedLanguages.VB6);
+            Libraries() with { Outside = world ?? RDFormsWorld() }, [FormModule(form ?? Form())], SupportedLanguages.VB6);
 
     [TestMethod]
     public async Task AVB6Form_HostedByRDForms_IsShownModelessByAShowThatSaysNothing_AndHidden()
@@ -315,6 +315,32 @@ public sealed class VisualBasicFormLanguageTests
     }
 
     [TestMethod]
+    public async Task AVB6FormsControls_HostedByRDForms_HaveTheirDesignersProperties()
+    {
+        var printed = await RunWithRDFormsAsync("Debug.Print Form1.Command1.Caption\r\nDebug.Print Form1.Text1.Text\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "Command1", "Text1" }, printed);
+    }
+
+    [TestMethod]
+    public async Task AVB6FormsControl_HostedByRDForms_KeepsWhatTheProgramSetsIt()
+    {
+        var printed = await RunWithRDFormsAsync("Form1.Text1.Text = \"typed\"\r\nDebug.Print Form1.Text1.Text\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "typed" }, printed);
+    }
+
+    [TestMethod]
+    public async Task AVB6FormsControlsEvent_HostedByRDForms_IsHandledByTheFormsHandler()
+    {
+        // setting a TextBox's Text from code raises its Change, in VB6 as in a UserForm.
+        var form = Form("Private Sub Text1_Change()", "Debug.Print \"changed \" & Text1.Text", "End Sub");
+        var printed = await RunWithRDFormsAsync("Form1.Text1.Text = \"typed\"\r\nUnload Form1", form: form);
+
+        CollectionAssert.AreEqual(new[] { "changed typed" }, printed);
+    }
+
+    [TestMethod]
     public async Task AVB6Form_WithRDFormsTurnedOff_IsATrappableRunTimeError_AsWithNothingToHostIt()
     {
         var printed = await RunWithRDFormsAsync(
@@ -322,6 +348,14 @@ public sealed class VisualBasicFormLanguageTests
             RDFormsWorld(RDCore.External.Forms.RDForms.VisualBasicFormsHost.Off));
 
         Assert.AreNotEqual("0", Assert.ContainsSingle(printed));
+    }
+
+    [TestMethod]
+    public async Task AnObjectByName_WithRDFormsAndNoAutomationServer_IsError429_AsWithNoFormHost()
+    {
+        var printed = await RunWithRDFormsAsync("On Error Resume Next\r\nDim x As Object\r\nSet x = CreateObject(\"Scripting.Dictionary\")\r\nDebug.Print Err.Number");
+
+        CollectionAssert.AreEqual(new[] { "429" }, printed);
     }
 
     // ---- completion ----

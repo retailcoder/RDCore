@@ -69,6 +69,7 @@ public sealed record class FormDefinition(string Name, ReadOnlyMemory<byte> Stat
     public static FormDefinition Of(string name, SDK.Workspace.Forms.FormDescriptor designer) => new(name, designer.State)
     {
         Kind = designer.Kind,
+        DesignerText = designer.DesignerText,
         Caption = designer.Caption,
         StartUpPosition = designer.StartUpPosition is { } position && Enum.IsDefined((FormStartUpPosition)position) ? (FormStartUpPosition)position : FormStartUpPosition.CenterOwner,
         Left = PointsOf(designer.Properties.GetValueOrDefault("Left")),
