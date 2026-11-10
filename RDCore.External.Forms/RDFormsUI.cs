@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using RDCore.External.Automation;
+using RDCore.Forms.Avalonia;
 
 namespace RDCore.External.Forms.RDForms;
 
@@ -106,15 +107,11 @@ internal static class RDFormsUI
         }
     }
 
+    // RDForms' own application, which its controls' look is made for, on the platform asked for.
     private static AppBuilder BuilderFor(RDFormsPlatform platform) => platform switch
     {
-        RDFormsPlatform.Headless => AppBuilder.Configure<RDFormsApplication>()
-            .UseSkia()
-            .WithInterFont()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false }),
-        _ => AppBuilder.Configure<RDFormsApplication>()
-            .UsePlatformDetect()
-            .WithInterFont(),
+        RDFormsPlatform.Headless => RDFormsApplication.Configure().UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false }),
+        _ => RDFormsApplication.Configure().UsePlatformDetect(),
     };
 
     // makes a call of the program on the UI thread, and answers what it returned. What fails there fails the call, as a server's failure does.

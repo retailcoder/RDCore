@@ -3,7 +3,6 @@ using RDCore.External.Automation;
 using RDCore.Forms.Avalonia.Controls;
 using RDCore.Forms.Avalonia.Rendering;
 using RDCore.Forms.Model;
-using RDCore.Forms.Model.VB;
 using Model = RDCore.Forms.Model;
 
 namespace RDCore.External.Forms.RDForms;
@@ -24,8 +23,6 @@ internal sealed class RDFormsObject(RDFormsForm form, ComponentInstance componen
 // a form hosted in an RDForms window: its model, its window, the handles of its components, and where their events go. Made and used on the UI thread only.
 internal sealed class RDFormsForm : IComponentEventSink
 {
-    private const int CancelUnload = 1;
-
     private readonly Dictionary<ComponentInstance, RDFormsObject> _handles = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ComponentInstance, IAutomationEventSink> _sinks = new(ReferenceEqualityComparer.Instance);
     private DispatcherFrame? _modal;
@@ -33,7 +30,7 @@ internal sealed class RDFormsForm : IComponentEventSink
     public RDFormsForm(Model.FormDefinition model)
     {
         Model = model;
-        Window = new VBFormWindow(model);
+        Window = new VBFormWindow(model) { UnloadRequestHandler = AskToUnload };
         VBControl.SetEventSink(Window, this);
         Handle = HandleOf(model.Root);
     }
@@ -125,12 +122,6 @@ internal sealed class RDFormsForm : IComponentEventSink
     // control reads back.
     public void Raise(ComponentInstance source, EventDefinition definition, FormValue[] arguments)
     {
-        if (ReferenceEquals(source, Model.Root) && ReferenceEquals(definition, VBEvents.QueryUnload))
-        {
-            AskToClose(arguments);
-            return;
-        }
-
         if (!_sinks.TryGetValue(source, out var sink))
         {
             return;
@@ -144,16 +135,21 @@ internal sealed class RDFormsForm : IComponentEventSink
         }
     }
 
-    // the window is asked to close, by its user or by the desktop: closing a form is the program's to decide and to do, as Unload does, so the window stays and the
-    // program is asked. A form no program listens to has nothing to ask, and closes.
-    private void AskToClose(FormValue[] arguments)
+    // the window was asked to close, by its user, the desktop or its owner (the UnloadMode says which): closing a form is the program's to decide and to do, as Unload
+    // does, so the window stays open and raises nothing, and the program is asked. A form no program listens to has nothing to ask, and closes.
+    private void AskToUnload(int mode)
     {
-        if (!_sinks.TryGetValue(Model.Root, out var sink))
+        if (IsDestroyed)
         {
             return;
         }
 
-        arguments[0] = FormValue.FromInteger(CancelUnload);
-        sink.OnEvent(new AutomationEvent(FormWindowEvents.Close, [], RDFormsUI.IsInCall, _ => RDFormsUI.Pump()));
+        if (!_sinks.TryGetValue(Model.Root, out var sink))
+        {
+            Window.Close();
+            return;
+        }
+
+        sink.OnEvent(new AutomationEvent(FormWindowEvents.Close, [(short)mode], RDFormsUI.IsInCall, _ => RDFormsUI.Pump()));
     }
 }

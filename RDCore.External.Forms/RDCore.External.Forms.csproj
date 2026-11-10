@@ -19,13 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- the RDForms model and its Avalonia windows, and what starts Avalonia: a desktop platform, the headless one, a theme and a font. -->
+    <!-- the RDForms model, its Avalonia windows and its application, and the platforms the host starts that application on: the desktop's, and the headless one. -->
     <PackageReference Include="RDCore.Forms" Version="$(RDCoreFormsVersion)" />
     <PackageReference Include="RDCore.Forms.Avalonia" Version="$(RDCoreFormsVersion)" />
     <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Headless" Version="$(AvaloniaVersion)" />
-    <PackageReference Include="Avalonia.Themes.Simple" Version="$(AvaloniaVersion)" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
   </ItemGroup>
 
 </Project>
