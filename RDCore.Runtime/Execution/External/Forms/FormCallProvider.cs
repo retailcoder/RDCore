@@ -143,7 +143,8 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
                 ("CAPTION", "get") => RuntimeSemanticsEvaluationResult.Success(new VBStringValue(outside.Forms.GetCaption(hosted))),
                 ("CAPTION", "let") => Done(() => outside.Forms.SetCaption(hosted, StringOf(request.Arguments[^1]))),
                 ("VISIBLE", "get") => RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(outside.Forms.IsShown(hosted))),
-                // the members of the VBA form object that its form host adds to a UserForm; a Visual Basic 6.0 form's own object model has them, and its server calls them.
+                // a member of the VBA form object that the form host does not host raises 438 on a UserForm; a Visual Basic 6.0 form's own object model
+                // has it, and its server calls it.
                 _ when FormObjectMembers.Contains(member) && !IsVisualBasic6(form) => RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
                     VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, request.CallSite, $"{request.Describe()}: the form host does not host '{member}' yet.")),
 
