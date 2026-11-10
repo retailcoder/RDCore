@@ -53,19 +53,12 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
         });
     }
 
-    // the size of a new Visual Basic 6.0 form's client area, in twips: what the designer writes for one (ClientWidth = 4680, ClientHeight = 3195).
-    private const double NewFormWidth = 4680;
-    private const double NewFormHeight = 3195;
-
-    // the form's model: the one its designer's text declares, or, with no text, an empty form of a new form's size, with the caption its designer gives it.
+    // the form's model: the one its designer's text declares, or, with no text, an empty form with the caption its designer gives it.
     private static ComponentInstance RootOf(FormDefinition form)
     {
         if (form.DesignerText is not { } text)
         {
-            return new ComponentInstance(VBClasses.Form, form.Name)
-                .Set(VBProperties.Caption, form.Caption ?? form.Name)
-                .Set(VBProperties.Width, NewFormWidth)
-                .Set(VBProperties.Height, NewFormHeight);
+            return new ComponentInstance(VBClasses.Form, form.Name).Set(VBProperties.Caption, form.Caption ?? form.Name);
         }
 
         var import = VB6FormReader.Read(text, form.State.IsEmpty ? null : form.State.ToArray());
