@@ -73,8 +73,9 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
             return [];
         }
 
-        // a form is created from what its designer declares when the program first uses it, whether or not its code loads: Form1.Show shows a form with no code.
-        image.DefineForm(module.Name, parseResult.Designer is { Kind: FormDesignerKind.MSForms } designer ? designer : null);
+        // a form is created from what its designer declares when the program first uses it, whether or not its code loads: Form1.Show shows a form with no code. A
+        // UserForm and a Visual Basic 6.0 form each have a form host; another ActiveX designer's form has none.
+        image.DefineForm(module.Name, parseResult.Designer is { Kind: FormDesignerKind.MSForms or FormDesignerKind.VisualBasic6 } designer ? designer : null);
 
         // composed before anything is lowered, because lowering needs its expression evaluator to decide
         // which #If branches are live. The invoker looks a body up at call time, so the image it holds is this same one.

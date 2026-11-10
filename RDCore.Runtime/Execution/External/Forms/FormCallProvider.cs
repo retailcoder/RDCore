@@ -143,7 +143,8 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
                 ("CAPTION", "get") => RuntimeSemanticsEvaluationResult.Success(new VBStringValue(outside.Forms.GetCaption(hosted))),
                 ("CAPTION", "let") => Done(() => outside.Forms.SetCaption(hosted, StringOf(request.Arguments[^1]))),
                 ("VISIBLE", "get") => RuntimeSemanticsEvaluationResult.Success(new VBBooleanValue(outside.Forms.IsShown(hosted))),
-                _ when FormObjectMembers.Contains(member) => RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+                // the members of the VBA form object that its form host adds to a UserForm; a Visual Basic 6.0 form's own object model has them, and its server calls them.
+                _ when FormObjectMembers.Contains(member) && !IsVisualBasic6(form) => RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
                     VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, request.CallSite, $"{request.Describe()}: the form host does not host '{member}' yet.")),
 
                 // a control, or a member of the Microsoft Forms UserForm: a member of the form object, which the automation server calls.
@@ -256,6 +257,8 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
         FormEvents.Listen(session, outside.Automation, outside.Forms, identity, created, designer);
         return created;
     }
+
+    private bool IsVisualBasic6(string form) => forms.TryGetValue(form, out var designer) && designer.Kind == SDK.Workspace.Forms.FormDesignerKind.VisualBasic6;
 
     // Show [Modal]: modal when it says vbModal, and as the designer's ShowModal says when it says nothing: a UserForm's is True unless its designer says otherwise,
     // and a Visual Basic 6.0 form has none, and is shown modeless (vbModeless). A modal form is waited for, and the program gives its turn up while it does: what the
