@@ -5,12 +5,12 @@ using System.Globalization;
 namespace RDCore.External.Forms.RDForms;
 
 /// <summary>
-/// The automation server of the RDForms forms a <see cref="RDFormsFormHost"/> hosts: a form and each of its controls is an object of it, whose properties are the
-/// properties of its RDForms component and whose controls are reached by their names.
+/// The automation server of the RDForms forms a <see cref="RDFormsFormHost"/> hosts: a form and each of its controls are objects of it. An object's properties are
+/// those of its RDForms component, and a form's controls are reached by their names.
 /// </summary>
 /// <remarks>
-/// It creates nothing by name: a form is created by its form host, and its controls with it. Its objects are called on the RDForms UI thread, which every call is
-/// made on, inline when it comes from that thread already, as the calls the handlers of an event make do.
+/// It creates nothing by name: a form is created by its form host, and its controls with it. Every call on its objects is made on the RDForms UI thread, inline
+/// when it comes from that thread already, as the calls an event's handlers make are.
 /// </remarks>
 public sealed class RDFormsAutomationServer : IAutomationServer
 {
@@ -24,7 +24,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     /// Creates the server of the forms of a process, whose windows are on <paramref name="platform"/>.
     /// </summary>
     /// <param name="platform">
-    /// Where the windows are. The process's first form starts the RDForms UI thread on it, once a process: a server of the same process that asks for the other
+    /// Where the windows are. The process's first form starts the RDForms UI thread on it, once per process: a server of the same process that asks for the other
     /// platform cannot create a form.
     /// </param>
     public RDFormsAutomationServer(RDFormsPlatform platform)

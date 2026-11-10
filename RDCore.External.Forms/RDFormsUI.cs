@@ -39,7 +39,7 @@ internal static class RDFormsUI
 
     public static Dispatcher Dispatcher => _dispatcher ?? throw new InvalidOperationException("The RDForms UI thread is not started.");
 
-    // starts the UI thread on the platform asked for, once a process: the first start says which, and a later one that asks for the other cannot have it.
+    // starts the UI thread on the platform asked for, once per process: the first start says which, and a later one that asks for the other cannot have it.
     public static void Start(RDFormsPlatform platform)
     {
         lock (Gate)
