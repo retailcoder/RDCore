@@ -23,6 +23,16 @@ public sealed record class FormCreateParams : AutomationRequest
     /// <summary>Where a manual form's window is, from the top of the desktop, in points.</summary>
     public double Top { get; init; }
 
+    /// <summary>
+    /// The designer that wrote the form.
+    /// </summary>
+    public SDK.Workspace.Forms.FormDesignerKind Kind { get; init; } = SDK.Workspace.Forms.FormDesignerKind.MSForms;
+
+    /// <summary>
+    /// The text of the form's designer block, for a form whose controls it declares; <see langword="null"/> when there is none.
+    /// </summary>
+    public string? DesignerText { get; init; }
+
     /// <summary>The request for <paramref name="form"/>.</summary>
     /// <param name="form">The form.</param>
     /// <param name="handlingEvent">The event whose handler asks for it, if one does.</param>
@@ -34,11 +44,21 @@ public sealed record class FormCreateParams : AutomationRequest
         StartUpPosition = form.StartUpPosition,
         Left = form.Left,
         Top = form.Top,
+        Kind = form.Kind,
+        DesignerText = form.DesignerText,
         HandlingEvent = handlingEvent,
     };
 
     /// <summary>The form this request is for.</summary>
-    public FormDefinition ToDefinition() => new(Name, State) { Caption = Caption, StartUpPosition = StartUpPosition, Left = Left, Top = Top };
+    public FormDefinition ToDefinition() => new(Name, State)
+    {
+        Caption = Caption,
+        StartUpPosition = StartUpPosition,
+        Left = Left,
+        Top = Top,
+        Kind = Kind,
+        DesignerText = DesignerText,
+    };
 }
 
 /// <summary>Request for <see cref="ExternalProtocol.FormShow"/>: <see cref="IFormHost.Show"/>.</summary>

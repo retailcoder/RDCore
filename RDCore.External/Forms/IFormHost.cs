@@ -49,12 +49,26 @@ public sealed record class FormDefinition(string Name, ReadOnlyMemory<byte> Stat
     public bool ShowModal { get; init; } = true;
 
     /// <summary>
+    /// The designer that wrote the form, which says what can host it: a VBA UserForm is a Microsoft Forms form, and a Visual Basic 6.0 form is not.
+    /// <see cref="SDK.Workspace.Forms.FormDesignerKind.MSForms"/> unless said otherwise.
+    /// </summary>
+    public SDK.Workspace.Forms.FormDesignerKind Kind { get; init; } = SDK.Workspace.Forms.FormDesignerKind.MSForms;
+
+    /// <summary>
+    /// The text of the form's designer block (<c>Begin VB.Form</c> … <c>End</c>), which declares a Visual Basic 6.0 form's controls and their properties; the
+    /// <see cref="State"/> of such a form is its <c>.frx</c>. <see langword="null"/> when there is no text to read, and for a VBA UserForm, whose controls are in
+    /// its state.
+    /// </summary>
+    public string? DesignerText { get; init; }
+
+    /// <summary>
     /// The definition of the form a form module's designer declares: its state, and what its designer block says of its window.
     /// </summary>
     /// <param name="name">The name of the form's module.</param>
     /// <param name="designer">What the designer declares.</param>
     public static FormDefinition Of(string name, SDK.Workspace.Forms.FormDescriptor designer) => new(name, designer.State)
     {
+        Kind = designer.Kind,
         Caption = designer.Caption,
         StartUpPosition = designer.StartUpPosition is { } position && Enum.IsDefined((FormStartUpPosition)position) ? (FormStartUpPosition)position : FormStartUpPosition.CenterOwner,
         Left = PointsOf(designer.Properties.GetValueOrDefault("Left")),
