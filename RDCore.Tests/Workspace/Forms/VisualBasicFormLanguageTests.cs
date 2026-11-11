@@ -368,6 +368,50 @@ public sealed class VisualBasicFormLanguageTests
         CollectionAssert.AreEqual(new[] { "429" }, printed);
     }
 
+    // a value assigned to a control's property is let-coerced to the property's declared type, early-bound or late-bound, as DispInvoke coerces it.
+    [TestMethod]
+    [DataRow("Form1.Text1", "Left = Empty", "Left", "0", DisplayName = "Empty to a Single, early-bound, is 0")]
+    [DataRow("o", "Left = Empty", "Left", "0", DisplayName = "Empty to a Single, late-bound, is 0")]
+    [DataRow("o", "Width = \"1500\"", "Width", "1500", DisplayName = "a String to a Single, late-bound, is its number")]
+    [DataRow("o", "Text = True", "Text", "True", DisplayName = "True to a String, late-bound, is True")]
+    [DataRow("o", "Text = 2.5", "Text", "2.5", DisplayName = "a Double to a String, late-bound, is its digits")]
+    [DataRow("o", "TabIndex = 1.5", "TabIndex", "2", DisplayName = "a Double to an Integer, late-bound, rounds to even")]
+    public async Task AValueAssignedToAControlsProperty_IsLetCoercedToItsDeclaredType(string target, string assignment, string read, string printed)
+    {
+        var lines = await RunWithRDFormsAsync(
+            $"Dim o As Object\r\nSet o = Form1.Text1\r\n{target}.{assignment}\r\nDebug.Print {target}.{read}\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { printed }, lines);
+    }
+
+    [TestMethod]
+    [DataRow("Text = Null", "94", DisplayName = "Null to a String is invalid use of Null")]
+    [DataRow("Width = \"wide\"", "13", DisplayName = "a String that is no number, to a Single, is a type mismatch")]
+    [DataRow("TabIndex = 70000", "6", DisplayName = "a number too large for an Integer overflows")]
+    public async Task AValueThatDoesNotCoerceToAControlsProperty_IsTheCoercionsError(string assignment, string error)
+    {
+        var printed = await RunWithRDFormsAsync($"On Error Resume Next\r\nDim o As Object\r\nSet o = Form1.Text1\r\no.{assignment}\r\nDebug.Print Err.Number\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { error }, printed);
+    }
+
+    [TestMethod]
+    public async Task AControlReachedLateBound_IsOfItsVBClass()
+    {
+        var printed = await RunWithRDFormsAsync("Dim o As Object\r\nSet o = Form1.Text1\r\nDebug.Print TypeName(o)\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "TextBox" }, printed);
+    }
+
+    [TestMethod]
+    [Ignore("control arrays are not implemented in the RDForms model")]
+    public async Task AControlOfAControlArray_IsReachedByItsIndex()
+    {
+        var printed = await RunWithRDFormsAsync("Debug.Print Form1.Command2(1).Index\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "1" }, printed);
+    }
+
     // ---- completion ----
 
     private static async Task<string[]> CompletionAtAsync(string form)
