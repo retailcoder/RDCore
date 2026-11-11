@@ -195,7 +195,7 @@ public sealed class VisualBasicFormMethodTests
         CollectionAssert.AreEqual(new[] { "0" }, printed, string.Join(" | ", printed));
     }
 
-    // RDForms' rule for Refresh, which VB6 was not measured for: on a form whose AutoRedraw is False, it raises Paint inside the call.
+    // RDForms' own rule, not measured with VB6: Refresh on a form whose AutoRedraw is False raises Paint inside the call.
     [TestMethod]
     public async Task Refresh_OnAFormWhoseAutoRedrawIsFalse_RaisesPaintInsideTheCall()
     {
