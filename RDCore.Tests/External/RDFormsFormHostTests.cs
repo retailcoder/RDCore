@@ -273,7 +273,9 @@ public sealed class RDFormsFormHostTests
         }
     }
 
+    // the keyboard's focus is the UI thread's, which every RDForms window shares: a row that types runs alone, with no other test's window activated meanwhile.
     [TestMethod]
+    [DoNotParallelize]
     [DataRow((short)'a', "a", DisplayName = "the character as it was typed is typed")]
     [DataRow((short)'B', "B", DisplayName = "another character is typed instead")]
     [DataRow((short)0, "", DisplayName = "0 types nothing")]
