@@ -105,7 +105,12 @@ public static class RDFormsHosting
             ? ((IFormHost?)visualBasic ?? UnavailableFormHost.Instance).Create(form)
             : microsoftForms.Create(form);
 
-        public void Show(object form, bool modal) => HostOf(form).Show(form, modal);
+        // an owner of the other host is none of this form's host's forms.
+        public void Show(object form, bool modal, object? owner = null)
+        {
+            var host = HostOf(form);
+            host.Show(form, modal, owner is not null && ReferenceEquals(HostOf(owner), host) ? owner : null);
+        }
 
         public void Hide(object form) => HostOf(form).Hide(form);
 

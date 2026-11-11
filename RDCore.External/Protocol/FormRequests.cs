@@ -69,6 +69,11 @@ public sealed record class FormShowParams : AutomationRequest
 
     /// <summary>Whether it is shown modal, and answered once it is hidden.</summary>
     public bool Modal { get; init; }
+
+    /// <summary>
+    /// The handle of the form that owns it, or <see langword="null"/> when it has none.
+    /// </summary>
+    public long? Owner { get; init; }
 }
 
 /// <summary>Request for <see cref="ExternalProtocol.FormHold"/>.</summary>

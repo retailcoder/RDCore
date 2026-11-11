@@ -122,8 +122,9 @@ public interface IFormHost
     /// </remarks>
     /// <param name="form">The handle of the form.</param>
     /// <param name="modal">Whether it is shown modal.</param>
+    /// <param name="owner">The handle of the form that owns it, or <see langword="null"/> when it has none.</param>
     /// <exception cref="Automation.AutomationException">The handle is not a form of this host, or the form was destroyed.</exception>
-    void Show(object form, bool modal);
+    void Show(object form, bool modal, object? owner = null);
 
     /// <summary>
     /// Hides a form, which ends the wait of the <see cref="Show"/> that showed it modal. A form that is not shown is left as it is.
@@ -232,7 +233,7 @@ public sealed class UnavailableFormHost : IFormHost
     public object Create(FormDefinition form) => throw new Automation.AutomationException(ClassNotRegistered, ExternalMessages.FormsUnavailable);
 
     /// <inheritdoc/>
-    public void Show(object form, bool modal) => throw new Automation.AutomationException(ClassNotRegistered, ExternalMessages.FormsUnavailable);
+    public void Show(object form, bool modal, object? owner = null) => throw new Automation.AutomationException(ClassNotRegistered, ExternalMessages.FormsUnavailable);
 
     /// <inheritdoc/>
     public void Hide(object form) => throw new Automation.AutomationException(ClassNotRegistered, ExternalMessages.FormsUnavailable);

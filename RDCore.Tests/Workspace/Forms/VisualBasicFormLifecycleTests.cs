@@ -82,14 +82,53 @@ public sealed class VisualBasicFormLifecycleTests
             .. body,
             string.Empty]);
 
-    // the outside world of an external host that hosts its VB6 forms with RDForms, headless, and has no other server.
-    private static RDCore.External.ExternalWorld RDFormsWorld()
+    // the outside world of an external host that hosts its VB6 forms with RDForms, headless, and has no other server; its forms are seen through the given host.
+    private static RDCore.External.ExternalWorld RDFormsWorld(Func<RDCore.External.Forms.IFormHost, RDCore.External.Forms.IFormHost>? seen = null)
     {
         var (automation, forms) = RDCore.External.Forms.RDForms.RDFormsHosting.Compose(
             RDCore.External.Automation.UnavailableAutomationServer.Instance,
             RDCore.External.Forms.UnavailableFormHost.Instance,
             new RDCore.External.Forms.RDForms.FormsOptions { VB = RDCore.External.Forms.RDForms.VisualBasicFormsHost.RDForms, Headless = true });
-        return new RDCore.External.ExternalWorld(automation, RDCore.External.Native.UnavailableNativeLibraryHost.Instance) { Forms = forms };
+        return new RDCore.External.ExternalWorld(automation, RDCore.External.Native.UnavailableNativeLibraryHost.Instance) { Forms = seen?.Invoke(forms) ?? forms };
+    }
+
+    // the forms of a world, which record each form shown and the form its Show gave as its owner, by their names.
+    private sealed class OwnersRecorded(RDCore.External.Forms.IFormHost forms) : RDCore.External.Forms.IFormHost
+    {
+        private readonly Dictionary<object, string> _names = new(ReferenceEqualityComparer.Instance);
+
+        public List<(string Form, string? Owner)> Shown { get; } = [];
+
+        public bool IsAvailable => forms.IsAvailable;
+
+        public object Create(RDCore.External.Forms.FormDefinition form)
+        {
+            var created = forms.Create(form);
+            _names[created] = form.Name;
+            return created;
+        }
+
+        public void Show(object form, bool modal, object? owner = null)
+        {
+            Shown.Add((_names[form], owner is null ? null : _names[owner]));
+            forms.Show(form, modal, owner);
+        }
+
+        public void Hide(object form) => forms.Hide(form);
+
+        public bool IsShown(object form) => forms.IsShown(form);
+
+        public string GetCaption(object form) => forms.GetCaption(form);
+
+        public void SetCaption(object form, string caption) => forms.SetCaption(form, caption);
+
+        public void Leave(object form) => forms.Leave(form);
+
+        public void Destroy(object form) => forms.Destroy(form);
+
+        public void Hold(bool running) => forms.Hold(running);
+
+        public void DoEvents() => forms.DoEvents();
     }
 
     private static string Program(string[] body)
@@ -227,6 +266,19 @@ public sealed class VisualBasicFormLifecycleTests
     }
 
     [TestMethod]
+    [DataRow("Form2.Show vbModeless, Form3", "Form3", DisplayName = "the owner form it is given")]
+    [DataRow("Form2.Show vbModeless", null, DisplayName = "none, when it is given none")]
+    public async Task TheOwnerFormOfAShow_IsGivenToItsFormHost(string show, string? owner)
+    {
+        OwnersRecorded? recorded = null;
+        var libraries = new ModuleWorkspace.WorkspaceLibraries([], Shipped) with { Outside = RDFormsWorld(forms => recorded = new OwnersRecorded(forms)) };
+
+        await ModuleWorkspace.RunAsync([], Program(["Form3.Show", show, "Unload Form2", "Unload Form3"]), libraries, Forms(), SupportedLanguages.VB6);
+
+        CollectionAssert.AreEqual(new (string, string?)[] { ("Form3", null), ("Form2", owner) }, recorded!.Shown);
+    }
+
+    [TestMethod]
     public async Task End_RaisesNoUnloadAndNoTerminate()
     {
         ExecuteResult? ended = null;
@@ -240,7 +292,7 @@ public sealed class VisualBasicFormLifecycleTests
         CollectionAssert.AreEqual(new[] { "Initialize", "Load" }, ended.Output.Select(line => line.Trim()).ToArray());
     }
 
-    private const string FormsDoesNotResolve = "binding the VB library's Global members (such as Forms) in a VB6 program is not implemented";
+    private const string FormsDoesNotResolve = "VB.Global members do not bind unqualified: Forms is not a name a VB6 program can use";
     [TestMethod]
     [Ignore(FormsDoesNotResolve)]
     [DataRow(new[] { "Load Form3", "Load Form2", "Debug.Print Forms.Count & Forms(0).Caption & Forms(1).Caption", "Unload Form2", "Unload Form3" },

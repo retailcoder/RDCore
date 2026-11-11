@@ -78,8 +78,9 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
     }
 
     /// <inheritdoc/>
-    public void Show(object form, bool modal)
+    public void Show(object form, bool modal, object? owner = null)
     {
+        // the owner is not given to the window: RDForms has no way to show a VBFormWindow with an owner window (Avalonia's ShowDialog takes one).
         var hosted = FormOf(form);
         RDFormsUI.Run(() =>
         {

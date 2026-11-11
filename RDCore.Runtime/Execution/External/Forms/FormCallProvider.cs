@@ -173,7 +173,7 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
             return (member.ToUpperInvariant(), kind) switch
             {
                 ("NAME", "get") => RuntimeSemanticsEvaluationResult.Success(new VBStringValue(form)),
-                ("SHOW", _) when visualBasic6 => ShowVisualBasic6(hosted, identity, request),
+                ("SHOW", _) when visualBasic6 => ShowVisualBasic6(hosted, identity, request, resolver),
                 ("HIDE", _) when visualBasic6 => HideVisualBasic6(hosted, identity, request),
                 ("SHOW", _) => Show(hosted, request, form),
                 ("HIDE", _) => Done(() => outside.Forms.Hide(hosted)),
@@ -235,7 +235,7 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
     // Basic 6.0 form's Unload is its own (FormHandlers.Unload).
     private RuntimeSemanticsEvaluationResult LoadOrUnload(ExternalCallRequest request, IRuntimeSymbolResolver resolver, bool unload)
     {
-        if (FormArgument(request, resolver) is not { } identity)
+        if (request.Arguments is not [var argument, ..] || FormArgument(argument, resolver) is not { } identity)
         {
             return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.CantLoadOrUnloadThisObject, request.CallSite,
                 $"{request.Describe()}: the object is no form."));
@@ -254,16 +254,22 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
     }
 
     // the instance of a form's class the argument is, if it is one.
-    private VBRuntimeObjectId? FormArgument(ExternalCallRequest request, IRuntimeSymbolResolver resolver)
+    private VBRuntimeObjectId? FormArgument(IRuntimeValue argument, IRuntimeSymbolResolver resolver)
     {
-        if (request.Arguments is not [var argument, ..])
-        {
-            return null;
-        }
-
         while (argument is VBRuntimeReference reference && resolver.TryRead(reference.Value, out var cell))
         {
             argument = cell.Value;
+        }
+
+        // a Variant argument is the form its object is, and a Variant that holds none (Missing, for an omitted owner form) is no form.
+        if (argument is VBRuntimeVariantValue { WrappedValue: var held })
+        {
+            if (held is not VBObjectValue)
+            {
+                return null;
+            }
+
+            argument = held.RuntimeValue;
         }
 
         return VBObjectType.TypeInfo.CreateValue(new ValueBindingHandle(argument)) is VBObjectValue { } value && !value.IsNothing()
@@ -365,8 +371,9 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
 
     // Show [Modal] of a Visual Basic 6.0 form: the style converts as CInt does, and only vbModeless (0) and vbModal (1) are styles (5 otherwise, the form loaded).
     // A modal form is waited for until it is hidden or unloaded. While one is, a modeless Show fails (401), and so does a modal Show of a form that is modal
-    // already (405); a form shown modeless, or one beneath the modal form, turns modal (measured in VB6).
-    private RuntimeSemanticsEvaluationResult ShowVisualBasic6(object hosted, VBRuntimeObjectId identity, ExternalCallRequest request)
+    // already (405); a form shown modeless, or one beneath the modal form, turns modal (measured in VB6). The owner form, when its form is hosted, is given to the
+    // host with the form it owns.
+    private RuntimeSemanticsEvaluationResult ShowVisualBasic6(object hosted, VBRuntimeObjectId identity, ExternalCallRequest request, IRuntimeSymbolResolver resolver)
     {
         var modal = false;
         if (request.Arguments.Length > 1 && VariantOf(request.Arguments[1]) is { } argument and not VBMissingValue)
@@ -404,6 +411,13 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
                 $"{request.Describe()}: the form is modal already."));
         }
 
+        object? owner = null;
+        if (request.Arguments.Length > 2 && FormArgument(request.Arguments[2], resolver) is { } ownerIdentity
+            && session.ExternalObjects.TryGet(ownerIdentity, out var server, out var ownerForm) && ReferenceEquals(server, outside.Automation))
+        {
+            owner = ownerForm;
+        }
+
         if (modal)
         {
             _forms.BeginModal(identity);
@@ -413,7 +427,7 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
         {
             using (session.Turn.Yield())
             {
-                outside.Forms.Show(hosted, modal);
+                outside.Forms.Show(hosted, modal, owner);
             }
         }
         finally
