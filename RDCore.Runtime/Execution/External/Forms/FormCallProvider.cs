@@ -261,7 +261,7 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
             argument = cell.Value;
         }
 
-        // a Variant argument is the form its object is, and a Variant that holds none (Missing, for an omitted owner form) is no form.
+        // a Variant argument is the form its object is, and a Variant that holds no object (Missing, for an omitted owner form) is not a form.
         if (argument is VBRuntimeVariantValue { WrappedValue: var held })
         {
             if (held is not VBObjectValue)
