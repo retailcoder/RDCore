@@ -146,7 +146,7 @@ internal sealed class RDFormsForm : IComponentEventSink
         }
 
         var raised = arguments.Select(argument => RDFormsValues.ToNeutral(argument, HandleOf)).ToArray();
-        sink.OnEvent(new AutomationEvent(definition.Name, raised, RDFormsUI.IsInCall, _ => RDFormsUI.Pump()));
+        sink.OnEvent(new AutomationEvent(definition.Name, raised, RDFormsUI.IsInCall, _ => RDFormsUI.Serve()));
         for (var index = 0; index < arguments.Length; index++)
         {
             arguments[index] = RDFormsValues.FromNeutral(raised[index], arguments[index]);
@@ -168,6 +168,6 @@ internal sealed class RDFormsForm : IComponentEventSink
             return;
         }
 
-        sink.OnEvent(new AutomationEvent(FormWindowEvents.Close, [(short)mode], RDFormsUI.IsInCall, _ => RDFormsUI.Pump()));
+        sink.OnEvent(new AutomationEvent(FormWindowEvents.Close, [(short)mode], RDFormsUI.IsInCall, _ => RDFormsUI.Serve()));
     }
 }

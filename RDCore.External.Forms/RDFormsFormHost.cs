@@ -21,6 +21,10 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
     private const int ClassNotRegistered = unchecked((int)0x80040154);
     private const int Failed = unchecked((int)0x80004005);
 
+    // whether this host's program runs, which holds the windows' messages.
+    private readonly object _holdGate = new();
+    private bool _holding;
+
     /// <summary>
     /// The server the forms are objects of.
     /// </summary>
@@ -157,6 +161,19 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
         if (form is RDFormsObject { IsForm: true } handle)
         {
             Server.Destroy(handle.Form);
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Hold(bool running)
+    {
+        lock (_holdGate)
+        {
+            if (running != _holding)
+            {
+                _holding = running;
+                RDFormsUI.Hold(running);
+            }
         }
     }
 
