@@ -301,7 +301,7 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
 
     private bool IsVisualBasic6(string form) => forms.TryGetValue(form, out var designer) && designer.Kind == SDK.Workspace.Forms.FormDesignerKind.VisualBasic6;
 
-    // the session's Forms collection, of the standard library's class that VB6 names nothing (IStdFormsClass).
+    // the session's Forms collection, of the standard library's class that has no name in VB6 (IStdFormsClass).
     private RuntimeSemanticsEvaluationResult FormsCollection()
     {
         var collection = _forms.FormsCollection ??= session.Objects.CreateObject();

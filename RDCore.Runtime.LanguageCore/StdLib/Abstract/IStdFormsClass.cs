@@ -8,8 +8,8 @@ namespace RDCore.Runtime.LanguageCore.StdLib.Abstract;
 /// The <c>Forms</c> collection of a Visual Basic 6.0 program: the forms that are loaded, in the order they were, numbered from 0 (measured in VB6).
 /// </summary>
 /// <remarks>
-/// Its class is one VB6 names nothing (<c>TypeName(Forms)</c> is <c>Object</c>), reached late-bound through the VB library's global <c>Forms</c>. It has no keys,
-/// and no <c>Add</c> or <c>Remove</c>: a member it does not have is error 438, as any late-bound member that is not there is.
+/// Its class has no name in VB6 (<c>TypeName(Forms)</c> is <c>Object</c>), and it is reached late-bound through the VB library's global <c>Forms</c>. It has
+/// no keys, and no <c>Add</c> or <c>Remove</c>: a member it does not have is error 438, as for any late-bound member that is missing.
 /// </remarks>
 [StdLibClass("_Forms", IsCreatable = false, TypeName = "Object")]
 public interface IStdFormsClass
@@ -21,8 +21,9 @@ public interface IStdFormsClass
     RuntimeSemanticsEvaluationResult<VBIntegerValue> Count();
 
     /// <summary>
-    /// The loaded form at <paramref name="index"/>, from 0: its default member (<c>Forms(0)</c>). The index converts as <c>CInt</c> converts it. An index that is
-    /// no form's is error 9; one that is no number, a form's name or <c>Null</c>, is error 13; one too large for an <c>Integer</c> is error 6.
+    /// The loaded form at <paramref name="index"/>, from 0: the default member (<c>Forms(0)</c>). The index is converted as <c>CInt</c> converts it. An index
+    /// outside the loaded forms is error 9; a <c>String</c> that is not a number (a form's name included) or <c>Null</c> is error 13; an index too large for an
+    /// <c>Integer</c> is error 6.
     /// </summary>
     /// <param name="index">The position of the form.</param>
     [StdLibMember(UserMemId = WellKnownDispIds.Value)]
