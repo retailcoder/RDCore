@@ -292,9 +292,7 @@ public sealed class VisualBasicFormLifecycleTests
         CollectionAssert.AreEqual(new[] { "Initialize", "Load" }, ended.Output.Select(line => line.Trim()).ToArray());
     }
 
-    private const string FormsDoesNotResolve = "VB.Global members do not bind unqualified: Forms is not a name a VB6 program can use";
     [TestMethod]
-    [Ignore(FormsDoesNotResolve)]
     [DataRow(new[] { "Load Form3", "Load Form2", "Debug.Print Forms.Count & Forms(0).Caption & Forms(1).Caption", "Unload Form2", "Unload Form3" },
         new[] { "Initialize", "Load", "2Form3Form2", "QueryUnload 1", "Unload" }, DisplayName = "the loaded forms, in the order they loaded")]
     [DataRow(new[] { "Form2.pub = 1", "Dim f As Form2", "Set f = New Form2", "Debug.Print Forms.Count" }, new[] { "Initialize", "Initialize", "0", "Terminate" },
@@ -308,7 +306,13 @@ public sealed class VisualBasicFormLifecycleTests
         => CollectionAssert.AreEqual(printed, await RunAsync(body));
 
     [TestMethod]
-    [Ignore(FormsDoesNotResolve)]
+    [DataRow("Forms.Count", DisplayName = "unqualified")]
+    [DataRow("VB.Forms.Count", DisplayName = "qualified with its library")]
+    [DataRow("VB.Global.Forms.Count", DisplayName = "qualified with its library and its module")]
+    public async Task TheFormsCollection_IsAGlobalMemberOfTheVBLibrary(string count)
+        => CollectionAssert.AreEqual(new[] { "Initialize", "Load", "1", "QueryUnload 1", "Unload" }, await RunAsync("Load Form2", $"Debug.Print {count}", "Unload Form2"));
+
+    [TestMethod]
     [DataRow("Forms(\"0\").Caption", "0|Form2", DisplayName = "a String that is a number is the position")]
     [DataRow("Forms(0.4).Caption", "0|Form2", DisplayName = "the position converts as CInt")]
     [DataRow("Forms.Item(0).Caption", "0|Form2", DisplayName = "Item is the default member")]
@@ -325,16 +329,14 @@ public sealed class VisualBasicFormLifecycleTests
     }
 
     [TestMethod]
-    [Ignore(FormsDoesNotResolve)]
     public async Task TheFormsCollection_LetWithoutSet_Is450()
     {
         var printed = await RunAsync("On Error Resume Next", "Dim v As Variant", "v = Forms", "Debug.Print Err.Number & \" \" & IsEmpty(v)");
 
-        CollectionAssert.AreEqual(new[] { "450 True" }, printed);
+        CollectionAssert.AreEqual(new[] { "450 True" }, printed, string.Join(" | ", printed));
     }
 
     [TestMethod]
-    [Ignore(FormsDoesNotResolve)]
     public async Task AForm_IsOneOfTheLoadedForms_FromItsLoad_ToTheEndOfItsUnload()
     {
         var printed = await RunAsync(counting: true, "Load Form2", "Unload Form2");
@@ -342,7 +344,6 @@ public sealed class VisualBasicFormLifecycleTests
         CollectionAssert.AreEqual(new[] { "Initialize", "count 0", "Load", "count 1", "QueryUnload 1", "count 1", "Unload", "count 1" }, printed);
     }
     [TestMethod]
-    [Ignore(FormsDoesNotResolve)]
     [DataRow(new[] { "Dim f As Object", "For Each f In Forms", "Unload f", "Next", "Debug.Print Forms.Count & \" \" & (f Is Nothing)" },
         new[] { "Initialize", "Load", "QueryUnload 1", "Unload", "0 True" }, DisplayName = "For Each unloads every form")]
     [DataRow(new[] { "Dim i As Integer", "For i = Forms.Count - 1 To 0 Step -1", "Unload Forms(i)", "Next", "Debug.Print Forms.Count" },
