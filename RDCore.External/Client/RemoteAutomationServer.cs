@@ -144,7 +144,7 @@ public sealed class RemoteAutomationServer : IAutomationServer, Forms.IFormHost
     /// <inheritdoc/>
     public void Show(object form, bool modal, object? owner = null)
     {
-        // an owner is the external host's to give its form only when that host holds it: one of another incarnation is none of its forms.
+        // the external host gives its form an owner only when it holds the owner: an owner from another incarnation of the host is not one of its forms.
         var remote = Live(form);
         long? ownerHandle = owner is RemoteObject { Incarnation.IsLost: false } held && held.Incarnation == remote.Incarnation ? held.Handle : null;
         _ = Send<FormShowParams, ExternalDoneResult>(remote.Incarnation, ExternalProtocol.FormShow,
