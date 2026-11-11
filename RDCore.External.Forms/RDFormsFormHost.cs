@@ -47,7 +47,7 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
         RDFormsUI.Start(Server.Platform);
         return RDFormsUI.Run(() =>
         {
-            // a VB6 form's code reads positions and sizes in twips and in its containers' scales.
+            // a VB6 form's code reads a control's position and size in its container's scale (twips in a Frame), and the form's own in twips.
             var hosted = new RDFormsForm(new Model.FormDefinition(root), CodeUnit.VB6);
             Server.Forms.Add(hosted);
             return hosted.Handle;

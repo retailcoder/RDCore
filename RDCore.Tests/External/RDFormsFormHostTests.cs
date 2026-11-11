@@ -134,7 +134,7 @@ public sealed class RDFormsFormHostTests
             var text = Get(host, form, "Text1")!;
             Let(host, form, "ScaleMode", 3);
 
-            // 15 twips to the pixel.
+            // ScaleMode 3 is pixels, at 15 twips to the pixel.
             Assert.AreEqual(8d, Get(host, text, "Left"));
             Assert.AreEqual(81d, Get(host, text, "Width"));
 
