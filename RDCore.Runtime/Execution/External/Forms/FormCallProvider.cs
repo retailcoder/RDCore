@@ -219,7 +219,7 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
     }
 
     // Load, which the reference to its argument has done already for a UserForm, and does now for a Visual Basic 6.0 form; and Unload: QueryClose (vbFormCode),
-    // which can cancel it; then Terminate, the form's window, and its default instance, which the next reference makes again (oracle\s41 L10-L19). A Visual
+    // which can cancel it; then Terminate, the form's window, and its default instance, which the next reference makes again (Excel-measured). A Visual
     // Basic 6.0 form's Unload is its own (FormHandlers.Unload).
     private RuntimeSemanticsEvaluationResult LoadOrUnload(ExternalCallRequest request, IRuntimeSymbolResolver resolver, bool unload)
     {

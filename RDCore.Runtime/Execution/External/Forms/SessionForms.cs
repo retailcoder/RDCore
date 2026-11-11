@@ -122,7 +122,7 @@ internal sealed class SessionForms
     }
 
     /// <summary>
-    /// A Visual Basic 6.0 form's unload is over: unloaded, it is no longer one of the loaded forms; cancelled, it is.
+    /// A Visual Basic 6.0 form's unload is over: unloaded, it leaves the loaded forms; cancelled, it stays among them.
     /// </summary>
     /// <param name="form">The instance of the form's class.</param>
     /// <param name="unloaded">Whether it was unloaded.</param>
@@ -139,7 +139,7 @@ internal sealed class SessionForms
     }
 
     /// <summary>
-    /// The loaded forms let go of a Visual Basic 6.0 form that is no longer loaded: the last reference to it runs its <c>Terminate</c>.
+    /// The loaded forms let go of a Visual Basic 6.0 form that was unloaded: the last reference to it runs its <c>Terminate</c>.
     /// </summary>
     /// <param name="session">The session the form is of.</param>
     /// <param name="form">The instance of the form's class.</param>
