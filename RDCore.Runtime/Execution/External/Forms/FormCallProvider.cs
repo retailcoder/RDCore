@@ -8,6 +8,7 @@ using RDCore.Runtime.Semantics.Conversion;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
 using RDCore.SDK.Model.Values;
 using RDCore.SDK.Model.Values.Abstract;
@@ -16,6 +17,7 @@ using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Model.Values.Runtime;
 using RDCore.SDK.Runtime.Abstract.Execution;
 using RDCore.SDK.Runtime.Shared;
+using RDCore.SDK.Runtime.StdLib;
 using RDCore.SDK.Workspace.Forms;
 using RDCore.Runtime.LanguageCore.Errors;
 
@@ -68,6 +70,10 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
 
     private static string GlobalKey(string member) => StdLibSymbolReader.ExternalTargetOf(typeof(IStdGlobalClass), typeof(IStdGlobalClass).GetMethod(member)!);
 
+    // the VB library's global Forms, a Visual Basic 6.0 program's loaded forms: the session's one collection of them, answered here as UserForms is by the
+    // standard library.
+    private const string FormsKey = "VB.Global.Forms/get";
+
     // RPC_E_SERVER_DIED_DNE, what MS-VBA reports for a member of a form that was unloaded: Err.Number -2147418105 (oracle\s41 L51).
     private const int FormUnloaded = unchecked((int)0x80010007);
 
@@ -94,7 +100,8 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
     /// <inheritdoc/>
     public bool CanDispatch(ExternalCallRequest request)
         => FormObject.IsDeclaredBy(request.Member)
-        || request.Member.GetProperty(SymbolProperties.ExternalTarget) is { } key && (key == LoadKey || key == UnloadKey || key == RemoveKey && DesignedNamesOf(request) is not null);
+        || request.Member.GetProperty(SymbolProperties.ExternalTarget) is { } key
+            && (key == LoadKey || key == UnloadKey || key == FormsKey || key == RemoveKey && DesignedNamesOf(request) is not null);
 
     // the names a hosted form's designer declares, when the receiver of a request is that form's Controls collection.
     private IReadOnlySet<string>? DesignedNamesOf(ExternalCallRequest request)
@@ -115,6 +122,11 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
         if (key == RemoveKey)
         {
             return Remove(request, resolver);
+        }
+
+        if (key == FormsKey)
+        {
+            return FormsCollection();
         }
 
         var (form, member, kind) = Parse(key);
@@ -288,6 +300,24 @@ public sealed class FormCallProvider(IRuntimeSession session, ExternalWorld outs
     }
 
     private bool IsVisualBasic6(string form) => forms.TryGetValue(form, out var designer) && designer.Kind == SDK.Workspace.Forms.FormDesignerKind.VisualBasic6;
+
+    // the session's Forms collection, of the standard library's class that VB6 names nothing (IStdFormsClass).
+    private RuntimeSemanticsEvaluationResult FormsCollection()
+    {
+        var collection = _forms.FormsCollection ??= session.Objects.CreateObject();
+        if (!session.Symbols.TryGetInstance(collection, out _))
+        {
+            if (VBProjectSymbol.ResolveQualifiedType(session.Symbols.Resolver, StandardLibrary.LibraryName, "_Forms", StaticSymbol.GlobalUri).Symbol
+                is not VBClassModuleSymbol collectionClass)
+            {
+                return RuntimeSemanticsEvaluationResult.InternalError();
+            }
+
+            _ = session.Symbols.CreateInstance(collection, collectionClass);
+        }
+
+        return RuntimeSemanticsEvaluationResult.Success(new VBObjectValue(collection));
+    }
 
     private static RuntimeSemanticsEvaluationResult NoFormToHost(ExternalCallRequest request, string form)
         => RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.ApplicationDefinedOrObjectDefinedError, request.CallSite,

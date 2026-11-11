@@ -216,6 +216,7 @@ internal sealed class SessionForms
             _unloading.Clear();
             _modal.Clear();
             Collection = null;
+            FormsCollection = null;
         }
     }
 
@@ -345,6 +346,12 @@ internal sealed class SessionForms
     /// by whatever first asks for it.
     /// </summary>
     public VBRuntimeObjectId? Collection { get; set; }
+
+    /// <summary>
+    /// The identity of the session's <c>Forms</c> collection, a Visual Basic 6.0 program's: one object, the same every time it is asked for. Its instance is made
+    /// by whatever first asks for it.
+    /// </summary>
+    public VBRuntimeObjectId? FormsCollection { get; set; }
 
     /// <summary>
     /// Holds a form the collection loaded (<c>UserForms.Add</c>), which stays loaded with nothing else referring to it (U05), until it is unloaded.
