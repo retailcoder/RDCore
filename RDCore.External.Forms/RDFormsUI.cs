@@ -44,7 +44,7 @@ internal static class RDFormsUI
     // wakes the held UI thread for a call, or for the end of the hold.
     private static readonly SemaphoreSlim Arrived = new(0);
 
-    // whether the UI thread is in its hold, and whether a hold waits for the call it was asked for during to be answered. Touched on the UI thread only.
+    // whether the UI thread is in its hold, and whether a hold asked for during a call waits for that call to be answered. Touched on the UI thread only.
     private static bool _inHold;
     private static bool _holdAfterCall;
 

@@ -65,7 +65,7 @@ public sealed class VisualBasicFormMethodTests
     // where a form or a control is, and its size, in twips.
     private static string Where(string target) => $"Debug.Print {target}.Left & \" \" & {target}.Top & \" \" & {target}.Width & \" \" & {target}.Height";
 
-    // a shown form, moved to 1200, 1200, 6000 x 4500 before the case: what the case prints follows "base", but its Paint.
+    // a shown form, moved to 1200, 1200, 6000 x 4500 before the case: what the case prints follows "base", except its Paint.
     private static async Task<(string[] Printed, string All)> AfterTheBaseMoveAsync(params string[] body)
     {
         var lines = await RunAsync(["Form2.Show", "DoEvents", "Form2.Move 1200, 1200, 6000, 4500", "Debug.Print \"base\"", .. body, "Unload Form2"]);
@@ -74,7 +74,7 @@ public sealed class VisualBasicFormMethodTests
         return ([.. lines[(start + 1)..].Where(line => line != "Paint")], string.Join(" | ", lines));
     }
 
-    // what a shown form prints after its first focus, but its Resize and its Paint.
+    // what a shown form prints after its first focus, except its Resize and its Paint.
     private static async Task<string[]> ShownAsync(params string[] body)
     {
         var lines = await RunAsync(["Form2.Show", "DoEvents", "Form2.Logging = True", .. body, "Form2.Logging = False", "Unload Form2"]);

@@ -14,10 +14,10 @@ internal static class RDFormsValues
     // VB error 380, which a control raises for a value its property cannot take.
     public const int InvalidPropertyValue = unchecked((int)0x800A017C);
 
-    // VB error 94, which a Null where a number is needed is.
+    // VB error 94, Invalid use of Null: a Null where a number is needed.
     private const int InvalidUseOfNull = unchecked((int)0x800A005E);
 
-    // an argument a program gives a method: a Single parameter takes it let-coerced to a Single (MS-VBAL 5.5.1.2), and a Variant one, or an argument past the
+    // an argument a program gives a method: a Single parameter takes it let-coerced to a Single (MS-VBAL §5.5.1.2), and a Variant one, or an argument past the
     // parameters, takes it as it is, for the method to check.
     public static FormValue ArgumentOf(object? value, MethodParameter? parameter, CultureInfo culture)
         => string.Equals(parameter?.TypeName, "Single", StringComparison.OrdinalIgnoreCase) ? FormValue.FromSingle(SingleOf(value, culture)) : VariantOf(value);
