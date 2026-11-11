@@ -320,6 +320,41 @@ public sealed class RDFormsFormHostTests
     }
 
     [TestMethod]
+    [DataRow(true, false, true, DisplayName = "an owner form that is shown owns it")]
+    [DataRow(false, false, false, DisplayName = "an owner form that is not shown does not")]
+    [DataRow(true, true, false, DisplayName = "a form shown already keeps the owner it was shown with")]
+    public void TheOwnerFormOfAShow_OwnsTheFormsWindow(bool ownerShown, bool shownAlready, bool owned)
+    {
+        var host = Host();
+        var owner = host.Create(VisualBasicForm());
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            if (ownerShown)
+            {
+                host.Show(owner, modal: false);
+            }
+
+            if (shownAlready)
+            {
+                host.Show(form, modal: false);
+            }
+
+            host.Show(form, modal: false, owner);
+
+            var ownerWindow = RDFormsAutomationServer.HandleOf(owner).Form.Window;
+            var actual = RDFormsUI.Run(() => RDFormsAutomationServer.HandleOf(form).Form.Window.Owner);
+            Assert.AreEqual(owned, ReferenceEquals(ownerWindow, actual));
+            Assert.IsTrue(owned || actual is null, "a form not owned has no owner");
+        }
+        finally
+        {
+            host.Destroy(form);
+            host.Destroy(owner);
+        }
+    }
+
+    [TestMethod]
     public void ADestroyedForm_IsNoLongerAnObject()
     {
         var host = Host();

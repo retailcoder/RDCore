@@ -80,18 +80,18 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
     /// <inheritdoc/>
     public void Show(object form, bool modal, object? owner = null)
     {
-        // the owner is not given to the window: RDForms has no way to show a VBFormWindow with an owner window (Avalonia's ShowDialog takes one).
         var hosted = FormOf(form);
+        var owning = owner is null ? null : FormOf(owner);
         RDFormsUI.Run(() =>
         {
             RDFormsAutomationServer.Alive(hosted.Handle);
             if (modal)
             {
-                hosted.ShowModal(Server.Forms.Where(other => !ReferenceEquals(other, hosted)));
+                hosted.ShowModal(Server.Forms.Where(other => !ReferenceEquals(other, hosted)), owning);
             }
             else
             {
-                hosted.Window.Show();
+                hosted.Show(owning);
             }
         });
     }

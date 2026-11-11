@@ -62,8 +62,22 @@ internal sealed class RDFormsForm : IComponentEventSink
 
     public void Unadvise(ComponentInstance source) => _sinks.Remove(source);
 
+    // shown with the owner form's window as its owner when it has one: only a window not shown yet takes an owner, and only one that is another form's window, shown
+    // (Avalonia's Show refuses a closed owner and the window itself). A form owned is placed over its owner, and closed with it (UnloadMode vbFormOwner).
+    public void Show(RDFormsForm? owner)
+    {
+        if (owner is { IsDestroyed: false } && !ReferenceEquals(owner, this) && owner.Window.IsVisible && !Window.IsVisible)
+        {
+            Window.Show(owner.Window);
+        }
+        else
+        {
+            Window.Show();
+        }
+    }
+
     // shown modal: the other windows of the form host wait, and so does the call, on a frame of the UI thread's own that hiding the form ends.
-    public void ShowModal(IEnumerable<RDFormsForm> others)
+    public void ShowModal(IEnumerable<RDFormsForm> others, RDFormsForm? owner)
     {
         var waiting = others.Where(other => other.Window.IsEnabled).ToList();
         foreach (var other in waiting)
@@ -76,7 +90,7 @@ internal sealed class RDFormsForm : IComponentEventSink
             // the window raises its first Resize inside Show, and a handler of it can hide the form before the frame is there to end.
             var frame = new DispatcherFrame();
             _modal = frame;
-            Window.Show();
+            Show(owner);
             if (frame.Continue && Window.IsVisible)
             {
                 Dispatcher.UIThread.PushFrame(frame);
