@@ -56,7 +56,7 @@ public sealed class ClassLifecycle(IRuntimeSession session, ICallableBindingFact
             // what the form listened to goes with it; one that was unloaded stopped listening then.
             External.Forms.SessionForms.Of(session).StopListening(instance);
 
-            // a Visual Basic 6.0 form's Terminate is its instance's, whether it was ever loaded: the loaded forms hold one that is, so its last reference goes after its unload.
+            // a Visual Basic 6.0 form's Terminate runs when its instance goes, whether it was ever loaded: the loaded forms hold a loaded one until its unload.
             if (External.Forms.SessionForms.Of(session).IsVisualBasic6(session, instance))
             {
                 return External.Forms.FormHandlers.Raise(session, bindings, instance, "Terminate");

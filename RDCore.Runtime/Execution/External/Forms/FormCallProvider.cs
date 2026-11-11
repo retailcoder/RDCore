@@ -41,7 +41,7 @@ namespace RDCore.Runtime.Execution.External.Forms;
 /// window and lets its default instance go, and leaves an object whose designer's members fail (<see cref="SessionForms"/>).
 /// </para>
 /// <para>
-/// A Visual Basic 6.0 form's lifecycle is VB6's. The use of its name makes its instance without loading it; any member of its form, <c>Load</c>, <c>Show</c>
+/// A Visual Basic 6.0 form follows VB6's lifecycle. The use of its name makes its instance without loading it; any member of its form, <c>Load</c>, <c>Show</c>
 /// and <c>Hide</c> load it, and its <c>Form_Load</c> runs inside the use. <c>Unload</c> keeps its instance, its variables and its name, and the next member of
 /// its form loads it again (measured in VB6).
 /// </para>

@@ -74,8 +74,8 @@ internal sealed class SessionForms
     }
 
     /// <summary>
-    /// A Visual Basic 6.0 form is loaded: it is held by the loaded forms, at their end, from now until its <c>Form_Unload</c> has returned, apart from its name and
-    /// whatever else holds it.
+    /// Loads a Visual Basic 6.0 form: it is added at the end of the loaded forms, which hold a reference to it until it is unloaded. A form that is loaded
+    /// already is left as it is.
     /// </summary>
     /// <param name="session">The session the form is of.</param>
     /// <param name="form">The instance of the form's class.</param>
@@ -533,7 +533,7 @@ internal static class FormHandlers
             }
             catch (RDCore.External.Automation.AutomationException)
             {
-                // a form whose window is gone already - its host went with it - has no control to leave.
+                // a form whose window is gone already (its host went with it) has no control to leave.
             }
 
             forms.StopListening(form);
@@ -545,7 +545,7 @@ internal static class FormHandlers
             forms.EndUnload(form, unloaded: !kept);
         }
 
-        // the loaded forms let go of it: what else holds it - its name, a variable, a running procedure's Me - keeps it, and the last of them runs its Terminate.
+        // the loaded forms let go of it: what else holds it (its name, a variable, a running procedure's Me) keeps it, and the last of them runs its Terminate.
         return forms.LetGoOfLoaded(session, form);
     }
 
