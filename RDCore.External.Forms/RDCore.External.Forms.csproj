@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the tests type into a form's headless window, which only the host has. -->
+    <InternalsVisibleTo Include="RDCore.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- the outside world's abstractions this host implements; nothing else of the platform, so that it can move to a process of its own. -->
     <ProjectReference Include="..\RDCore.External\RDCore.External.csproj" />
   </ItemGroup>

@@ -274,6 +274,52 @@ public sealed class RDFormsFormHostTests
     }
 
     [TestMethod]
+    [DataRow((short)'a', "a", DisplayName = "the character as it was typed is typed")]
+    [DataRow((short)'B', "B", DisplayName = "another character is typed instead")]
+    [DataRow((short)0, "", DisplayName = "0 types nothing")]
+    public void WhatTheSinkLeavesInKeyAscii_IsWhatTheTextBoxTypes(short left, string typed)
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            // the argument the sink writes to is the one the control reads back, as a KeyPress handler's ByRef KeyAscii.
+            var text = Get(host, form, "Text1")!;
+            Let(host, text, "Text", string.Empty);
+            host.Server.Advise(text, new Recorder { Handler = raised => { if (raised.Name == "KeyPress") { raised.Arguments[0] = left; } } });
+            host.Show(form, modal: false);
+
+            // the key goes to the control that has the focus: the TextBox's own control in the window, focused once the window's activation has given the form its
+            // focus, as the user's click would after it.
+            var control = RDFormsAutomationServer.HandleOf(text);
+            var window = control.Form.Window;
+            var focused = RDFormsUI.Run(() =>
+            {
+                window.Activate();
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                var box = window.View.ControlOf(control.Component)!;
+                box.Focus();
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                if (!box.IsFocused)
+                {
+                    return false;
+                }
+
+                Avalonia.Headless.HeadlessWindowExtensions.KeyTextInput(window, "a");
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                return true;
+            });
+
+            Assert.IsTrue(focused, "the TextBox has the focus the key goes to");
+            Assert.AreEqual(typed, Get(host, text, "Text"));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
     public void ADestroyedForm_IsNoLongerAnObject()
     {
         var host = Host();
