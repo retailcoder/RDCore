@@ -16,7 +16,7 @@ namespace RDCore.Tests.Workspace.Forms;
 [TestClass]
 public sealed class VisualBasicFormLifecycleTests
 {
-    private static DirectoryLibrarySource Shipped => new(new System.IO.Abstractions.FileSystem(), ShippedLibrariesTests.Symbols);
+    internal static DirectoryLibrarySource Shipped => new(new System.IO.Abstractions.FileSystem(), ShippedLibrariesTests.Symbols);
 
     // Form2 prints its events, and the number of loaded forms after each when it counts; what its Resize does while it is shown is what its Probe says.
     private static string Form2(bool counting = false)
@@ -83,7 +83,7 @@ public sealed class VisualBasicFormLifecycleTests
             string.Empty]);
 
     // the outside world of an external host that hosts its VB6 forms with RDForms, headless, and has no other server; its forms are seen through the given host.
-    private static RDCore.External.ExternalWorld RDFormsWorld(Func<RDCore.External.Forms.IFormHost, RDCore.External.Forms.IFormHost>? seen = null)
+    internal static RDCore.External.ExternalWorld RDFormsWorld(Func<RDCore.External.Forms.IFormHost, RDCore.External.Forms.IFormHost>? seen = null)
     {
         var (automation, forms) = RDCore.External.Forms.RDForms.RDFormsHosting.Compose(
             RDCore.External.Automation.UnavailableAutomationServer.Instance,

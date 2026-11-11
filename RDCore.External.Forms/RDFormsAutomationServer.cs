@@ -18,6 +18,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     private const int UnknownName = unchecked((int)0x80020006);
     private const int BadParameterCount = unchecked((int)0x8002000E);
     private const int NotImplemented = unchecked((int)0x80004001);
+    private const int VisualBasicError = unchecked((int)0x800A0000);
     private const string VisualBasicLibrary = "VB";
 
     /// <summary>
@@ -67,6 +68,11 @@ public sealed class RDFormsAutomationServer : IAutomationServer
                 };
             }
 
+            if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && component.Class.Method(member) is { } method)
+            {
+                return Call(handle, method, arguments, culture);
+            }
+
             if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0
                 && Control(handle, member) is { } control)
             {
@@ -75,6 +81,29 @@ public sealed class RDFormsAutomationServer : IAutomationServer
 
             throw new AutomationException(UnknownName, $"{handle} has no member named {member}.");
         });
+    }
+
+    // a method runs on the form's window, which checks the arguments as VB6 does and raises what the method raises. An argument left out is none, and one for a
+    // typed parameter is let-coerced to its type first, as a typed parameter's argument is before the call.
+    private static object? Call(RDFormsObject handle, MethodDefinition method, object?[] arguments, CultureInfo culture)
+    {
+        var given = new FormValue?[arguments.Length];
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            given[index] = arguments[index] is System.Reflection.Missing
+                ? null
+                : RDFormsValues.ArgumentOf(arguments[index], index < method.Parameters.Count ? method.Parameters[index] : null, culture);
+        }
+
+        try
+        {
+            _ = handle.Form.Window.Invoke(handle.Component, method, given, handle.Form.Unit);
+            return null;
+        }
+        catch (FormErrorException exception)
+        {
+            throw new AutomationException(VisualBasicError | exception.Error.Number, exception.Error.Description);
+        }
     }
 
     // a control of the form, by its name: a control that is an element of an array is reached through the array, which a name alone is not.

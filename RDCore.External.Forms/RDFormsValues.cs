@@ -14,6 +14,47 @@ internal static class RDFormsValues
     // VB error 380, which a control raises for a value its property cannot take.
     public const int InvalidPropertyValue = unchecked((int)0x800A017C);
 
+    // VB error 94, which a Null where a number is needed is.
+    private const int InvalidUseOfNull = unchecked((int)0x800A005E);
+
+    // an argument a program gives a method: a Single parameter takes it let-coerced to a Single (MS-VBAL 5.5.1.2), and a Variant one, or an argument past the
+    // parameters, takes it as it is, for the method to check.
+    public static FormValue ArgumentOf(object? value, MethodParameter? parameter, CultureInfo culture)
+        => string.Equals(parameter?.TypeName, "Single", StringComparison.OrdinalIgnoreCase) ? FormValue.FromSingle(SingleOf(value, culture)) : VariantOf(value);
+
+    private static float SingleOf(object? value, CultureInfo culture)
+    {
+        var number = Unwrapped(value) switch
+        {
+            null => 0d,
+            DBNull => throw new AutomationException(InvalidUseOfNull, "Invalid use of Null"),
+            bool truth => truth ? -1d : 0d,
+            DateTime date => date.ToOADate(),
+            var other => (double)FromNeutral(other, typeof(double), culture)!,
+        };
+        return Math.Abs(number) <= float.MaxValue ? (float)number : throw new AutomationException(Overflow, "Overflow");
+    }
+
+    private static FormValue VariantOf(object? value) => value switch
+    {
+        null => FormValue.Empty,
+        DBNull => FormValue.Null,
+        bool truth => FormValue.FromBoolean(truth),
+        byte number => FormValue.FromByte(number),
+        short number => FormValue.FromInteger(number),
+        int number => FormValue.FromLong(number),
+        long number => FormValue.FromLongLong(number),
+        float number => FormValue.FromSingle(number),
+        double number => FormValue.FromDouble(number),
+        decimal number => FormValue.FromDecimal(number),
+        DateTime date => FormValue.FromDate(date),
+        string text => FormValue.FromString(text),
+        ErrorWrapper error => FormValue.FromError(error.ErrorCode),
+        RDFormsObject held => FormValue.FromObject(held.Component),
+        _ when Unwrapped(value) is decimal currency => FormValue.FromCurrency(currency),
+        _ => FormValue.FromObject(value),
+    };
+
     // a property's value, as a server answers it: an enumeration is its number, and a colour its OLE_COLOR. A value of a type no program can hold yet is no value.
     public static bool TryToNeutral(object? value, out object? neutral)
     {
