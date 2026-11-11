@@ -240,7 +240,7 @@ public sealed class VisualBasicFormLifecycleTests
         CollectionAssert.AreEqual(new[] { "Initialize", "Load" }, ended.Output.Select(line => line.Trim()).ToArray());
     }
 
-    private const string FormsDoesNotResolve = "the members of the VB library's Global, an application object, are not names of a VB6 program, so Forms does not resolve";
+    private const string FormsDoesNotResolve = "binding the VB library's Global members (such as Forms) in a VB6 program is not implemented";
     [TestMethod]
     [Ignore(FormsDoesNotResolve)]
     [DataRow(new[] { "Load Form3", "Load Form2", "Debug.Print Forms.Count & Forms(0).Caption & Forms(1).Caption", "Unload Form2", "Unload Form3" },
