@@ -298,15 +298,17 @@ internal static class ModuleWorkspace
     /// <param name="releaseDropsDebugStatements">Whether a release build leaves out the <c>Debug</c> statements; it keeps them when omitted.</param>
     /// <param name="modules">The name and the source of each standard module beside <c>Program</c>; none when omitted.</param>
     /// <param name="environment">What else the environment says, given the profile the other arguments make; that profile when omitted.</param>
+    /// <param name="forms">The forms of the workspace, each with what its designer declares; none when omitted.</param>
     public static Task InspectAsync(
         IReadOnlyList<(string Name, string Source)> classes, string program,
         Func<EnvironmentSessionProvider, ExecuteResult, Func<Task<ExecuteResult>>, Task> inspect, Func<EnvironmentSessionProvider, Task>? cancelWhen = null,
         bool debug = false,
         WorkspaceLibraries? libraries = null, SupportedLanguage? language = null, VBBuildConfiguration configuration = VBBuildConfiguration.Debug,
         VBExecutionEngine? engine = null, bool releaseDropsDebugStatements = false, IReadOnlyList<(string Name, string Source)>? modules = null,
-        Func<RuntimeEnvironmentProfile, RuntimeEnvironmentProfile>? environment = null, IHostInteractionChannel? interaction = null)
+        Func<RuntimeEnvironmentProfile, RuntimeEnvironmentProfile>? environment = null, IHostInteractionChannel? interaction = null,
+        IReadOnlyList<(string Name, string Source, FormDescriptor Designer)>? forms = null)
         => RunCoreAsync(classes, program, errorsOnly: false, language: language, inspect: inspect, cancelWhen: cancelWhen, debug: debug, libraries: libraries,
-            configuration: configuration, engine: engine, releaseDropsDebugStatements: releaseDropsDebugStatements, modules: modules, environment: environment,
+            forms: forms, configuration: configuration, engine: engine, releaseDropsDebugStatements: releaseDropsDebugStatements, modules: modules, environment: environment,
             interaction: interaction);
 
     /// <summary>
