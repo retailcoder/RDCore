@@ -100,6 +100,73 @@ public sealed class RDFormsFormHostTests
     }
 
     [TestMethod]
+    public void AVisualBasicControlsPositionAndSize_AreInTwips_AsItsDesignerWritesThem()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            var text = Get(host, form, "Text1")!;
+
+            Assert.AreEqual(120d, Get(host, text, "Left"));
+            Assert.AreEqual(120d, Get(host, text, "Top"));
+            Assert.AreEqual(1215d, Get(host, text, "Width"));
+            Assert.AreEqual(285d, Get(host, text, "Height"));
+
+            Let(host, text, "Left", 360);
+            Let(host, text, "Width", 2400);
+            Assert.AreEqual(360d, Get(host, text, "Left"));
+            Assert.AreEqual(2400d, Get(host, text, "Width"));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AVisualBasicControlsPositionAndSize_AreInItsContainersScale()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            var text = Get(host, form, "Text1")!;
+            Let(host, form, "ScaleMode", 3);
+
+            // 15 twips to the pixel.
+            Assert.AreEqual(8d, Get(host, text, "Left"));
+            Assert.AreEqual(81d, Get(host, text, "Width"));
+
+            Let(host, text, "Left", 16);
+            Let(host, form, "ScaleMode", 1);
+            Assert.AreEqual(240d, Get(host, text, "Left"));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void AVisualBasicFormsOwnSize_IsItsClientArea_InTwips_WhateverItsScale()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm());
+        try
+        {
+            Let(host, form, "ScaleMode", 3);
+
+            Assert.AreEqual(4680d, Get(host, form, "Width"));
+            Assert.AreEqual(3195d, Get(host, form, "Height"));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
     public void AFormsCaption_IsItsOwnCaptionProperty()
     {
         var host = Host();

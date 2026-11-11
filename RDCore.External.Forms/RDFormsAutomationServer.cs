@@ -61,8 +61,8 @@ public sealed class RDFormsAutomationServer : IAutomationServer
             {
                 return invocation switch
                 {
-                    AutomationInvocation.Let or AutomationInvocation.Set => Assign(component, property, arguments, culture),
-                    _ when arguments.Length == 0 => Read(component, property),
+                    AutomationInvocation.Let or AutomationInvocation.Set => Assign(component, property, arguments, culture, handle.Form.Unit),
+                    _ when arguments.Length == 0 => Read(component, property, handle.Form.Unit),
                     _ => throw new AutomationException(BadParameterCount, $"{handle}.{member} takes no argument."),
                 };
             }
@@ -81,12 +81,21 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     private static RDFormsObject? Control(RDFormsObject handle, string name)
         => handle.IsForm && handle.Form.Model.Find(name) is { } control && !ReferenceEquals(control, handle.Component) ? handle.Form.HandleOf(control) : null;
 
-    private static object? Read(ComponentInstance component, PropertyDefinition property)
-        => RDFormsValues.TryToNeutral(component.GetBoxed(property), out var value)
+    // the model holds a component's position and size in pixels: the program reads and writes them in its form's unit.
+    private static object? Read(ComponentInstance component, PropertyDefinition property, CodeUnit unit)
+    {
+        var stored = component.GetBoxed(property);
+        if (CodeUnits.IsExtent(property))
+        {
+            stored = CodeUnits.ToCode(component, property, (double)stored!, unit);
+        }
+
+        return RDFormsValues.TryToNeutral(stored, out var value)
             ? value
             : throw new AutomationException(NotImplemented, $"{component}.{property.Name}: a value of type {property.ValueType.Name} cannot be given to a program.");
+    }
 
-    private static object? Assign(ComponentInstance component, PropertyDefinition property, object?[] arguments, CultureInfo culture)
+    private static object? Assign(ComponentInstance component, PropertyDefinition property, object?[] arguments, CultureInfo culture, CodeUnit unit)
     {
         if (arguments.Length != 1)
         {
@@ -94,6 +103,11 @@ public sealed class RDFormsAutomationServer : IAutomationServer
         }
 
         var value = RDFormsValues.FromNeutral(arguments[0], property.ValueType, culture);
+        if (CodeUnits.IsExtent(property))
+        {
+            value = CodeUnits.FromCode(component, property, (double)value!, unit);
+        }
+
         if (!component.TrySet(property, value))
         {
             throw new AutomationException(RDFormsValues.InvalidPropertyValue, "Invalid property value");

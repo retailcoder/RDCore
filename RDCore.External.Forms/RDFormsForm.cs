@@ -27,15 +27,19 @@ internal sealed class RDFormsForm : IComponentEventSink
     private readonly Dictionary<ComponentInstance, IAutomationEventSink> _sinks = new(ReferenceEqualityComparer.Instance);
     private DispatcherFrame? _modal;
 
-    public RDFormsForm(Model.FormDefinition model)
+    public RDFormsForm(Model.FormDefinition model, CodeUnit unit)
     {
         Model = model;
+        Unit = unit;
         Window = new VBFormWindow(model) { UnloadRequestHandler = AskToUnload };
         VBControl.SetEventSink(Window, this);
         Handle = HandleOf(model.Root);
     }
 
     public Model.FormDefinition Model { get; }
+
+    // the unit the form's program reads and writes its components' positions and sizes in; the model holds them in pixels.
+    public CodeUnit Unit { get; }
 
     public VBFormWindow Window { get; }
 

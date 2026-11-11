@@ -331,6 +331,16 @@ public sealed class VisualBasicFormLanguageTests
     }
 
     [TestMethod]
+    public async Task AVB6FormsControlsPosition_HostedByRDForms_IsInTwips_OrInTheFormsScale()
+    {
+        var printed = await RunWithRDFormsAsync(
+            "Form1.Text1.Left = 360\r\nForm1.Text1.Width = 1500\r\nDebug.Print Form1.Text1.Left\r\nDebug.Print Form1.Text1.Width\r\n" +
+            "Form1.ScaleMode = 3\r\nDebug.Print Form1.Text1.Left\r\nDebug.Print Form1.Text1.Width\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "360", "1500", "24", "100" }, printed);
+    }
+
+    [TestMethod]
     public async Task AVB6FormsControlsEvent_HostedByRDForms_IsHandledByTheFormsHandler()
     {
         // setting a TextBox's Text from code raises its Change, in VB6 as in a UserForm.
