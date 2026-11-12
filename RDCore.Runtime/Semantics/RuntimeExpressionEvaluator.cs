@@ -1157,6 +1157,24 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
                 VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, default, $"The object has no member '{memberName}'."));
 
     /// <summary>
+    /// Invokes a member of <paramref name="owner"/> by name, with arguments the caller makes: what a graphics statement calls on the object it draws on.
+    /// </summary>
+    /// <param name="session">The session the object lives in.</param>
+    /// <param name="context">The scope of the statement.</param>
+    /// <param name="owner">The value the member is called on.</param>
+    /// <param name="ownerExpression">The expression the value was reached through, or <see langword="null"/> for none.</param>
+    /// <param name="memberName">The member's name.</param>
+    /// <param name="arguments">The arguments, in the order of the member's parameters.</param>
+    /// <param name="call">The statement that makes the call, which the call is located at.</param>
+    /// <returns>What the member returned, or the error it raised; <c>438</c> when the value is no object that has such a member.</returns>
+    public RuntimeSemanticsEvaluationResult InvokeMember(IRuntimeSession session, RuntimeEvaluationContext context, VBTypedValue owner, ExpressionNode? ownerExpression,
+        string memberName, ImmutableArray<ExpressionNode> arguments, SyntaxNode call)
+        => TryResolveInvocableMember(session, context, ownerExpression, owner, memberName) is { } found
+            ? InvokeProcedure(session, context, found.Member, arguments, found.Receiver, reachedThrough: ownerExpression, call: call)
+            : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+                VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, call.SourceLocation, $"The object has no {memberName} method."));
+
+    /// <summary>
     /// Invokes <paramref name="member"/> of <paramref name="owner"/> with the arguments written after its name, as a read of it does: what an assignment to a
     /// member that has no <c>Property Let</c> invokes instead, to assign the default member of what it returns (<strong>MS-VBAL §5.4.3.8</strong>).
     /// </summary>

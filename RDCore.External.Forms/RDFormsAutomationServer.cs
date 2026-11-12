@@ -62,6 +62,11 @@ public sealed class RDFormsAutomationServer : IAutomationServer
         {
             Alive(handle);
             var component = handle.Component;
+            if (RDFormsGraphics.TryInvoke(component, member, invocation, arguments, culture, out var drawn))
+            {
+                return drawn;
+            }
+
             if (component.Class.Property(member) is { } property)
             {
                 return invocation switch
