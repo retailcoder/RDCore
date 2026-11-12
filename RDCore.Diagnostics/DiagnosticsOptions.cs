@@ -34,14 +34,14 @@ public sealed record class DiagnosticsOptions
     public NameRuleOptions HungarianNotation { get; set; } = new();
 
     /// <summary>
-    /// Whether a <c>For</c> loop whose step is <c>1</c> states it. <see cref="ForStepConvention.Implicit"/> reports <c>Step 1</c> (<c>RDC00313</c>);
+    /// Whether a <c>For</c> loop whose step is <c>1</c> states it. <see cref="ForStepConvention.Implicit"/>, the default, reports <c>Step 1</c> (<c>RDC00313</c>);
     /// <see cref="ForStepConvention.Explicit"/> reports a loop with no <c>Step</c> (<c>RDC00116</c>).
     /// </summary>
     public ForStepConvention ForStep { get; set; } = ForStepConvention.Implicit;
 
     /// <summary>
-    /// Whether a parameter passed by reference states <c>ByRef</c>. <see cref="ByRefConvention.Explicit"/> reports a parameter that states neither <c>ByRef</c>
-    /// nor <c>ByVal</c> (<c>RDC00104</c>); <see cref="ByRefConvention.Implicit"/> reports <c>ByRef</c> written (<c>RDC00314</c>).
+    /// Whether a parameter passed by reference states <c>ByRef</c>. <see cref="ByRefConvention.Explicit"/>, the default, reports a parameter that states neither
+    /// <c>ByRef</c> nor <c>ByVal</c> (<c>RDC00104</c>); <see cref="ByRefConvention.Implicit"/> reports <c>ByRef</c> written (<c>RDC00314</c>).
     /// </summary>
     public ByRefConvention ByRefModifier { get; set; } = ByRefConvention.Explicit;
 }
