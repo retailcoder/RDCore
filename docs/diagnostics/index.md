@@ -249,6 +249,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00112](rdc00112.md)|Implicit narrowing conversion|A value converted implicitly into a type that holds less of it|
 |[RDC00114](rdc00114.md)|Implicit array declaration|A `ReDim` that declares the array it re-dimensions|
 |[RDC00115](rdc00115.md)|Implicit result local|A function that reads its own return value, as the local variable it implicitly is|
+|[RDC00116](rdc00116.md)|Implicit For step|A For loop that states no Step, under the convention that writes Step 1|
 |[RDC00201](rdc00201.md)|Integer data type declaration|An As Integer clause|
 |[RDC00202](rdc00202.md)|Module-scope Dim declaration|A module-level variable declared with Dim|
 |[RDC00203](rdc00203.md)|Multiline parameter declaration|One parameter declared over several lines|
@@ -257,6 +258,8 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00206](rdc00206.md)|Not all code paths return a value|A function or property getter with a code path that does not assign its return value|
 |[RDC00207](rdc00207.md)|IsMissing that is always False|IsMissing of a parameter that is not a Variant, or an Optional Variant with a default value|
 |[RDC00208](rdc00208.md)|Shadowed declaration|A local or a parameter named like a member of the module, of another module, or of a library|
+|[RDC00209](rdc00209.md)|Boolean assigned in If…Else|An If…Else that assigns True in one branch and False in the other to the same variable|
+|[RDC00210](rdc00210.md)|Stop statement|A Stop statement|
 |[RDC00302](rdc00302.md)|Obsolete Call statement|A call statement written with the Call keyword|
 |[RDC00303](rdc00303.md)|Obsolete comment syntax|A comment written with the Rem keyword|
 |[RDC00304](rdc00304.md)|Obsolete error syntax|An Error statement|
@@ -267,6 +270,9 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00309](rdc00309.md)|Obsolete On Local Error statement|An error handler set with On Local Error|
 |[RDC00310](rdc00310.md)|Redundant ByVal argument|An argument written `ByVal` for a parameter that is `ByVal` already|
 |[RDC00311](rdc00311.md)|Early binding opportunity|`CreateObject` of a class that a referenced library declares|
+|[RDC00313](rdc00313.md)|Redundant Step 1|A For loop that states Step 1|
+|[RDC00314](rdc00314.md)|Redundant ByRef modifier|A parameter that states ByRef, under the convention that leaves it unwritten|
+|[RDC00315](rdc00315.md)|Redundant module option|A module that states Option Base 0 or Option Compare Binary|
 |[RDC00405](rdc00405.md)|Implementations should be private|A Public implementation of an interface member or handler of an event|
 |[RDC00407](rdc00407.md)|Unmatched event handler|A handler of a form control's event that does not match the event, and that nothing calls|
 |[RDC01001](rdc01001.md)|Use meaningful identifier names|A name too short, ending with a digit, or without a vowel|

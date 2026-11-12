@@ -34,13 +34,14 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00101`](../diagnostics/rdc00101.md)|Implicit declarations enabled|Warning|`ModuleSemanticModel.OptionExplicit`|
 |[`RDC00102`](../diagnostics/rdc00102.md)|Implicit non-default array base|Hint|the syntax tree: an `Option Base 1` directive|
 |[`RDC00103`](../diagnostics/rdc00103.md)|Implicit type declarations enabled|Hint|the syntax tree: a `Def<Type>` directive|
-|[`RDC00104`](../diagnostics/rdc00104.md)|Implicit ByRef modifier|Information|the syntax tree: `ParameterDeclarationNode.ParameterKind`|
+|[`RDC00104`](../diagnostics/rdc00104.md)|Implicit ByRef modifier|Information|the syntax tree: `ParameterDeclarationNode.ParameterKind`, when `DiagnosticsOptions.ByRefModifier` is `Explicit`|
 |[`RDC00105`](../diagnostics/rdc00105.md)|Implicit Public member|Information|the syntax tree: `MemberDeclarationNode.AccessModifier`|
 |[`RDC00106`](../diagnostics/rdc00106.md)|Implicit Variant declaration|Information|the syntax tree: a declaration with no type, and the `Def<Type>` directives|
 |[`RDC00107`](../diagnostics/rdc00107.md)|Implicit Variant return type|Information|the syntax tree: a function with no type, and the `Def<Type>` directives|
 |[`RDC00112`](../diagnostics/rdc00112.md)|Implicit narrowing conversion|Warning|`ProcedureSemanticModel.Runtime`: the `ConversionFact`s the language core states about the code of the procedure|
 |[`RDC00114`](../diagnostics/rdc00114.md)|Implicit array declaration|Information|`ModuleSemanticModel.Declarations`: a local whose `DeclarationFact.DeclaredBy` is `ReDim`|
 |[`RDC00115`](../diagnostics/rdc00115.md)|Implicit result local|Information|the syntax tree, and `ProcedureSemanticModel.Expressions`: a name of the procedure, read in its body, bound to it and not a call of it|
+|[`RDC00116`](../diagnostics/rdc00116.md)|Implicit For step|Information|the syntax tree: a `ForStatementNode` with no `StepExpression`, when `DiagnosticsOptions.ForStep` is `Explicit`|
 |[`RDC00201`](../diagnostics/rdc00201.md)|Integer data type declaration|Information|the syntax tree: `AsTypeExpressionNode`|
 |[`RDC00202`](../diagnostics/rdc00202.md)|Module-scope Dim declaration|Information|the syntax tree: a module-level variable with no access modifier|
 |[`RDC00203`](../diagnostics/rdc00203.md)|Multiline parameter declaration|Information|the syntax tree: the range of a `ParameterDeclarationNode`|
@@ -49,6 +50,8 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00206`](../diagnostics/rdc00206.md)|Not all code paths return a value|Warning|`ProcedureSemanticModel.ReturnValue`, from the `ControlFlowGraph` of the procedure|
 |[`RDC00207`](../diagnostics/rdc00207.md)|IsMissing that is always False|Warning|`ValueExpressionSemanticFlags.IsMissingAlwaysFalse`|
 |[`RDC00208`](../diagnostics/rdc00208.md)|Shadowed declaration|Information|`DeclarationFact.Hides`, from the resolver: what the name of a local or a parameter means as seen from the module|
+|[`RDC00209`](../diagnostics/rdc00209.md)|Boolean assigned in If…Else|Information|the syntax tree: an `IfBlockStatementNode` whose `Body` and `ElseBlock` each hold one Let-assignment of a Boolean literal to the same name|
+|[`RDC00210`](../diagnostics/rdc00210.md)|Stop statement|Information|the syntax tree: a `KeywordStatementNode` of `Stop`|
 |[`RDC00302`](../diagnostics/rdc00302.md)|Obsolete Call statement|Hint|`ValueExpressionSemanticFlags.ExplicitCallKeyword`|
 |[`RDC00303`](../diagnostics/rdc00303.md)|Obsolete comment syntax|Information|`ModuleSemanticModel.Language` (`SupportedLanguage.UsesClassicBasicSyntax`), and the comments of the syntax tree|
 |[`RDC00304`](../diagnostics/rdc00304.md)|Obsolete error syntax|Information|`ModuleSemanticModel.Language`, and the syntax tree: an `Error` statement|
@@ -59,6 +62,9 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00309`](../diagnostics/rdc00309.md)|Obsolete On Local Error statement|Information|the syntax tree: `OnErrorGoToStatementNode.IsLocal`|
 |[`RDC00310`](../diagnostics/rdc00310.md)|Redundant ByVal argument|Hint|`ValueExpressionSemanticFlags.RedundantByVal`|
 |[`RDC00311`](../diagnostics/rdc00311.md)|Early binding opportunity|Information|`ExpressionFact.Creates` (`ObjectClassSource.ReferencedLibrary`)|
+|[`RDC00313`](../diagnostics/rdc00313.md)|Redundant Step 1|Information|the syntax tree: a `StepExpression` that is the Integer literal `1`, when `DiagnosticsOptions.ForStep` is `Implicit`|
+|[`RDC00314`](../diagnostics/rdc00314.md)|Redundant ByRef modifier|Information|the syntax tree: `ParameterKind.ExplicitByRef`, when `DiagnosticsOptions.ByRefModifier` is `Implicit`; `DeclarationFact.Role` leaves out implementations and event handlers|
+|[`RDC00315`](../diagnostics/rdc00315.md)|Redundant module option|Information|the syntax tree: a `ModuleOptionDirectiveNode` of `Option Base 0` or `Option Compare Binary`|
 |[`RDC00405`](../diagnostics/rdc00405.md)|Implementations should be private|Information|`DeclarationFact.Role` and `DeclarationFact.Access`|
 |[`RDC00407`](../diagnostics/rdc00407.md)|Unmatched event handler|Hint|`DeclarationFact.Role` (`DeclarationRole.UnmatchedEventHandler`) and `DeclarationFact.References`|
 |[`RDC01001`](../diagnostics/rdc01001.md)|Use meaningful identifier names|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.MeaningfulNames`|

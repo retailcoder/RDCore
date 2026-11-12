@@ -851,5 +851,59 @@ namespace RDCore.Diagnostics.Model {
             }
         }
 
+        /// <summary>
+        ///   Looks up a localized string similar to This For loop states no Step: Step 1 says that the counter goes up by 1..
+        /// </summary>
+        public static string ImplicitForStep_Message {
+            get {
+                return ResourceManager.GetString("ImplicitForStep_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Step 1 is what a For loop with no Step does..
+        /// </summary>
+        public static string RedundantStepOne_Message {
+            get {
+                return ResourceManager.GetString("RedundantStepOne_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Each branch assigns a Boolean literal to &apos;{0}&apos;: assigning it the condition, or Not the condition, says the same..
+        /// </summary>
+        public static string BooleanAssignedInIfElse_Message {
+            get {
+                return ResourceManager.GetString("BooleanAssignedInIfElse_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Stop suspends the program here, as a breakpoint does..
+        /// </summary>
+        public static string StopStatement_Message {
+            get {
+                return ResourceManager.GetString("StopStatement_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Parameter &apos;{0}&apos; is passed by reference with or without ByRef..
+        /// </summary>
+        public static string RedundantByRefModifier_Message {
+            get {
+                return ResourceManager.GetString("RedundantByRefModifier_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0} is what a module that states no such option has..
+        /// </summary>
+        public static string RedundantModuleOption_Message {
+            get {
+                return ResourceManager.GetString("RedundantModuleOption_Message", resourceCulture);
+            }
+        }
+
     }
 }

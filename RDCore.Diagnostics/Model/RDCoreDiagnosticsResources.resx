@@ -381,4 +381,22 @@
   <data name="TrueValueIsNotMinusOne_Message" xml:space="preserve">
     <value>&apos;{0}&apos; works on the bits of a constant that is True with a value other than -1, so this condition does not give the truth value it seems to give (Not 1 is -2, which is True). Test the constant by itself, or compare it with 0; or give a constant of your own the value True.</value>
   </data>
+  <data name="ImplicitForStep_Message" xml:space="preserve">
+    <value>This For loop states no Step: Step 1 says that the counter goes up by 1.</value>
+  </data>
+  <data name="RedundantStepOne_Message" xml:space="preserve">
+    <value>Step 1 is what a For loop with no Step does.</value>
+  </data>
+  <data name="BooleanAssignedInIfElse_Message" xml:space="preserve">
+    <value>Each branch assigns a Boolean literal to &apos;{0}&apos;: assigning it the condition, or Not the condition, says the same.</value>
+  </data>
+  <data name="StopStatement_Message" xml:space="preserve">
+    <value>Stop suspends the program here, as a breakpoint does.</value>
+  </data>
+  <data name="RedundantByRefModifier_Message" xml:space="preserve">
+    <value>Parameter &apos;{0}&apos; is passed by reference with or without ByRef.</value>
+  </data>
+  <data name="RedundantModuleOption_Message" xml:space="preserve">
+    <value>{0} is what a module that states no such option has.</value>
+  </data>
 </root>

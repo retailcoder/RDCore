@@ -408,6 +408,8 @@
   href: rdc00114.md
 - name: "RDC00115: Implicit result local"
   href: rdc00115.md
+- name: "RDC00116: Implicit For step"
+  href: rdc00116.md
 - name: "RDC00201: Integer data type declaration"
   href: rdc00201.md
 - name: "RDC00202: Module-scope Dim declaration"
@@ -424,6 +426,10 @@
   href: rdc00207.md
 - name: "RDC00208: Shadowed declaration"
   href: rdc00208.md
+- name: "RDC00209: Boolean assigned in If…Else"
+  href: rdc00209.md
+- name: "RDC00210: Stop statement"
+  href: rdc00210.md
 - name: "RDC00302: Obsolete Call statement"
   href: rdc00302.md
 - name: "RDC00303: Obsolete comment syntax"
@@ -444,6 +450,12 @@
   href: rdc00310.md
 - name: "RDC00311: Early binding opportunity"
   href: rdc00311.md
+- name: "RDC00313: Redundant Step 1"
+  href: rdc00313.md
+- name: "RDC00314: Redundant ByRef modifier"
+  href: rdc00314.md
+- name: "RDC00315: Redundant module option"
+  href: rdc00315.md
 - name: "RDC00405: Implementations should be private"
   href: rdc00405.md
 - name: "RDC00407: Unmatched event handler"

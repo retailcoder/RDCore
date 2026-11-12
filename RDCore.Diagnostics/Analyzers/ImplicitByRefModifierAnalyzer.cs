@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.Diagnostics.Model;
 using RDCore.SDK.Model;
@@ -11,17 +12,21 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <c>RDC00104</c>: a parameter that states neither <c>ByRef</c> nor <c>ByVal</c>, and is passed by reference (<strong>MS-VBAL §5.3.1.5</strong>).
 /// </summary>
 /// <remarks>
-/// A <c>ParamArray</c> cannot state either, and the value parameter of a property <c>Let</c> or <c>Set</c> is always passed by value, so neither is reported.
+/// A <c>ParamArray</c> cannot state either, and the value parameter of a property <c>Let</c> or <c>Set</c> is always passed by value, so neither is reported. Under
+/// the convention that leaves <c>ByRef</c> unwritten (<see cref="DiagnosticsOptions.ByRefModifier"/>) nothing is: <c>RDC00314</c> reports the opposite.
 /// </remarks>
-internal sealed class ImplicitByRefModifierAnalyzer : SyntaxTreeAnalyzer
+/// <param name="options">The settings of the extension.</param>
+internal sealed class ImplicitByRefModifierAnalyzer(IOptions<DiagnosticsOptions> options) : SyntaxTreeAnalyzer
 {
     protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
-        => module.Descendants()
-            .OfType<ParameterDeclarationNode>()
-            .Where(parameter => parameter is { ParameterKind: ParameterKind.ImplicitByRef, IsParamArray: false })
-            .Select(parameter => new AnalyzerFinding(
-                RDCoreDiagnosticId.ImplicitByRefModifier.ToCode(),
-                parameter.Location.Range,
-                DiagnosticSeverity.Information,
-                Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Message, parameter.Name)));
+        => options.Value.ByRefModifier is ByRefConvention.Implicit
+            ? []
+            : module.Descendants()
+                .OfType<ParameterDeclarationNode>()
+                .Where(parameter => parameter is { ParameterKind: ParameterKind.ImplicitByRef, IsParamArray: false })
+                .Select(parameter => new AnalyzerFinding(
+                    RDCoreDiagnosticId.ImplicitByRefModifier.ToCode(),
+                    parameter.Location.Range,
+                    DiagnosticSeverity.Information,
+                    Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Message, parameter.Name)));
 }
