@@ -124,7 +124,7 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to &quot;&quot; is a String of no characters, which vbNullString says by name..
+        ///   Looks up a localized string similar to &quot;&quot; is a String of no characters: vbNullString says the same by name..
         /// </summary>
         public static string EmptyStringLiteral_Message {
             get {

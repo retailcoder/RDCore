@@ -267,7 +267,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00309](rdc00309.md)|Obsolete On Local Error statement|An error handler set with On Local Error|
 |[RDC00310](rdc00310.md)|Redundant ByVal argument|An argument written `ByVal` for a parameter that is `ByVal` already|
 |[RDC00311](rdc00311.md)|Early binding opportunity|`CreateObject` of a class that a referenced library declares|
-|[RDC00312](rdc00312.md)|Empty string literal|The literal `""`, which `vbNullString` says by name|
+|[RDC00312](rdc00312.md)|Empty string literal|The literal `""`, where `vbNullString` says the same by name|
 |[RDC00405](rdc00405.md)|Implementations should be private|A Public implementation of an interface member or handler of an event|
 |[RDC00407](rdc00407.md)|Unmatched event handler|A handler of a form control's event that does not match the event, and that nothing calls|
 |[RDC01001](rdc01001.md)|Use meaningful identifier names|A name too short, ending with a digit, or without a vowel|

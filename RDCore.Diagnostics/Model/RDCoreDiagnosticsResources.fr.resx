@@ -388,6 +388,6 @@
     <value>Le module &apos;{0}&apos; ne déclare rien.</value>
   </data>
   <data name="EmptyStringLiteral_Message" xml:space="preserve">
-    <value>&quot;&quot; est une String sans aucun caractère, ce que vbNullString dit par son nom.</value>
+    <value>&quot;&quot; est une String sans aucun caractère : vbNullString dit la même chose par son nom.</value>
   </data>
 </root>
