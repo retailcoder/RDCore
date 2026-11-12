@@ -142,6 +142,14 @@ public interface IReplPlatformClient
     Task<IReadOnlyList<ReplInlayHint>> GetInlayHintsAsync(Uri document, CancellationToken token);
 
     /// <summary>
+    /// Asks the language server which document of the workspace a module is (<c>workspace/symbol</c>): the one whose outline has a module of that name.
+    /// </summary>
+    /// <param name="moduleName">The module's name, in any case.</param>
+    /// <param name="token">A token that cancels the request.</param>
+    /// <returns>The document's URI; <see langword="null"/> when no document of the workspace is that module.</returns>
+    Task<Uri?> FindModuleAsync(string moduleName, CancellationToken token);
+
+    /// <summary>
     /// Asks the language server what it finds in a document (<c>textDocument/diagnostic</c>): the diagnostics as an editor gets them, with what fixes them in
     /// their <c>data</c>.
     /// </summary>
@@ -287,6 +295,13 @@ public interface IReplPlatformClient
     /// <param name="breakpoints">The breakpoints to set.</param>
     /// <param name="token">A token that cancels the request.</param>
     Task<DebugBreakpointsResult> SetBreakpointsAsync(string moduleName, IReadOnlyList<SessionBreakpointLine> breakpoints, CancellationToken token);
+
+    /// <summary>
+    /// Asks the language server to set which run-time errors a program under a debugger waits at, where they are raised.
+    /// </summary>
+    /// <param name="mode">The errors to wait at.</param>
+    /// <param name="token">A token that cancels the request.</param>
+    Task SetErrorBreakAsync(ErrorBreakMode mode, CancellationToken token);
 
     /// <summary>
     /// Asks the language server for the activations of the program that waits, innermost first.
@@ -442,6 +457,12 @@ public sealed record class ReplCommandContext(
     /// <c>0</c> lists none.
     /// </summary>
     public int BreakListingLines { get; init; } = AppOptions.DefaultBreakListingLines;
+
+    /// <summary>
+    /// The files of the workspace the shell is attached to, which a break in one of its modules lists the lines of: the language server says which file a module
+    /// is, and the shell, its client, reads it.
+    /// </summary>
+    public System.IO.Abstractions.IFileSystem Files { get; init; } = new System.IO.Abstractions.FileSystem();
 }
 
 /// <summary>
@@ -463,6 +484,12 @@ public interface IReplCommand
 
     /// <summary>A one-line description, for <c>HELP</c>.</summary>
     string Summary { get; }
+
+    /// <summary>
+    /// Whether the command works on the numbered program (<c>LIST</c>, <c>RUN</c>, <c>SAVE</c>): a shell attached to a workspace has none, and refuses it
+    /// (<see cref="ReplProgram.AttachedToWorkspace"/>).
+    /// </summary>
+    bool WorksOnTheProgram => false;
 
     /// <summary>
     /// Runs the command.

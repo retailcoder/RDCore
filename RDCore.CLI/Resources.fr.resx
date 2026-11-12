@@ -293,8 +293,20 @@
   <data name="Repl_SyntaxError" xml:space="preserve">
     <value>ERREUR DE SYNTAXE</value>
   </data>
+  <data name="Repl_NoProgramInWorkspace" xml:space="preserve">
+    <value>ERREUR : AUCUN PROGRAMME</value>
+  </data>
+  <data name="Repl_NoProgramInWorkspace_Verbose" xml:space="preserve">
+    <value>Avec un espace de travail, l'interpréteur exécute les instructions dans son projet. Le programme numéroté, et les commandes qui s'en servent, sont pour l'interpréteur sans espace de travail.</value>
+  </data>
   <data name="Repl_UndefinedLine" xml:space="preserve">
     <value>ERREUR: LIGNE NON DÉFINIE</value>
+  </data>
+  <data name="Repl_UndefinedModule" xml:space="preserve">
+    <value>ERREUR : MODULE NON DÉFINI</value>
+  </data>
+  <data name="Repl_Breakpoint_NoStatement" xml:space="preserve">
+    <value>AUCUNE INSTRUCTION À {0}</value>
   </data>
   <data name="Repl_NotAvailable" xml:space="preserve">
     <value>ERREUR: NON DISPONIBLE</value>
@@ -307,6 +319,9 @@
   </data>
   <data name="Repl_Break_InLine" xml:space="preserve">
     <value>INTERRUPTION À LA LIGNE {0}</value>
+  </data>
+  <data name="Repl_Break_InModuleLine" xml:space="preserve">
+    <value>INTERRUPTION DANS {0} À LA LIGNE {1}</value>
   </data>
   <data name="Repl_HelpHint" xml:space="preserve">
     <value>Tapez HELP pour la liste des commandes.</value>
@@ -359,6 +374,9 @@
   <data name="Repl_RuntimeError_InLine" xml:space="preserve">
     <value>{0} À LA LIGNE {1}</value>
   </data>
+  <data name="Repl_RuntimeError_InModuleLine" xml:space="preserve">
+    <value>{0} DANS {1} À LA LIGNE {2}</value>
+  </data>
   <data name="Repl_RuntimeError_Source" xml:space="preserve">
     <value>SOURCE: {0}</value>
   </data>
@@ -399,7 +417,7 @@
     <value>Efface le contenu de la console.</value>
   </data>
   <data name="Repl_Break_Summary" xml:space="preserve">
-    <value>Place ou retire un point d'arrêt à une ligne (BREAK 40), ou en place un qui attend une condition (BREAK 40 I &gt; 5). BREAK TOGGLE 40 le désactive ou le réactive. BREAK seul les liste, BREAK CLEAR les retire tous.</value>
+    <value>Place ou retire un point d'arrêt à une ligne (BREAK 40), ou en place un qui attend une condition (BREAK 40 I &gt; 5). BREAK TOGGLE 40 le désactive ou le réactive. BREAK seul les liste, BREAK CLEAR les retire tous. Sur un espace de travail, un point d'arrêt est à une ligne d'un module : BREAK Other 9.</value>
   </data>
   <data name="Repl_Cont_Summary" xml:space="preserve">
     <value>Poursuit le programme interrompu, d'où il s'est arrêté ou à partir d'une ligne (CONT 200).</value>
@@ -460,6 +478,9 @@
   </data>
   <data name="Repl_Frame_Summary" xml:space="preserve">
     <value>Choisit la procédure visée par VARS : FRAME 1 est celle qui a appelé.</value>
+  </data>
+  <data name="Repl_Frame_InModuleLine" xml:space="preserve">
+    <value>({0} à la ligne {1})</value>
   </data>
   <data name="Host_NoRuntimeSession" xml:space="preserve">
     <value>il n'y a pas de session d'exécution</value>
@@ -793,5 +814,62 @@
   </data>
   <data name="Verbose_FrameDetails" xml:space="preserve">
     <value>Détails du niveau :</value>
+  </data>
+  <data name="Install_Summary" xml:space="preserve">
+    <value>Installe cette plateforme pour vous, et met rdc dans votre PATH.</value>
+  </data>
+  <data name="Install_Title" xml:space="preserve">
+    <value>Installation</value>
+  </data>
+  <data name="Install_PathOnlyHelp" xml:space="preserve">
+    <value>Met seulement le rdc de la version courante dans votre PATH.</value>
+  </data>
+  <data name="Install_NoModifyPathHelp" xml:space="preserve">
+    <value>Installe la plateforme sans modifier votre PATH ni votre profil.</value>
+  </data>
+  <data name="Install_Waiting" xml:space="preserve">
+    <value>Une autre installation utilise {0} : en attente de sa fin.</value>
+  </data>
+  <data name="Install_NothingCurrent" xml:space="preserve">
+    <value>Aucune plateforme n&apos;est installée dans {0}. Lancez d&apos;abord rdc install à partir du dossier d&apos;une plateforme.</value>
+  </data>
+  <data name="Install_NotATree" xml:space="preserve">
+    <value>rdc install installe la plateforme d&apos;où rdc est lancé, et ce n&apos;en est pas une : {0}</value>
+  </data>
+  <data name="Install_NoVersion" xml:space="preserve">
+    <value>{0} ne nomme aucune version de plateforme : « {1} ».</value>
+  </data>
+  <data name="Install_Deployed" xml:space="preserve">
+    <value>RDCore {0} est déployé dans {1}.</value>
+  </data>
+  <data name="Install_AlreadyDeployed" xml:space="preserve">
+    <value>RDCore {0} était déjà déployé dans {1}.</value>
+  </data>
+  <data name="Install_MadeCurrent" xml:space="preserve">
+    <value>RDCore {0} est maintenant la version courante.</value>
+  </data>
+  <data name="Install_NewerIsCurrent" xml:space="preserve">
+    <value>RDCore {1}, plus récent, reste la version courante : {0} est déployé à côté.</value>
+  </data>
+  <data name="Install_AddedToPath" xml:space="preserve">
+    <value>{0} est maintenant dans votre PATH. Ouvrez un nouveau terminal pour utiliser rdc.</value>
+  </data>
+  <data name="Install_AlreadyOnPath" xml:space="preserve">
+    <value>{0} était déjà dans votre PATH.</value>
+  </data>
+  <data name="Install_Linked" xml:space="preserve">
+    <value>{0} pointe maintenant vers {1}.</value>
+  </data>
+  <data name="Install_AlreadyLinked" xml:space="preserve">
+    <value>{0} pointait déjà vers {1}.</value>
+  </data>
+  <data name="Install_LinkTaken" xml:space="preserve">
+    <value>{0} est un de vos fichiers, pas un lien créé par rdc install : supprimez-le, ou lancez rdc install --no-modify-path.</value>
+  </data>
+  <data name="Install_ProfileBlockAdded" xml:space="preserve">
+    <value>{0} n&apos;est pas dans votre PATH : {1} l&apos;y ajoute maintenant. Ouvrez un nouveau terminal, ou lancez . {1}</value>
+  </data>
+  <data name="Install_ProfileHasBlock" xml:space="preserve">
+    <value>{0} n&apos;est pas encore dans le PATH de ce terminal : {1} l&apos;y ajoute dans un nouveau terminal.</value>
   </data>
 </root>

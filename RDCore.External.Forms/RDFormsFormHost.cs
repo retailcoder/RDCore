@@ -20,6 +20,7 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
 {
     private const int ClassNotRegistered = unchecked((int)0x80040154);
     private const int Failed = unchecked((int)0x80004005);
+    private const int MemberNotFound = unchecked((int)0x80020003);
 
     // whether this host's program runs, which holds the windows' messages.
     private readonly object _holdGate = new();
@@ -142,6 +143,24 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
             RDFormsAutomationServer.Alive(hosted.Handle);
             hosted.Model.Root.Set(VBProperties.Caption, caption);
         });
+    }
+
+    // a Visual Basic 6.0 form's position and size are members of its own object model, which its server serves: only a UserForm's are its form host's,
+    // and RDForms hosts none.
+    /// <inheritdoc/>
+    public FormBounds GetBounds(object form)
+    {
+        var hosted = FormOf(form);
+        RDFormsUI.Run(() => RDFormsAutomationServer.Alive(hosted.Handle));
+        throw new AutomationException(MemberNotFound, "RDForms hosts Visual Basic 6.0 forms only: a form's Left, Top, Width and Height are its own members.");
+    }
+
+    /// <inheritdoc/>
+    public void SetBounds(object form, FormBounds bounds)
+    {
+        var hosted = FormOf(form);
+        RDFormsUI.Run(() => RDFormsAutomationServer.Alive(hosted.Handle));
+        throw new AutomationException(MemberNotFound, "RDForms hosts Visual Basic 6.0 forms only: a form's Left, Top, Width and Height are its own members.");
     }
 
     /// <inheritdoc/>

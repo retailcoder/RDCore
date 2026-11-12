@@ -21,6 +21,14 @@ The shell runs what you type. A line with no line number runs right away: `Debug
 the _current program_: `10 Debug.Print "Hello"`. The current program is the body of an implicit procedure named `Main`, in an implicit module named
 `Program`. It stays in memory until `NEW`, `LOAD` or `EXIT`.
 
+On a workspace (`rdc --workspace <path>`), the shell runs each line in the workspace's project: `Main`, `Program.Main` and the other public procedures
+of the project can be called from the prompt. There is no current program. A numbered line, and the commands that work on the program (`LIST`,
+`FOLD`, `NEW`, `SAVE`, `LOAD`, `RUN`, `ANALYZE`, `DUCKY`, and `CONT` to a line), answer `NO PROGRAM ERROR`.
+
+On a workspace, `BREAK` takes a module and a line of its file: `BREAK Other 9`, `BREAK Other 9 I > 5`, `BREAK TOGGLE Other 9`. `BREAK` alone lists them
+as `Other 9`, and `BREAK CLEAR` removes them all. A module the workspace does not have answers `UNDEF'D MODULE ERROR`, and a line no statement begins on
+answers `NO STATEMENT AT Other 9`.
+
 The shell's language is RDCore BASIC: a variable one line assigns is the one the next line reads, without a `Dim`, and `Print` alone is a statement.
 
 |Command|What it does|
@@ -46,14 +54,21 @@ The shell's language is RDCore BASIC: a variable one line assigns is the one the
 |`MEMORY`, `PEEK <address>`, `POKE <address>, <byte>`|Shows a summary of the session's memory, reads a byte of it, or writes one.|
 |`EXIT`|Ends the session and exits. `BYE` and `QUIT` do the same.|
 
-`Ctrl+C` stops a running program. At a stop (a `Stop` statement, a breakpoint, a step or `Ctrl+C`) the shell says `BREAK IN` and the line number, and
-lists the two lines above it and the two below it, with the stopped line highlighted. `CONFIG CLI.BreakListingLines` sets how many lines are listed on
-each side, from the next start of the shell; `0` lists none. At a stop you can type statements as in the VBIDE's immediate pane, and edit the program
-before you go on.
+`Ctrl+C` stops a running program. At a stop (a `Stop` statement, a failed `Debug.Assert`, a breakpoint or `Ctrl+C`) the shell lists the two lines above
+the stopped line and the two below it, with the stopped line highlighted, then says `BREAK IN` and the line number. A run-time error that nothing
+handles stops the program at the statement that raised it, as in the VBIDE: the shell lists the lines around that statement the same way, then shows
+the error. `CONT` runs the statement again, and `END` ends the program. An error that an `On Error` statement handles does not stop it. A step lists
+nothing: it says only `BREAK IN` and the line number, or shows the error it stopped at. `CONFIG CLI.BreakListingLines`
+sets how many lines are listed on each side, from the next start of the shell; `0` lists none. At a stop you can type statements as in the VBIDE's
+immediate pane, and edit the program before you go on.
+
+A line typed at the prompt runs under the debugger as `RUN` does: a `Stop`, a breakpoint or an error in the code it calls stops it there, and `STACK`
+shows the line's own procedure under the one that stopped. A stop in a module of a workspace lists the module's lines around it as `LIST` lists the
+program, then says `BREAK IN`, the module and its line. A stop at an error in a module of a workspace lists the module's lines the same way, then shows the error with the module and its line.
 
 > [!NOTE]
-> The shell is a way to try the platform. It does not handle a project with more than one procedure scope, or BASIC-style line numbers in your own
-> modules.
+> The shell is a way to try the platform. Its current program is a single procedure: a project with more procedures runs in the shell on a workspace.
+> The shell does not handle BASIC-style line numbers in your own modules.
 
 ---
 ## Commands
@@ -71,6 +86,7 @@ Each command takes a workspace as a folder, with or without a `.rdproj`, or as a
 |`rdc compilation [<path>]`|`cc`|Says, for each procedure, whether it runs compiled, and what keeps it in the interpreter.|
 |`rdc bench [<path>]`|`b`|Times the interpreter on a workspace: its parse, its load, its analysis, then each `Public Sub Bench*()` of its standard modules.|
 |`rdc describe-ext <extension>`|`x`|Writes the manifest of a platform extension. It is for extension authors (see [Building on RDCore](building-on-rdcore.md)).|
+|`rdc install`||Installs the platform `rdc` runs from for your user account, and puts `rdc` on your PATH (below). It takes no workspace.|
 
 ### Running a program
 
@@ -80,7 +96,7 @@ Each command takes a workspace as a folder, with or without a `.rdproj`, or as a
 - otherwise, the `Sub Main` of the one standard module that declares one.
 
 A project with no entry point, or with a `Sub Main` in more than one standard module, does not run. Neither does one with a module that does not load. `Debug.Print`
-writes to the standard output.
+writes to the standard output. A `MsgBox` or an `InputBox` is a dialog box on Windows. On Linux and macOS it is drawn in the console and answered there, as in the shell.
 
 |Option|What it does|
 |---|---|
@@ -105,6 +121,34 @@ The exit code says how the run went:
 |`-n`, `--name`|The program's name; the project's by default.|
 |`-c`, `--configuration`|`Debug` (the default) or `Release`.|
 |`-r`, `--runtime`|The platform the program is built for, such as `win-x64` or `linux-x64`; the one `rdc` runs on by default.|
+
+The program shows its dialogs as `rdc run` does. Run with `--unattended` among its arguments, it fails at the first `MsgBox`, `InputBox` or form it shows. The switch stays in `Command$` and in the arguments of `Main`.
+
+### Installing the platform
+
+`rdc install` installs the platform it runs from, such as a release archive you unpacked, for your user account. The IDE add-in installs the
+platform in the same place, so each one uses what the other installed.
+
+- It copies the platform into `RDCore/Platform/versions/<version>/` in your local application data folder: `%LOCALAPPDATA%` on Windows,
+  `~/.local/share` on Linux, `~/Library/Application Support` on macOS. A version that is installed already is not copied again, and no version
+  is removed.
+- It makes that version the current one, unless the current version is newer.
+- It puts the current version's `rdc` on your PATH, in place of an earlier version's. On Windows, it adds the version's `RDCore.CLI` folder to
+  your user `Path`. On Linux and macOS, it links `~/.local/bin/rdc` to it; when `~/.local/bin` is not on your PATH, it adds a block of lines that
+  puts it there to `~/.profile` (Linux) or `~/.zprofile` (macOS). Open a new terminal to use it.
+
+|Option|What it does|
+|---|---|
+|`--path-only`|Only puts the current version's `rdc` on your PATH.|
+|`--no-modify-path`|Installs the platform without changing your PATH or your profile.|
+
+The exit code says how the installation went:
+
+|Exit code|Meaning|
+|---|---|
+|`0`|The platform is installed.|
+|`1`|It is not: the folder `rdc` runs from is not a whole platform, no version is installed (`--path-only`), or `~/.local/bin/rdc` is a file of your own. The message says which.|
+|`2`|The options are not valid.|
 
 ---
 [ACCUEIL](index.fr.md) • [HOME](index.md) | ℹ️ [BIENVENUE](introduction.fr.md) • [WELCOME](introduction.html) | 🧩 [BÂTISSONS](getting-started.fr.md) • [BUILD](getting-started.html) | [**RD-VBAL**](/RDCore/specs/rd-vbal.html) | [SDK](https://rubberduck-vba.github.io/RDCore.SDK/api/RDCore.SDK.html) | 🌐 [rubberduckvba.ca](https://rubberduckvba.ca)

@@ -7,6 +7,7 @@ using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
+using RDCore.SDK.Model.Symbols.VBProject;
 
 namespace RDCore.LanguageServer.Services.Refactoring.ExtractMethod;
 
@@ -68,11 +69,13 @@ internal static class ExtractionVerification
     /// <param name="edit">The extraction, written.</param>
     /// <param name="name">The name of the new procedure.</param>
     /// <param name="sourceProcedure">The name of the source procedure.</param>
+    /// <param name="sourceKind">Its kind, which tells the procedures of a property apart.</param>
     /// <param name="before">The module as it is.</param>
     /// <param name="analyze">Analyzes the module as the edit leaves it, given its text: bound in the workspace as the module is.</param>
     /// <returns>Why the extraction is not made; <see langword="null"/> when it is verified.</returns>
     public static ExtractionVerificationFailure? Verify(
-        ExtractionPlan plan, ExtractionEdit edit, string name, string sourceProcedure, ExtractionModuleAnalysis before, Func<string, ExtractionModuleAnalysis> analyze)
+        ExtractionPlan plan, ExtractionEdit edit, string name, string sourceProcedure, MemberKind sourceKind, ExtractionModuleAnalysis before,
+        Func<string, ExtractionModuleAnalysis> analyze)
     {
         var (text, written) = ExtractionText.Apply(before.Text, edit.Edits);
         var after = analyze(text);
@@ -81,14 +84,17 @@ internal static class ExtractionVerification
             return new(ExtractionVerificationFailureKind.DoesNotParse, after.Parse.SyntaxErrors.FirstOrDefault()?.Verbose);
         }
 
-        if (before.Procedure(sourceProcedure) is not { } original)
+        if (before.Procedure(sourceProcedure, sourceKind) is not { } original)
         {
             return new(ExtractionVerificationFailureKind.DoesNotParse, sourceProcedure);
         }
 
-        if (after.Procedure(sourceProcedure) is not { } edited || after.Procedure(name) is not { } extracted)
+        // the new procedure is a Function when it gives a value or an exit code back, and a Sub otherwise.
+        var edited = after.Procedure(sourceProcedure, sourceKind);
+        var extracted = after.Procedure(name, MemberKind.Function) ?? after.Procedure(name, MemberKind.Procedure);
+        if (edited is null || extracted is null)
         {
-            return new(ExtractionVerificationFailureKind.DoesNotParse, after.Procedure(sourceProcedure) is null ? sourceProcedure : name);
+            return new(ExtractionVerificationFailureKind.DoesNotParse, edited is null ? sourceProcedure : name);
         }
 
         // a variable declared by being named is one the source procedure had, whichever of the two now names it.
@@ -119,11 +125,16 @@ internal static class ExtractionVerification
         return DataFlowOf(plan, replanned, original, PassedByValue(callSite!, edited, extracted, name)) ?? ExitsOf(plan, replanned);
     }
 
-    // the variables the call passes to a ByVal parameter of the new procedure, and only there: the call cannot write them. The data flow takes every variable
-    // passed to a procedure as one it may write, whatever the procedure declares.
+    // the variables the call passes to a parameter of the new procedure that it cannot write, and only there: a ByVal one, or a ByRef one the new procedure
+    // gives no value. The data flow takes every variable passed to a procedure as one it may write, whatever the procedure declares and does.
     private static HashSet<SemanticId> PassedByValue(ExtractionSelection callSite, ExtractionProcedureAnalysis edited, ExtractionProcedureAnalysis extracted, string name)
     {
-        var parameters = extracted.Declaration.Children.OfType<ParameterDeclarationNode>().ToArray();
+        var written = extracted.Accesses.Definitions.Where(definition => definition.Kind is not VariableDefinitionKind.Entry).Select(definition => definition.Variable).ToHashSet();
+        var unwritten = extracted.Declaration.Children.OfType<ParameterDeclarationNode>()
+            .Select(parameter => parameter.ParameterKind is ParameterKind.ExplicitByVal or ParameterKind.ImplicitByVal
+                || extracted.Scope.Declarations.OfType<VBParameterSymbol>().FirstOrDefault(symbol => symbol.Name.Equals(parameter.Name, StringComparison.OrdinalIgnoreCase)) is { } symbol
+                    && !written.Contains(symbol.SemanticId))
+            .ToArray();
         var byValue = callSite.Statements.SelectMany(statement => (IEnumerable<SyntaxNode>)[statement, .. statement.Descendants()])
             .Select(node => node switch
             {
@@ -132,7 +143,7 @@ internal static class ExtractionVerification
                 _ => [],
             })
             .SelectMany(arguments => arguments.Select((argument, index) => (argument, index)))
-            .Where(passed => passed.index < parameters.Length && parameters[passed.index].ParameterKind is ParameterKind.ExplicitByVal or ParameterKind.ImplicitByVal)
+            .Where(passed => passed.index < unwritten.Length && unwritten[passed.index])
             .Select(passed => passed.argument.Identity)
             .ToHashSet();
 

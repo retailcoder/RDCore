@@ -21,6 +21,15 @@ Le _shell_ exécute ce que vous tapez. Une ligne sans numéro de ligne s'exécut
 de ligne est écrite dans le _programme courant_ : `10 Debug.Print "Bonjour"`. Le programme courant est le corps d'une procédure implicite nommée `Main`,
 dans un module implicite nommé `Program`. Il reste en mémoire jusqu'à `NEW`, `LOAD` ou `EXIT`.
 
+Sur un espace de travail (`rdc --workspace <chemin>`), le _shell_ exécute chaque ligne dans le projet de l'espace de travail : `Main`, `Program.Main` et
+les autres procédures publiques du projet peuvent être appelées depuis l'invite. Il n'y a pas de programme courant. Une ligne numérotée, et les commandes qui se
+servent du programme (`LIST`, `FOLD`, `NEW`, `SAVE`, `LOAD`, `RUN`, `ANALYZE`, `DUCKY`, et `CONT` vers une ligne), répondent
+`ERREUR : AUCUN PROGRAMME`.
+
+Sur un espace de travail, `BREAK` prend un module et une ligne de son fichier : `BREAK Other 9`, `BREAK Other 9 I > 5`, `BREAK TOGGLE Other 9`.
+`BREAK` seul les liste sous la forme `Other 9`, et `BREAK CLEAR` les retire tous. Un module que l'espace de travail n'a pas répond
+`ERREUR : MODULE NON DÉFINI`, et une ligne où ne commence aucune instruction répond `AUCUNE INSTRUCTION À Other 9`.
+
 La langue du _shell_ est le BASIC de RDCore : la variable qu'une ligne assigne est celle que lit la ligne suivante, sans `Dim`, et `Print` seul est
 une instruction.
 
@@ -47,15 +56,23 @@ une instruction.
 |`MEMORY`, `PEEK <adresse>`, `POKE <adresse>, <octet>`|Affiche un sommaire de la mémoire de la session, en lit un octet, ou en écrit un.|
 |`EXIT`|Termine la session et quitte. `BYE` et `QUIT` font de même.|
 
-`Ctrl+C` arrête un programme en cours d'exécution. Lors d'un arrêt (une instruction `Stop`, un point d'arrêt, un pas ou `Ctrl+C`), le _shell_ affiche
-`INTERRUPTION À LA LIGNE` et le numéro de ligne, puis liste les deux lignes au-dessus de cette ligne et les deux au-dessous, la ligne de l'arrêt étant
-mise en évidence. `CONFIG CLI.BreakListingLines` fixe combien de lignes sont listées de chaque côté, à partir du prochain démarrage du _shell_; `0`
-n'en liste aucune. Lors d'un arrêt, vous pouvez taper des instructions comme dans le volet _exécution_ du VBIDE, et modifier le programme avant de
-reprendre.
+`Ctrl+C` arrête un programme en cours d'exécution. Lors d'un arrêt (une instruction `Stop`, un `Debug.Assert` qui échoue, un point d'arrêt ou `Ctrl+C`),
+le _shell_ liste les deux lignes au-dessus de la ligne de l'arrêt et les deux au-dessous, la ligne de l'arrêt étant mise en évidence, puis affiche
+`INTERRUPTION À LA LIGNE` et le numéro de ligne. Une erreur d'exécution que rien ne gère arrête le programme à l'instruction qui l'a déclenchée,
+comme dans le VBIDE : le _shell_ liste de la même façon les lignes autour de cette instruction, puis affiche l'erreur. `CONT` exécute de nouveau
+l'instruction, et `END` termine le programme. Une erreur qu'une instruction `On Error` gère ne l'arrête pas. Un pas ne liste rien : il affiche
+seulement `INTERRUPTION À LA LIGNE` et le numéro de ligne, ou l'erreur à laquelle il s'est arrêté. `CONFIG CLI.BreakListingLines` fixe combien de lignes
+sont listées de chaque côté, à partir du prochain démarrage du _shell_; `0` n'en liste aucune. Lors d'un arrêt, vous pouvez taper des instructions comme
+dans le volet _exécution_ du VBIDE, et modifier le programme avant de reprendre.
+
+Une ligne tapée à l'invite s'exécute sous le débogueur comme avec `RUN` : un `Stop`, un point d'arrêt ou une erreur dans le code qu'elle appelle
+l'arrête là, et `STACK` montre la procédure propre à la ligne sous celle qui s'est arrêtée. Un arrêt dans un module d'un espace de travail liste les
+lignes du module autour de cet arrêt comme `LIST` liste le programme, puis affiche `INTERRUPTION DANS`, le module et sa ligne. Un arrêt à une erreur
+dans un module d'un espace de travail liste de la même façon les lignes du module, puis affiche l'erreur avec le module et sa ligne.
 
 > [!NOTE]
-> Le _shell_ est une façon d'essayer la plateforme. Il ne prend pas en charge un projet de plus d'une portée de procédure, ni les numéros de ligne à la
-> BASIC dans vos propres modules.
+> Le _shell_ est une façon d'essayer la plateforme. Son programme courant est une seule procédure : un projet qui en a plus s'exécute dans le _shell_
+> sur un espace de travail. Le _shell_ ne prend pas en charge les numéros de ligne à la BASIC dans vos propres modules.
 
 ---
 ## Les commandes
@@ -74,6 +91,7 @@ travaille sur le dossier courant.
 |`rdc compilation [<chemin>]`|`cc`|Indique, pour chaque procédure, si elle s'exécute compilée, et ce qui la garde dans l'interpréteur.|
 |`rdc bench [<chemin>]`|`b`|Chronomètre l'interpréteur sur un espace de travail : son analyse syntaxique, son chargement, son analyse, puis chaque `Public Sub Bench*()` de ses modules standard.|
 |`rdc describe-ext <extension>`|`x`|Écrit le manifeste d'une extension de la plateforme. Elle s'adresse aux auteurs d'extensions (voir [Bâtir sur RDCore](building-on-rdcore.fr.md)).|
+|`rdc install`||Installe pour votre compte d'utilisateur la plateforme d'où `rdc` est lancé, et met `rdc` dans votre PATH (ci-dessous). Elle ne prend pas d'espace de travail.|
 
 ### Exécuter un programme
 
@@ -83,7 +101,7 @@ travaille sur le dossier courant.
 - sinon, le `Sub Main` du seul module standard qui en déclare un.
 
 Un projet sans point d'entrée, ou avec un `Sub Main` dans plus d'un module standard, ne s'exécute pas. Un projet dont un module ne se charge pas non
-plus. `Debug.Print` écrit sur la sortie standard.
+plus. `Debug.Print` écrit sur la sortie standard. Un `MsgBox` ou un `InputBox` est une boîte de dialogue sous Windows. Sous Linux et macOS, il s'affiche dans la console et on y répond, comme dans le _shell_.
 
 |Option|Ce qu'elle fait|
 |---|---|
@@ -109,6 +127,35 @@ Le code de sortie indique comment s'est passée l'exécution :
 |`-n`, `--name`|Le nom du programme; celui du projet par défaut.|
 |`-c`, `--configuration`|`Debug` (par défaut) ou `Release`.|
 |`-r`, `--runtime`|La plateforme pour laquelle le programme est construit, comme `win-x64` ou `linux-x64`; celle où s'exécute `rdc` par défaut.|
+
+Le programme affiche ses boîtes de dialogue comme `rdc run`. Exécuté avec `--unattended` parmi ses arguments, il échoue au premier `MsgBox`, `InputBox` ou formulaire qu'il affiche. L'option reste dans `Command$` et dans les arguments de `Main`.
+
+### Installer la plateforme
+
+`rdc install` installe la plateforme d'où il est lancé, comme une archive de version que vous avez décompressée, pour votre compte d'utilisateur.
+Le complément de l'IDE installe la plateforme au même endroit : chacun utilise ce que l'autre a installé.
+
+- Il copie la plateforme dans `RDCore/Platform/versions/<version>/` de votre dossier de données d'application locales : `%LOCALAPPDATA%` sous
+  Windows, `~/.local/share` sous Linux, `~/Library/Application Support` sous macOS. Une version déjà installée n'est pas copiée de nouveau, et
+  aucune version n'est supprimée.
+- Il fait de cette version la version courante, à moins que la version courante soit plus récente.
+- Il met le `rdc` de la version courante dans votre PATH, à la place de celui d'une version antérieure. Sous Windows, il ajoute le dossier
+  `RDCore.CLI` de la version à votre `Path` d'utilisateur. Sous Linux et macOS, il crée le lien `~/.local/bin/rdc` vers celui-ci; quand
+  `~/.local/bin` n'est pas dans votre PATH, il ajoute à `~/.profile` (Linux) ou à `~/.zprofile` (macOS) un bloc de lignes qui l'y met. Ouvrez un
+  nouveau terminal pour l'utiliser.
+
+|Option|Ce qu'elle fait|
+|---|---|
+|`--path-only`|Met seulement le `rdc` de la version courante dans votre PATH.|
+|`--no-modify-path`|Installe la plateforme sans modifier votre PATH ni votre profil.|
+
+Le code de sortie indique comment s'est passée l'installation :
+
+|Code de sortie|Signification|
+|---|---|
+|`0`|La plateforme est installée.|
+|`1`|Elle ne l'est pas : le dossier d'où `rdc` est lancé n'est pas une plateforme complète, aucune version n'est installée (`--path-only`), ou `~/.local/bin/rdc` est un de vos propres fichiers. Le message indique lequel.|
+|`2`|Les options ne sont pas valides.|
 
 ---
 [ACCUEIL](index.fr.md) • [HOME](index.md) | ℹ️ [BIENVENUE](introduction.fr.md) • [WELCOME](introduction.html) | 🧩 [BÂTISSONS](getting-started.fr.md) • [BUILD](getting-started.html) | [**RD-VBAL**](/RDCore/specs/rd-vbal.html) | [SDK](https://rubberduck-vba.github.io/RDCore.SDK/api/RDCore.SDK.html) | 🌐 [rubberduckvba.ca](https://rubberduckvba.ca)

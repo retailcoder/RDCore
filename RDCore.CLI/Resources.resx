@@ -295,8 +295,21 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Repl_SyntaxError" xml:space="preserve">
     <value>SYNTAX ERROR</value>
   </data>
+  <data name="Repl_NoProgramInWorkspace" xml:space="preserve">
+    <value>NO PROGRAM ERROR</value>
+  </data>
+  <data name="Repl_NoProgramInWorkspace_Verbose" xml:space="preserve">
+    <value>With a workspace, the shell runs statements in its project. The numbered program, and the commands that work on it, are for the shell without a workspace.</value>
+  </data>
   <data name="Repl_UndefinedLine" xml:space="preserve">
     <value>UNDEF'D LINE ERROR</value>
+  </data>
+  <data name="Repl_UndefinedModule" xml:space="preserve">
+    <value>UNDEF'D MODULE ERROR</value>
+  </data>
+  <data name="Repl_Breakpoint_NoStatement" xml:space="preserve">
+    <value>NO STATEMENT AT {0}</value>
+    <comment>{0} is where the breakpoint is: a module and its line, such as Other 9.</comment>
   </data>
   <data name="Repl_NotAvailable" xml:space="preserve">
     <value>NOT AVAILABLE ERROR</value>
@@ -309,6 +322,10 @@ Long Live the Cucumber (Latin)</comment>
   </data>
   <data name="Repl_Break_InLine" xml:space="preserve">
     <value>BREAK IN {0}</value>
+  </data>
+  <data name="Repl_Break_InModuleLine" xml:space="preserve">
+    <value>BREAK IN {0} LINE {1}</value>
+    <comment>{0} is the name of the module the program waits in, {1} the line of the module.</comment>
   </data>
   <data name="Repl_HelpHint" xml:space="preserve">
     <value>Type HELP for a list of commands.</value>
@@ -361,6 +378,10 @@ Long Live the Cucumber (Latin)</comment>
   <data name="Repl_RuntimeError_InLine" xml:space="preserve">
     <value>{0} IN {1}</value>
   </data>
+  <data name="Repl_RuntimeError_InModuleLine" xml:space="preserve">
+    <value>{0} IN {1} LINE {2}</value>
+    <comment>{0} is the error's title, {1} the name of the module the program waits in, {2} the line of the module.</comment>
+  </data>
   <data name="Repl_RuntimeError_Source" xml:space="preserve">
     <value>SOURCE: {0}</value>
   </data>
@@ -401,7 +422,7 @@ Long Live the Cucumber (Latin)</comment>
     <value>Clears the console content.</value>
   </data>
   <data name="Repl_Break_Summary" xml:space="preserve">
-    <value>Sets or clears a breakpoint at a line (BREAK 40), or sets one that waits on a condition (BREAK 40 I &gt; 5). BREAK TOGGLE 40 disables or enables it. BREAK alone lists them, BREAK CLEAR removes them all.</value>
+    <value>Sets or clears a breakpoint at a line (BREAK 40), or sets one that waits on a condition (BREAK 40 I &gt; 5). BREAK TOGGLE 40 disables or enables it. BREAK alone lists them, BREAK CLEAR removes them all. On a workspace, a breakpoint is on a line of a module: BREAK Other 9.</value>
   </data>
   <data name="Repl_Cont_Summary" xml:space="preserve">
     <value>Continues the program that was stopped, from where it stopped or from a line (CONT 200).</value>
@@ -462,6 +483,10 @@ Long Live the Cucumber (Latin)</comment>
   </data>
   <data name="Repl_Frame_Summary" xml:space="preserve">
     <value>Selects the procedure VARS is about: FRAME 1 is the one that called.</value>
+  </data>
+  <data name="Repl_Frame_InModuleLine" xml:space="preserve">
+    <value>({0} line {1})</value>
+    <comment>Where an activation of a module of the workspace is, in STACK and in a run-time error's stack trace. {0} is the name of the module, {1} the line of the module.</comment>
   </data>
   <data name="Host_NoRuntimeSession" xml:space="preserve">
     <value>there is no runtime session</value>
@@ -796,5 +821,62 @@ Long Live the Cucumber (Latin)</comment>
   </data>
   <data name="Verbose_FrameDetails" xml:space="preserve">
     <value>Frame details:</value>
+  </data>
+  <data name="Install_Summary" xml:space="preserve">
+    <value>Installs this platform for you, and puts rdc on your PATH.</value>
+  </data>
+  <data name="Install_Title" xml:space="preserve">
+    <value>Install</value>
+  </data>
+  <data name="Install_PathOnlyHelp" xml:space="preserve">
+    <value>Only puts the current version&apos;s rdc on your PATH.</value>
+  </data>
+  <data name="Install_NoModifyPathHelp" xml:space="preserve">
+    <value>Installs the platform without changing your PATH or your profile.</value>
+  </data>
+  <data name="Install_Waiting" xml:space="preserve">
+    <value>Another installation is using {0}: waiting for it to finish.</value>
+  </data>
+  <data name="Install_NothingCurrent" xml:space="preserve">
+    <value>No platform is installed in {0}. Run rdc install from a platform&apos;s folder first.</value>
+  </data>
+  <data name="Install_NotATree" xml:space="preserve">
+    <value>rdc install installs the platform rdc runs from, and this is not one: {0}</value>
+  </data>
+  <data name="Install_NoVersion" xml:space="preserve">
+    <value>{0} names no platform version: &apos;{1}&apos;.</value>
+  </data>
+  <data name="Install_Deployed" xml:space="preserve">
+    <value>RDCore {0} is deployed in {1}.</value>
+  </data>
+  <data name="Install_AlreadyDeployed" xml:space="preserve">
+    <value>RDCore {0} was already deployed in {1}.</value>
+  </data>
+  <data name="Install_MadeCurrent" xml:space="preserve">
+    <value>RDCore {0} is now the current version.</value>
+  </data>
+  <data name="Install_NewerIsCurrent" xml:space="preserve">
+    <value>RDCore {1}, which is newer, stays the current version: {0} is deployed beside it.</value>
+  </data>
+  <data name="Install_AddedToPath" xml:space="preserve">
+    <value>{0} is on your PATH now. Open a new terminal to use rdc.</value>
+  </data>
+  <data name="Install_AlreadyOnPath" xml:space="preserve">
+    <value>{0} was already on your PATH.</value>
+  </data>
+  <data name="Install_Linked" xml:space="preserve">
+    <value>{0} now links to {1}.</value>
+  </data>
+  <data name="Install_AlreadyLinked" xml:space="preserve">
+    <value>{0} was already linked to {1}.</value>
+  </data>
+  <data name="Install_LinkTaken" xml:space="preserve">
+    <value>{0} is a file of yours, not a link rdc install made: remove it, or run rdc install --no-modify-path.</value>
+  </data>
+  <data name="Install_ProfileBlockAdded" xml:space="preserve">
+    <value>{0} is not on your PATH: {1} now adds it. Open a new terminal, or run . {1}</value>
+  </data>
+  <data name="Install_ProfileHasBlock" xml:space="preserve">
+    <value>{0} is not on this terminal&apos;s PATH yet: {1} adds it in a new terminal.</value>
   </data>
 </root>

@@ -120,6 +120,10 @@ public static class RDFormsHosting
 
         public void SetCaption(object form, string caption) => HostOf(form).SetCaption(form, caption);
 
+        public FormBounds GetBounds(object form) => HostOf(form).GetBounds(form);
+
+        public void SetBounds(object form, FormBounds bounds) => HostOf(form).SetBounds(form, bounds);
+
         public void Leave(object form) => HostOf(form).Leave(form);
 
         public void Destroy(object form) => HostOf(form).Destroy(form);

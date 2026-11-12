@@ -17,11 +17,25 @@ public sealed record class FormCreateParams : AutomationRequest
     /// <summary>Where the form starts up.</summary>
     public FormStartUpPosition StartUpPosition { get; init; } = FormStartUpPosition.CenterOwner;
 
-    /// <summary>Where a manual form's window is, from the left of the desktop, in points.</summary>
-    public double Left { get; init; }
+    /// <summary>
+    /// <see cref="FormDefinition.ClientLeft"/>.
+    /// </summary>
+    public double? ClientLeft { get; init; }
 
-    /// <summary>Where a manual form's window is, from the top of the desktop, in points.</summary>
-    public double Top { get; init; }
+    /// <summary>
+    /// <see cref="FormDefinition.ClientTop"/>.
+    /// </summary>
+    public double? ClientTop { get; init; }
+
+    /// <summary>
+    /// <see cref="FormDefinition.ClientWidth"/>.
+    /// </summary>
+    public double? ClientWidth { get; init; }
+
+    /// <summary>
+    /// <see cref="FormDefinition.ClientHeight"/>.
+    /// </summary>
+    public double? ClientHeight { get; init; }
 
     /// <summary>
     /// The designer that wrote the form.
@@ -42,8 +56,10 @@ public sealed record class FormCreateParams : AutomationRequest
         State = form.State.ToArray(),
         Caption = form.Caption,
         StartUpPosition = form.StartUpPosition,
-        Left = form.Left,
-        Top = form.Top,
+        ClientLeft = form.ClientLeft,
+        ClientTop = form.ClientTop,
+        ClientWidth = form.ClientWidth,
+        ClientHeight = form.ClientHeight,
         Kind = form.Kind,
         DesignerText = form.DesignerText,
         HandlingEvent = handlingEvent,
@@ -54,8 +70,10 @@ public sealed record class FormCreateParams : AutomationRequest
     {
         Caption = Caption,
         StartUpPosition = StartUpPosition,
-        Left = Left,
-        Top = Top,
+        ClientLeft = ClientLeft,
+        ClientTop = ClientTop,
+        ClientWidth = ClientWidth,
+        ClientHeight = ClientHeight,
         Kind = Kind,
         DesignerText = DesignerText,
     };
@@ -117,4 +135,31 @@ public sealed record class FormCaptionResult : ExternalResult
 {
     /// <summary>The form's caption, once the request is made.</summary>
     public string Caption { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// Request for <see cref="ExternalProtocol.FormBounds"/>: <see cref="IFormHost.GetBounds"/>, or <see cref="IFormHost.SetBounds"/> when it gives them.
+/// </summary>
+public sealed record class FormBoundsParams : AutomationRequest
+{
+    /// <summary>
+    /// The handle of the form.
+    /// </summary>
+    public long Target { get; init; }
+
+    /// <summary>
+    /// Where the window goes and its size, in points; <see langword="null"/> asks where it is.
+    /// </summary>
+    public FormBounds? Bounds { get; init; }
+}
+
+/// <summary>
+/// Response for <see cref="ExternalProtocol.FormBounds"/>.
+/// </summary>
+public sealed record class FormBoundsResult : ExternalResult
+{
+    /// <summary>
+    /// Where the form's window is and its size, in points, once the request is made.
+    /// </summary>
+    public FormBounds Bounds { get; init; }
 }

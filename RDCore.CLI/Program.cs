@@ -1,3 +1,4 @@
+using RDCore.External.Interaction;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using RDCore.CLI.App.Commands;
 using RDCore.CLI.App.Configuration;
 using RDCore.CLI.App.Console;
+using RDCore.CLI.App.Install;
 using RDCore.CLI.App.Repl;
 using RDCore.CLI.App.Repl.Commands;
 using RDCore.CLI.App.VerboseMessages;
@@ -72,6 +74,8 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         var mode = Environment.GetEnvironmentVariable(RDCoreServerProcess.ModeEnvironmentVariable);
+        // in every mode, the version of the platform rdc runs from is held until it exits: a deployment into the shared root does not remove it.
+        using var lease = PlatformTree.Hold(PlatformEnvironment.Default.Root);
         try
         {
             // RDCORE_MODE=external (set by the environment host when it launches rdc.exe): run as its external host,
@@ -163,18 +167,18 @@ internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) :
             .AddSingleton<ShowSplashReplCommand>()
             .AddSingleton<ShowMemoryReplCommand>()
             // the interactive shell and everything it acts on:
-            // the program's statements are stored indented by the settings as they are, and indented again when they change.
+            // the program's statements are stored indented by the settings as they are, and indented again when they change. A shell that was given a workspace
+            // (no scratch one of its own) runs its lines in that workspace's project, and has no numbered program.
             .AddSingleton(provider => ReplIndentation.Program(
-                provider.GetRequiredService<IOptions<SdkAppOptions>>(), provider.GetService<ILiveSettings>(), provider.GetService<ILogger<ReplProgram>>()))
+                provider.GetRequiredService<IOptions<SdkAppOptions>>(), provider.GetService<ILiveSettings>(), provider.GetService<ILogger<ReplProgram>>(),
+                attachedToWorkspace: scratchWorkspace is null))
             .AddSingleton<ReplDocument>()
             .AddSingleton<IReplConsole, ReplConsole>()
             // the dialogs a program opens are asked at the shell's console.
             .AddSingleton<IConsoleKeys, SystemConsoleKeys>()
-            .AddSingleton(provider => new ReplUserInteraction(
+            .AddSingleton(provider => ConsoleUserInteraction.OfTheConsole(
                 provider.GetRequiredService<IConsoleKeys>(),
-                System.Console.Out,
-                ansi: provider.GetRequiredService<Spectre.Console.IAnsiConsole>().Profile.Capabilities.Ansi,
-                consoleWidth: () => System.Console.IsOutputRedirected ? 0 : System.Console.WindowWidth))
+                ansi: provider.GetRequiredService<Spectre.Console.IAnsiConsole>().Profile.Capabilities.Ansi))
             // and the questions the language server asks, when the console is the shell's to ask them at: the shell's messages wait while one is asked.
             .AddSingleton(provider => new ReplServerQuestions(provider.GetRequiredService<IConsoleKeys>(), provider.GetService<PromptAwareMessageWriter>()))
             .AddSingleton<IReplPlatformClient>(provider => new ReplPlatformClient(provider.GetRequiredService<RDCoreConsoleClientApp>()))
@@ -330,7 +334,7 @@ internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) :
 internal class RDCoreConsoleClientApp(
     IOptions<SdkAppOptions> options,
     IChildConnectionFactory connectionFactory,
-    ReplUserInteraction interaction,
+    ConsoleUserInteraction interaction,
     IReplConsole console,
     RubberduckIndenterSettingsReader rubberduck,
     IPlatformSettings settings,
@@ -466,6 +470,7 @@ internal class RDCoreConsoleCommandHost : AppHost<RDCoreConsoleCommandApp>
             .AddSingleton<ICliCommand, CompilationCommand>()
             .AddSingleton<ICliCommand, BuildCommand>()
             .AddSingleton<ICliCommand, RunCommand>()
+            .AddSingleton<ICliCommand, InstallCommand>()
             .AddSingleton<IPlatformSettings, PlatformSettings>()
             .AddSingleton(_ => RubberduckIndenterSettingsReader.ForThisMachine())
             .AddSingleton<ConfigCommand>()

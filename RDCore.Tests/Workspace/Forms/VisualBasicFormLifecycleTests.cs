@@ -122,6 +122,10 @@ public sealed class VisualBasicFormLifecycleTests
 
         public void SetCaption(object form, string caption) => forms.SetCaption(form, caption);
 
+        public RDCore.External.Forms.FormBounds GetBounds(object form) => forms.GetBounds(form);
+
+        public void SetBounds(object form, RDCore.External.Forms.FormBounds bounds) => forms.SetBounds(form, bounds);
+
         public void Leave(object form) => forms.Leave(form);
 
         public void Destroy(object form) => forms.Destroy(form);

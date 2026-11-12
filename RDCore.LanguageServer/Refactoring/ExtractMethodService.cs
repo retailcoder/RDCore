@@ -40,6 +40,17 @@ internal interface IExtractMethodService
     /// <param name="token">A token that cancels the parses.</param>
     /// <returns>The edit, or why there is none, in the language of the user interface.</returns>
     Task<ExtractMethodAnswer> ApplyAsync(Uri documentUri, SourceRange range, IReadOnlyList<RefactorAnswer> answers, IReadOnlyList<string> accepted, CancellationToken token);
+
+    /// <summary>
+    /// What the name the user is typing raises before the extraction is applied: one the code cannot declare there, which <see cref="ApplyAsync"/> refuses, or
+    /// one that hides a declaration outside the module, which it takes.
+    /// </summary>
+    /// <param name="documentUri">The document.</param>
+    /// <param name="range">The range, in the text of the document.</param>
+    /// <param name="answers">The user's answers, whose name is checked; a name that is not answered, or is answered with nothing, raises nothing.</param>
+    /// <param name="token">A token that cancels the parses.</param>
+    /// <returns>The notices, each with the choice it answers; none for a range that <see cref="PrepareAsync"/> refuses.</returns>
+    Task<RefactorIdentifierCheckResult> CheckIdentifierAsync(Uri documentUri, SourceRange range, IReadOnlyList<RefactorAnswer> answers, CancellationToken token);
 }
 
 /// <summary>
@@ -57,8 +68,9 @@ internal sealed record class ExtractMethodAnswer(RefactorWorkspaceEdit? Edit, st
 /// <remarks>
 /// <para>
 /// It asks the name of the new procedure, the variable it returns as a <c>Function</c> when the selection gives any back, and whether the exits of a selection
-/// that leaves the procedure, or a loop or a block around it, are routed; it shows the parameters and why each is passed as it is. Each behaviour change of the
-/// extraction is a change the user accepts, or a note.
+/// that leaves the procedure, or a loop or a block around it, are routed; it shows the parameters and why each is passed as it is, which the user renames,
+/// reorders, and passes by reference where they are passed by value (<see cref="ExtractionParameters"/>). Each behavior change of the extraction is a change
+/// the user accepts, or a note.
 /// </para>
 /// <para>
 /// A program of the platform's BASIC is not extracted from: its lines are not the module they are the body of.
@@ -86,6 +98,17 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
     /// </summary>
     public const string RouteExitsChoice = "routeExits";
 
+    /// <summary>
+    /// The id of the choice of a parameter's name, among the choices of an item of <see cref="ParametersChoice"/>.
+    /// </summary>
+    public const string ParameterNameChoice = "name";
+
+    /// <summary>
+    /// The id of the choice of how a parameter is passed, <c>ByVal</c> or <c>ByRef</c>, among the choices of an item of <see cref="ParametersChoice"/>: only a
+    /// parameter whose passing is the user's to choose has it (<see cref="ExtractionParameters.PassingIsAChoice"/>).
+    /// </summary>
+    public const string ParameterPassingChoice = "passing";
+
     // the value of the option that returns nothing: no variable is named so.
     private const string NoReturnValue = "";
 
@@ -95,6 +118,11 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
     /// The title of the code action that extracts a selection, in the language of the user interface.
     /// </summary>
     public static string Title() => Format("ExtractMethod_Title");
+
+    /// <summary>
+    /// Why an extraction offered for one version of a document is not made for another, in the language of the user interface.
+    /// </summary>
+    public static string DocumentChanged() => Format("ExtractMethod_DocumentChanged");
 
     public async Task<RefactorPrepareResult> PrepareAsync(Uri documentUri, SourceRange range, CancellationToken token)
     {
@@ -112,10 +140,12 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
             return new RefactorPrepareResult { Notices = [extraction.SelectionRefusal!] };
         }
 
+        // from here the selection snapped: the statements it is of are what the editor shows will move, refused or not.
         var notices = extraction.Notices();
+        var moved = plan.Selection.Range;
         if (!plan.IsExtractable)
         {
-            return new RefactorPrepareResult { Notices = notices };
+            return new RefactorPrepareResult { Notices = notices, Range = moved };
         }
 
         // a refusal of the writer that no answer can lift is said before the user answers anything.
@@ -125,10 +155,33 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
             return new RefactorPrepareResult
             {
                 Notices = [new RefactorNotice { Code = Code(written.Refusal.Value.ToString()), Kind = RefactorNoticeKind.Refusal, Message = EditRefusal(written.Refusal.Value, extraction) }, .. notices],
+                Range = moved,
             };
         }
 
-        return new RefactorPrepareResult { Choices = extraction.Choices(), Notices = notices };
+        return new RefactorPrepareResult { Choices = extraction.Choices(), Notices = notices, Range = moved };
+    }
+
+    public async Task<RefactorIdentifierCheckResult> CheckIdentifierAsync(Uri documentUri, SourceRange range, IReadOnlyList<RefactorAnswer> answers, CancellationToken token)
+    {
+        // the name as ApplyAsync reads it: trimmed, and one that is not answered takes its default, which raises nothing.
+        if (answers.FirstOrDefault(answer => answer.Id == NameChoice)?.Value is not { Length: > 0 } typed
+            || await ExtractionOfAsync(documentUri, range, token) is not { Plan: { IsExtractable: true } plan } extraction)
+        {
+            return new RefactorIdentifierCheckResult();
+        }
+
+        return new RefactorIdentifierCheckResult
+        {
+            Notices = [.. ExtractionName.Validate(typed.Trim(), plan, extraction.Source, extraction.Part.Context, extraction.Module.Module).Select(problem => new RefactorNotice
+            {
+                Code = Code($"Name{problem.Kind}"),
+                Kind = problem.IsWarning ? RefactorNoticeKind.Note : RefactorNoticeKind.Refusal,
+                Message = problem.ToMessage(RenameWorkspace.Locator(extraction.Part)),
+                Related = extraction.DeclarationOf(problem),
+                Choice = NameChoice,
+            })],
+        };
     }
 
     public async Task<ExtractMethodAnswer> ApplyAsync(
@@ -173,7 +226,19 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
             return new(null, Format("ExtractMethodEdit_NotAccepted", extraction.ChangeMessage(declined)));
         }
 
-        var choices = new ExtractionChoices(name) { ReturnValue = returnValue?.Variable, RouteExits = routeExits };
+        // the parameters as the user renamed them, put them in order and passes them; an item that is not answered is kept as it is, where it is.
+        var parameterAnswers = answers.FirstOrDefault(answer => answer.Id == ParametersChoice)?.Items
+            .Select(item => new ExtractionParameterAnswer(item.Id,
+                item.Answers.FirstOrDefault(each => each.Id == ParameterNameChoice)?.Value,
+                item.Answers.FirstOrDefault(each => each.Id == ParameterPassingChoice)?.Value))
+            .ToArray() ?? [];
+        var (parameters, parameterProblem) = ExtractionParameters.Choose(parameterAnswers, plan, extraction.Source, name, extraction.Part.Context, extraction.Module.Module);
+        if (parameterProblem is not null)
+        {
+            return new(null, parameterProblem.ToMessage());
+        }
+
+        var choices = new ExtractionChoices(name) { ReturnValue = returnValue?.Variable, RouteExits = routeExits, Parameters = parameters };
         var edit = ExtractMethodEdit.Of(plan, extraction.Source, choices);
         if (edit.Refusal is { } refusal)
         {
@@ -217,7 +282,8 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
         var after = ExtractionModuleAnalysis.Of(extraction.Module.Module, edited, parse, composition.Resolver, composition.ScopeTree);
 
         // the verification analyzes the text the edit leaves, which is the one parsed here.
-        return ExtractionVerification.Verify(extraction.Plan!, edit, name, extraction.Procedure.Declaration.Name, extraction.Analysis, _ => after);
+        var source = extraction.Procedure.Declaration;
+        return ExtractionVerification.Verify(extraction.Plan!, edit, name, source.Name, source.MemberKind, extraction.Analysis, _ => after);
     }
 
     // a text of the module, parsed as the document is: the designer of a form is its document's, which the text of its code does not hold.
@@ -237,7 +303,7 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
         }
 
         var analysis = ExtractionModuleAnalysis.Of(module.Module, module.Source, module.Parse, part.Context.Resolver, part.Context.ScopeTree);
-        if (analysis.Procedure(member.Name) is not { } procedure)
+        if (analysis.Procedure(member.Name, member.MemberKind) is not { } procedure)
         {
             return null;
         }
@@ -283,6 +349,19 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
 
         public string RefusalMessage(ExtractionRefusal refusal) => Format($"ExtractMethodRefusal_{refusal.Kind}", refusal.Name, Where(refusal.Location));
 
+        // the name a problem of a name points to, in the document of a module of the workspace; null for a declaration of a library, or of no module.
+        public SourceLocation? DeclarationOf(ExtractionNameProblem problem)
+        {
+            if (problem.Module is not { } module || Part.Modules.FirstOrDefault(candidate => candidate.Module.AbsoluteUri == module.AbsoluteUri) is not { } document)
+            {
+                return null;
+            }
+
+            var end = new SourcePosition(problem.Position.Line, problem.Position.Character + problem.Name.Length);
+            var text = document.ToTextRange(new SourceRange(problem.Position, end));
+            return new SourceLocation(document.Document.Id.Uri.ToUri(), new SourceRange(text.Start.Line, text.Start.Character, text.End.Line, text.End.Character));
+        }
+
         public string ChangeMessage(ExtractionBehaviourChange change)
             => Format($"ExtractMethodChange_{change.Kind}", string.Join(", ", change.Handlers), string.Join(", ", change.Variables));
 
@@ -320,7 +399,8 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
                 },
             ];
 
-            // the parameters are shown, with why each is passed as it is: the plan decides them.
+            // the parameters are shown, with why each is passed as it is: the user renames them, puts them in another order, and passes by reference one the
+            // plan passes by value.
             if (!plan.Parameters.IsEmpty)
             {
                 choices.Add(new()
@@ -329,11 +409,13 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
                     Kind = RefactorChoiceKind.List,
                     Label = Format("ExtractMethodChoice_Parameters"),
                     Description = Format("ExtractMethodChoice_ParametersDescription"),
-                    Items = [.. plan.Parameters.Select(parameter => new RefactorItem
+                    CanReorder = true,
+                    Items = [.. ExtractionParameters.InDeclarationOrder(plan).Select(parameter => new RefactorItem
                     {
                         Id = parameter.Name,
                         Label = ExtractMethodEdit.ParameterTextOf(plan, Source, parameter),
                         Reason = Format($"ExtractMethodReason_{parameter.Reason}"),
+                        Choices = ParameterChoices(parameter),
                     })],
                 });
             }
@@ -361,6 +443,39 @@ internal sealed class ExtractMethodService(IRenameService rename, IParsingClient
                     Label = Format("ExtractMethodChoice_RouteExits"),
                     Description = Format("ExtractMethodChoice_RouteExitsDescription"),
                     Default = "true",
+                });
+            }
+
+            return choices;
+        }
+
+        // the name of a parameter, and how it is passed when that is the user's to choose.
+        private static IReadOnlyList<RefactorChoice> ParameterChoices(ExtractionParameter parameter)
+        {
+            List<RefactorChoice> choices =
+            [
+                new()
+                {
+                    Id = ParameterNameChoice,
+                    Kind = RefactorChoiceKind.Name,
+                    Label = Format("ExtractMethodChoice_ParameterName"),
+                    Default = parameter.Name,
+                },
+            ];
+
+            if (ExtractionParameters.PassingIsAChoice(parameter))
+            {
+                choices.Add(new()
+                {
+                    Id = ParameterPassingChoice,
+                    Kind = RefactorChoiceKind.Option,
+                    Label = Format("ExtractMethodChoice_ParameterPassing"),
+                    Default = ExtractionParameters.ValueOf(parameter.Passing),
+                    Options =
+                    [
+                        new() { Value = ExtractionParameters.ValueOf(ExtractionPassing.ByVal), Label = "ByVal", Description = Format("ExtractMethodChoice_ParameterByVal") },
+                        new() { Value = ExtractionParameters.ValueOf(ExtractionPassing.ByRef), Label = "ByRef", Description = Format("ExtractMethodChoice_ParameterByRef") },
+                    ],
                 });
             }
 

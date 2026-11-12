@@ -1,3 +1,4 @@
+using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.Source;
 using RDCore.LanguageServer.Services.Refactoring.ExtractMethod;
 using RDCore.Parsing;
@@ -28,30 +29,35 @@ internal static class ExtractionFixture
         => PlanOf(FlowFixture.Analyze(body, header, close, optionExplicit, declarations), start, end);
 
     // The module after extracting the lines of the body from first to last (zero-based) as a procedure name, returning the variable returnValue
-    // names; and the edit. With formatting, the edit is formatted as it says.
+    // names; and the edit. With formatting, the edit is formatted as it says. A range, lines zero-based from the body's first, is extracted instead of the lines.
+    // The parameters are answered as parameters says, which must be valid answers.
     public static (string Module, ExtractionEdit Edit) Extract(
         string body, int first, int last, string name = "Extracted", string? returnValue = null, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub",
-        bool optionExplicit = true, string declarations = "", bool routeExits = true, CodeFormattingOptions? formatting = null)
+        bool optionExplicit = true, string declarations = "", bool routeExits = true, CodeFormattingOptions? formatting = null, SourceRange? range = null,
+        IReadOnlyList<ExtractionParameterAnswer>? parameters = null)
     {
-        var extracted = Extracted(body, first, last, name, returnValue, header, end, optionExplicit, declarations, routeExits, formatting);
+        var extracted = Extracted(body, first, last, name, returnValue, header, end, optionExplicit, declarations, routeExits, formatting, range: range, parameters: parameters);
         return (extracted.Module, extracted.Edit);
     }
 
     // Extract's module and edit, with the module before the extraction and the plan the edit was written from; the workspace has the class modules in
-    // classes beside the module.
+    // classes beside the module, which is a class module itself with classModule.
     public static (string Original, string Module, ExtractionEdit Edit, ExtractionPlan Plan) Extracted(
         string body, int first, int last, string name = "Extracted", string? returnValue = null, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub",
         bool optionExplicit = true, string declarations = "", bool routeExits = true, CodeFormattingOptions? formatting = null,
-        IReadOnlyList<(string Name, string Source)>? classes = null)
+        IReadOnlyList<(string Name, string Source)>? classes = null, bool classModule = false, SourceRange? range = null,
+        IReadOnlyList<ExtractionParameterAnswer>? parameters = null)
     {
-        var analyzed = FlowFixture.Analyze(body, header, end, optionExplicit, declarations, classes);
-        var plan = PlanOf(analyzed, new SourcePosition(first, 0), new SourcePosition(last, 1));
+        var analyzed = FlowFixture.Analyze(body, header, end, optionExplicit, declarations, classes, classModule);
+        var plan = PlanOf(analyzed, range?.Start ?? new SourcePosition(first, 0), range?.End ?? new SourcePosition(last, 1));
         var source = new ExtractionSource(analyzed.Module, analyzed.Procedure, analyzed.Model.Procedure, analyzed.Text, analyzed.Scopes);
-        var choices = new ExtractionChoices(name) { ReturnValue = returnValue is null ? null : analyzed.Variable(returnValue), RouteExits = routeExits };
+        var (chosen, problem) = ExtractionParameters.Choose(parameters ?? [], plan, source, name, analyzed.Context, analyzed.ModuleAddress);
+        Assert.IsNull(problem, problem?.ToMessage());
+        var choices = new ExtractionChoices(name) { ReturnValue = returnValue is null ? null : analyzed.Variable(returnValue), RouteExits = routeExits, Parameters = chosen };
         var edit = ExtractMethodEdit.Of(plan, source, choices);
         if (formatting is not null)
         {
-            var edited = new ModuleParser().Parse(new Uri("file:///c:/ws/Main.bas"), edit.ApplyTo(analyzed.Text));
+            var edited = new ModuleParser().Parse(FlowFixture.FileOf(classModule), edit.ApplyTo(analyzed.Text));
             edit = edit.Formatted(analyzed.Text, edited, formatting);
         }
 
@@ -59,16 +65,19 @@ internal static class ExtractionFixture
     }
 
     // The verification of extracting the lines first to last as Extracted, formatted as for a user who set nothing; tamper, when given, changes the edit before it
-    // is verified, as a writer that got it wrong would have written it.
+    // is verified, as a writer that got it wrong would have written it. The parameters are answered as parameters says.
     public static ExtractionVerificationFailure? Verified(
         string body, int first, int last, string? returnValue = null, string header = "Public Sub Run(ByVal n As Long)", string end = "End Sub",
-        bool optionExplicit = true, string declarations = "", Func<ExtractionEdit, ExtractionEdit>? tamper = null)
+        bool optionExplicit = true, string declarations = "", Func<ExtractionEdit, ExtractionEdit>? tamper = null,
+        IReadOnlyList<ExtractionParameterAnswer>? parameters = null)
     {
         var extracted = Extracted(body, first, last, returnValue: returnValue, header: header, end: end, optionExplicit: optionExplicit, declarations: declarations,
-            formatting: CodeFormattingOptions.Default);
+            formatting: CodeFormattingOptions.Default, parameters: parameters);
         Assert.IsNull(extracted.Edit.Refusal, $"refused: {extracted.Edit.Refusal}");
         var edit = tamper?.Invoke(extracted.Edit) ?? extracted.Edit;
-        return ExtractionVerification.Verify(extracted.Plan, edit, "Extracted", "Run", FlowFixture.Module(extracted.Original), text => FlowFixture.Module(text));
+        var before = FlowFixture.Module(extracted.Original);
+        var kind = before.Parse.SyntaxTree!.Children.OfType<MemberDeclarationNode>().First(member => member.Name == "Run").MemberKind;
+        return ExtractionVerification.Verify(extracted.Plan, edit, "Extracted", "Run", kind, before, text => FlowFixture.Module(text));
     }
 
     // the edit with the text of its edits of the kind changed from what to what instead.

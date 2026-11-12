@@ -1,5 +1,6 @@
 using RDCore.LanguageServer.Services.Refactoring.ExtractMethod;
 using RDCore.SDK.Formatting;
+using RDCore.SDK.Model.Source;
 
 namespace RDCore.Tests.Semantics.Refactoring;
 
@@ -16,6 +17,36 @@ public sealed class ExtractMethodEditTests
     private static string Lines(string text) => text.ReplaceLineEndings("\r\n");
 
     // the loop of AVariableTheLoopReadsAgain_IsPassedByRef: ByVal, the write is lost and the loop never ends.
+    // the run starts after x = n on its line: that statement stays, the call takes the run's place after it, and the moved lines are indented alike.
+    [TestMethod]
+    public void AStatementAfterAnotherOfItsLine_MovesWithoutIt_AndTheCallTakesItsPlace()
+    {
+        var (module, _) = ExtractionFixture.Extract("Dim x As Long\nx = n: x = x + 1\nx = x * 2\nDebug.Print x", 0, 0, range: new SourceRange(1, 7, 2, 9));
+
+        Assert.AreEqual(Lines("""
+            Public Sub Run(ByVal n As Long)
+            Dim x As Long
+            x = n: Extracted x
+            Debug.Print x
+            End Sub
+
+            Private Sub Extracted(ByRef x As Long)
+                x = x + 1
+                x = x * 2
+            End Sub
+
+            """), FromRun(module));
+    }
+
+    // with a statement after the call on its line, the If that routes an exit is a block: the statement is not in its Then.
+    [TestMethod]
+    public void AnExitRoutedBeforeAnotherStatementOfTheLine_IsABlockIf()
+    {
+        var (_, edit) = ExtractionFixture.Extract("Dim x As Long\nx = n\nIf x > 2 Then\nExit Sub\nEnd If: Debug.Print x", 0, 0, range: new SourceRange(2, 0, 4, 6));
+
+        Assert.AreEqual(Lines("If Extracted(x) Then\n    Exit Sub\nEnd If"), edit.Call);
+    }
+
     [TestMethod]
     public void AVariableTheLoopReadsAgain_IsPassedByRef_ByACallWithoutParentheses()
     {
@@ -437,5 +468,60 @@ public sealed class ExtractMethodEditTests
                 End Select
             """).TrimEnd(), edit.Call);
         Assert.AreEqual(Lines("Private Enum ExtractedExit\n  ExtractedExitNone\n  ExtractedExitDo\n  ExtractedExitSub\nEnd Enum"), edit.Enumeration);
+    }
+
+    // b and a are put in each other's places, and renamed; a is passed by reference. The call passes the variables as the source names them.
+    [TestMethod]
+    public void TheParametersTheUserEdits_AreDeclaredAndNamedAsTheUserSaid_AndTheCallPassesThemInThatOrder()
+    {
+        var (module, _) = ExtractionFixture.Extract("Dim a As Long\nDim b As Long\nDim t As Long\na = n + 1\nt = a * 2\nb = t + n\nDebug.Print a; b", 4, 5,
+            parameters: [new("b", Name: "sum"), new("a", Name: "x", Passing: "ByRef")]);
+
+        Assert.AreEqual(Lines("""
+            Public Sub Run(ByVal n As Long)
+            Dim a As Long
+            Dim b As Long
+            a = n + 1
+            Extracted b, n, a
+            Debug.Print a; b
+            End Sub
+
+            Private Sub Extracted(ByRef sum As Long, ByVal n As Long, ByRef x As Long)
+                Dim t As Long
+                t = x * 2
+                sum = t + n
+            End Sub
+
+            """), FromRun(module));
+    }
+
+    // its type-declaration character stays with the variable it is written after, whatever its name.
+    [TestMethod]
+    public void ARenamedParameterWithATypeDeclarationCharacter_KeepsIt()
+    {
+        var (module, _) = ExtractionFixture.Extract("Dim k%\nk = n\nDebug.Print k% + k\nDebug.Print k", 2, 2, parameters: [new("k", Name: "count")]);
+
+        StringAssert.Contains(module, Lines("Private Sub Extracted(ByVal count%)\n    Debug.Print count% + count\nEnd Sub"));
+        StringAssert.Contains(module, Lines("Extracted k\nDebug.Print k"));
+    }
+
+    // the variable returned is the new procedure's own: the user's name for it is its local's.
+    [TestMethod]
+    public void ARenamedReturnValue_IsTheNewProceduresLocal_UnderItsNewName()
+    {
+        var (module, _) = ExtractionFixture.Extract("Dim a As Long\nDim b As Long\na = n\nb = a + 1\nDebug.Print b", 3, 3, returnValue: "b",
+            parameters: [new("b", Name: "total")]);
+
+        StringAssert.Contains(module, Lines("""
+            b = Extracted(a)
+            Debug.Print b
+            End Sub
+
+            Private Function Extracted(ByVal a As Long) As Long
+                Dim total As Long
+                total = a + 1
+                Extracted = total
+            End Function
+            """));
     }
 }

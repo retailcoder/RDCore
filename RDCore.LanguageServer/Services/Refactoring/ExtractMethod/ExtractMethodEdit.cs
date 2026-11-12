@@ -74,6 +74,12 @@ internal sealed record class ExtractionChoices(string Name)
     /// code, and the call site goes where it says. On by default; a selection with an exit is refused when it is off.
     /// </summary>
     public bool RouteExits { get; init; } = true;
+
+    /// <summary>
+    /// The parameters as the user chose them (<see cref="ExtractionParameters.Choose"/>), in the order the new procedure declares them; empty for the plan's,
+    /// as <see cref="ExtractionParameters.InDeclarationOrder"/> puts them.
+    /// </summary>
+    public ImmutableArray<ExtractionParameterChoice> Parameters { get; init; } = [];
 }
 
 /// <summary>
@@ -174,10 +180,11 @@ internal sealed record class ExtractionEdit(ImmutableArray<ExtractionTextEdit> E
 /// </summary>
 /// <remarks>
 /// <para>
-/// The new procedure is a <c>Function</c> when it returns a value or an exit code, and a <c>Sub</c> otherwise. Its parameters are the plan's, in its order, each
-/// as the plan passes it, and typed as its variable is declared: an array's with <c>()</c>, a fixed-length string's as <c>String</c>, an object's without
-/// <c>New</c>. Its body is the selection, with the constants it reads and the locals it has of its own declared first, and <c>On Error Resume Next</c> when the
-/// plan says it starts with it.
+/// The new procedure is a <c>Function</c> when it returns a value or an exit code, and a <c>Sub</c> otherwise. Its parameters are the plan's, in the order and
+/// with the names and the passing the user chose (<see cref="ExtractionChoices.Parameters"/>), and typed as its variable is declared: an array's with
+/// <c>()</c>, a fixed-length string's as <c>String</c>, an object's without <c>New</c>. Its body is the selection, with the constants it reads and the locals it
+/// has of its own declared first, and <c>On Error Resume Next</c> when the plan says it starts with it. A parameter the user renamed is named so wherever the
+/// selection names its variable.
 /// </para>
 /// <para>
 /// The call is <c>Name a, b</c>, never <c>Name (a)</c>, which passes a copy; or <c>x = Name(a, b)</c>, <c>Set</c> for an object. A selection that leaves the source
@@ -237,6 +244,17 @@ internal static class ExtractMethodEdit
         return exits.Count > 1 ? [name, $"{name}Exit", $"{name}ExitNone", .. exits.Select(exit => exit.Code)] : [name];
     }
 
+    // the names the new procedure has besides its parameters: its own and those of its exit codes, those of its locals, the copy of the source's result, and
+    // the object of a With block.
+    internal static IEnumerable<string> NewProcedureNamesOf(ExtractionPlan plan, ExtractionSource source, string name)
+    {
+        var writer = new Writer(plan, source, new ExtractionChoices(name), new ExtractionText(source.Text));
+        return ModuleNamesOf(plan, source, name)
+            .Concat(plan.Locals.Select(local => local.Name))
+            .Concat(plan.WithTarget is { } target ? [target.Name] : [])
+            .Concat(plan.AssignsResult || plan.ReadsResult ? [writer.ResultCopyName()] : []);
+    }
+
     // a parameter of the plan as the new procedure's signature writes it (ByRef total As Long).
     internal static string ParameterTextOf(ExtractionPlan plan, ExtractionSource source, ExtractionParameter parameter)
         => new Writer(plan, source, new ExtractionChoices(string.Empty), new ExtractionText(source.Text)).ParameterText(parameter);
@@ -248,6 +266,13 @@ internal static class ExtractMethodEdit
         private readonly List<VariableDeclarationNode> _variables = [.. source.Procedure.Descendants().OfType<VariableDeclarationNode>()];
         private readonly List<ConstantDeclarationNode> _constants = [.. source.Procedure.Descendants().OfType<ConstantDeclarationNode>()];
         private readonly List<ParameterDeclarationNode> _parameters = [.. source.Procedure.Children.OfType<ParameterDeclarationNode>()];
+
+        // the parameters in the order the new procedure declares them, and what the user chose of each.
+        private readonly ExtractionParameter[] _ordered = choices.Parameters.IsEmpty
+            ? [.. ExtractionParameters.InDeclarationOrder(plan)]
+            : [.. choices.Parameters.Select(choice => plan.Parameters.Single(parameter => parameter.Variable == choice.Variable))];
+
+        private ExtractionParameterChoice? ChoiceOf(SemanticId variable) => choices.Parameters.FirstOrDefault(choice => choice.Variable == variable);
 
         // the return value is the function's own when there is no exit code to return instead: with one, it goes out ByRef, as a parameter.
         private SemanticId? ReturnValue => plan.Exits.IsEmpty ? choices.ReturnValue : null;
@@ -274,9 +299,9 @@ internal static class ExtractMethodEdit
             var movedIn = plan.Locals.Where(local => local.MovesDeclaration).Select(local => local.Variable).ToHashSet();
             edits.AddRange(DeclarationEdits(movedIn, outsideTheSelection: true, ExtractionTextEditKind.Declaration));
 
-            var body = Body(moved, resultCopy, exits);
+            var body = Body(moved, start.Character == 0 ? string.Empty : indentation, resultCopy, exits);
             var procedure = ProcedureText(body, resultCopy, exits);
-            var call = CallText(indentation, resultCopy, exits, fromLineStart: start.Character == 0);
+            var call = CallText(indentation, resultCopy, exits, fromLineStart: start.Character == 0, followed: text.StatementFollows(selection.Range.End));
 
             edits.Add(new ExtractionTextEdit(moved, call, ExtractionTextEditKind.Call));
             var after = source.Procedure.SourceLocation.Range.End;
@@ -300,11 +325,11 @@ internal static class ExtractMethodEdit
 
         private string ProcedureText(IReadOnlyList<string> body, string? resultCopy, IReadOnlyList<Exit> exits)
         {
-            var parameters = plan.Parameters
-                .Where(parameter => parameter.Variable != ReturnValue)
+            var parameters = Given(optional: false)
                 .Select(ParameterText)
                 .Concat(plan.WithTarget is { } target ? [WithTargetText(target)] : [])
                 .Concat(resultCopy is { } copy ? [$"ByRef {copy} As {ResultType()}"] : [])
+                .Concat(Given(optional: true).Select(ParameterText))
                 .ToArray();
 
             var returns = exits.Count switch
@@ -335,7 +360,7 @@ internal static class ExtractMethodEdit
 
             if (ReturnValue is { } returned)
             {
-                lines.Add($"{Indent}{(IsObject(returned) ? "Set " : string.Empty)}{_name} = {NameOf(returned)}");
+                lines.Add($"{Indent}{(IsObject(returned) ? "Set " : string.Empty)}{_name} = {LocalName(returned)}");
             }
 
             lines.Add($"End {keyword}");
@@ -356,17 +381,18 @@ internal static class ExtractMethodEdit
             {
                 if (isUndeclared || DeclarationOf(variable) is not { } declaration)
                 {
-                    yield return $"Dim {NameOf(variable)} As {ParameterType(variable)}";
+                    yield return $"Dim {LocalName(variable)} As {ParameterType(variable)}";
                 }
                 else if (!InTheSelection(declaration.SourceLocation.Range) || plan.MovedOut.Contains(variable))
                 {
-                    yield return $"Dim {DeclaratorOf(declaration)}";
+                    yield return $"Dim {DeclaratorOf(declaration, LocalName(variable))}";
                 }
             }
         }
 
-        // the selection, with what changes in it: the declarations that stay in the source, the source's result, and the exits; dedented.
-        private List<string> Body(SourceRange moved, string? resultCopy, IReadOnlyList<Exit> exits)
+        // the selection, with what changes in it: the declarations that stay in the source, the source's result, and the exits; dedented. A run that starts
+        // after another statement of its line is dedented as the line is.
+        private List<string> Body(SourceRange moved, string lineIndentation, string? resultCopy, IReadOnlyList<Exit> exits)
         {
             var stays = plan.MovedOut.Where(variable => plan.Parameters.Any(parameter => parameter.Variable == variable) || variable == ReturnValue).ToHashSet();
             var edits = DeclarationEdits(stays, outsideTheSelection: false, ExtractionTextEditKind.Call).ToList();
@@ -380,20 +406,36 @@ internal static class ExtractMethodEdit
                 edits.AddRange(exit.From.Select(from => new ExtractionTextEdit(from.Range, $"{_name} = {exit.Code}: Exit Function", ExtractionTextEditKind.Call)));
             }
 
+            // the names of a variable the user renamed, but in a declaration that stays in the source, which leaves the body.
+            var removed = edits.Select(edit => edit.Range).ToArray();
+            edits.AddRange(choices.Parameters
+                .SelectMany(choice => choice.Names.Select(range => new ExtractionTextEdit(range, choice.Name, ExtractionTextEditKind.Call)))
+                .Where(rename => !removed.Any(range => range.Start <= rename.Range.Start && rename.Range.End <= range.End)));
+
             var lines = text.Of(moved, edits).Split(["\r\n", "\n"], StringSplitOptions.None).ToList();
+            lines[0] = lineIndentation + lines[0];
             var dedent = lines.Where(line => line.Trim().Length > 0).Select(line => line.Length - line.TrimStart().Length).DefaultIfEmpty(0).Min();
             return [.. lines.Select(line => line.Trim().Length == 0 ? string.Empty : line[Math.Min(dedent, line.Length - line.TrimStart().Length)..])];
         }
 
+        // the parameters the new procedure is given, in the order it declares them: the required ones, or the Optional ones, which come after every other.
+        private IEnumerable<ExtractionParameter> Given(bool optional)
+            => _ordered.Where(parameter => parameter.Variable != ReturnValue && parameter.IsOptional == optional);
+
         public string ParameterText(ExtractionParameter parameter)
         {
-            var passing = parameter.Passing is ExtractionPassing.ByRef ? "ByRef" : "ByVal";
+            var passing = ExtractionParameters.ValueOf(ChoiceOf(parameter.Variable)?.Passing ?? parameter.Passing);
+            var (name, hasHint) = WrittenName(parameter.Variable);
             if (parameter.Reason is ExtractionPassingReason.ParamArray)
             {
-                return $"ByVal {parameter.Name} As Variant";
+                return $"ByVal {LocalName(parameter.Variable)} As Variant";
             }
 
-            var (name, hasHint) = WrittenName(parameter.Variable);
+            if (parameter.IsOptional)
+            {
+                return $"Optional {passing} {name} As Variant";
+            }
+
             var array = SymbolOf(parameter.Variable) is ITypedSymbol { ResolvedType: VBArrayType } ? "()" : string.Empty;
             return hasHint ? $"{passing} {name}{array}" : $"{passing} {name}{array} As {ParameterType(parameter.Variable)}";
         }
@@ -403,11 +445,13 @@ internal static class ExtractMethodEdit
 
         // ---- the call site ----
 
-        private string CallText(string indentation, string? resultCopy, IReadOnlyList<Exit> exits, bool fromLineStart)
+        // followed: another statement of the line comes after the call, which a single-line If would take into its Then.
+        private string CallText(string indentation, string? resultCopy, IReadOnlyList<Exit> exits, bool fromLineStart, bool followed)
         {
-            var arguments = plan.Parameters.Where(parameter => parameter.Variable != ReturnValue).Select(parameter => parameter.Name)
+            var arguments = Given(optional: false).Select(parameter => parameter.Name)
                 .Concat(plan.WithTarget is { } target ? [target.Name] : [])
                 .Concat(resultCopy is { } copy ? [copy] : [])
+                .Concat(Given(optional: true).Select(parameter => parameter.Name))
                 .ToArray();
             var lines = new List<string>();
 
@@ -437,6 +481,11 @@ internal static class ExtractMethodEdit
                     break;
                 case 0:
                     lines.Add(arguments.Length == 0 ? _name : $"{_name} {string.Join(", ", arguments)}");
+                    break;
+                case 1 when followed:
+                    lines.Add($"If {invoked} Then");
+                    lines.Add($"{Indent}{exits[0].Dispatch}");
+                    lines.Add("End If");
                     break;
                 case 1:
                     lines.Add($"If {invoked} Then {exits[0].Dispatch}");
@@ -548,6 +597,26 @@ internal static class ExtractMethodEdit
         private string DeclaratorOf(SyntaxNode declaration)
             => text.Of(new SourceRange(NameRangeOf(declaration)?.Start ?? declaration.SourceLocation.Range.Start, declaration.SourceLocation.Range.End)).Trim();
 
+        // the declarator, with the variable named as the new procedure names it: its type-declaration character, when it has one, stays.
+        private string DeclaratorOf(SyntaxNode declaration, string name)
+        {
+            if (NameRangeOf(declaration) is not { } range)
+            {
+                return DeclaratorOf(declaration);
+            }
+
+            var written = text.Of(range);
+            return SymbolName(written).Equals(name, StringComparison.Ordinal)
+                ? DeclaratorOf(declaration)
+                : $"{name}{written[SymbolName(written).Length..]}{text.Of(new SourceRange(range.End, declaration.SourceLocation.Range.End))}".Trim();
+        }
+
+        // a written name without its type-declaration character.
+        private static string SymbolName(string written) => written.Length > 0 && "$%&!#@^".Contains(written[^1]) ? written[..^1] : written;
+
+        // the name the new procedure gives a variable: the one the user chose for its parameter, or its own.
+        private string LocalName(SemanticId variable) => ChoiceOf(variable)?.Name ?? NameOf(variable);
+
         private static SourceRange? NameRangeOf(SyntaxNode declaration) => declaration switch
         {
             VariableDeclarationNode variable => variable.NameRange,
@@ -576,10 +645,12 @@ internal static class ExtractMethodEdit
             if (declaration is not null && NameRangeOf(declaration) is { } range)
             {
                 var written = text.Of(range);
-                return (written, written.Length > 0 && "$%&!#@^".Contains(written[^1]));
+                var symbolName = SymbolName(written);
+                var name = ChoiceOf(variable)?.Name is { } chosen ? $"{chosen}{written[symbolName.Length..]}" : written;
+                return (name, symbolName.Length < written.Length);
             }
 
-            return (NameOf(variable), false);
+            return (LocalName(variable), false);
         }
 
         // the type a variable is declared as, as a parameter writes it: no New, and a String for a fixed-length one; or the type its DefType gives it.
@@ -626,7 +697,7 @@ internal static class ExtractMethodEdit
 
         // ---- the source's result ----
 
-        private string ResultCopyName()
+        public string ResultCopyName()
         {
             var taken = _variables.Select(node => node.Name).Concat(_parameters.Select(node => node.Name)).Concat(_constants.Select(node => node.Name)).Append(_name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
