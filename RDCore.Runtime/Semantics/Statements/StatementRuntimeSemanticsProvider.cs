@@ -127,7 +127,7 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         return outcome;
     }
 
-    // RD-VBAL: a graphics statement calls the method of its name on the object it draws on, a Visual Basic 6.0 form or PictureBox, as VB6 compiles it: the
+    // a graphics statement calls the method of its name on the object it draws on, a Visual Basic 6.0 form or PictureBox, as VB6 compiles it: the
     // method takes every argument its type library declares, after GraphicsFlags, which say what the syntax said. An object that has no such method raises 438.
     // The statement with no object at all never gets here (GraphicsStatementStaticSemantics).
     private RuntimeExecutionOutcome ExecuteGraphics(IRuntimeSession session, RuntimeEvaluationContext context, GraphicsMethodStatementNode graphics)
@@ -163,7 +163,7 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
             : RuntimeExecutionOutcome.Error(called.ErrorInfo!);
     }
 
-    // the arguments of each graphics statement's call, made once for the statement: the evaluator lives one execution.
+    // the arguments of each graphics statement's call, made once for the statement: the evaluator lives for one execution.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<GraphicsMethodStatementNode, ImmutableArray<ExpressionNode>> _graphicsArguments =
         new(ReferenceEqualityComparer.Instance);
 
