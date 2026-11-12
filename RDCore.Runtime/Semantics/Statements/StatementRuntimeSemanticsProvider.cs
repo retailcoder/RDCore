@@ -129,7 +129,7 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
 
     // a graphics statement calls the method of its name on the object it draws on, a Visual Basic 6.0 form or PictureBox, as VB6 compiles it: the
     // method takes every argument its type library declares, after GraphicsFlags, which say what the syntax said. An object that has no such method raises 438.
-    // The statement with no object at all never gets here (GraphicsStatementStaticSemantics).
+    // A statement with no object is the form's own in a Visual Basic 6.0 form's code, and never gets here anywhere else (GraphicsStatementStaticSemantics).
     private RuntimeExecutionOutcome ExecuteGraphics(IRuntimeSession session, RuntimeEvaluationContext context, GraphicsMethodStatementNode graphics)
     {
         VBTypedValue? owner = null;
@@ -148,6 +148,11 @@ public sealed class StatementRuntimeSemanticsProvider : IStatementRuntimeSemanti
         {
             owner = context.EnclosingWithTarget;
             ownerExpression = context.EnclosingWithTargetExpression;
+        }
+        else if (session.Symbols.Resolver.ResolveValue(Tokens.Me, ScopeKind.Local, context.Scope).Symbol is { } me)
+        {
+            // written with no object, in a Visual Basic 6.0 form's code: the form's own.
+            owner = new VBObjectValue(session.Symbols.Resolver.GetValue(me));
         }
 
         if (owner is null)

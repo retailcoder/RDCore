@@ -49,6 +49,14 @@ public sealed class VisualBasicFormGraphicsTests
             "Attribute VB_Exposed = False",
             "Option Explicit",
             "Public Sub DrawOwnLine()", "    Me.Line (0, 0)-(600, 300)", "End Sub",
+            "Public Sub DrawBare(ByVal which As Integer)",
+            "    Select Case which",
+            "        Case 1: Line (0, 0)-(600, 300)",
+            "        Case 2: PSet (100, 200)",
+            "        Case 3: Circle (1000, 1200), 100",
+            "        Case 4: Scale (0, 0)-(100, 50)",
+            "    End Select",
+            "End Sub",
             string.Empty]);
 
     private static string Program(string[] body)
@@ -78,6 +86,9 @@ public sealed class VisualBasicFormGraphicsTests
     [DataRow("Form4.Circle (1000, 1200), 500", "1000 1200", DisplayName = "Circle ends at its center")]
     [DataRow("With Form4: .Line (0, 0)-(20, 30): End With", "20 30", DisplayName = "a Line of the With block's object")]
     [DataRow("Form4.DrawOwnLine", "600 300", DisplayName = "Me.Line in the form's own code")]
+    [DataRow("Form4.DrawBare 1", "600 300", DisplayName = "a Line with no object in the form's own code is the form's")]
+    [DataRow("Form4.DrawBare 2", "100 200", DisplayName = "a PSet with no object in the form's own code is the form's")]
+    [DataRow("Form4.DrawBare 3", "1000 1200", DisplayName = "a Circle with no object in the form's own code is the form's")]
     public async Task ADrawingStatement_EndsWhereItsFigureEnds(string statement, string current)
     {
         var printed = await ShownAsync(statement, Current("Form4"));
@@ -114,6 +125,14 @@ public sealed class VisualBasicFormGraphicsTests
         var printed = await ShownAsync("Form4.Scale (0, 0)-(100, 50)", "Debug.Print Form4.ScaleWidth & \" \" & Form4.ScaleHeight & \" \" & Form4.ScaleMode");
 
         CollectionAssert.AreEqual(new[] { "100 50 0" }, printed, string.Join(" | ", printed));
+    }
+
+    [TestMethod]
+    public async Task AScaleWithNoObject_InTheFormsOwnCode_SetsTheFormsScale()
+    {
+        var printed = await ShownAsync("Form4.DrawBare 4", "Debug.Print Form4.ScaleWidth & \" \" & Form4.ScaleHeight");
+
+        CollectionAssert.AreEqual(new[] { "100 50" }, printed, string.Join(" | ", printed));
     }
 
     [TestMethod]

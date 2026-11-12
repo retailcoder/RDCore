@@ -102,8 +102,9 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
 
         // the structure of the #If blocks, whatever they evaluated to: what says that a name declared in each branch of one is declared once.
         var blocks = ConditionalCompilationBlocks.Of(parseResult.PrecompilerTrivia);
+        var drawsOnMe = parseResult.Designer is { Kind: FormDesignerKind.VisualBasic6 };
         var options = new InstructionLoweringOptions(deadRanges, IsReleaseBuild: !session.IsDebugBuild(), Language: session.Environment.Language,
-            DropsDebugStatements: session.Environment.ReleaseDropsDebugStatements);
+            DropsDebugStatements: session.Environment.ReleaseDropsDebugStatements, DrawsOnMe: drawsOnMe);
         var procedures = new List<KeyValuePair<SemanticId, InstructionList>>();
         var procedureModels = ImmutableArray.CreateBuilder<ProcedureSemanticModel>();
         var sweepable = new List<(VBTypeMemberSymbol Procedure, InstructionList Body)>();
@@ -132,7 +133,7 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
             // structure of the body.
             var scope = session.Symbols.ScopeOf(procedure.Uri);
             var model = StatementStaticSemanticsEvaluator.Analyze(
-                procedure.SemanticId, body, new StaticSemanticsOptions(deadRanges, session.Environment.Language, blocks), declaration.MemberKind,
+                procedure.SemanticId, body, new StaticSemanticsOptions(deadRanges, session.Environment.Language, blocks, drawsOnMe), declaration.MemberKind,
                 scope is null ? null : new StaticEvaluationContext(session.Symbols.Resolver, scope,
                     Environment: new StaticEnvironment(session.Environment.Is64Bit) { Libraries = session.Libraries }));
 
