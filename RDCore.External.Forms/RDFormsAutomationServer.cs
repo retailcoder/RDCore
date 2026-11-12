@@ -1,5 +1,8 @@
+using Avalonia.Threading;
 using RDCore.External.Automation;
+using RDCore.Forms.Menus;
 using RDCore.Forms.Model;
+using RDCore.Forms.Model.VB;
 using System.Globalization;
 
 namespace RDCore.External.Forms.RDForms;
@@ -20,6 +23,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     private const int NotImplemented = unchecked((int)0x80004001);
     private const int VisualBasicError = unchecked((int)0x800A0000);
     private const string VisualBasicLibrary = "VB";
+    private const string PopupMenuMember = "PopupMenu";
 
     /// <summary>
     /// Creates the server of the forms of a process, whose windows are on <paramref name="platform"/>.
@@ -79,6 +83,13 @@ public sealed class RDFormsAutomationServer : IAutomationServer
                 return control;
             }
 
+            if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && handle.IsForm
+                && string.Equals(member, PopupMenuMember, StringComparison.OrdinalIgnoreCase))
+            {
+                PopupMenu(handle, arguments, culture);
+                return null;
+            }
+
             throw new AutomationException(UnknownName, $"{handle} has no member named {member}.");
         });
     }
@@ -105,6 +116,55 @@ public sealed class RDFormsAutomationServer : IAutomationServer
             throw new AutomationException(VisualBasicError | exception.Error.Number, exception.Error.Description);
         }
     }
+
+    // VB's PopupMenu Menu, [Flags], [X], [Y], [BoldCommand]: the form's window pops up the menu's items, and the call waits, as a modal Show does, until the menu
+    // closes, after the Click of an item chosen from it. X and Y are in the form's scale, and either one left out is the pointer's. Of Flags, 4 centres the menu
+    // on the point and 8 puts its right edge there; the mouse button flag (2) is not served. A form that is not shown has no menu host, and pops up nothing.
+    private static void PopupMenu(RDFormsObject handle, object?[] arguments, CultureInfo culture)
+    {
+        if (arguments.Length is 0 or > 5)
+        {
+            throw new AutomationException(BadParameterCount, $"{handle}.{PopupMenuMember} takes a menu, and up to four arguments after it.");
+        }
+
+        var menu = MenuOf(handle, arguments[0]) ?? throw NotAMenu(handle);
+        var flags = Given(arguments, 1) is { } flag ? (int)RDFormsValues.FromNeutral(flag, typeof(int), culture)! : 0;
+        double? x = Given(arguments, 2) is { } left ? RDFormsValues.SingleOf(left, culture) : null;
+        double? y = Given(arguments, 3) is { } top ? RDFormsValues.SingleOf(top, culture) : null;
+        var bold = Given(arguments, 4) is { } boldCommand ? MenuOf(handle, boldCommand) ?? throw NotAMenu(handle) : null;
+        var alignment = (flags & 8) != 0 ? PopupMenuAlignment.Right : (flags & 4) != 0 ? PopupMenuAlignment.Center : PopupMenuAlignment.Left;
+
+        if (MenuHosts.Of(handle.Form.Model.Root) is not { } host)
+        {
+            return;
+        }
+
+        var closed = host.PopupMenu(menu, x, y, alignment, bold);
+        if (!closed.IsCompleted)
+        {
+            var frame = new DispatcherFrame();
+            _ = closed.ContinueWith(_ => Dispatcher.UIThread.Post(() => frame.Continue = false, DispatcherPriority.Send), TaskScheduler.Default);
+            Dispatcher.UIThread.PushFrame(frame);
+        }
+
+        // what the menu raised as it closed fails the call.
+#pragma warning disable VSTHRD002
+        closed.GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
+    }
+
+    // an argument given: none past the last one, and none for one left out.
+    private static object? Given(object?[] arguments, int index)
+        => index < arguments.Length && arguments[index] is not System.Reflection.Missing ? arguments[index] : null;
+
+    // the item a menu of the form's own is; null for any other value.
+    private static FormMenuItem? MenuOf(RDFormsObject form, object? value)
+        => value is RDFormsObject { IsForm: false } menu && ReferenceEquals(menu.Form, form.Form) && menu.Component.Class == VBClasses.Menu
+            ? FormMenuItem.Of(menu.Component)
+            : null;
+
+    private static AutomationException NotAMenu(RDFormsObject handle)
+        => new(VisualBasicError | 5, $"{handle}.{PopupMenuMember}: the argument is not a menu of the form.");
 
     // a control of the form, by its name: a control that is an element of an array is reached through the array, which a name alone is not.
     private static RDFormsObject? Control(RDFormsObject handle, string name)

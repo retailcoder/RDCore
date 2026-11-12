@@ -3,6 +3,7 @@ using RDCore.External.Forms;
 using RDCore.External.Forms.RDForms;
 using RDCore.SDK.Workspace.Forms;
 using System.Globalization;
+using System.Reflection;
 
 namespace RDCore.Tests.External;
 
@@ -380,6 +381,142 @@ public sealed class RDFormsFormHostTests
         host.Server.Release(form);
 
         Assert.ThrowsExactly<AutomationException>(() => host.IsShown(form));
+    }
+
+    // a form that keeps a hidden top-level menu to pop up: mnuEdit holds Cut and Copy.
+    private const string MenuDesigner =
+        "VERSION 5.00\r\n" +
+        "Begin VB.Form Form1 \r\n" +
+        "   Caption         =   \"Menus\"\r\n" +
+        "   ClientHeight    =   3195\r\n" +
+        "   ClientWidth     =   4680\r\n" +
+        "   Begin VB.Menu mnuEdit \r\n" +
+        "      Caption         =   \"&Edit\"\r\n" +
+        "      Visible         =   0   'False\r\n" +
+        "      Begin VB.Menu mnuCut \r\n" +
+        "         Caption         =   \"Cu&t\"\r\n" +
+        "      End\r\n" +
+        "      Begin VB.Menu mnuCopy \r\n" +
+        "         Caption         =   \"&Copy\"\r\n" +
+        "      End\r\n" +
+        "   End\r\n" +
+        "End\r\n" +
+        "Attribute VB_Name = \"Form1\"\r\n";
+
+    // what a user does with the menu PopupMenu pops up, once it is open: run on the UI thread, after the menu's own Click, while the PopupMenu call waits. The
+    // popup opens on a job of its own, so the action waits behind the jobs before it until it is there.
+    private static void OnceItPopsUp(RDFormsObject form, Action<Avalonia.Controls.ContextMenu> act, int jobsLeft = 20)
+        => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (form.Form.Window.PoppedUpMenu is { IsOpen: true } popup)
+            {
+                act(popup);
+            }
+            else if (jobsLeft > 0)
+            {
+                OnceItPopsUp(form, act, jobsLeft - 1);
+            }
+            else
+            {
+                // nothing popped up: hiding the form ends the call, and the row fails on what was raised.
+                form.Form.Hide();
+            }
+        }, Avalonia.Threading.DispatcherPriority.Background);
+
+    private static Avalonia.Controls.MenuItem ItemOf(Avalonia.Controls.ContextMenu popup, string name)
+        => Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(popup).OfType<Avalonia.Controls.MenuItem>()
+            .Single(item => RDCore.Forms.Avalonia.Controls.VBControl.GetInstance(item)?.Name == name);
+
+    private static void PopupMenu(RDFormsFormHost host, object form, params object?[] arguments)
+        => host.Server.Invoke(form, "PopupMenu", AutomationInvocation.Method, arguments, new bool[arguments.Length], CultureInfo.InvariantCulture);
+
+    [TestMethod]
+    [DoNotParallelize]
+    public void PopupMenu_RaisesTheMenusClickAsItOpens_AndReturnsOnceItCloses()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm(MenuDesigner));
+        try
+        {
+            var edit = Get(host, form, "mnuEdit")!;
+            var raised = new List<string>();
+            host.Server.Advise(edit, new Recorder
+            {
+                Handler = clicked =>
+                {
+                    raised.Add($"mnuEdit {clicked.Name}");
+                    OnceItPopsUp(RDFormsAutomationServer.HandleOf(form), popup =>
+                    {
+                        raised.Add("popped up");
+                        popup.Close();
+                    });
+                },
+            });
+            host.Show(form, modal: false);
+
+            PopupMenu(host, form, edit);
+            raised.Add("returned");
+
+            CollectionAssert.AreEqual(new[] { "mnuEdit Click", "popped up", "returned" }, raised, string.Join(" | ", raised));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public void AnItemChosenFromThePopup_RaisesItsClick_BeforePopupMenuReturns()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm(MenuDesigner));
+        try
+        {
+            var edit = Get(host, form, "mnuEdit")!;
+            var raised = new List<string>();
+            host.Server.Advise(Get(host, form, "mnuCopy")!, new Recorder { Handler = clicked => raised.Add($"mnuCopy {clicked.Name}") });
+            host.Server.Advise(edit, new Recorder
+            {
+                Handler = clicked =>
+                {
+                    raised.Add($"mnuEdit {clicked.Name}");
+                    OnceItPopsUp(RDFormsAutomationServer.HandleOf(form), popup =>
+                    {
+                        // a click on the item raises its Click, then the menu closes.
+                        ItemOf(popup, "mnuCopy").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Controls.MenuItem.ClickEvent));
+                        popup.Close();
+                    });
+                },
+            });
+            host.Show(form, modal: false);
+
+            PopupMenu(host, form, edit, 0, Missing.Value, Missing.Value, Get(host, form, "mnuCopy"));
+            raised.Add("returned");
+
+            CollectionAssert.AreEqual(new[] { "mnuEdit Click", "mnuCopy Click", "returned" }, raised, string.Join(" | ", raised));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
+    }
+
+    [TestMethod]
+    public void PopupMenu_IsAFormsMethod_AndNotAControls()
+    {
+        var host = Host();
+        var form = host.Create(VisualBasicForm(MenuDesigner));
+        try
+        {
+            var edit = Get(host, form, "mnuEdit")!;
+
+            Assert.ThrowsExactly<AutomationException>(() => PopupMenu(host, edit, edit));
+        }
+        finally
+        {
+            host.Destroy(form);
+        }
     }
 
     [TestMethod]

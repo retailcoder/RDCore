@@ -22,7 +22,7 @@ internal static class RDFormsValues
     public static FormValue ArgumentOf(object? value, MethodParameter? parameter, CultureInfo culture)
         => string.Equals(parameter?.TypeName, "Single", StringComparison.OrdinalIgnoreCase) ? FormValue.FromSingle(SingleOf(value, culture)) : VariantOf(value);
 
-    private static float SingleOf(object? value, CultureInfo culture)
+    public static float SingleOf(object? value, CultureInfo culture)
     {
         var number = Unwrapped(value) switch
         {
