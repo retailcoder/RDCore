@@ -310,6 +310,26 @@ public sealed class SyntaxErrorRunRefusalTests
         Assert.IsEmpty(resumed.Output, "nothing after the Stop runs");
     }
 
+    // a module the project gains while the program waits at its Stop is code of the project too: with a syntax error, the program is not resumed.
+    [TestMethod]
+    [Ignore("needs edit-and-continue design: the session gains a module only when it is composed again, which the host refuses while a program runs")]
+    public async Task AModuleAddedAtAStop_ThatDoesNotLoad_IsNotResumedOn()
+    {
+        var added = ("Added", ModuleType.StdModule, Module("Added", "Public Sub Bad()", "    Debug.Print 1 +", "End Sub"));
+        ExecuteResult? resumed = null;
+        await ModuleWorkspace.InspectWithModulesAsync([("Other", GoodOther.Source)], StoppedProgram(), async (provider, stopped, runAgain) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Suspended, stopped.Outcome, stopped.ErrorMessage);
+            _ = await ModuleWorkspace.ReloadOnlyAsync(provider, ["Added"], syntaxErrors: true, ("Program", ModuleType.StdModule, StoppedProgram()), GoodOther, added);
+            resumed = await Resume(provider);
+        }, debug: true);
+
+        Assert.AreEqual(ExecutionOutcome.Refused, resumed!.Outcome, resumed.ErrorMessage);
+        StringAssert.Contains(resumed.ErrorMessage, "Added");
+        StringAssert.Contains(resumed.ErrorMessage, "does not compile");
+        Assert.IsEmpty(resumed.Output, "nothing after the Stop runs");
+    }
+
     // what a debugger evaluates or runs at the stop is code of the project too, which can call into the module that does not load.
     [TestMethod]
     [DataRow(false, DisplayName = "an expression evaluated")]
