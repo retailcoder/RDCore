@@ -12,7 +12,7 @@ public static class GraphicsStatementStaticSemantics
     public static VBCompileErrorInfo? Evaluate(GraphicsMethodStatementNode graphics, bool drawsOnMe = false)
         => graphics is { Target: null, IsWithRelative: false } && !drawsOnMe
             ? VBCompileErrorInfo.For(VBCompileErrorId.SubOrFunctionNotDefined, graphics.SourceLocation,
-                $"'{graphics.Token}' is not defined: written with no object, it is the {graphics.Token} method of the form or report it is written in, and only a Visual Basic 6.0 form's code has one to draw on.")
+                $"'{graphics.Token}' is not defined: written with no object, it is the {graphics.Token} method of the form or report it is written in, which draws only in the code of a Visual Basic 6.0 form.")
             : null;
 
     public static IEnumerable<ExpressionNode> Expressions(GraphicsMethodStatementNode graphics)
