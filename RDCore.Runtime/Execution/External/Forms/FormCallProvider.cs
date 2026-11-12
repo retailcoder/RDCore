@@ -36,8 +36,8 @@ namespace RDCore.Runtime.Execution.External.Forms;
 /// <para>
 /// What the form host adds to the form is the window, so the members that are the window's are asked of it: <c>Show</c>, <c>Hide</c>, <c>Visible</c>, the
 /// <c>Caption</c>, which is the window's caption and not the Microsoft Forms form's own, and <c>Left</c>, <c>Top</c>, <c>Width</c> and <c>Height</c>, which are
-/// where the window is and its size. Every other member of the <c>UserForm</c> - <c>Controls</c>,
-/// <c>InsideWidth</c> - and every control is the form object's, called through the automation server as any server object's member is.
+/// where the window is and its size. Every other member of the <c>UserForm</c> (<c>Controls</c>, <c>InsideWidth</c>) and every control is the form object's,
+/// called through the automation server as any server object's member is.
 /// </para>
 /// <para>
 /// The standard library's <c>Load</c> and <c>Unload</c> are answered here too: <c>Unload</c> asks the form (<c>QueryClose</c>), terminates it, destroys its
@@ -46,7 +46,8 @@ namespace RDCore.Runtime.Execution.External.Forms;
 /// <para>
 /// A Visual Basic 6.0 form follows VB6's lifecycle. The use of its name makes its instance without loading it; any member of its form, <c>Load</c>, <c>Show</c>
 /// and <c>Hide</c> load it, and its <c>Form_Load</c> runs inside the use. <c>Unload</c> keeps its instance, its variables and its name, and the next member of
-/// its form loads it again (measured in VB6).
+/// its form loads it again (measured in VB6). Its <c>Left</c>, <c>Top</c>, <c>Width</c> and <c>Height</c> are members of its own object model, which its
+/// server calls, as it does every other member of the form.
 /// </para>
 /// <para>
 /// 🚧 Not yet: the <c>UserForms</c> collection; the window's own events (<c>Activate</c>, <c>Deactivate</c>, the close button's <c>QueryClose</c>); the form

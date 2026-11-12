@@ -146,7 +146,7 @@ public sealed class RDFormsFormHost(RDFormsAutomationServer server) : IFormHost
     }
 
     // a Visual Basic 6.0 form's position and size are members of its own object model, which its server serves: only a UserForm's are its form host's,
-    // and RDForms hosts none.
+    // and RDForms hosts no UserForm.
     /// <inheritdoc/>
     public FormBounds GetBounds(object form)
     {
