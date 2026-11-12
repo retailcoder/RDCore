@@ -67,7 +67,7 @@ public sealed class VisualBasicFormPopupMenuTests
     }
 
     [TestMethod]
-    [DataRow("Form3.PopupMenu Form3.mnuEmpty, 4", DisplayName = "centred")]
+    [DataRow("Form3.PopupMenu Form3.mnuEmpty, 4", DisplayName = "centered")]
     [DataRow("Form3.PopupMenu Form3.mnuEmpty, 8, 120, 240", DisplayName = "right-aligned, at a point")]
     [DataRow("Form3.PopupMenu Form3.mnuEmpty, 2, , , Form3.mnuEmpty", DisplayName = "the right button, with a bold item")]
     public async Task PopupMenu_TakesItsOptionalArguments(string call)
@@ -78,7 +78,7 @@ public sealed class VisualBasicFormPopupMenuTests
     }
 
     [TestMethod]
-    [Ignore("not measured with VB6: PopupMenu of an object that is not a menu of the form; RD raises 5")]
+    [Ignore("not measured with VB6: PopupMenu of an object that is not a menu of the form; RD-VBA raises 5")]
     [DataRow("Form3.PopupMenu Form3", DisplayName = "the form itself")]
     [DataRow("Form3.PopupMenu Form3.mnuEdit, , , , Form3", DisplayName = "a bold item that is not a menu")]
     public async Task PopupMenu_OfWhatIsNotAMenu_Is5(string call)
@@ -89,7 +89,7 @@ public sealed class VisualBasicFormPopupMenuTests
     }
 
     [TestMethod]
-    [Ignore("not measured with VB6: PopupMenu on a form that is loaded but not shown; RD pops up nothing, raises nothing, and returns")]
+    [Ignore("not measured with VB6: PopupMenu on a form that is loaded but not shown; RD-VBA pops up nothing, raises nothing, and returns")]
     public async Task PopupMenu_OnAFormThatIsNotShown_PopsUpNothing()
     {
         var printed = await RunAsync("Load Form3", "On Error Resume Next", "Form3.PopupMenu Form3.mnuEdit", "Debug.Print Err.Number", "Unload Form3");

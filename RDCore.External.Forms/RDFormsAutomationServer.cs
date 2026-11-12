@@ -118,8 +118,8 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     }
 
     // VB's PopupMenu Menu, [Flags], [X], [Y], [BoldCommand]: the form's window pops up the menu's items, and the call waits, as a modal Show does, until the menu
-    // closes, after the Click of an item chosen from it. X and Y are in the form's scale, and either one left out is the pointer's. Of Flags, 4 centres the menu
-    // on the point and 8 puts its right edge there; the mouse button flag (2) is not served. A form that is not shown has no menu host, and pops up nothing.
+    // closes, after the Click of an item chosen from it. X and Y are in the form's scale, and either one left out is the pointer's. Of Flags, 4 centers the menu
+    // on the point and 8 puts its right edge there; the mouse button flag (2) is accepted and changes nothing. A form that is not shown has no menu host, and pops up nothing.
     private static void PopupMenu(RDFormsObject handle, object?[] arguments, CultureInfo culture)
     {
         if (arguments.Length is 0 or > 5)
