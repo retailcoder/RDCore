@@ -235,7 +235,7 @@
     <value>doté d'une valeur par défaut</value>
   </data>
   <data name="IsMissingAlwaysFalse_NotAParameter_Message" xml:space="preserve">
-    <value>IsMissing({0}) est toujours False: '{0}' est {1}, qui ne contient jamais la valeur Missing. IsMissing indique si un paramètre Variant n'a reçu aucun argument.</value>
+    <value>IsMissing({0}) est toujours False : '{0}' est {1}, qui ne contient jamais la valeur Missing. IsMissing indique si un paramètre Variant n'a reçu aucun argument.</value>
   </data>
   <data name="IsMissingAlwaysFalse_AVariableNotAVariant" xml:space="preserve">
     <value>une variable autre qu'un Variant</value>

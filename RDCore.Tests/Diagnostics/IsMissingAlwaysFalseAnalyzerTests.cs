@@ -8,8 +8,8 @@ using RDCore.Diagnostics;
 namespace RDCore.Tests.Diagnostics;
 
 /// <summary>
-/// <c>RDC00207</c>: <c>IsMissing</c> of a parameter that can never be missing - one that is not a <c>Variant</c>, or an <c>Optional</c> <c>Variant</c> with a
-/// default value - which is always <c>False</c> (observed in Excel); and of a variable that is not a <c>Variant</c>, or a constant, which
+/// <c>RDC00207</c>: <c>IsMissing</c> of a parameter that can never be missing (one that is not a <c>Variant</c>, or an <c>Optional</c> <c>Variant</c> with a
+/// default value), which is always <c>False</c> (observed in Excel); and of a variable that is not a <c>Variant</c>, or a constant, which
 /// never hold the Missing value.
 /// </summary>
 [TestClass]
@@ -54,7 +54,7 @@ public sealed class IsMissingAlwaysFalseAnalyzerTests
 
     [TestMethod]
     public async Task IsMissingOfSomethingElse_IsNotReported()
-        // I07: a Variant local holds the Missing value that is assigned to it (MS-VBAL §6.1.2.7.1.6), and a literal is no name.
+        // a Variant local holds the Missing value that is assigned to it (MS-VBAL §6.1.2.7.1.6), and a literal is no name.
         => Assert.IsEmpty(await FindingsAsync("Optional n As Long", "Dim w As Variant\r\nDebug.Print IsMissing(w)\r\nDebug.Print IsMissing(5)"));
 
     [TestMethod]
