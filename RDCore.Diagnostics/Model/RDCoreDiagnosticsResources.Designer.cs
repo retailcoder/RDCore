@@ -95,13 +95,31 @@ namespace RDCore.Diagnostics.Model {
                 return ResourceManager.GetString("EmptyCodeBlock_Message", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Looks up a localized string similar to Remove the empty Else.
+        /// </summary>
+        public static string EmptyElseBlock_Fix {
+            get {
+                return ResourceManager.GetString("EmptyElseBlock_Fix", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Looks up a localized string similar to This {0} branch has no statement: it does nothing when its condition is True..
         /// </summary>
         public static string EmptyIfBlock_Message {
             get {
                 return ResourceManager.GetString("EmptyIfBlock_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Remove the empty If.
+        /// </summary>
+        public static string EmptyIfBlock_Fix {
+            get {
+                return ResourceManager.GetString("EmptyIfBlock_Fix", resourceCulture);
             }
         }
 
@@ -129,6 +147,15 @@ namespace RDCore.Diagnostics.Model {
         public static string EmptyStringLiteral_Message {
             get {
                 return ResourceManager.GetString("EmptyStringLiteral_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Replace &quot;&quot; with vbNullString.
+        /// </summary>
+        public static string EmptyStringLiteral_Fix {
+            get {
+                return ResourceManager.GetString("EmptyStringLiteral_Fix", resourceCulture);
             }
         }
 
