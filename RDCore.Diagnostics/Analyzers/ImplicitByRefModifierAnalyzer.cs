@@ -15,6 +15,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class ImplicitByRefModifierAnalyzer : SyntaxTreeAnalyzer
 {
+    public override IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.ImplicitByRefModifier.ToCode()];
+
     protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
         => module.Descendants()
             .OfType<ParameterDeclarationNode>()

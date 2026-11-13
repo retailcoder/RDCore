@@ -18,6 +18,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class CaseComparedInSelectorTypeAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.CaseComparedInSelectorType.ToCode()];
+
     private const CaseClauseSemanticFlags Reported = CaseClauseSemanticFlags.ComparisonForm | CaseClauseSemanticFlags.ComparedInSelectorType;
 
     public AnalysisPhase Phase => AnalysisPhase.Runtime;

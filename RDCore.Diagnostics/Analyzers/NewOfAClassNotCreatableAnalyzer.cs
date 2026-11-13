@@ -18,6 +18,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class NewOfAClassNotCreatableAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.NewOfAClassNotCreatable.ToCode()];
+
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
     {
         var declarations = (context.Semantics?.Declarations ?? [])

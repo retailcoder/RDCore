@@ -18,6 +18,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class StringComparedWithANumberAsADoubleAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.StringComparedWithANumberAsADouble.ToCode()];
+
     public AnalysisPhase Phase => AnalysisPhase.Runtime;
 
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)

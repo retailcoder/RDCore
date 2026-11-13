@@ -18,6 +18,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class IsMissingAlwaysFalseAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.IsMissingAlwaysFalse.ToCode()];
+
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
     {
         if (context.ParseResult.SyntaxTree is not { } module || context.Semantics is not { } semantics)

@@ -14,6 +14,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class RedundantByValArgumentAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.RedundantByValArgument.ToCode()];
+
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
         => (context.Semantics?.Procedures ?? [])
             .SelectMany(procedure => procedure.Expressions)

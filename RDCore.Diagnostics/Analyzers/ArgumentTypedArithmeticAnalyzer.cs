@@ -21,6 +21,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class ArgumentTypedArithmeticAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.ArgumentTypedArithmeticOverflow.ToCode()];
+
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
     {
         var flagged = (context.Semantics?.Procedures ?? [])

@@ -16,6 +16,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class IntegerDataTypeAnalyzer : SyntaxTreeAnalyzer
 {
+    public override IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.IntegerDataTypeDeclaration.ToCode()];
+
     protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
         => module.Children
             .Where(member => member is not ExternalMemberDeclarationNode)

@@ -26,6 +26,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </remarks>
 internal sealed class SetThroughACallAnalyzer : IModuleAnalyzer
 {
+    public IReadOnlyList<RDCoreDiagnosticCode> Codes => [RDCoreDiagnosticId.SetThroughACallFails.ToCode()];
+
     public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
         => (context.Semantics?.Procedures ?? []).SelectMany(procedure => procedure.Expressions
             .Where(fact => fact.Flags.HasFlag(ValueExpressionSemanticFlags.SetHasNoDefaultMemberToSet))
