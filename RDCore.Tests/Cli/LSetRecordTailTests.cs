@@ -23,7 +23,7 @@ public sealed class LSetRecordTailTests
 
     // the low two bytes of the Long are the Integer's, and its high two bytes are what they were.
     [TestMethod]
-    [Ignore("RD-VBAL §5.4.3.6 sets a field the copy reaches part of to its default; MS-VBA keeps its other bytes. Awaiting the author's ruling.")]
+    [Ignore("a field LSet reaches only part of: RD-VBAL §5.4.3.6 sets it to its default, so that no place holds half a value; MS-VBA keeps its other bytes (observed in Excel)")]
     [DataRow(VBExecutionEngine.Interpreter, DisplayName = "Interpreter")]
     [DataRow(VBExecutionEngine.Compiled, DisplayName = "Compiled")]
     public async Task AShorterRecord_LSetOntoALong_KeepsTheBytesItDoesNotReach(VBExecutionEngine engine)
@@ -42,7 +42,7 @@ public sealed class LSetRecordTailTests
 
     // a field the copy does not reach at all is what it was.
     [TestMethod]
-    [Ignore("RD-VBAL §5.4.3.6 sets a field the copy does not reach to its default; MS-VBA leaves it as it was. Awaiting the author's ruling.")]
+    [Ignore("a field LSet does not reach: RD-VBAL §5.4.3.6 sets it to its default; MS-VBA leaves it as it was (observed in Excel)")]
     [DataRow(VBExecutionEngine.Interpreter, DisplayName = "Interpreter")]
     [DataRow(VBExecutionEngine.Compiled, DisplayName = "Compiled")]
     public async Task AShorterRecord_LSetOntoTwoFields_LeavesTheSecondAsItWas(VBExecutionEngine engine)
