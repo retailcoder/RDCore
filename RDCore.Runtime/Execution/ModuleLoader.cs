@@ -110,6 +110,7 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
         var sweepable = new List<(VBTypeMemberSymbol Procedure, InstructionList Body)>();
         var swept = new HashSet<SemanticId>();
         var headerErrors = ImmutableArray.CreateBuilder<VBCompileErrorInfo>();
+        var unanalyzedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var member in written.Children.OfType<MemberDeclarationNode>())
         {
             // a procedure written once in each #If branch is the one of the live branch, and a header written once in each around one body is the live
@@ -136,6 +137,13 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
                 procedure.SemanticId, body, new StaticSemanticsOptions(deadRanges, session.Environment.Language, blocks), declaration.MemberKind,
                 scope is null ? null : new StaticEvaluationContext(session.Symbols.Resolver, scope,
                     Environment: new StaticEnvironment(session.Environment.Is64Bit) { Libraries = session.Libraries }) { Arguments = arguments });
+
+            // a declaration of the module that a procedure not fully analyzed does not name is referred to by the rest of the module alone. The procedure is
+            // taken as it is written, each of its #If branches with it.
+            if (!model.IsFullyAnalyzed)
+            {
+                unanalyzedNames.UnionWith(DeclarationUsage.NamesIn(member));
+            }
 
             // the code paths are those of the lowered body, which only the loader has next to what the static pass found out about it.
             // the For Each control variables followed are the procedure's automatic locals: what nothing but its own code assigns.
@@ -176,7 +184,7 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
             OptionExplicit = session.Environment.Language is { HasOptionExplicit: false } ? null : module is VBModuleSymbol { Directives.Explicit: true },
             Declarations = DeclarationUsage.Of(
                 DeclarationUsage.DeclaredBy(members), procedureModels, module is VBClassModuleSymbol classModule ? MemberRoles.Of(classModule, session.Symbols.Resolver, parseResult.Designer) : null,
-                symbol => DeclarationShadowing.Of(symbol, session.Symbols.Resolver, module.Uri), arguments),
+                symbol => DeclarationShadowing.Of(symbol, session.Symbols.Resolver, module.Uri), arguments, unanalyzedNames),
             Language = session.Environment.Language?.Id,
             Class = module is VBClassModuleSymbol declaredClass ? ClassFlagsOf(declaredClass, members) : null,
             Document = module is VBClassModuleSymbol document ? DocumentModuleFact.Of(document, session.Symbols.Resolver) : null,
