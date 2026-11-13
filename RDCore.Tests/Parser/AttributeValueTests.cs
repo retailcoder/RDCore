@@ -5,7 +5,7 @@ namespace RDCore.Tests.Parser;
 
 /// <summary>
 /// The value of an <c>Attribute</c> statement is its text as written, quotes included: a character that looks like another (a non-breaking space in a
-/// <c>VB_Name</c>) is kept, for what checks the name to see.
+/// <c>VB_Name</c>) is kept, so that a check of the name sees it.
 /// </summary>
 [TestClass]
 [TestCategory("RD-VBAL §4.2 Modules")]
