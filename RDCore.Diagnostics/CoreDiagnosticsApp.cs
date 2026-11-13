@@ -146,6 +146,7 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, ImplementsInDocumentModuleAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, UseMeaningfulIdentifierNamesAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, HungarianNotationAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, KeywordUsedAsMemberNameAnalyzer>();
     }
 
     protected override void Dispose(bool disposing)
