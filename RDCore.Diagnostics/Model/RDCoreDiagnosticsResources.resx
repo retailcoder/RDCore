@@ -249,6 +249,9 @@
   <data name="SuspiciousPredeclaredInstanceAccess_Message" xml:space="preserve">
     <value>&apos;{0}&apos; names the default instance of the class, and the object running this code (Me) is not always that instance.</value>
   </data>
+  <data name="ImplementedInterfaceMember_Message" xml:space="preserve">
+    <value>Class &apos;{0}&apos; is implemented as an interface, and its member &apos;{1}&apos; has code: a class that implements it does not run that code.</value>
+  </data>
   <data name="ObsoleteCommentSyntax_Message" xml:space="preserve">
     <value>The Rem keyword is obsolete: a comment starts with an apostrophe (').</value>
   </data>
