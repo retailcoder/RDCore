@@ -48,6 +48,7 @@ public enum RDCoreDiagnosticId
     LineContinuationBetweenKeywords = 213, // [RD2:LineContinuationBetweenKeywordsInspection] End _ / If: a line continuation between the words of a keyword
     ProcedureCanBeWrittenAsFunction = 214, // [RD2:ProcedureCanBeWrittenAsFunctionInspection] a Sub whose only ByRef parameter is assigned: its result
     SelfAssignedDeclaration = 215, // [RD2:SelfAssignedDeclarationInspection] a variable declared As New, created when first used
+    FunctionReturnValueDiscarded = 216, // [RD2:FunctionReturnValueDiscardedInspection] a Function of the project called as a statement: the value it returns is discarded
 
     ObsoleteCallingConvention = 301,
     ObsoleteCallStatement = 302,

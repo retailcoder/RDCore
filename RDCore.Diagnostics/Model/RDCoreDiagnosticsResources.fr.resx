@@ -243,6 +243,9 @@
   <data name="SelfAssignedDeclaration_Message" xml:space="preserve">
     <value>La variable &apos;{0}&apos; est déclarée As New : son objet est créé à sa première utilisation, et de nouveau quand elle est utilisée après avoir été mise à Nothing.</value>
   </data>
+  <data name="FunctionReturnValueDiscarded_Message" xml:space="preserve">
+    <value>La fonction &apos;{0}&apos; est appelée comme une instruction : la valeur qu&apos;elle renvoie est perdue.</value>
+  </data>
   <data name="EncapsulatePublicField_Message" xml:space="preserve">
     <value>Le champ &apos;{0}&apos; est Public : tout code qui détient l&apos;objet peut l&apos;affecter. Une propriété peut vérifier la valeur.</value>
   </data>
