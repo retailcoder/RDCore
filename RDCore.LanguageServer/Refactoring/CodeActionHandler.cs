@@ -14,6 +14,7 @@ using System.IO.Abstractions;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Runtime.Libraries;
 using RDCore.SDK.Server.Services;
 
 namespace RDCore.LanguageServer.Refactoring;
@@ -32,6 +33,11 @@ namespace RDCore.LanguageServer.Refactoring;
 /// A diagnostic fixed by edits its analyzer made is offered each fix as a quick fix, in the analyzer's order, with its edits as they are, for the version of
 /// the document they were made of: a fix of another version is not offered. Only the first is preferred, and not when it changes what the code does. A
 /// diagnostic fixed by a refactoring this server makes is offered the refactoring for its range, as a selection of that range is.
+/// </para>
+/// <para>
+/// A diagnostic fixed by a change of the project (<see cref="ProjectFix"/>) is offered a quick fix that is a command this server runs
+/// (<see cref="ServerCommands.ChangeProject"/>, <see cref="Workspace.ChangeProjectCommand"/>), when every change can be made of the project as it is, and it is
+/// not what the fix says already. It is preferred unless it changes what the code does.
 /// </para>
 /// <para>
 /// The statements of a selection that nothing refuses to extract are offered as a refactoring that extracts them as a procedure (<see cref="IExtractMethodService"/>).
@@ -54,7 +60,8 @@ namespace RDCore.LanguageServer.Refactoring;
 /// </remarks>
 internal sealed class CodeActionHandler(
     IRenameService rename, IWorkspaceDocumentService documents, IFileSystem fileSystem, IExtractMethodService extractMethod,
-    IPlatformClientCapabilitiesService clientCapabilities, OmniSharp.Extensions.JsonRpc.ISerializer serializer) : CodeActionHandlerBase
+    IPlatformClientCapabilitiesService clientCapabilities, OmniSharp.Extensions.JsonRpc.ISerializer serializer, IProjectFileService? projectFiles = null,
+    ILibrarySource? libraries = null) : CodeActionHandlerBase
 {
     /// <summary>The kind of the action that renames a symbol: a refactoring (<c>refactor.rename</c>).</summary>
     public static readonly CodeActionKind RefactorRename = new("refactor.rename");
@@ -140,6 +147,25 @@ internal sealed class CodeActionHandler(
                 {
                     actions.Add(refactoring with { Diagnostics = new Container<Diagnostic>(diagnostic) });
                 }
+            }
+
+            // a change of the project that fixes the finding is a command this server runs, offered when it changes the project as it is now.
+            if (fixes?.Project is { Changes.Count: > 0 } projectFix && projectFiles?.Project is { } project && libraries is not null
+                && projectFix.ApplyTo(project, documentUri, libraries, out _) is { } changed && !ReferenceEquals(changed, project))
+            {
+                actions.Add(new CodeAction
+                {
+                    Title = projectFix.Title,
+                    Kind = CodeActionKind.QuickFix,
+                    Diagnostics = new Container<Diagnostic>(diagnostic),
+                    Command = new Command
+                    {
+                        Name = ServerCommands.ChangeProject,
+                        Title = projectFix.Title,
+                        Arguments = new JArray(request.TextDocument.Uri.ToString(), JObject.FromObject(projectFix)),
+                    },
+                    IsPreferred = !projectFix.ChangesBehavior,
+                });
             }
 
             if (fixes?.Rename is not { } fix || workspace.Prepare(documentUri, diagnostic.Range.Start).Value is not { } target)

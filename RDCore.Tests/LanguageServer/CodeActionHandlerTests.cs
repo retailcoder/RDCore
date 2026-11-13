@@ -43,6 +43,14 @@ public sealed class CodeActionHandlerTests
     // what the client said it can do, as it initialized; none, a client that takes neither documentChanges nor change annotations.
     private ClientCapabilities? _client;
 
+    // the project of the workspace, which a fix that changes it is offered against, and the libraries it can reference.
+    private readonly IProjectFileService _projectFiles = Substitute.For<IProjectFileService>();
+    private readonly ILibrarySource _libraries = new InMemoryLibrarySource(new LibraryDescription
+    {
+        Name = "Excel",
+        Origin = new LibraryOrigin { Guid = "{00020813-0000-0000-C000-000000000046}", Version = "1.9" },
+    });
+
     public CodeActionHandlerTests()
     {
         _documents.WorkspaceRoot.Returns(Root);
@@ -69,7 +77,8 @@ public sealed class CodeActionHandlerTests
         var options = Options.Create(new SdkAppOptions { Workspace = new SdkWorkspaceOptions { WorkspaceUri = Root, Language = "vba" } });
         var rename = new RenameService(_documents, _parsing, new IntrinsicSymbolResolver(), libraries, options, NullLogger<RenameService>.Instance, OneProject.Registry());
         var handler = new CodeActionHandler(rename, _documents, new System.IO.Abstractions.TestingHelpers.MockFileSystem(), new ExtractMethodService(rename, _parsing, options),
-            Substitute.For<RDCore.SDK.Server.Services.IPlatformClientCapabilitiesService>(), new OmniSharp.Extensions.LanguageServer.Protocol.Serialization.LspSerializer());
+            Substitute.For<RDCore.SDK.Server.Services.IPlatformClientCapabilitiesService>(), new OmniSharp.Extensions.LanguageServer.Protocol.Serialization.LspSerializer(),
+            _projectFiles, _libraries);
         if (_client is not null)
         {
             ((IRegistration<CodeActionRegistrationOptions, CodeActionCapability>)handler).GetRegistrationOptions(new CodeActionCapability(), _client);
@@ -175,6 +184,44 @@ public sealed class CodeActionHandlerTests
         CollectionAssert.AreEqual(new[] { (new Range(1, 0, 1, 0), "15 Dim result As Long\r\n"), (new Range(2, 3, 2, 10), "result") },
             changes.Select(edit => (edit.Range, edit.NewText)).ToArray());
     }
+
+    private Diagnostic FixedByTheProject(string library, params RDCoreReference[] references)
+    {
+        _projectFiles.Project.Returns(new ProjectFile(Root, new RDCoreProject { References = references, Modules = [new RDCoreModule { RelativeUri = "Main.rdc" }] }));
+        return new Diagnostic
+        {
+            Range = new Range(0, 0, 0, 2),
+            Code = "RDC01007",
+            Source = "RDCore",
+            Message = "host library not referenced",
+            Data = new DiagnosticFixes
+            {
+                Project = new ProjectFix { Title = $"Reference the {library} library", Changes = [ProjectChange.AddReference(library)] },
+            }.ToData(),
+        };
+    }
+
+    [TestMethod]
+    public async Task ADiagnosticFixedByAChangeOfTheProject_IsOfferedTheCommandThatMakesIt()
+    {
+        var diagnostic = FixedByTheProject("Excel", new RDCoreReference { Name = "VBA" });
+
+        var action = (await ActionsAsync(new Range(0, 0, 0, 2), [CodeActionKind.QuickFix], diagnostic)).Single();
+
+        Assert.AreEqual("Reference the Excel library", action.Title);
+        Assert.IsTrue(action.IsPreferred);
+        Assert.IsNull(action.Edit);
+        Assert.AreEqual(ServerCommands.ChangeProject, action.Command!.Name);
+        Assert.AreEqual(Document.ToString(), (string?)action.Command.Arguments![0]);
+        Assert.AreEqual(ProjectChange.AddReference("Excel"), action.Command.Arguments[1].ToObject<ProjectFix>()!.Changes.Single());
+    }
+
+    [TestMethod]
+    [DataRow("Word", DisplayName = "a library the platform does not describe")]
+    [DataRow("excel", DisplayName = "a library the project references already")]
+    public async Task AChangeOfTheProjectThatCannotBeMade_OrChangesNothing_IsNotOffered(string library)
+        => Assert.IsEmpty(await ActionsAsync(new Range(0, 0, 0, 2), [CodeActionKind.QuickFix],
+            FixedByTheProject(library, new RDCoreReference { Name = "VBA" }, new RDCoreReference { Name = "Excel" })));
 
     [TestMethod]
     public async Task AFirstFixThatChangesWhatTheCodeDoes_IsNotPreferred()
