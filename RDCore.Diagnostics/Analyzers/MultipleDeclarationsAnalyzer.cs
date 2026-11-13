@@ -56,7 +56,7 @@ internal sealed class MultipleDeclarationsAnalyzer : SyntaxTreeAnalyzer
         var indent = new string(' ', statement[0].SourceLocation.Range.Start.Character);
         var edits = statement.Zip(statement.Skip(1), (before, after) => SyntaxEdits.Replace(
             new SourceRange(before.SourceLocation.Range.End, after.SourceLocation.Range.Start), $"{NewLine}{indent}{keywords} "));
-        return SyntaxEdits.Fix(RDCoreDiagnosticsResources.MultipleDeclarations_Fix, [.. edits]);
+        return new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.MultipleDeclarations_Fix, [.. edits]) };
     }
 
     // the keywords the statement starts with, which the tree says by its access modifier and whether it is static or constant.

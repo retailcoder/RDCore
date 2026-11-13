@@ -26,7 +26,10 @@ internal sealed class MisleadingByRefParameterAnalyzer : SyntaxTreeAnalyzer
             {
                 Fixes = parameter.IsOptional
                     ? null
-                    : SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.MisleadingByRefParameter_Fix, parameter.Name),
-                        SyntaxEdits.Replace(SyntaxEdits.Following(parameter.Location.Range.Start, "ByRef".Length), "ByVal")),
+                    : new DiagnosticFixes
+                    {
+                        Edit = SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.MisleadingByRefParameter_Fix, parameter.Name),
+                            SyntaxEdits.Replace(SyntaxEdits.Following(parameter.Location.Range.Start, "ByRef".Length), "ByVal")),
+                    },
             });
 }

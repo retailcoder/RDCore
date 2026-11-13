@@ -24,7 +24,10 @@ internal sealed class ModuleScopeDimAnalyzer : SyntaxTreeAnalyzer
                 DiagnosticSeverity.Information,
                 RDCoreDiagnosticsResources.ModuleScopeDimDeclaration_Message)
             {
-                Fixes = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ModuleScopeDimDeclaration_Fix,
-                    SyntaxEdits.Replace(SyntaxEdits.Following(statement[0].SourceLocation.Range.Start, "Dim".Length), "Private")),
+                Fixes = new DiagnosticFixes
+                {
+                    Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ModuleScopeDimDeclaration_Fix,
+                        SyntaxEdits.Replace(SyntaxEdits.Following(statement[0].SourceLocation.Range.Start, "Dim".Length), "Private")),
+                },
             });
 }
