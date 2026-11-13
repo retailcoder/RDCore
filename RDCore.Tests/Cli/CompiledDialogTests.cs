@@ -15,7 +15,7 @@ namespace RDCore.Tests.Cli;
 [TestClass]
 public sealed class CompiledDialogTests
 {
-    // a prompt answered by its If, a Stop and an End in the branch the answer takes: what nothing compiled code does would gain from.
+    // a prompt whose answer an If tests, with a Stop and an End in the branch the answer takes: nothing in it would gain from compiled code.
     private static readonly string[] Prompt =
     [
         "    Const message As String = \"Not implemented.\" & vbNewLine & \"Will you implement it?\"",
