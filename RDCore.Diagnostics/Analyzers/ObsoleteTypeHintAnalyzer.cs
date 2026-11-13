@@ -4,6 +4,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Source;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Extensibility.Diagnostics;
 
@@ -76,15 +77,15 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
     // the character comes out of the name, and its As clause goes where the declarator ends: after the name, or after the bounds of an array.
     private static DiagnosticFixes? DeclarationFix(string name, string? hint, SourceRange? nameRange, SourcePosition? declaratorEnd)
     {
-        if (hint is null || TypeCharacters.TypeNameOf(hint) is not { } typeName || nameRange is not { } range || declaratorEnd is not { } end
+        if (hint is null || !IntrinsicVBTypes.TryResolveTypeHint(hint, out var type) || nameRange is not { } range || declaratorEnd is not { } end
             || SyntaxEdits.Width(range.Start, range.End) != name.Length + hint.Length)
         {
             return null;
         }
 
         var character = new SourceRange(new SourcePosition(range.End.Line, range.End.Character - hint.Length), range.End);
-        var asClause = $" As {typeName}";
-        var title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_DeclarationFix, name, typeName);
+        var asClause = $" As {type.Name}";
+        var title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_DeclarationFix, name, type.Name);
         return end == range.End
             ? SyntaxEdits.Fix(title, SyntaxEdits.Replace(character, asClause))
             : SyntaxEdits.Fix(title, SyntaxEdits.Remove(character), SyntaxEdits.Insert(end, asClause));
