@@ -23,7 +23,7 @@ namespace RDCore.LanguageServer.Workspace;
 /// (<see cref="WorkspaceChangeReport"/>): asked to pull its diagnostics again. A fix that changes nothing of the project writes nothing.
 /// </para>
 /// <para>
-/// A change that cannot be made of the project as it is now - it changed since the fix was offered - is a refusal (<c>RequestFailed</c>, -32803) that says
+/// A change that cannot be made of the project as it is now (it changed since the fix was offered) is a refusal (<c>RequestFailed</c>, -32803) that says
 /// why, and nothing is changed; so is a project file the file system will not let be written.
 /// </para>
 /// </remarks>
