@@ -7,6 +7,7 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Directives;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Symbols;
+using RDCore.SDK.Model.Types;
 
 namespace RDCore.Diagnostics.Analyzers;
 
@@ -92,7 +93,7 @@ internal sealed class OptionExplicitAnalyzer : IModuleAnalyzer
             return ImplicitTypes.IsVariant(module, name) ? $"{name} As Variant" : name;
         }
 
-        if (TypeCharacters.TypeNameOf(hinted[0].TypeHint) is not { } typeName)
+        if (!IntrinsicVBTypes.TryResolveTypeHint(hinted[0].TypeHint!, out var type))
         {
             return null;
         }
@@ -108,7 +109,7 @@ internal sealed class OptionExplicitAnalyzer : IModuleAnalyzer
             edits.Add(SyntaxEdits.Remove(new SourceRange(new SourcePosition(range.End.Line, range.End.Character - use.TypeHint.Length), range.End)));
         }
 
-        return $"{name} As {typeName}";
+        return $"{name} As {type.Name}";
     }
 
     // the line the option goes on: the first of the module's declarations and procedures, after its attributes; the line after them in a module that has none.
