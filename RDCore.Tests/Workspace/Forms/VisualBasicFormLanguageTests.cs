@@ -408,19 +408,15 @@ public sealed class VisualBasicFormLanguageTests
         StringAssert.StartsWith(Assert.ContainsSingle(errors), nameof(VBCompileErrorId.CantAssignToReadOnlyProperty));
     }
 
-    // o is an Object, c a Control and v a Variant, each set to Form1.Text1.
+    // o is an Object and v a Variant, each set to Form1.Text1.
     private static Task<string[]> RunWithText1Async(string statements)
         => RunWithRDFormsAsync(
-            "On Error Resume Next\r\nDim o As Object, c As Control, v As Variant\r\nSet o = Form1.Text1\r\nSet c = Form1.Text1\r\nSet v = Form1.Text1\r\n" +
+            "On Error Resume Next\r\nDim o As Object, v As Variant\r\nSet o = Form1.Text1\r\nSet v = Form1.Text1\r\n" +
             $"{statements}\r\nUnload Form1");
 
     [TestMethod]
-    [Ignore("a TextBox's MultiLine and ScrollBars are not implemented in the RDForms version RDCore references")]
     [DataRow("o", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through an Object")]
     [DataRow("o", "ScrollBars = 2", "ScrollBars", DisplayName = "ScrollBars, through an Object")]
-    [DataRow("c", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through a Control")]
-    [DataRow("c", "ScrollBars = 2", "ScrollBars", DisplayName = "ScrollBars, through a Control")]
-    [DataRow("Form1.Controls(\"Text1\")", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through the form's Controls")]
     [DataRow("v", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through a Variant")]
     [DataRow("o", "MultiLine = False", "MultiLine", DisplayName = "MultiLine, assigned the value it already has")]
     [DataRow("o", "ScrollBars = 0", "ScrollBars", DisplayName = "ScrollBars, assigned the value it already has")]
@@ -428,11 +424,55 @@ public sealed class VisualBasicFormLanguageTests
     {
         var printed = await RunWithText1Async($"{target}.{assignment}\r\nDebug.Print Err.Number & \"|\" & Err.Description");
 
-        CollectionAssert.AreEqual(new[] { $"382|'{property}' property cannot be set at run time" }, printed);
+        CollectionAssert.AreEqual(new[] { $"382|'{property}' property cannot be set at run time" }, printed, string.Join(" | ", printed));
+    }
+
+    // VB6, each assigned late-bound while the program runs: a property the form's designer sets is 382, any other the class declares with a Property Get
+    // alone is 383, once the value is coerced to the property's type (13 when it does not).
+    [TestMethod]
+    [DataRow("o.hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "a TextBox's hWnd, through an Object")]
+    [DataRow("v.hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "a TextBox's hWnd, through a Variant")]
+    [DataRow("o.Name = \"Other\"", "382|'Name' property cannot be set at run time", DisplayName = "a TextBox's Name")]
+    [DataRow("o.Index = 1", "382|'Index' property cannot be set at run time", DisplayName = "a TextBox's Index, of no control array")]
+    [DataRow("o.hWnd = \"x\"", "13|Type mismatch", DisplayName = "a TextBox's hWnd, a value that does not coerce")]
+    [DataRow("f.ControlBox = False", "382|'ControlBox' property cannot be set at run time", DisplayName = "the form's ControlBox")]
+    [DataRow("f.Name = \"Other\"", "382|'Name' property cannot be set at run time", DisplayName = "the form's Name")]
+    [DataRow("f.Count = 1", "383|'Count' property is read-only", DisplayName = "the form's Count")]
+    [DataRow("f.hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "the form's hWnd")]
+    [DataRow("f.ControlBox = \"x\"", "13|Type mismatch", DisplayName = "the form's ControlBox, a value that does not coerce")]
+    public async Task AGetOnlyProperty_AssignedLateBound_IsWhatVB6Answers(string assignment, string error)
+    {
+        var printed = await RunWithText1Async($"Dim f As Object\r\nSet f = Form1\r\n{assignment}\r\nDebug.Print Err.Number & \"|\" & Err.Description");
+
+        CollectionAssert.AreEqual(new[] { error }, printed, string.Join(" | ", printed));
+    }
+
+    // VB6, as through an Object: c is a Control set to Form1.Text1.
+    [TestMethod]
+    [Ignore("not implemented: a VB6 intrinsic control set to a variable declared As Control")]
+    [DataRow("c.MultiLine = True", "382|'MultiLine' property cannot be set at run time", DisplayName = "MultiLine, through a Control")]
+    [DataRow("c.ScrollBars = 2", "382|'ScrollBars' property cannot be set at run time", DisplayName = "ScrollBars, through a Control")]
+    [DataRow("c.hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "a TextBox's hWnd, through a Control")]
+    public async Task AGetOnlyProperty_AssignedThroughAControl_IsWhatVB6Answers(string assignment, string error)
+    {
+        var printed = await RunWithText1Async($"Dim c As Control\r\nSet c = Form1.Text1\r\n{assignment}\r\nDebug.Print Err.Number & \"|\" & Err.Description");
+
+        CollectionAssert.AreEqual(new[] { error }, printed, string.Join(" | ", printed));
+    }
+
+    // VB6, as through an Object.
+    [TestMethod]
+    [Ignore("the Controls collection of a VB6 form hosted by RDForms is not implemented")]
+    [DataRow("Form1.Controls(\"Text1\").MultiLine = True", "382|'MultiLine' property cannot be set at run time", DisplayName = "MultiLine, through the form's Controls")]
+    [DataRow("Form1.Controls(\"Text1\").hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "a TextBox's hWnd, through the form's Controls")]
+    public async Task AGetOnlyProperty_AssignedThroughTheFormsControls_IsWhatVB6Answers(string assignment, string error)
+    {
+        var printed = await RunWithText1Async($"{assignment}\r\nDebug.Print Err.Number & \"|\" & Err.Description");
+
+        CollectionAssert.AreEqual(new[] { error }, printed, string.Join(" | ", printed));
     }
 
     [TestMethod]
-    [Ignore("a TextBox's MultiLine and ScrollBars are not implemented in the RDForms version RDCore references")]
     public async Task AValueThatDoesNotCoerce_ToATextBoxsDesignTimeProperty_IsTheCoercionsError_Before382()
     {
         var printed = await RunWithText1Async("o.MultiLine = \"x\"\r\nDebug.Print Err.Number");

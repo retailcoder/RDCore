@@ -222,6 +222,12 @@
   <data name="VBIndex_NothingToIndex_Verbose" xml:space="preserve">
     <value>Un {0} n'est ni un tableau ni un objet : il n'y a rien à indexer.</value>
   </data>
+  <data name="VBMemberAssignment_DesignTimeOnlyProperty_Verbose" xml:space="preserve">
+    <value>La propriété {0} est définie par le concepteur de la feuille, et un programme peut seulement la lire.</value>
+  </data>
+  <data name="VBMemberAssignment_GetOnlyProperty_Verbose" xml:space="preserve">
+    <value>La propriété {0} a un Property Get et aucun Property Let ni Set : un programme peut seulement la lire.</value>
+  </data>
   <data name="VBMemberAssignment_ReadOnlyProperty_Verbose" xml:space="preserve">
     <value>La propriété {0} de l'objet a un Property Get et aucun Property Let, et ce qu'elle retourne n'est pas un objet dont le membre par défaut pourrait être assigné à sa place.</value>
   </data>

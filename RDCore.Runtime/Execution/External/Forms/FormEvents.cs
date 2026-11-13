@@ -36,7 +36,7 @@ namespace RDCore.Runtime.Execution.External.Forms;
 internal static class FormEvents
 {
     // the library a Visual Basic 6.0 form's Form class is of.
-    private const string VisualBasicLibrary = "VB";
+    internal const string VisualBasicLibrary = "VB";
 
     /// <summary>
     /// Listens to the events of <paramref name="form"/>, hosted for the instance <paramref name="identity"/>, and of each control its designer declares.

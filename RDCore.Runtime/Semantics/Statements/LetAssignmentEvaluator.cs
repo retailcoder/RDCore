@@ -508,6 +508,13 @@ public sealed class LetAssignmentEvaluator(
                 VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, memberAccess.Location, Exceptions.VBMemberAccess_ObjectVariableNotSet_Verbose));
         }
 
+        // a property of a Visual Basic 6.0 form or intrinsic control that its class declares with a Property Get alone refuses the assignment once the value is
+        // coerced to its type: 382 for one the form's designer sets, 383 for any other (VB6-measured, through an Object, a Control, Controls and a Variant).
+        if (indexArguments.IsEmpty && GetOnlyPropertyOfVisualBasic(session, owner, memberAccess.Member.IdentifierName) is { } getOnly)
+        {
+            return RefuseGetOnlyProperty(session, statement, memberAccess, source, value, getOnly, isSet);
+        }
+
         if (expressions.ResolveAssignableMember(session, context, memberAccess, owner, isSet) is not { } member)
         {
             if (DispatchedClassOf(session, context, memberAccess, owner) is { } dispatched)
@@ -763,6 +770,54 @@ public sealed class LetAssignmentEvaluator(
             && instance.ClassModule.DefaultInterfaceMembers.Any(member => member is VBPropertyGetMemberSymbol { ResolvedType: var type }
                 && (!returningAValueOnly || type is not (VBClassType or VBObjectType or VBVariantType))
                 && string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    // the property a Visual Basic 6.0 form or intrinsic control declares with a Property Get alone, of no parameter: of the VB library's class the control is, or
+    // of its Form for a form. A form's class declares its Form's members as its own, and VB6 refuses a form whose code declares one of them again ("Member already
+    // exists in an object module from which this object module derives"): a member of the name is the Form's, which the VB library describes (design-time only).
+    private static VBPropertyGetMemberSymbol? GetOnlyPropertyOfVisualBasic(IRuntimeSession session, VBObjectValue owner, string name)
+    {
+        if (!session.Symbols.TryGetInstance(owner.Value, out var instance))
+        {
+            return null;
+        }
+
+        var actual = instance.ClassModule;
+        var getter = Execution.External.Forms.SessionForms.Of(session).IsVisualBasic6(actual)
+            ? SingleGetterOf(actual, name) is not null && VisualBasicClass(session, "Form") is { } form ? SingleGetterOf(form, name) : null
+            : VisualBasicClass(session, actual.Name) is { } library && ReferenceEquals(library, actual) ? SingleGetterOf(library, name) : null;
+
+        return getter is not null && RuntimeProcedureInvoker.GetParameters(getter) is [] or [{ Name: Tokens.Me }] ? getter : null;
+    }
+
+    private static VBPropertyGetMemberSymbol? SingleGetterOf(VBClassModuleSymbol declaring, string name)
+        => declaring.DefaultInterfaceMembers.Where(member => string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase)).ToArray() is [VBPropertyGetMemberSymbol getter]
+            ? getter
+            : null;
+
+    private static VBClassModuleSymbol? VisualBasicClass(IRuntimeSession session, string name)
+        => VBProjectSymbol.ResolveQualifiedType(
+            session.Symbols.Resolver, Execution.External.Forms.FormEvents.VisualBasicLibrary, name, StaticSymbol.GlobalUri).Symbol as VBClassModuleSymbol;
+
+    private RuntimeExecutionOutcome RefuseGetOnlyProperty(
+        IRuntimeSession session, StatementNode statement, MemberAccessExpressionNode memberAccess, ExpressionNode source, VBTypedValue value,
+        VBPropertyGetMemberSymbol property, bool isSet)
+    {
+        if (!isSet && !TryLetCoerce(session, statement, source, value, property.ResolvedType, out _, out var failure))
+        {
+            return failure;
+        }
+
+        // the descriptions VB6 gives them, in English as every error's (RuntimeErrors).
+        var designTimeOnly = property.GetProperty(SymbolProperties.DesignTimeOnly);
+        var error = designTimeOnly
+            ? VBRuntimeErrorInfo.For(VBRuntimeErrorId.SetNotSupportedAtRuntime, memberAccess.Location,
+                string.Format(Exceptions.VBMemberAssignment_DesignTimeOnlyProperty_Verbose, property.Name))
+                with { Description = $"'{property.Name}' property cannot be set at run time" }
+            : VBRuntimeErrorInfo.For(VBRuntimeErrorId.SetNotSupportedReadOnlyProperty, memberAccess.Location,
+                string.Format(Exceptions.VBMemberAssignment_GetOnlyProperty_Verbose, property.Name))
+                with { Description = $"'{property.Name}' property is read-only" };
+        return RuntimeExecutionOutcome.Error(error);
+    }
 
     // MS-VBAL §5.4.3.8 with a <member-access-expression> target whose owner is a UDT. A UDT field is not an
     // addressable Symbol the way a variable is - it lives on the value, which is what makes it reachable at

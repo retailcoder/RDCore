@@ -376,6 +376,24 @@ namespace RDCore.Runtime {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The {0} property is set by the form&apos;s designer, and a program can only read it..
+        /// </summary>
+        internal static string VBMemberAssignment_DesignTimeOnlyProperty_Verbose {
+            get {
+                return ResourceManager.GetString("VBMemberAssignment_DesignTimeOnlyProperty_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The {0} property has a Property Get and no Property Let or Set: a program can only read it..
+        /// </summary>
+        internal static string VBMemberAssignment_GetOnlyProperty_Verbose {
+            get {
+                return ResourceManager.GetString("VBMemberAssignment_GetOnlyProperty_Verbose", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to The object&apos;s {0} property has a Property Get and no Property Let, and what it returns is no object whose default member could be assigned instead..
         /// </summary>
         internal static string VBMemberAssignment_ReadOnlyProperty_Verbose {

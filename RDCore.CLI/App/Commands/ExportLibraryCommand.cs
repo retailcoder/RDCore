@@ -93,9 +93,17 @@ internal sealed class ExportLibraryCommand(IConsoleMessageWriter writer, IFileSy
 
             var export = new TypeLibraryExporter(!options.WithoutDescriptions).Export(loaded, exportedBy);
             var path = PathOf(output, loaded, identity);
-            fileSystem.File.WriteAllText(path, LibraryJson.Write(export.Description), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
-            Write(MessageKind.Success, string.Format(Resources.ExportLibrary_Written, loaded.Name, path), Counts(export.Description));
+            // which properties are design-time only, which the type library cannot say, is kept from the file the export writes over.
+            var description = export.Description.KeepingDesignTimeOnly(Previous(path), out var lost);
+            fileSystem.File.WriteAllText(path, LibraryJson.Write(description), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            Write(MessageKind.Success, string.Format(Resources.ExportLibrary_Written, loaded.Name, path), Counts(description));
+            if (lost.Count > 0)
+            {
+                Write(MessageKind.Warning, string.Format(Resources.ExportLibrary_DesignTimeOnlyLost, Abbreviated(lost)));
+            }
+
             if (export.Skipped.Count > 0)
             {
                 Write(MessageKind.Warning, string.Format(Resources.ExportLibrary_Skipped, Abbreviated(export.Skipped)));
@@ -145,6 +153,24 @@ internal sealed class ExportLibraryCommand(IConsoleMessageWriter writer, IFileSy
             .FirstOrDefault(path => IsOf(path, identity, strictly: true));
         return own ?? Names().Select(name => fileSystem.Path.Combine(output, name + DirectoryLibrarySource.Extension))
             .First(path => !fileSystem.File.Exists(path) || IsOf(path, identity));
+    }
+
+    // the description in the file an export writes over, if it has one that can be read.
+    private LibraryDescription? Previous(string path)
+    {
+        if (!fileSystem.File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return LibraryJson.Read(fileSystem.File.ReadAllText(path));
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
     }
 
     // whether the file describes the type library. One that cannot be read, or states none, is written over, as it always was, unless `strictly`.

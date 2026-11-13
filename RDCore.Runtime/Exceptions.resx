@@ -222,6 +222,12 @@
   <data name="VBIndex_NothingToIndex_Verbose" xml:space="preserve">
     <value>A {0} is neither an array nor an object: there is nothing to index.</value>
   </data>
+  <data name="VBMemberAssignment_DesignTimeOnlyProperty_Verbose" xml:space="preserve">
+    <value>The {0} property is set by the form's designer, and a program can only read it.</value>
+  </data>
+  <data name="VBMemberAssignment_GetOnlyProperty_Verbose" xml:space="preserve">
+    <value>The {0} property has a Property Get and no Property Let or Set: a program can only read it.</value>
+  </data>
   <data name="VBMemberAssignment_ReadOnlyProperty_Verbose" xml:space="preserve">
     <value>The object's {0} property has a Property Get and no Property Let, and what it returns is no object whose default member could be assigned instead.</value>
   </data>

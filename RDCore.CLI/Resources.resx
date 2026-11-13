@@ -232,6 +232,9 @@ Long Live the Cucumber (Latin)</comment>
   <data name="ExportLibrary_DependsOn" xml:space="preserve">
     <value>Depends on: {0}. A project cannot reference this library without them; export them too (--dependencies).</value>
   </data>
+  <data name="ExportLibrary_DesignTimeOnlyLost" xml:space="preserve">
+    <value>Design-time only in the file written over, and no longer declared by the type library: {0}.</value>
+  </data>
   <data name="ExportLibrary_Skipped" xml:space="preserve">
     <value>Not described: {0}.</value>
   </data>

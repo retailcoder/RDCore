@@ -358,6 +358,15 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Design-time only in the file written over, and no longer declared by the type library: {0}..
+        /// </summary>
+        public static string ExportLibrary_DesignTimeOnlyLost {
+            get {
+                return ResourceManager.GetString("ExportLibrary_DesignTimeOnlyLost", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Not described: {0}..
         /// </summary>
         public static string ExportLibrary_Skipped {

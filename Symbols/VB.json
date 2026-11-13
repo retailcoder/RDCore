@@ -79,7 +79,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -103,7 +104,8 @@
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Picture",
@@ -1213,7 +1215,8 @@
           "name": "HasDC",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Determines whether a unique display context is allocated for the control."
+          "description": "Determines whether a unique display context is allocated for the control.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Drag",
@@ -1966,7 +1969,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Caption",
@@ -1990,7 +1994,8 @@
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -3197,13 +3202,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -3587,13 +3594,15 @@
           "name": "MultiLine",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns/sets a value that determines whether a control can accept multiple lines of text."
+          "description": "Returns/sets a value that determines whether a control can accept multiple lines of text.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "ScrollBars",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets a value indicating whether an object has vertical or horizontal scroll bars."
+          "description": "Returns/sets a value indicating whether an object has vertical or horizontal scroll bars.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "SelStart",
@@ -3779,7 +3788,8 @@
           "name": "HideSelection",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Specifies whether the selection in a Masked edit control is hidden when the control loses focus."
+          "description": "Specifies whether the selection in a Masked edit control is hidden when the control loses focus.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Alignment",
@@ -4620,7 +4630,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Caption",
@@ -4644,7 +4655,8 @@
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -5586,7 +5598,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Caption",
@@ -5610,7 +5623,8 @@
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -6336,7 +6350,8 @@
           "name": "Style",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the appearance of the control, whether standard (standard Windows style) or graphical (with a custom picture)."
+          "description": "Returns/sets the appearance of the control, whether standard (standard Windows style) or graphical (with a custom picture).",
+          "isDesignTimeOnly": true
         },
         {
           "name": "CausesValidation",
@@ -6766,7 +6781,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Caption",
@@ -6790,7 +6806,8 @@
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -7498,7 +7515,8 @@
           "name": "Style",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the appearance of the control, whether standard (standard Windows style) or graphical (with a custom picture)."
+          "description": "Returns/sets the appearance of the control, whether standard (standard Windows style) or graphical (with a custom picture).",
+          "isDesignTimeOnly": true
         },
         {
           "name": "OLEDropMode",
@@ -8046,7 +8064,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Caption",
@@ -8070,7 +8089,8 @@
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -8742,7 +8762,8 @@
           "name": "Style",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the appearance of the control, whether standard (standard Windows style) or graphical (with a custom picture)."
+          "description": "Returns/sets the appearance of the control, whether standard (standard Windows style) or graphical (with a custom picture).",
+          "isDesignTimeOnly": true
         },
         {
           "name": "OLEDropMode",
@@ -9240,19 +9261,22 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Style",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets a value that determines the type of control and the behavior of its list box portion."
+          "description": "Returns/sets a value that determines the type of control and the behavior of its list box portion.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -9618,7 +9642,8 @@
           "name": "Sorted",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Indicates whether the elements of a control are automatically sorted alphabetically."
+          "description": "Indicates whether the elements of a control are automatically sorted alphabetically.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "SelStart",
@@ -9966,7 +9991,8 @@
           "name": "IntegralHeight",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns/Sets a value indicating whether the control displays partial items."
+          "description": "Returns/Sets a value indicating whether the control displays partial items.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "RightToLeft",
@@ -10515,13 +10541,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -10869,7 +10897,8 @@
           "name": "Sorted",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Indicates whether the elements of a control are automatically sorted alphabetically."
+          "description": "Indicates whether the elements of a control are automatically sorted alphabetically.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Text",
@@ -11001,7 +11030,8 @@
           "name": "MultiSelect",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets a value that determines whether a user can make multiple selections in a control."
+          "description": "Returns/sets a value that determines whether a user can make multiple selections in a control.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Selected",
@@ -11259,7 +11289,8 @@
           "name": "IntegralHeight",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns/Sets a value indicating whether the control displays partial items."
+          "description": "Returns/Sets a value indicating whether the control displays partial items.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "RightToLeft",
@@ -11337,7 +11368,8 @@
           "name": "Style",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets a value that determines whether checkboxes are displayed inside a ListBox control."
+          "description": "Returns/sets a value that determines whether checkboxes are displayed inside a ListBox control.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "CausesValidation",
@@ -11846,13 +11878,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Left",
@@ -12542,13 +12576,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Left",
@@ -13238,13 +13274,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Enabled",
@@ -14319,7 +14357,8 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Caption",
@@ -14991,19 +15030,22 @@
           "name": "MaxButton",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Determines whether a form has a Maximize button."
+          "description": "Determines whether a form has a Maximize button.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "MinButton",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Determines whether a form has a Minimize button."
+          "description": "Determines whether a form has a Minimize button.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "ControlBox",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns a value indicating whether a Control-menu box is displayed on a form at run time."
+          "description": "Returns a value indicating whether a Control-menu box is displayed on a form at run time.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Image",
@@ -15015,7 +15057,8 @@
           "name": "HasDC",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Determines whether a unique display context is allocated for the control."
+          "description": "Determines whether a unique display context is allocated for the control.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Visible",
@@ -15057,7 +15100,8 @@
           "name": "MDIChild",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns/sets a value that determines if a form is displayed as an MDI child form."
+          "description": "Returns/sets a value that determines if a form is displayed as an MDI child form.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "KeyPreview",
@@ -15201,19 +15245,22 @@
           "name": "WhatsThisButton",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns or sets whether the What\u0027s This button appears in the title bar of a Form or MDIForm."
+          "description": "Returns or sets whether the What\u0027s This button appears in the title bar of a Form or MDIForm.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "WhatsThisHelp",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Sets or returns whether context-sensitive Help uses the What\u0027s This popup provided by Windows 95 Help or the main Help window."
+          "description": "Sets or returns whether context-sensitive Help uses the What\u0027s This popup provided by Windows 95 Help or the main Help window.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "ShowInTaskbar",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Determines whether a Form or MDIForm object appears in the Windows 95 taskbar."
+          "description": "Determines whether a Form or MDIForm object appears in the Windows 95 taskbar.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "RightToLeft",
@@ -15237,7 +15284,8 @@
           "name": "StartUpPosition",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns or sets a value specifying the position of a Form when it first appears."
+          "description": "Returns or sets a value specifying the position of a Form when it first appears.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "OLEDropMode",
@@ -15309,7 +15357,8 @@
           "name": "Moveable",
           "kind": "propertyGet",
           "type": "Boolean",
-          "description": "Returns/sets a value that determines whether a form can be moved."
+          "description": "Returns/sets a value that determines whether a form can be moved.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Refresh",
@@ -16327,13 +16376,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -17324,13 +17375,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -18409,13 +18462,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -19004,7 +19059,8 @@
           "name": "MultiSelect",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets a value that determines whether a user can make multiple selections in a control."
+          "description": "Returns/sets a value that determines whether a user can make multiple selections in a control.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Selected",
@@ -21115,13 +21171,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BackColor",
@@ -21542,13 +21600,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "BorderColor",
@@ -21863,13 +21923,15 @@
           "name": "Name",
           "kind": "propertyGet",
           "type": "String",
-          "description": "Returns the name used in code to identify an object."
+          "description": "Returns the name used in code to identify an object.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Index",
           "kind": "propertyGet",
           "type": "Integer",
-          "description": "Returns/sets the number identifying a control in a control array."
+          "description": "Returns/sets the number identifying a control in a control array.",
+          "isDesignTimeOnly": true
         },
         {
           "name": "Picture",

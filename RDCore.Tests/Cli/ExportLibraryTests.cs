@@ -262,4 +262,30 @@ public sealed class ExportLibraryTests
 
         CollectionAssert.AreEqual(new[] { @"c:\out\Scripting.json" }, files.Directory.GetFiles(@"c:\out"));
     }
+
+    // that a property is design-time only is no fact a type library states: an export keeps it from the file it writes over.
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ALibraryExportedAgain_KeepsTheDesignTimeOnlyPropertiesOfTheFileItWritesOver()
+    {
+        const string path = @"c:\out\Scripting.json";
+        var files = new MockFileSystem();
+        files.AddDirectory(@"c:\out");
+        var command = new ExportLibraryCommand(Substitute.For<IConsoleMessageWriter>(), files);
+        await command.ExecuteAsync([ScriptingFile, "-o", @"c:\out"], CancellationToken.None);
+
+        static bool IsCount(MemberDescription member) => member is { Name: "Count", Kind: MemberKind.PropertyGet };
+        var first = LibraryJson.Read(files.File.ReadAllText(path));
+        files.File.WriteAllText(path, LibraryJson.Write(first with
+        {
+            Classes = [.. first.Classes.Select(owner => owner.Name != "Dictionary" ? owner
+                : owner with { Members = [.. owner.Members.Select(member => IsCount(member) ? member with { IsDesignTimeOnly = true } : member)] })],
+        }));
+
+        await command.ExecuteAsync([ScriptingFile, "-o", @"c:\out"], CancellationToken.None);
+
+        var exported = LibraryJson.Read(files.File.ReadAllText(path));
+        Assert.IsTrue(exported.Classes.Single(owner => owner.Name == "Dictionary").Members.Single(IsCount).IsDesignTimeOnly);
+        Assert.HasCount(1, exported.Classes.SelectMany(owner => owner.Members).Where(member => member.IsDesignTimeOnly));
+    }
 }
