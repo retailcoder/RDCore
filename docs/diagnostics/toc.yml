@@ -548,5 +548,7 @@
   href: rdc11035.md
 - name: "RDC11039: Function called whatever the IIf condition"
   href: rdc11039.md
+- name: "RDC11043: Object assigned with Let to a Variant property"
+  href: rdc11043.md
 - name: "RDC20001: Edit not applied to the waiting program"
   href: rdc20001.md

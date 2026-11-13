@@ -402,6 +402,9 @@
   <data name="IIfSideEffect_Message" xml:space="preserve">
     <value>&apos;{0}&apos; is called whatever the condition: IIf evaluates both its TruePart and its FalsePart before it chooses one.</value>
   </data>
+  <data name="ObjectLetToVariantProperty_Message" xml:space="preserve">
+    <value>&apos;{0}&apos; is given the object itself: MS-VBA passes an object Let-assigned to a property whose value is a Variant as it is, where MS-VBAL §5.4.3.8 passes its default member&apos;s value. Name the default member to pass its value.</value>
+  </data>
   <data name="TrueValueIsNotMinusOne_Message" xml:space="preserve">
     <value>&apos;{0}&apos; works on the bits of a constant that is True with a value other than -1, so this condition does not give the truth value it seems to give (Not 1 is -2, which is True). Test the constant by itself, or compare it with 0; or give a constant of your own the value True.</value>
   </data>

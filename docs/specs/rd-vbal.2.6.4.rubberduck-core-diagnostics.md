@@ -110,6 +110,7 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC11032`](../diagnostics/rdc11032.md)|For Each variable read after the loop ran out|Warning|`ProcedureSemanticModel.EmptiedControlReads`: the `EmptiedControlReadFact`s `ForEachControlAnalysis` finds on the `ControlFlowGraph`|
 |[`RDC11035`](../diagnostics/rdc11035.md)|Collection set to Nothing inside its own For Each loop|Warning|`ProcedureSemanticModel.Expressions`: `ValueExpressionSemanticFlags.CollectionSetToNothingInItsOwnLoop` of the `ExpressionFact`s|
 |[`RDC11039`](../diagnostics/rdc11039.md)|Function called whatever the IIf condition|Warning|the syntax tree (the `TruePart` and `FalsePart` arguments of a call bound to `Interaction.IIf`) and `ExpressionFactDto`: a `ProcedureCall` of a `Function` or `Property Get`, bound to anything but a VBA library function that changes nothing and raises no error|
+|[`RDC11043`](../diagnostics/rdc11043.md)|Object assigned with Let to a Variant property|Warning|`ProcedureSemanticModel.Expressions`: `ValueExpressionSemanticFlags.ObjectGivenToVariantProperty` of the `ExpressionFact`s|
 |[`RDC20001`](../diagnostics/rdc20001.md)|Edit not applied to the waiting program|Information|the language server, while a program waits: the host's `rdcore/host/debug/editStatus`|
 
 What the host's static pass found wrong with the code is not an opinion: it is reported as the `VBC` compile error it is, by the same

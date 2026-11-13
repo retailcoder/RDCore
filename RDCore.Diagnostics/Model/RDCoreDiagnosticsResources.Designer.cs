@@ -924,6 +924,15 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is given the object itself: MS-VBA passes an object Let-assigned to a property whose value is a Variant as it is, where MS-VBAL §5.4.3.8 passes its default member&apos;s value. Name the default member to pass its value..
+        /// </summary>
+        public static string ObjectLetToVariantProperty_Message {
+            get {
+                return ResourceManager.GetString("ObjectLetToVariantProperty_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to New {0} compiles, and fails whenever it runs: no object of the class {0} is ever created, and MS-VBA raises run-time error -2147221164 (Class not registered)..
         /// </summary>
         public static string NewOfAClassNotCreatable_New_Message {

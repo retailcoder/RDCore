@@ -170,6 +170,7 @@ public sealed class DiagnosticDocumentationTests
         (RDCoreDiagnosticId.ArrayGivenASecondEmptyArgumentList, 11025),
         (RDCoreDiagnosticId.ObjectVariablePassedByRefIsACopy, 11026),
         (RDCoreDiagnosticId.IIfSideEffect, 11039),
+        (RDCoreDiagnosticId.ObjectLetToVariantProperty, 11043),
     ];
 
     [TestMethod]

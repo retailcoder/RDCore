@@ -127,6 +127,7 @@ public enum RDCoreDiagnosticId
     ForEachControlEmptiedAfterLoop = 11032, // For Each c In r ... Next: Debug.Print c.Address - MS-VBAL keeps the last element in c; MS-VBA empties it (Nothing)
     CollectionSetToNothingInItsOwnLoop = 11035, // Set c = Nothing in For Each v In c: RD-VBA leaves c as it is while the loop runs; MS-VBA destroys the Collection, the loop ends
     IIfSideEffect = 11039, // [RD2:IIfSideEffectInspection] IIf(c, Compute(1), 2): a Function or Property Get in the TruePart or FalsePart runs whatever the condition
+    ObjectLetToVariantProperty = 11043, // c.Item = o, Property Let Item(v As Variant): MS-VBA passes the object; MS-VBAL §5.4.3.8 passes its default member's value
 
     /*
      * [20000-20999]: the debugger and edit-and-continue, issued by the language server while a program waits

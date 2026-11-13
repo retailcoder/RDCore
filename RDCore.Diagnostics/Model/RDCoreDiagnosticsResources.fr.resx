@@ -402,6 +402,9 @@
   <data name="IIfSideEffect_Message" xml:space="preserve">
     <value>&apos;{0}&apos; est appelée quelle que soit la condition : IIf évalue son TruePart et son FalsePart avant de choisir l&apos;un des deux.</value>
   </data>
+  <data name="ObjectLetToVariantProperty_Message" xml:space="preserve">
+    <value>&apos;{0}&apos; reçoit l&apos;objet lui-même : MS-VBA passe tel quel un objet assigné par Let à une propriété dont la valeur est un Variant, là où MS-VBAL §5.4.3.8 passe la valeur de son membre par défaut. Nommez le membre par défaut pour passer sa valeur.</value>
+  </data>
   <data name="TrueValueIsNotMinusOne_Message" xml:space="preserve">
     <value>&apos;{0}&apos; travaille sur les bits d&apos;une constante qui vaut True sans valoir -1 : cette condition ne donne donc pas la valeur de vérité qu&apos;elle semble donner (Not 1 vaut -2, qui est True). Testez la constante seule, ou comparez-la à 0; ou donnez la valeur True à une constante à vous.</value>
   </data>

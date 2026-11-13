@@ -319,6 +319,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC11032](rdc11032.md)|For Each variable read after the loop ran out|MS-VBA leaves it Empty or Nothing, where MS-VBAL says it keeps the last element|
 |[RDC11035](rdc11035.md)|Collection set to Nothing inside its own For Each loop|RD-VBA leaves it as it is while the loop runs; MS-VBA destroys it, and the loop ends|
 |[RDC11039](rdc11039.md)|Function called whatever the IIf condition|A `Function` or `Property Get` in the `TruePart` or `FalsePart` of `IIf`, which runs whatever the condition|
+|[RDC11043](rdc11043.md)|Object assigned with Let to a Variant property|An object given to a property whose value parameter is a `Variant`: MS-VBA passes the object, MS-VBAL its default member's value|
 |[RDC20001](rdc20001.md)|Edit not applied to the waiting program|Made while it waits in the debugger, which can't go on with it|
 
 ---

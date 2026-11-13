@@ -280,6 +280,11 @@ public static class StatementStaticSemanticsEvaluator
                 MarkSetThroughACall(context, assignment.Target);
             }
 
+            if (isLet && !assignsADefaultMember && valueResult is { IsSuccess: true, Result: VBClassType or VBObjectType })
+            {
+                MarkObjectGivenToVariantProperty(context, assignment.Target);
+            }
+
             // a resizable array is assigned an array, or a Variant that may hold one (or a String, the data of a Byte array, §5.5.1.2.6); a number, a
             // String, a Boolean or a Date is never one, which MS-VBA refuses before the coercion of it is considered (Excel-verified, oracle\findings-labels
             // A03, A04, A06, R02, oracle\s44 G01-G08, G10: "Can't assign to array"; G09 assigns a Byte() a String).
@@ -680,6 +685,21 @@ public static class StatementStaticSemanticsEvaluator
         {
             facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.AssignmentTarget });
         }
+    }
+
+    // RD-VBAL §5.4.3.8: an object a Let gives to a property whose value parameter is a Variant is passed as the object, as MS-VBA has it, where MS-VBAL
+    // evaluates its default member's value (RuntimeExpressionEvaluator.InvokeAssignment). The fact is the property's name, which is what binds to it.
+    private static void MarkObjectGivenToVariantProperty(StaticEvaluationContext context, ExpressionNode target)
+    {
+        var property = target is IndexExpressionNode { Callee: var called } ? called : target;
+        if (context.Facts is not { } facts
+            || AccessorsOf(context, property)?.OfType<VBPropertyLetMemberSymbol>().FirstOrDefault() is not { Parameters: [.., { ResolvedType: VBVariantType }] }
+            || !facts.TryGet(property.Identity, out var fact))
+        {
+            return;
+        }
+
+        facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.ObjectGivenToVariantProperty });
     }
 
     // an Exit For or Exit Do is checked against the loops it is lexically inside, so a body is walked with the kind of loop it belongs to counted. A loop
