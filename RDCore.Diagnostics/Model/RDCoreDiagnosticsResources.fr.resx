@@ -382,7 +382,7 @@
     <value>&apos;{0}&apos; n&apos;est pas mis à Nothing ici : la boucle For Each qui le parcourt tient l&apos;objet jusqu&apos;à ce qu&apos;elle prenne fin. MS-VBA libère ici une Collection : elle est détruite, avec les membres que la boucle n&apos;a pas atteints, et la boucle prend fin. Quittez la boucle avec Exit For, puis mettez &apos;{0}&apos; à Nothing.</value>
   </data>
   <data name="ObjectLetToVariantProperty_Message" xml:space="preserve">
-    <value>&apos;{0}&apos; reçoit l&apos;objet lui-même : MS-VBA passe tel quel un objet assigné par Let à une propriété dont la valeur est un Variant, là où MS-VBAL §5.4.3.8 passe la valeur de son membre par défaut. Nommez le membre par défaut pour passer sa valeur.</value>
+    <value>La propriété &apos;{0}&apos; reçoit l&apos;objet lui-même, comme dans MS-VBA, là où MS-VBAL §5.4.3.8 passe la valeur de son membre par défaut. Nommez le membre par défaut pour passer sa valeur.</value>
   </data>
   <data name="TrueValueIsNotMinusOne_Message" xml:space="preserve">
     <value>&apos;{0}&apos; travaille sur les bits d&apos;une constante qui vaut True sans valoir -1 : cette condition ne donne donc pas la valeur de vérité qu&apos;elle semble donner (Not 1 vaut -2, qui est True). Testez la constante seule, ou comparez-la à 0; ou donnez la valeur True à une constante à vous.</value>

@@ -382,7 +382,7 @@
     <value>&apos;{0}&apos; is not set to Nothing here: the For Each loop that walks it holds the object until the loop is over. MS-VBA lets go of a Collection here: it is destroyed, with the members the loop has not reached, and the loop ends. Leave the loop with Exit For, then set &apos;{0}&apos; to Nothing.</value>
   </data>
   <data name="ObjectLetToVariantProperty_Message" xml:space="preserve">
-    <value>&apos;{0}&apos; is given the object itself: MS-VBA passes an object Let-assigned to a property whose value is a Variant as it is, where MS-VBAL §5.4.3.8 passes its default member&apos;s value. Name the default member to pass its value.</value>
+    <value>Property &apos;{0}&apos; receives the object itself, as in MS-VBA, where MS-VBAL §5.4.3.8 passes the value of its default member. Name the default member to pass its value.</value>
   </data>
   <data name="TrueValueIsNotMinusOne_Message" xml:space="preserve">
     <value>&apos;{0}&apos; works on the bits of a constant that is True with a value other than -1, so this condition does not give the truth value it seems to give (Not 1 is -2, which is True). Test the constant by itself, or compare it with 0; or give a constant of your own the value True.</value>

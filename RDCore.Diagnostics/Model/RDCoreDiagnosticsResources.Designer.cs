@@ -915,7 +915,7 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to &apos;{0}&apos; is given the object itself: MS-VBA passes an object Let-assigned to a property whose value is a Variant as it is, where MS-VBAL §5.4.3.8 passes its default member&apos;s value. Name the default member to pass its value..
+        ///   Looks up a localized string similar to Property &apos;{0}&apos; receives the object itself, as in MS-VBA, where MS-VBAL §5.4.3.8 passes the value of its default member. Name the default member to pass its value..
         /// </summary>
         public static string ObjectLetToVariantProperty_Message {
             get {
