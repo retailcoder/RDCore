@@ -116,6 +116,8 @@ public static class DeclarationUsage
 
     private static DeclarationKind? KindOf(Symbol symbol) => symbol switch
     {
+        // Me is the parameter the language gives a member of a class (MS-VBAL §5.6.11): no code declares it, and there is nothing to say of it as a declaration.
+        VBParameterSymbol { Name: Tokens.Me, ParameterKind: ParameterKind.ImplicitByRef } => null,
         VBParameterSymbol => DeclarationKind.Parameter,
         VBLocalVariableSymbol or VBModuleFieldVariableMemberSymbol => DeclarationKind.Variable,
         VBLocalConstantSymbol or VBConstantMemberSymbol => DeclarationKind.Constant,
