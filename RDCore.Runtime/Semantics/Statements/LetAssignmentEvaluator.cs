@@ -108,6 +108,9 @@ public sealed class LetAssignmentEvaluator(
                 ? AssignObjectMember(session, context, statement, target, source, value, isSet: false)
                 : target is IndexExpressionNode element
                     ? AssignArrayElement(session, context, statement, element.Callee, element.Arguments, source, value, isSet: false)
+                // MS-VBAL §5.4.3.8: `Me = value` is a value of the class's type, let-assigned through the default member of the object, as a variable of a class is.
+                : target is InstanceExpressionNode
+                    ? AssignDefaultMember(session, context, statement, target, source, value)
                     // a variable is assigned through the slot it is bound to, by the plan of its coercion, when it can be (IR lowering S0.8c).
                     : expressions.TryAssignBound(session, target, value, context) is { } assigned
                         ? assigned.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Next
@@ -715,16 +718,18 @@ public sealed class LetAssignmentEvaluator(
                     string.Format(Exceptions.VBMemberAssignment_ReadOnlyProperty_Verbose, name)));
     }
 
-    // whether the member of the name is called when it is assigned, for what it returns to be assigned through: a function, or a Property Get that declares
-    // no parameter and is given arguments, which index what it returns.
+    // whether the member of the name is called when it is assigned, for what it returns to be assigned through: a function; a Property Get that declares no
+    // parameter and is given arguments, which index what it returns; and, for a Let, a Property Get declared a class, Object or Variant, which is invoked with
+    // the arguments it is given (MS-VBAL §5.4.3.8: `c.Item(1) = 5`, where Item(i) returns an object, assigns that object's default member; MS-VBA, recorded
+    // in Excel).
     private static bool IsCalledToBeAssignedThrough(
         IRuntimeSession session, VBObjectValue owner, string name, System.Collections.Immutable.ImmutableArray<ExpressionNode> arguments, bool isSet)
         => session.Symbols.TryGetInstance(owner.Value, out var instance)
             && instance.ClassModule.DefaultInterfaceMembers.FirstOrDefault(member => string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase)) switch
             {
                 VBFunctionMemberSymbol => true,
-                VBPropertyGetMemberSymbol get => RuntimeProcedureInvoker.GetParameters(get) is [] or [{ Name: Tokens.Me }]
-                    && (!arguments.IsEmpty || !isSet && get.ResolvedType is VBClassType or VBObjectType or VBVariantType),
+                VBPropertyGetMemberSymbol get => !isSet && get.ResolvedType is VBClassType or VBObjectType or VBVariantType
+                    || RuntimeProcedureInvoker.GetParameters(get) is [] or [{ Name: Tokens.Me }] && !arguments.IsEmpty,
                 _ => false,
             };
 

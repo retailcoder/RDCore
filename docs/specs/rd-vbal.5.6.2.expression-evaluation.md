@@ -40,9 +40,8 @@ default member that takes no argument.
 
 A chain that goes deeper than 64 objects when it runs is run-time error 28 (Out of stack space).
 
-> [!NOTE]
-> **Not implemented.** MS-VBA refuses `os = 5`, where the default member of `os` is a `Property Get` with no `Property Let`
-> that returns an object, with the compile error "Invalid use of property". RD-VBA compiles it, and assigns the default
-> member of the object it returns. `os() = 5` compiles in both.
+A Let to `os`, where the default member of `os` is a `Property Get` with no `Property Let` that returns an object (`os = 5`),
+assigns the default member of the object it returns, as **MS-VBAL §5.4.3.8** specifies. MS-VBA refuses it at compile time
+([**RD-VBAL §5.4.3.8** Targets of a class](rd-vbal.5.4.3.8.let-statement.md#targets-of-a-class)).
 
 See [**RD-VBAL §2.4.2** Non-intrinsic Types](rd-vbal.2.4.2.non-intrinsic-types.md).

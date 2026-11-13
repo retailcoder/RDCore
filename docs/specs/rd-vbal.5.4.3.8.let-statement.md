@@ -88,7 +88,7 @@ The Set statement does not use the operator pipeline; see
 ### Targets of a class
 
 A Let of a value to a target declared as a class or `Object` assigns the default property of the object the target holds, as naming that
-property after the target would. This holds for a variable, a public variable of an object, a field of a record and an element of an array.
+property after the target would. This holds for a variable, `Me`, a public variable of an object, a field of a record and an element of an array.
 
 | The target holds | Result |
 |---|---|
@@ -96,6 +96,14 @@ property after the target would. This holds for a variable, a public variable of
 | `Nothing`, declared `As New` | The target is given its object first, and that object's property is assigned. |
 | `Nothing` | Error 91. |
 | An object whose class has no default property | Error 438. |
+
+A default member with no `Property Let` is assigned as [Members of an object](#members-of-an-object) describes: a `Property Get` or a function that
+returns an object has that object's default member assigned.
+
+**RD-VBA differs from MS-VBA:** MS-VBA refuses at compile time a Let to a target of a specific class whose default member has no `Property Let`:
+"Invalid use of property" when it is a `Property Get` (`os = 5`, `Me = 5`), "Type mismatch" when it is a function (observed in Excel). **MS-VBAL
+§5.4.3.8** makes the statement valid, and RD-VBA compiles and runs it. Naming the member (`os.S = 5`) or giving it an empty argument list
+(`os() = 5`) compiles in both.
 
 ### Function result variable
 
@@ -139,9 +147,10 @@ What is indexed can be an object - or a `Variant` holding one - rather than an a
 arguments, as `c.Item(1) = value` does, and `Set c(1) = obj` its `Property Set` ([**RD-VBAL §5.6.13** Object
 Callee](rd-vbal.5.6.13.index-expressions.md#object-callee)).
 
-Some members of an object have no `Property Let` to assign through: a function, and a `Property Get` that takes no argument when it is given
-arguments that index what it returns, or when it is declared a class, `Object` or `Variant`. Such a member is called, with the arguments written
-after it, and what it returns is assigned through its default member, as a function of a module is. `c(1) = 5` and `c.Item(1) = 5`, with `Dim c As Collection` holding a number, are error 424; an item that is an object is
+Some members of an object have no `Property Let` to assign through: a function; a `Property Get` declared a class, `Object` or `Variant`, given the
+arguments it takes (`c.Item(1) = 5` of a `Property Get Item(ByVal i As Long) As Slot`); and a `Property Get` that takes no argument, given arguments
+that index what it returns. Such a member is called, with the arguments written after it, and what it returns is assigned through its default member, as
+a function of a module is. A `Property Get` declared another type is error 451. `c(1) = 5` and `c.Item(1) = 5`, with `Dim c As Collection` holding a number, are error 424; an item that is an object is
 assigned its own default member, and one that takes an argument is error 438.
 
 A `ReDim` of an array gives it the element type of the variable's declaration (`Dim a() As Long`), including a variable of an object.
