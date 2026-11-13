@@ -78,6 +78,13 @@ public static class DeclarationUsage
         var modules = projectModules.Select(module => module.Uri.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
         var privateModules = projectModules.Where(module => module is not VBClassModuleSymbol && module.Directives.PrivateModule)
             .Select(module => module.Uri.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
+        // MS-VBAL §5.2.4.2: a class that the Implements directive of a module of the project names is implemented, whether or not the code is analyzed.
+        var implemented = projectModules.OfType<VBClassModuleSymbol>().SelectMany(module => module.ImplementedInterfaces)
+            .Select(implementedClass => implementedClass.Uri.AbsoluteUri).Where(modules.Contains).ToHashSet(StringComparer.Ordinal);
+        models = [.. models.Select(model => model.Class is { } flags && implemented.Contains(model.Module.AbsoluteUri)
+            ? model with { Class = flags | ClassModuleSemanticFlags.Implemented }
+            : model)];
+
         var inProject = models.Where(model => modules.Contains(model.Module.AbsoluteUri)).ToList();
         if (modules.Count == 0
             || inProject.Select(model => model.Module.AbsoluteUri).Distinct(StringComparer.Ordinal).Count() < modules.Count
