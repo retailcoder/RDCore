@@ -125,11 +125,13 @@ public sealed class EditRangeTests
     [DataRow("Sub Main()\r\nRetry:\r\n    Beep\r\nEnd Sub\r\n", "Retry", "Retry", DisplayName = "a label alone")]
     [DataRow("Sub Main()\r\nRetry:    Beep\r\nEnd Sub\r\n", "Retry", "Retry", DisplayName = "a label before a statement")]
     [DataRow("Sub Main()\r\n10 Retry: Beep\r\nEnd Sub\r\n", "Retry", "Retry", DisplayName = "a label after a line number")]
+    [DataRow("Sub Main()\r\n[Try Again]:\r\n    Beep\r\nEnd Sub\r\n", "Try Again", "[Try Again]", DisplayName = "a bracketed label, with its brackets")]
     [DataRow("Sub Main()\r\n10 Beep\r\nEnd Sub\r\n", "10", null, DisplayName = "a line number has no name")]
     public void TheNameOfALabel_IsWithoutItsColon(string source, string label, string? expected)
     {
         var parse = new ModuleParser().Parse(Module, source);
-        var node = parse.SyntaxTree!.Descendants().OfType<SDK.Model.AST.Abstract.LineLabelNode>().Single(node => node.Name == label);
+        Assert.IsEmpty(parse.SyntaxErrors);
+        var node = parse.SyntaxTree!.Descendants().OfType<SDK.Model.AST.Abstract.LineLabelNode>().Single(node => node.Name.Trim('[', ']') == label);
 
         Assert.AreEqual(expected, TextOf(source, node.NameRange));
     }
