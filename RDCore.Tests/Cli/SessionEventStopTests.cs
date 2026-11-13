@@ -10,7 +10,7 @@ using RDCore.SDK.Runtime.Abstract.Execution;
 namespace RDCore.Tests.Cli;
 
 /// <summary>
-/// A handler of an event of the session that stops while no program runs - a click on a form a statement showed - waits there when somebody takes the stop
+/// A handler of an event of the session that stops while no program runs (a click on a form a statement showed) waits there when somebody takes the stop
 /// (<see cref="IEnvironmentSessionProvider.SessionStopped"/>), and is then the program that waits: it is resumed, stepped and ended as one is.
 /// </summary>
 [TestClass]

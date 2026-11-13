@@ -90,7 +90,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
 
     /// <summary>
     /// Holds the handler of an event of the session that stops while no program runs, or lets it be stopped, as
-    /// <see cref="IEnvironmentSessionProvider.SessionStopped"/> now says. Called when it is set.
+    /// <see cref="IEnvironmentSessionProvider.SessionStopped"/> says. Called when it is set.
     /// </summary>
     internal void SessionStopsChanged()
     {

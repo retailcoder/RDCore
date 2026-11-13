@@ -8,7 +8,7 @@ namespace RDCore.CLI.App.Repl;
 /// breakpoint breaks there, as VB6 breaks in it, and the shell is in break mode at its prompt.
 /// </summary>
 /// <remarks>
-/// The handler of the notification is made by the language client's container, and the shell is not: this is what both have, in the outer one.
+/// The handler of the notification is made by the language client's container, and the shell is not: this is what both have, in the outer container.
 /// </remarks>
 internal sealed class ReplSessionStops
 {
