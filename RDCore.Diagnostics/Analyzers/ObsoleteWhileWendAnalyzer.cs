@@ -38,14 +38,17 @@ internal sealed class ObsoleteWhileWendAnalyzer : SyntaxTreeAnalyzer
         var descendants = loop.Descendants().ToList();
         var doLoops = descendants.Where(IsDoLoop).Select(doLoop => doLoop.SourceLocation.Range).ToList();
         if (descendants.Any(node => node is KeywordStatementNode { Token: Tokens.ExitDo } exit
-            && !doLoops.Any(doLoop => SyntaxEdits.Contains(doLoop, exit.SourceLocation.Range.Start))))
+            && !doLoops.Any(doLoop => doLoop.Contains(exit.SourceLocation.Range.Start))))
         {
             return null;
         }
 
-        return SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteWhileWend_Fix,
-            SyntaxEdits.Insert(range.Start, "Do "),
-            SyntaxEdits.Replace(new SourceRange(new SourcePosition(range.End.Line, range.End.Character - "Wend".Length), range.End), "Loop"));
+        return new DiagnosticFixes
+        {
+            Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteWhileWend_Fix,
+                SyntaxEdits.Insert(range.Start, "Do "),
+                SyntaxEdits.Replace(new SourceRange(new SourcePosition(range.End.Line, range.End.Character - "Wend".Length), range.End), "Loop")),
+        };
     }
 
     private static bool IsDoLoop(SyntaxNode node)

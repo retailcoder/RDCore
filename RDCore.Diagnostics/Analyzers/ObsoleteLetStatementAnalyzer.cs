@@ -26,7 +26,10 @@ internal sealed class ObsoleteLetStatementAnalyzer : SyntaxTreeAnalyzer
                 DiagnosticSeverity.Information,
                 RDCoreDiagnosticsResources.ObsoleteLetStatement_Message)
             {
-                Fixes = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteLetStatement_Fix,
-                    SyntaxEdits.Remove(new SourceRange(assignment.SourceLocation.Range.Start, assignment.Target.SourceLocation.Range.Start))),
+                Fixes = new DiagnosticFixes
+                {
+                    Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteLetStatement_Fix,
+                        SyntaxEdits.Remove(new SourceRange(assignment.SourceLocation.Range.Start, assignment.Target.SourceLocation.Range.Start))),
+                },
             });
 }

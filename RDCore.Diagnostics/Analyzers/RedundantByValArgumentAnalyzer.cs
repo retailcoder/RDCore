@@ -26,9 +26,12 @@ internal sealed class RedundantByValArgumentAnalyzer : IModuleAnalyzer
             .Select(fact => new AnalyzerFinding(
                 RDCoreDiagnosticId.RedundantByValArgument.ToCode(), fact.Location.Range, DiagnosticSeverity.Hint, RDCoreDiagnosticsResources.RedundantByValArgument_Message)
             {
-                Fixes = arguments.LastOrDefault(argument => SyntaxEdits.Contains(argument.SourceLocation.Range, fact.Location.Range.Start)) is { } byVal
-                    ? SyntaxEdits.Fix(RDCoreDiagnosticsResources.RedundantByValArgument_Fix,
-                        SyntaxEdits.Remove(new SourceRange(byVal.SourceLocation.Range.Start, byVal.Operand.SourceLocation.Range.Start)))
+                Fixes = arguments.LastOrDefault(argument => argument.SourceLocation.Range.Contains(fact.Location.Range.Start)) is { } byVal
+                    ? new DiagnosticFixes
+                    {
+                        Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.RedundantByValArgument_Fix,
+                            SyntaxEdits.Remove(new SourceRange(byVal.SourceLocation.Range.Start, byVal.Operand.SourceLocation.Range.Start))),
+                    }
                     : null,
             });
     }

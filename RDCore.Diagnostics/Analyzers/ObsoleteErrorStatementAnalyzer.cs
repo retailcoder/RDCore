@@ -44,6 +44,6 @@ internal sealed class ObsoleteErrorStatementAnalyzer : IModuleAnalyzer
         var edits = statement.NumberExpression is LiteralExpressionNode { StaticValue: VBIntegerValue }
             ? [SyntaxEdits.Replace(keyword, "Err.Clear: Err.Raise")]
             : new[] { SyntaxEdits.Replace(new SourceRange(statement.SourceLocation.Range.Start, number.Start), "Err.Clear: Err.Raise CInt("), SyntaxEdits.Insert(number.End, ")") };
-        return SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteErrorSyntax_Fix, edits);
+        return new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteErrorSyntax_Fix, edits) };
     }
 }

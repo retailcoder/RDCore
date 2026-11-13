@@ -33,6 +33,9 @@ internal sealed class ObsoleteGlobalModifierAnalyzer : SyntaxTreeAnalyzer
                 RDCoreDiagnosticId.ObsoleteGlobalModifier.ToCode(),
                 keyword,
                 DiagnosticSeverity.Information,
-                RDCoreDiagnosticsResources.ObsoleteGlobalModifier_Message) { Fixes = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteGlobalModifier_Fix, SyntaxEdits.Replace(keyword, "Public")) });
+                RDCoreDiagnosticsResources.ObsoleteGlobalModifier_Message)
+            {
+                Fixes = new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteGlobalModifier_Fix, SyntaxEdits.Replace(keyword, "Public")) },
+            });
     }
 }

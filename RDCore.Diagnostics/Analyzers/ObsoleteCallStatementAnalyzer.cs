@@ -40,7 +40,7 @@ internal sealed class ObsoleteCallStatementAnalyzer : IModuleAnalyzer
             .Select(fact => new AnalyzerFinding(
                 RDCoreDiagnosticId.ObsoleteCallStatement.ToCode(), fact.Location.Range, DiagnosticSeverity.Hint, RDCoreDiagnosticsResources.ObsoleteCallStatement_Message)
             {
-                Fixes = statements.FirstOrDefault(statement => SyntaxEdits.Contains(statement.SourceLocation.Range, fact.Location.Range.Start)) is { } call
+                Fixes = statements.FirstOrDefault(statement => statement.SourceLocation.Range.Contains(fact.Location.Range.Start)) is { } call
                     ? FixOf(call)
                     : null,
             });
@@ -83,6 +83,6 @@ internal sealed class ObsoleteCallStatementAnalyzer : IModuleAnalyzer
             edits.Add(SyntaxEdits.Remove(new SourceRange(last.End, end)));
         }
 
-        return SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteCallStatement_Fix, [.. edits]);
+        return new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteCallStatement_Fix, [.. edits]) };
     }
 }

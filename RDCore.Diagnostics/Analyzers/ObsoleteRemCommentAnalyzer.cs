@@ -25,7 +25,10 @@ internal sealed class ObsoleteRemCommentAnalyzer : IModuleAnalyzer
                     RDCoreDiagnosticId.ObsoleteCommentSyntax.ToCode(),
                     keyword,
                     DiagnosticSeverity.Information,
-                    RDCoreDiagnosticsResources.ObsoleteCommentSyntax_Message) { Fixes = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteCommentSyntax_Fix, SyntaxEdits.Replace(keyword, "'")) })
+                    RDCoreDiagnosticsResources.ObsoleteCommentSyntax_Message)
+                {
+                    Fixes = new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ObsoleteCommentSyntax_Fix, SyntaxEdits.Replace(keyword, "'")) },
+                })
             : [];
 
     // `Rem` is a keyword only as a word of its own: a comment that begins with `Remember` is not one.

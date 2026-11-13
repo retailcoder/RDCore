@@ -66,7 +66,7 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
                 yield return new AnalyzerFinding(
                     RDCoreDiagnosticId.ObsoleteTypeHint.ToCode(), range, DiagnosticSeverity.Information, AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_Message, name))
                 {
-                    Fixes = fix,
+                    Fixes = fix is null ? null : new DiagnosticFixes { Edit = fix },
                 };
             }
         }
@@ -75,7 +75,7 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
     private static SourceRange NameOf(SourceRange? name, SourceLocation declaration) => name ?? declaration.Range;
 
     // the character comes out of the name, and its As clause goes where the declarator ends: after the name, or after the bounds of an array.
-    private static DiagnosticFixes? DeclarationFix(string name, string? hint, SourceRange? nameRange, SourcePosition? declaratorEnd)
+    private static EditFix? DeclarationFix(string name, string? hint, SourceRange? nameRange, SourcePosition? declaratorEnd)
     {
         if (hint is null || !IntrinsicVBTypes.TryResolveTypeHint(hint, out var type) || nameRange is not { } range || declaratorEnd is not { } end
             || SyntaxEdits.Width(range.Start, range.End) != name.Length + hint.Length)
@@ -91,7 +91,7 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
             : SyntaxEdits.Fix(title, SyntaxEdits.Remove(character), SyntaxEdits.Insert(end, asClause));
     }
 
-    private static DiagnosticFixes? ReferenceFix(SimpleNameExpressionNode reference)
+    private static EditFix? ReferenceFix(SimpleNameExpressionNode reference)
     {
         var range = reference.Location.Range;
         var hint = reference.TypeHint!;
