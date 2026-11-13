@@ -255,6 +255,9 @@
   <data name="IsMissingOfAVariantThatIsNotOptional_Fix" xml:space="preserve">
     <value>Déclarer le paramètre '{0}' Optional, ce qui permet à un appel de l'omettre</value>
   </data>
+  <data name="IsMissingAlwaysFalse_Fix" xml:space="preserve">
+    <value>Remplacer 'IsMissing({0})' par False</value>
+  </data>
   <data name="ShadowedDeclaration_Message" xml:space="preserve">
     <value>'{0}' masque '{1}': dans cette procédure, le nom désigne '{0}', et '{1}' partout ailleurs. Donnez à '{0}' un nom bien à lui.</value>
   </data>
