@@ -438,4 +438,7 @@
   <data name="WriteOnlyProperty_Message" xml:space="preserve">
     <value>La propriété &apos;{0}&apos; n&apos;a aucun Property Get : on peut l&apos;affecter sans jamais la lire.</value>
   </data>
+  <data name="WriteOnlyProperty_Fix" xml:space="preserve">
+    <value>Ajouter un Property Get &apos;{0}&apos; qui renvoie la valeur que le Let garde dans &apos;{1}&apos;</value>
+  </data>
 </root>
