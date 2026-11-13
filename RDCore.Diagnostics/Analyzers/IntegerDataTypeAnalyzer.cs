@@ -24,9 +24,9 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </para>
 /// <para>
 /// The fix (<see cref="DiagnosticFixes.Edit"/>) changes the type to <c>Long</c>, which is what it is for, where no other code has to change with it: no
-/// expression passes the variable or the parameter as an argument, which a <c>ByRef</c> parameter of type <c>Integer</c> takes only as an <c>Integer</c>; a parameter is
-/// <c>ByVal</c>, which any argument it was given still converts to; and the member is neither a property whose other procedures state the type too, nor a
-/// public member of a class, which another class may implement. A member of a <c>Type</c> and a <c>ReDim</c> are not fixed.
+/// expression passes the variable or the parameter as an argument, which a <c>ByRef</c> parameter of type <c>Integer</c> takes only as an
+/// <c>Integer</c>; a parameter is <c>ByVal</c>, which any argument it was given still converts to; and the member is neither a property whose other
+/// procedures state the type too, nor a public member of a class, which another class may implement. A member of a <c>Type</c> and a <c>ReDim</c> are not fixed.
 /// </para>
 /// </remarks>
 internal sealed class IntegerDataTypeAnalyzer : IModuleAnalyzer
