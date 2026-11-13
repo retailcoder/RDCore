@@ -15,16 +15,20 @@ namespace RDCore.Tests.Workspace.Forms;
 [DoNotParallelize]
 public sealed class VisualBasicFormGraphicsTests
 {
-    // Form4 is white, in twips, 4680 x 3195 inside; Picture1 is a PictureBox in it, and Text1 a TextBox, which has no surface.
-    private static string Form4()
+    // Form4 is white, in twips, 4680 x 3195 inside; Picture1 is a white PictureBox in it, 1440 x 1440 inside, and Text1 a TextBox, which has
+    // no surface. autoRedraw: the form and Picture1 keep what is drawn on them.
+    private static string Form4(bool autoRedraw = false)
         => string.Join("\r\n", [
             "VERSION 5.00",
             "Begin VB.Form Form4 ",
+            .. AutoRedraw("   ", autoRedraw),
             "   BackColor       =   &H00FFFFFF&",
             "   Caption         =   \"Form4\"",
             "   ClientHeight    =   3195",
             "   ClientWidth     =   4680",
             "   Begin VB.PictureBox Picture1 ",
+            .. AutoRedraw("      ", autoRedraw),
+            "      BackColor       =   &H00FFFFFF&",
             "      Height          =   1500",
             "      Left            =   2400",
             "      ScaleHeight     =   1440",
@@ -59,6 +63,8 @@ public sealed class VisualBasicFormGraphicsTests
             "End Sub",
             string.Empty]);
 
+    private static string[] AutoRedraw(string indent, bool autoRedraw) => autoRedraw ? [$"{indent}AutoRedraw      =   -1  'True"] : [];
+
     private static string Program(string[] body)
         => $"Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\n{string.Join("\r\n", body)}\r\nEnd Sub\r\n";
 
@@ -70,6 +76,15 @@ public sealed class VisualBasicFormGraphicsTests
     {
         var form4 = Form4();
         var printed = await ModuleWorkspace.RunAsync([], Program(["Form4.Show", "DoEvents", .. body, "Unload Form4"]), Libraries,
+            [("Form4", form4, FormDesigner.Read(form4)!)], SupportedLanguages.VB6);
+        return [.. printed.Where(line => !line.StartsWith("Resize ", StringComparison.Ordinal) && line != "Paint")];
+    }
+
+    // what Form4 prints when it is loaded and not shown, and the body is run, except its Resize and its Paint.
+    private static async Task<string[]> HiddenAsync(bool autoRedraw, params string[] body)
+    {
+        var form4 = Form4(autoRedraw);
+        var printed = await ModuleWorkspace.RunAsync([], Program(["Load Form4", .. body, "Unload Form4"]), Libraries,
             [("Form4", form4, FormDesigner.Read(form4)!)], SupportedLanguages.VB6);
         return [.. printed.Where(line => !line.StartsWith("Resize ", StringComparison.Ordinal) && line != "Paint")];
     }
@@ -165,13 +180,43 @@ public sealed class VisualBasicFormGraphicsTests
     }
 
     [TestMethod]
-    [Ignore("not measured with VB6: drawing on a form that is loaded but not shown; RD-VBA draws nothing and raises nothing")]
-    public async Task ADrawingStatement_OnAFormThatIsNotShown_RaisesNothing()
+    [DataRow("Form4.Line (0, 0)-(1000, 1000)", false)]
+    [DataRow("Form4.Circle (500, 500), 300", false)]
+    [DataRow("Form4.PSet (10, 10)", false)]
+    [DataRow("Form4.Cls", false)]
+    [DataRow("Form4.Picture1.Line (0, 0)-(1000, 1000)", false)]
+    [DataRow("Form4.Picture1.Cls", false)]
+    [DataRow("Form4.Line (0, 0)-(1000, 1000)", true)]
+    [DataRow("Form4.Picture1.PSet (10, 10)", true)]
+    public async Task ADrawingStatement_OnAFormThatIsNotShown_RaisesNothing(string statement, bool autoRedraw)
     {
-        var form4 = Form4();
-        var printed = await ModuleWorkspace.RunAsync([], Program(["Load Form4", "On Error Resume Next", "Form4.PSet (10, 10)", "Debug.Print Err.Number", "Unload Form4"]),
-            Libraries, [("Form4", form4, FormDesigner.Read(form4)!)], SupportedLanguages.VB6);
+        var printed = await HiddenAsync(autoRedraw, "On Error Resume Next", statement, "Debug.Print Err.Number");
 
-        CollectionAssert.AreEqual(new[] { "0" }, printed.Where(line => !line.StartsWith("Resize ", StringComparison.Ordinal)).ToArray(), string.Join(" | ", printed));
+        CollectionAssert.AreEqual(new[] { "0" }, printed, string.Join(" | ", printed));
+    }
+
+    // Point while the form is not shown, then once it is.
+    private static string[] DrawnThenShown(string target)
+        => [$"{target}.PSet (700, 500), &HFF&", $"Debug.Print {target}.Point(700, 500)", "Form4.Show", "DoEvents", $"Debug.Print {target}.Point(700, 500)"];
+
+    [TestMethod]
+    [DataRow("Form4", DisplayName = "on the form")]
+    [DataRow("Form4.Picture1", DisplayName = "on its PictureBox")]
+    public async Task WhatIsDrawnOnAFormThatIsNotShown_IsLost_WithoutAutoRedraw(string target)
+    {
+        var printed = await HiddenAsync(false, DrawnThenShown(target));
+
+        CollectionAssert.AreEqual(new[] { "-1", "16777215" }, printed, string.Join(" | ", printed));
+    }
+
+    [TestMethod]
+    [Ignore("not implemented: RDForms gives a form its drawing surface when it is shown, so a form that is loaded and not shown keeps nothing drawn on it, whatever its AutoRedraw")]
+    [DataRow("Form4", DisplayName = "on the form")]
+    [DataRow("Form4.Picture1", DisplayName = "on its PictureBox")]
+    public async Task WhatIsDrawnOnAFormThatIsNotShown_IsKept_WithAutoRedraw(string target)
+    {
+        var printed = await HiddenAsync(true, DrawnThenShown(target));
+
+        CollectionAssert.AreEqual(new[] { "255", "255" }, printed, string.Join(" | ", printed));
     }
 }
