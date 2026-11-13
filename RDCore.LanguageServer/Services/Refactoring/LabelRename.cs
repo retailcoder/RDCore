@@ -32,13 +32,13 @@ internal static class LabelRename
     public static LabelOccurrences? At(RenameModule module, SourcePosition position)
     {
         if (module.Syntax.Children.OfType<MemberDeclarationNode>()
-                .FirstOrDefault(member => Procedures.Contains(member.MemberKind) && Contains(member.SourceLocation.Range, position)) is not { } procedure)
+                .FirstOrDefault(member => Procedures.Contains(member.MemberKind) && SymbolRename.Contains(member.SourceLocation.Range, position)) is not { } procedure)
         {
             return null;
         }
 
         var named = Named(procedure).ToList();
-        if (named.FirstOrDefault(name => Contains(name.Range, position)) is not { Label: { } label } here)
+        if (named.FirstOrDefault(name => SymbolRename.Contains(name.Range, position)) is not { Label: { } label } here)
         {
             return null;
         }
@@ -55,7 +55,7 @@ internal static class LabelRename
         => module.Syntax.Children.OfType<MemberDeclarationNode>()
             .Where(member => Procedures.Contains(member.MemberKind))
             .SelectMany(procedure => Named(procedure))
-            .Where(name => name.IsDefinition && Contains(range, name.Range.Start))
+            .Where(name => name.IsDefinition && SymbolRename.Contains(range, name.Range.Start))
             .Select(name => name.Range.Start);
 
     // every label a procedure defines and every one its statements name, without brackets, with the range of the name as it is written.
@@ -120,6 +120,4 @@ internal static class LabelRename
 
     // a line number, which a label node can be written as too: no identifier starts with a digit.
     private static bool IsLineNumber(string name) => name.Length > 0 && (char.IsAsciiDigit(name[0]) || name[0] == '-');
-
-    private static bool Contains(SourceRange range, SourcePosition position) => range.Start <= position && position <= range.End;
 }

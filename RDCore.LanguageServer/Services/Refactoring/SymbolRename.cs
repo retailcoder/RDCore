@@ -359,5 +359,5 @@ public static class SymbolRename
         return new(RenameRefusalKind.Conflict, newName, NameOccurrences.Describe(other), at, position);
     }
 
-    private static bool Contains(SourceRange range, SourcePosition position) => range.Start <= position && position <= range.End;
+    internal static bool Contains(SourceRange range, SourcePosition position) => range.Start <= position && position <= range.End;
 }
