@@ -184,6 +184,26 @@ public sealed class ExpressionFactTests
     }
 
     [TestMethod]
+    [DataRow("x = Len(\"abc\")", true)]
+    [DataRow("x = VBA.Strings.Len(\"abc\")", true)]
+    [DataRow("x = vbYes", true)]
+    [DataRow("x = Work", false)]
+    [DataRow("x = Work + 1", false)]
+    public void ANameBoundToWhatALibraryDeclares_SaysSo(string assignment, bool library)
+        => Assert.AreEqual(library, LastValue(["Public Function Work() As Long", "End Function"], ["Dim x As Long", assignment])
+            .Flags.HasFlag(ValueExpressionSemanticFlags.BoundToLibrary));
+
+    [TestMethod]
+    public void ALibraryFunctionCalledAsAStatement_IsBoundToTheLibrary_AndDiscardsItsResult()
+    {
+        var (model, run, _) = Analyze([], ["MsgBox \"hello\""]);
+
+        var flags = model.Expressions[run.Children.OfType<CallStatementNode>().Single().Callee.Identity].Flags;
+        Assert.IsTrue(flags.HasFlag(ValueExpressionSemanticFlags.BoundToLibrary));
+        Assert.IsTrue(flags.HasFlag(ValueExpressionSemanticFlags.ResultDiscarded));
+    }
+
+    [TestMethod]
     public void AFunctionCalledInAnExpression_DoesNotDiscardTheValueItReturns()
         => Assert.IsFalse(LastValue(["Public Function Work() As Long", "End Function"], ["Dim x As Long", "x = Work"])
             .Flags.HasFlag(ValueExpressionSemanticFlags.ResultDiscarded));
