@@ -448,6 +448,15 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Declare the parameter &apos;{0}&apos; Optional, which lets a call omit it.
+        /// </summary>
+        public static string IsMissingOfAVariantThatIsNotOptional_Fix {
+            get {
+                return ResourceManager.GetString("IsMissingOfAVariantThatIsNotOptional_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to &apos;{0}&apos; hides &apos;{1}&apos;: in this procedure, the name means &apos;{0}&apos;, and &apos;{1}&apos; everywhere else. Give &apos;{0}&apos; a name of its own..
         /// </summary>
         public static string ShadowedDeclaration_Message {

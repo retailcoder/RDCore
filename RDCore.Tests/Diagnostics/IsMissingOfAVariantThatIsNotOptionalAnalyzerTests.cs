@@ -48,4 +48,34 @@ public sealed class IsMissingOfAVariantThatIsNotOptionalAnalyzerTests
     [DataRow("Optional p As Variant", "Debug.Print IsMissing(5)", DisplayName = "a literal")]
     public async Task IsMissingOfAnythingElse_IsNotReported(string signature, string body)
         => Assert.IsEmpty(await FindingsAsync(signature, body));
+
+    [TestMethod]
+    [DataRow("p As Variant", "Optional p As Variant", DisplayName = "the only parameter")]
+    [DataRow("ByVal p As Variant", "Optional ByVal p As Variant", DisplayName = "Optional goes before ByVal")]
+    [DataRow("p, Optional q As Long", "Optional p, Optional q As Long", DisplayName = "every later parameter is Optional")]
+    [DataRow("a As Long, p", "a As Long, Optional p", DisplayName = "after a required parameter")]
+    public async Task ARequiredVariantParameter_IsDeclaredOptional(string signature, string fixedSignature)
+    {
+        var finding = Assert.ContainsSingle(await FindingsAsync(signature, "Debug.Print IsMissing(p)"));
+
+        var fix = finding.Fixes?.Edit;
+        Assert.IsNotNull(fix);
+        StringAssert.Contains(fix.Title, "'p'");
+        var edit = Assert.ContainsSingle(fix.Edits);
+        Assert.AreEqual(edit.Range.Start, edit.Range.End);
+        var line = $"Public Sub Probe({signature})";
+        Assert.AreEqual(1, edit.Range.Start.Line);
+        Assert.AreEqual($"Public Sub Probe({fixedSignature})", line.Insert(edit.Range.Start.Character, edit.NewText));
+    }
+
+    [TestMethod]
+    [DataRow("p, q", "Debug.Print IsMissing(p)", DisplayName = "a later parameter is required")]
+    [DataRow("p, ParamArray r()", "Debug.Print IsMissing(p)", DisplayName = "the procedure has a ParamArray")]
+    [DataRow("Optional p As Variant", "Dim w As Variant\r\nw = p\r\nDebug.Print IsMissing(w)", DisplayName = "a variable")]
+    public async Task NoOptionalDeclarationIsOffered_WhereItIsNotLegalOrNotAParameter(string signature, string body)
+    {
+        var finding = Assert.ContainsSingle(await FindingsAsync(signature, body));
+
+        Assert.IsNull(finding.Fixes?.Edit);
+    }
 }

@@ -3,8 +3,11 @@ using RDCore.Diagnostics.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
+using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Extensibility.Diagnostics;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace RDCore.Diagnostics.Analyzers;
 
@@ -26,14 +29,14 @@ internal sealed class IsMissingOfAVariantThatIsNotOptionalAnalyzer : IModuleAnal
             yield break;
         }
 
-        // each call, with the names of the parameters of the procedure it is written in.
-        var calls = new Dictionary<SyntaxNodeId, (IndexExpressionNode Call, HashSet<string> Parameters)>();
+        // each call, with the procedure it is written in and the names of its parameters.
+        var calls = new Dictionary<SyntaxNodeId, (IndexExpressionNode Call, MemberDeclarationNode Member, HashSet<string> Parameters)>();
         foreach (var member in module.Descendants().OfType<MemberDeclarationNode>())
         {
             var parameters = member.Descendants().OfType<ParameterDeclarationNode>().Select(parameter => parameter.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var call in member.Descendants().OfType<IndexExpressionNode>())
             {
-                calls.TryAdd(call.Identity, (call, parameters));
+                calls.TryAdd(call.Identity, (call, member, parameters));
             }
         }
 
@@ -46,15 +49,45 @@ internal sealed class IsMissingOfAVariantThatIsNotOptionalAnalyzer : IModuleAnal
                     continue;
                 }
 
-                var what = written.Parameters.Contains(argument.IdentifierName)
+                var isParameter = written.Parameters.Contains(argument.IdentifierName);
+                var what = isParameter
                     ? RDCoreDiagnosticsResources.IsMissingOfAVariantThatIsNotOptional_RequiredParameter
                     : RDCoreDiagnosticsResources.IsMissingOfAVariantThatIsNotOptional_Variable;
                 yield return new AnalyzerFinding(
                     RDCoreDiagnosticId.IsMissingOfAVariantThatIsNotOptional.ToCode(),
                     fact.Location.Range,
                     DiagnosticSeverity.Warning,
-                    AnalyzerMessages.Format(RDCoreDiagnosticsResources.IsMissingOfAVariantThatIsNotOptional_Message, argument.IdentifierName, what));
+                    AnalyzerMessages.Format(RDCoreDiagnosticsResources.IsMissingOfAVariantThatIsNotOptional_Message, argument.IdentifierName, what))
+                {
+                    Fixes = isParameter && FixOf(written.Member, argument.IdentifierName, semantics) is { } fix ? new DiagnosticFixes { Edit = fix } : null,
+                };
             }
         }
+    }
+
+    // Optional before the parameter. MS-VBAL §5.3.1.5 lets an Optional parameter be followed only by Optional parameters, never with a ParamArray, and makes the
+    // accessors of a property declare the same parameters; a handler or an implementation is declared as the event or the interface says.
+    private static EditFix? FixOf(MemberDeclarationNode member, string name, ModuleSemanticsDto semantics)
+    {
+        if (member.MemberKind is not (MemberKind.Procedure or MemberKind.Function)
+            || semantics.Declarations.Any(declaration => declaration is { Kind: DeclarationKind.Procedure, Role: not DeclarationRole.None }
+                && string.Equals(declaration.Name, member.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        var parameters = member.Children.OfType<ParameterDeclarationNode>().OrderBy(parameter => parameter.Location.Range.Start).ToArray();
+        var index = Array.FindIndex(parameters, parameter => string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || parameters.Any(parameter => parameter.IsParamArray) || parameters.Skip(index + 1).Any(parameter => !parameter.IsOptional))
+        {
+            return null;
+        }
+
+        var start = parameters[index].Location.Range.Start;
+        return new EditFix
+        {
+            Title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.IsMissingOfAVariantThatIsNotOptional_Fix, name),
+            Edits = [new TextEdit { Range = new Range(start.Line, start.Character, start.Line, start.Character), NewText = "Optional " }],
+        };
     }
 }
