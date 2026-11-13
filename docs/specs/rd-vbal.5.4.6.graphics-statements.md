@@ -57,7 +57,7 @@ as for any call.
 |A `Line` with no first point|It starts at `CurrentX` and `CurrentY`.|
 |A coordinate or a color that is not a number|Run-time error 13, _Type mismatch_ ([`VBR00013`](../diagnostics/vbr00013.md)).|
 |A color that is out of range|Run-time error 5, _Invalid procedure call or argument_ ([`VBR00005`](../diagnostics/vbr00005.md)).|
-|A form or PictureBox that is loaded and not shown|Nothing is raised. What is drawn is lost: `Point` returns `-1` until the form is shown, and the background after.|
+|A form or PictureBox that is loaded and not shown|Nothing is raised. What is drawn is lost: `Point` returns `-1` until the form is shown, and the background color once it is.|
 |An object with no such method (a TextBox, a class)|Run-time error 438, _Object doesn't support this property or method_ ([`VBR00438`](../diagnostics/vbr00438.md)).|
 
 > [!NOTE]
