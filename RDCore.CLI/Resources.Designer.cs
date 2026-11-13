@@ -358,7 +358,7 @@ namespace RDCore.CLI {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Design-time only in the file written over, and no longer declared by the type library: {0}..
+        ///   Looks up a localized string similar to Design-time-only properties of the file written over that the type library no longer declares: {0}..
         /// </summary>
         public static string ExportLibrary_DesignTimeOnlyLost {
             get {

@@ -231,7 +231,7 @@
     <value>Dépend de : {0}. Un projet ne peut pas référencer cette bibliothèque sans elles; exportez-les aussi (--dependencies).</value>
   </data>
   <data name="ExportLibrary_DesignTimeOnlyLost" xml:space="preserve">
-    <value>Propriétés de conception seulement dans le fichier remplacé, que la bibliothèque de types ne déclare plus : {0}.</value>
+    <value>Propriétés réservées à la conception dans le fichier remplacé, que la bibliothèque de types ne déclare plus : {0}.</value>
   </data>
   <data name="ExportLibrary_Skipped" xml:space="preserve">
     <value>Non décrit : {0}.</value>
