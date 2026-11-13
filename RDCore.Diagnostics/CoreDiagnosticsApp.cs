@@ -94,6 +94,10 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, ObsoleteTypeHintAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObsoleteWhileWendAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObsoleteOnLocalErrorStatementAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, OnErrorGoToMinusOneAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, UnrestoredOnErrorResumeNextAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ImplicitConstantTypeAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, UnderscoreInPublicClassMemberAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, RedundantByValArgumentAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObjectVariablePassedByRefAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObjectVariablePassedLateAnalyzer>();
