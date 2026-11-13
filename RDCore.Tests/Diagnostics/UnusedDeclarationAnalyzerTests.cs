@@ -204,9 +204,10 @@ public sealed class UnusedDeclarationAnalyzerTests
             "    Debug.Print value",
             "End Sub");
 
-        CollectionAssert.AreEqual(new[] { 4 }, Lines(findings), "not one read, passed, or read by another constant or a bound; not a constant of the module, which is not counted");
+        CollectionAssert.AreEqual(new[] { 2, 4 }, Lines(findings), "not one read, passed, or read by another constant or a bound, in a procedure or in the module");
         AssertAre(findings, RDCoreDiagnosticId.ConstantNotUsed, DiagnosticSeverity.Information);
-        StringAssert.Contains(findings[0].Message, "'Unused'");
+        StringAssert.Contains(findings[0].Message, "'Hidden'");
+        StringAssert.Contains(findings[1].Message, "'Unused'");
     }
 
     [TestMethod]
