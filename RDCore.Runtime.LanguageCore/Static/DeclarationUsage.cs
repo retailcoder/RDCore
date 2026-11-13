@@ -68,8 +68,8 @@ public static class DeclarationUsage
 
     // MS-VBAL §5.3.1.1, §5.2.1.4: a Friend procedure, and a Public variable or constant of a procedural module that is Option Private Module, are accessible
     // within the project and from nowhere else - the projects that reference it included. Every reference to one is in the code of a module of the project, and
-    // it is counted over all of them once each module has a model and every procedure of each was fully analyzed; a constant, once the expressions of the
-    // declarations of each module were as well (the value of another constant, the bounds of an array). A Public procedure of a private module is not counted
+    // it is counted over all of them once each module has a model and every procedure of each was fully analyzed. A constant is counted once the expressions in
+    // the declarations of each module were analyzed too (the value of another constant, the bounds of an array). A Public procedure of a private module is not counted
     // here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see.
     public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(
         IReadOnlyCollection<ModuleSemanticModel> models, IReadOnlyDictionary<string, ModuleDeclarationFacts> declarations, IEnumerable<VBModuleSymbol> project)
