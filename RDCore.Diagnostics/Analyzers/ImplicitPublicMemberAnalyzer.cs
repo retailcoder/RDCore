@@ -25,6 +25,9 @@ internal sealed class ImplicitPublicMemberAnalyzer : SyntaxTreeAnalyzer
                 DiagnosticSeverity.Information,
                 Say(RDCoreDiagnosticsResources.ImplicitPublicMember_Message, member.Name))
             {
-                Fixes = SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.ImplicitPublicMember_Fix, member.Name), SyntaxEdits.Insert(member.SourceLocation.Range.Start, "Public ")),
+                Fixes = new DiagnosticFixes
+                {
+                    Edit = SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.ImplicitPublicMember_Fix, member.Name), SyntaxEdits.Insert(member.SourceLocation.Range.Start, "Public ")),
+                },
             });
 }

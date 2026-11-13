@@ -28,6 +28,6 @@ internal sealed class ImplicitByRefModifierAnalyzer : SyntaxTreeAnalyzer
 
     private static DiagnosticFixes? FixOf(ParameterDeclarationNode parameter)
         => parameter.NameRange is { } name
-            ? SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Fix, parameter.Name), SyntaxEdits.Insert(name.Start, "ByRef "))
+            ? new DiagnosticFixes { Edit = SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Fix, parameter.Name), SyntaxEdits.Insert(name.Start, "ByRef ")) }
             : null;
 }
