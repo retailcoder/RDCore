@@ -17,7 +17,7 @@ public static class DeclarationUsage
 {
     public static ImmutableArray<DeclarationFact> Of(
         IEnumerable<Symbol> declared, IEnumerable<ProcedureSemanticModel> procedures, IReadOnlyDictionary<SemanticId, DeclarationRole>? roles = null,
-        Func<Symbol, HiddenDeclaration?>? hides = null)
+        Func<Symbol, HiddenDeclaration?>? hides = null, IReadOnlySet<string>? excludedBranchNames = null)
     {
         var models = procedures.ToList();
         var references = new Dictionary<SemanticId, DeclarationReferences>();
@@ -53,8 +53,10 @@ public static class DeclarationUsage
 
             var role = roles is not null && roles.TryGetValue(symbol.SemanticId, out var found) ? found : DeclarationRole.None;
             DeclarationReferences? counted = null;
+            // a name that a branch of a #If that is excluded writes can be a reference in another configuration (ExcludedBranchNames).
             if ((IsAccessibleOnlyFromItsOwnCode(symbol, kind!.Value) || IsCalledOnlyByItsOwnCode(symbol, role))
-                && CodeThatCanReferToIt(symbol, models, moduleIsFullyAnalyzed))
+                && CodeThatCanReferToIt(symbol, models, moduleIsFullyAnalyzed)
+                && excludedBranchNames?.Contains(symbol.Name) != true)
             {
                 counted = references.GetValueOrDefault(symbol.SemanticId);
             }
