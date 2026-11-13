@@ -108,6 +108,9 @@ public enum RDCoreDiagnosticId
     ObjectVariablePassedLateIsACopy = 11029, // o.Twice b.Count, o an Object: MS-VBA passes a copy of b's public variable to a procedure called late
     TrueValueIsNotMinusOne = 11031, // #If Not DEV with #Const DEV = 1: a True that is not -1, read through an operator that works on its bits (Not 1 is -2)
     ForEachControlEmptiedAfterLoop = 11032, // For Each c In r ... Next: Debug.Print c.Address - MS-VBAL keeps the last element in c; MS-VBA empties it (Nothing)
+    StrOfAFraction = 11040, // Str(0.5): MS-VBA writes " .5", with no zero before the point; MS-VBAL writes the let-coercion's " 0.5"
+    StrOfAnErrorValue = 11041, // Str(CVErr(5)): MS-VBA raises 13; MS-VBAL writes "Error 5"
+    WriteOfAFraction = 11042, // Write #1, 0.5: MS-VBA writes .5, with no zero before the point; MS-VBAL writes the let-coercion's 0.5
 
     /*
      * [20000-20999]: the debugger and edit-and-continue, issued by the language server while a program waits
