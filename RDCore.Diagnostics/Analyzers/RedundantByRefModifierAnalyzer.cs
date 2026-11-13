@@ -3,7 +3,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.Diagnostics.Model;
 using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Declarations;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Server.ProtocolExtensions;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Extensibility.Diagnostics;
 
@@ -37,9 +39,34 @@ internal sealed class RedundantByRefModifierAnalyzer(IOptions<DiagnosticsOptions
                     RDCoreDiagnosticId.RedundantByRefModifier.ToCode(),
                     parameter.Location.Range,
                     DiagnosticSeverity.Information,
-                    AnalyzerMessages.Format(RDCoreDiagnosticsResources.RedundantByRefModifier_Message, parameter.Name));
+                    AnalyzerMessages.Format(RDCoreDiagnosticsResources.RedundantByRefModifier_Message, parameter.Name))
+                {
+                    Fixes = FixOf(parameter),
+                };
             }
         }
+    }
+
+    // the ByRef and the space after it: the parameter is passed by reference without it. After Optional, only where the declaration is written with single
+    // spaces, which tells where the ByRef begins.
+    private static DiagnosticFixes? FixOf(ParameterDeclarationNode parameter)
+    {
+        var start = parameter.Location.Range.Start;
+        if (parameter.NameRange is not { Start: var name } || name.Line != start.Line
+            || parameter.IsOptional && name.Character - start.Character != "Optional ByRef ".Length)
+        {
+            return null;
+        }
+
+        var keyword = parameter.IsOptional ? new SourcePosition(start.Line, start.Character + "Optional ".Length) : start;
+        return new DiagnosticFixes
+        {
+            Edit = new EditFix
+            {
+                Title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.RedundantByRefModifier_Fix, parameter.Name),
+                Edits = [new TextEdit { Range = new SourceRange(keyword, name).ToLsp(), NewText = string.Empty }],
+            },
+        };
     }
 
     // an implementation of an interface member, or a handler of an event: its declaration matches another's.

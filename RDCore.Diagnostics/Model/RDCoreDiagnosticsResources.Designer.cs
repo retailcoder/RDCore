@@ -905,5 +905,68 @@ namespace RDCore.Diagnostics.Model {
             }
         }
 
+        /// <summary>
+        ///   Looks up a localized string similar to Assign the condition to &apos;{0}&apos;.
+        /// </summary>
+        public static string BooleanAssignedInIfElse_Fix {
+            get {
+                return ResourceManager.GetString("BooleanAssignedInIfElse_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Assign Not the condition to &apos;{0}&apos;.
+        /// </summary>
+        public static string BooleanAssignedInIfElse_NegatedFix {
+            get {
+                return ResourceManager.GetString("BooleanAssignedInIfElse_NegatedFix", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Write Step 1.
+        /// </summary>
+        public static string ImplicitForStep_Fix {
+            get {
+                return ResourceManager.GetString("ImplicitForStep_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Remove Step 1.
+        /// </summary>
+        public static string RedundantStepOne_Fix {
+            get {
+                return ResourceManager.GetString("RedundantStepOne_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Remove the Stop: the program no longer breaks here.
+        /// </summary>
+        public static string StopStatement_Fix {
+            get {
+                return ResourceManager.GetString("StopStatement_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Remove ByRef from &apos;{0}&apos;.
+        /// </summary>
+        public static string RedundantByRefModifier_Fix {
+            get {
+                return ResourceManager.GetString("RedundantByRefModifier_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Remove {0}.
+        /// </summary>
+        public static string RedundantModuleOption_Fix {
+            get {
+                return ResourceManager.GetString("RedundantModuleOption_Fix", resourceCulture);
+            }
+        }
+
     }
 }

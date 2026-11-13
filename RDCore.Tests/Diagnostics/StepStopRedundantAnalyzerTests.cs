@@ -74,6 +74,48 @@ public sealed class StepStopRedundantAnalyzerTests
     public void TheConventionsDefault_IsImplicit()
         => Assert.AreEqual(ForStepConvention.Implicit, new DiagnosticsOptions().ForStep);
 
+    private static string Fixed(string program, EditFix fix)
+    {
+        var lines = program.Split("\r\n");
+        int OffsetOf(Position position) => lines.Take(position.Line).Sum(line => line.Length + 2) + position.Character;
+        foreach (var edit in fix.Edits.OrderByDescending(edit => OffsetOf(edit.Range.Start)))
+        {
+            program = program[..OffsetOf(edit.Range.Start)] + edit.NewText + program[OffsetOf(edit.Range.End)..];
+        }
+
+        return program;
+    }
+
+    // the fix of the one finding of the analyzer leaves the module as it is expected, and the program prints the same.
+    private static async Task AssertFixedAsync(IModuleAnalyzer analyzer, string before, string after, string title, ModuleSemanticsDto? semantics = null)
+    {
+        var program = Module(before);
+        var fix = Assert.ContainsSingle(Run(analyzer, program, semantics)).Fixes?.Edit;
+        Assert.IsNotNull(fix);
+        Assert.AreEqual(title, fix.Title);
+
+        var fixedProgram = Fixed(program, fix);
+        Assert.AreEqual(Module(after), fixedProgram);
+        Assert.IsEmpty(Run(analyzer, fixedProgram, semantics), "the fix leaves nothing to report");
+        CollectionAssert.AreEqual(await ModuleWorkspace.RunAsync([], program), await ModuleWorkspace.RunAsync([], fixedProgram), "the program prints the same");
+    }
+
+    [TestMethod]
+    [DataRow("1 To 3 Step 1", "1 To 3", DisplayName = "a Step 1")]
+    [DataRow("1 To 3 _\n        Step 1", "1 To 3", DisplayName = "a Step 1 on a continued line")]
+    public async Task TheFix_RemovesStepOne(string before, string after)
+        => await AssertFixedAsync(new ForStepAnalyzer(Options()),
+            $"Public Sub Main()\n    Dim i As Long\n    For i = {before}\n        Debug.Print i\n    Next\n    Debug.Print i\nEnd Sub",
+            $"Public Sub Main()\n    Dim i As Long\n    For i = {after}\n        Debug.Print i\n    Next\n    Debug.Print i\nEnd Sub",
+            "Remove Step 1");
+
+    [TestMethod]
+    public async Task TheFix_WritesStepOne()
+        => await AssertFixedAsync(new ForStepAnalyzer(Options(forStep: ForStepConvention.Explicit)),
+            "Public Sub Main()\n    Dim i As Long\n    For i = 1 To 3\n        Debug.Print i\n    Next\n    Debug.Print i\nEnd Sub",
+            "Public Sub Main()\n    Dim i As Long\n    For i = 1 To 3 Step 1\n        Debug.Print i\n    Next\n    Debug.Print i\nEnd Sub",
+            "Write Step 1");
+
     #endregion
 
     #region RDC00209 Boolean assigned in If…Else
@@ -111,6 +153,34 @@ public sealed class StepStopRedundantAnalyzerTests
             Module($"Public Sub DoSomething(ByVal foo As Long)\n    Dim bar As Boolean, baz As Boolean, obj As Object\n    If foo > 0 Then\n        {then}\n    Else\n        {otherwise}\n    End If\nEnd Sub")));
 
     [TestMethod]
+    [DataRow("o Is Nothing", "True", "False", "found = o Is Nothing", "Assign the condition to 'found'", DisplayName = "Is")]
+    [DataRow("o Is Nothing", "False", "True", "found = Not (o Is Nothing)", "Assign Not the condition to 'found'", DisplayName = "Is, negated")]
+    [DataRow("TypeOf c Is Collection", "True", "False", "found = TypeOf c Is Collection", "Assign the condition to 'found'", DisplayName = "TypeOf, of an object: of Nothing it raises 91")]
+    [DataRow("Not (o Is Nothing) And True", "True", "False", "found = Not (o Is Nothing) And True", "Assign the condition to 'found'", DisplayName = "Not, And")]
+    public async Task TheFix_AssignsABooleanCondition_AndTheProgramPrintsTheSame(string condition, string then, string otherwise, string assignment, string title)
+    {
+        static string Source(string body) => $"Public Sub Main()\n    Dim o As Object\n    Dim c As Object\n    Set c = New Collection\n    Dim found As Long\n    Dim i As Long\n    For i = 1 To 2\n{body}\n        Debug.Print found\n        Set o = New Collection\n    Next\nEnd Sub";
+
+        await AssertFixedAsync(new BooleanAssignedInIfElseAnalyzer(),
+            Source($"        If {condition} Then\n            found = {then}\n        Else\n            found = {otherwise}\n        End If"),
+            Source($"        {assignment}"),
+            title);
+    }
+
+    [TestMethod]
+    [DataRow("n > 0", DisplayName = "a comparison, which is Null when an operand is")]
+    [DataRow("n", DisplayName = "a number, whose Not is not False")]
+    [DataRow("IsNumeric(n)", DisplayName = "a call, which any procedure of that name can answer")]
+    public void NoFixIsOffered_ForAConditionThatMayBeNullOrANumber(string condition)
+        => Assert.IsNull(Assert.ContainsSingle(Run(new BooleanAssignedInIfElseAnalyzer(),
+            Module($"Public Sub DoSomething(ByVal n As Variant)\n    Dim bar As Boolean\n    If {condition} Then\n        bar = True\n    Else\n        bar = False\n    End If\nEnd Sub"))).Fixes?.Edit);
+
+    [TestMethod]
+    public void NoFixIsOffered_WhereAComment_WouldGoWithTheBlock()
+        => Assert.IsNull(Assert.ContainsSingle(Run(new BooleanAssignedInIfElseAnalyzer(),
+            Module("Public Sub DoSomething(ByVal o As Object)\n    Dim bar As Boolean\n    If o Is Nothing Then ' no object\n        bar = True\n    Else\n        bar = False\n    End If\nEnd Sub"))).Fixes?.Edit);
+
+    [TestMethod]
     public void AnElseIf_MakesItSomethingElse()
         => Assert.IsEmpty(Run(new BooleanAssignedInIfElseAnalyzer(),
             Module("Public Sub DoSomething(ByVal foo As Long)\n    Dim bar As Boolean\n    If foo > 0 Then\n        bar = True\n    ElseIf foo < 0 Then\n        bar = True\n    Else\n        bar = False\n    End If\nEnd Sub")));
@@ -133,6 +203,27 @@ public sealed class StepStopRedundantAnalyzerTests
     [TestMethod]
     public void End_IsNoStop()
         => Assert.IsEmpty(Run(new StopStatementAnalyzer(), Module("Public Sub DoSomething()\n    End\nEnd Sub")));
+
+    [TestMethod]
+    [DataRow("    Stop\n", DisplayName = "a line of its own")]
+    [DataRow("    Stop ' look here\n", DisplayName = "with its comment")]
+    public void TheFix_RemovesTheStop_AndSaysTheProgramNoLongerBreaks(string stop)
+    {
+        var source = Module($"Public Sub DoSomething()\n    Debug.Print 1\n{stop}    Debug.Print 2\nEnd Sub");
+        var fix = Assert.ContainsSingle(Run(new StopStatementAnalyzer(), source)).Fixes?.Edit;
+        Assert.IsNotNull(fix);
+
+        Assert.AreEqual("Remove the Stop: the program no longer breaks here", fix.Title);
+        Assert.AreEqual(Module("Public Sub DoSomething()\n    Debug.Print 1\n    Debug.Print 2\nEnd Sub"), Fixed(source, fix));
+    }
+
+    [TestMethod]
+    [DataRow("    Debug.Print 1: Stop", DisplayName = "after a statement")]
+    [DataRow("    Stop: Debug.Print 1", DisplayName = "before a statement")]
+    [DataRow("Here: Stop", DisplayName = "after a label")]
+    [DataRow("    If True Then Stop", DisplayName = "in a single-line If")]
+    public void NoRemovalIsOffered_ForAStopThatSharesItsLine(string line)
+        => Assert.IsNull(Assert.ContainsSingle(Run(new StopStatementAnalyzer(), Module($"Public Sub DoSomething()\n{line}\nEnd Sub"))).Fixes?.Edit);
 
     #endregion
 
@@ -188,6 +279,21 @@ public sealed class StepStopRedundantAnalyzerTests
         StringAssert.Contains(findings[0].Message, "'by'");
     }
 
+    [TestMethod]
+    [DataRow("ByRef n As Long", "n As Long", DisplayName = "ByRef")]
+    [DataRow("Optional ByRef n As Long = 1", "Optional n As Long = 1", DisplayName = "Optional ByRef")]
+    public async Task TheFix_RemovesByRef_AndTheArgumentIsStillPassedByReference(string before, string after)
+    {
+        static string Source(string parameter) => $"Public Sub Main()\n    Dim x As Long\n    x = 41\n    Bump x\n    Debug.Print x\nEnd Sub\nPublic Sub Bump({parameter})\n    n = n + 1\nEnd Sub";
+
+        await AssertFixedAsync(new RedundantByRefModifierAnalyzer(Options(byRef: ByRefConvention.Implicit)), Source(before), Source(after), "Remove ByRef from 'n'", StandardModule(Program));
+    }
+
+    [TestMethod]
+    public void NoRemovalIsOffered_AfterOptional_WrittenWithMoreThanOneSpace()
+        => Assert.IsNull(Assert.ContainsSingle(Run(new RedundantByRefModifierAnalyzer(Options(byRef: ByRefConvention.Implicit)),
+            Module("Public Sub DoSomething(Optional  ByRef n As Long)\nEnd Sub"), StandardModule(Program))).Fixes?.Edit);
+
     #endregion
 
     #region RDC00315 a module option that states the default
@@ -207,6 +313,19 @@ public sealed class StepStopRedundantAnalyzerTests
     [TestMethod]
     public void TheOtherOptions_AreNot()
         => Assert.IsEmpty(Run(new RedundantModuleOptionAnalyzer(), Module("Option Explicit\nOption Base 1\nOption Compare Text\nOption Private Module\nPublic Sub DoSomething()\nEnd Sub")));
+
+    [TestMethod]
+    [DataRow("Option Base 0", DisplayName = "Option Base 0")]
+    [DataRow("Option Compare Binary", DisplayName = "Option Compare Binary")]
+    public async Task TheFix_RemovesTheOption_AndTheModuleHasItStill(string option)
+        => await AssertFixedAsync(new RedundantModuleOptionAnalyzer(),
+            $"Option Explicit\n{option}\nPublic Sub Main()\n    Dim a(2) As Long\n    Debug.Print LBound(a)\n    Debug.Print \"a\" = \"A\"\n    Debug.Print \"a\" < \"B\"\nEnd Sub",
+            "Option Explicit\nPublic Sub Main()\n    Dim a(2) As Long\n    Debug.Print LBound(a)\n    Debug.Print \"a\" = \"A\"\n    Debug.Print \"a\" < \"B\"\nEnd Sub",
+            $"Remove {option}");
+
+    [TestMethod]
+    public void NoRemovalIsOffered_ForAnOptionThatSharesItsLine()
+        => Assert.IsNull(Assert.ContainsSingle(Run(new RedundantModuleOptionAnalyzer(), Module("Option Explicit: Option Base 0\nPublic Sub DoSomething()\nEnd Sub"))).Fixes?.Edit);
 
     #endregion
 }

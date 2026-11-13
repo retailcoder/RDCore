@@ -7,6 +7,7 @@ using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Server.ProtocolExtensions;
 using RDCore.SDK.Extensibility.Diagnostics;
 
 namespace RDCore.Diagnostics.Analyzers;
@@ -28,12 +29,23 @@ internal sealed class ForStepAnalyzer(IOptions<DiagnosticsOptions> options) : Sy
                     RDCoreDiagnosticId.ImplicitForStep.ToCode(),
                     new SourceRange(loop.SourceLocation.Range.Start, loop.EndExpression.SourceLocation.Range.End),
                     DiagnosticSeverity.Information,
-                    RDCoreDiagnosticsResources.ImplicitForStep_Message))
+                    RDCoreDiagnosticsResources.ImplicitForStep_Message)
+                {
+                    Fixes = Fix(RDCoreDiagnosticsResources.ImplicitForStep_Fix, new SourceRange(loop.EndExpression.SourceLocation.Range.End, loop.EndExpression.SourceLocation.Range.End), " Step 1"),
+                })
             : loops.Where(loop => loop.StepExpression is LiteralExpressionNode { StaticValue: VBIntegerValue { Value: 1 } })
                 .Select(loop => new AnalyzerFinding(
                     RDCoreDiagnosticId.RedundantStepOne.ToCode(),
                     loop.StepExpression!.SourceLocation.Range,
                     DiagnosticSeverity.Information,
-                    RDCoreDiagnosticsResources.RedundantStepOne_Message));
+                    RDCoreDiagnosticsResources.RedundantStepOne_Message)
+                {
+                    // the Step clause, from the end of the bound before it.
+                    Fixes = Fix(RDCoreDiagnosticsResources.RedundantStepOne_Fix, new SourceRange(loop.EndExpression.SourceLocation.Range.End, loop.StepExpression.SourceLocation.Range.End), string.Empty),
+                });
     }
+
+    // the Integer 1 is the step of a loop that states none: the loop counts the same with or without it.
+    private static DiagnosticFixes Fix(string title, SourceRange range, string text)
+        => new() { Edit = new EditFix { Title = title, Edits = [new TextEdit { Range = range.ToLsp(), NewText = text }] } };
 }

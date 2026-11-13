@@ -1,10 +1,15 @@
 ﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.Diagnostics.Model;
+using RDCore.SDK.Model;
+using RDCore.SDK.Model.AST;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.AST.Statements;
+using RDCore.SDK.Model.Source;
+using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Values.Intrinsic;
+using RDCore.SDK.Server.ProtocolExtensions;
 using RDCore.SDK.Extensibility.Diagnostics;
 
 namespace RDCore.Diagnostics.Analyzers;
@@ -16,11 +21,21 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <remarks>
 /// An <c>ElseIf</c>, a second statement or a <c>Set</c> in a branch makes it something else. The name is a variable, or a member of one (<c>Me.Done</c>,
 /// <c>o.Done</c>); an element of an array is not compared. The finding is the header of the <c>If</c>.
+/// <para>
+/// The fix that assigns the condition is offered where the condition is a Boolean whatever its operands hold: an <c>Is</c> or <c>TypeOf…Is</c> operation, a
+/// Boolean literal, and <c>Not</c>, <c>And</c>, <c>Or</c>, <c>Xor</c>, <c>Eqv</c>, <c>Imp</c> and parentheses of those. Another condition can be <c>Null</c>, which
+/// an <c>If</c> takes as <c>False</c> (<strong>MS-VBAL §5.4.2.8</strong>), or a number other than <c>0</c> and <c>-1</c>, whose <c>Not</c> is not <c>False</c>.
+/// </para>
 /// </remarks>
-internal sealed class BooleanAssignedInIfElseAnalyzer : SyntaxTreeAnalyzer
+internal sealed class BooleanAssignedInIfElseAnalyzer : IModuleAnalyzer
 {
-    protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
+    public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
     {
+        if (context.ParseResult.SyntaxTree is not { } module)
+        {
+            yield break;
+        }
+
         foreach (var block in module.Descendants().OfType<IfBlockStatementNode>())
         {
             if (block is { ElseIfBlocks.IsDefaultOrEmpty: true, ElseBlock: { } otherwise }
@@ -33,17 +48,20 @@ internal sealed class BooleanAssignedInIfElseAnalyzer : SyntaxTreeAnalyzer
                     RDCoreDiagnosticId.BooleanAssignedInIfElse.ToCode(),
                     Header(block),
                     DiagnosticSeverity.Information,
-                    Say(RDCoreDiagnosticsResources.BooleanAssignedInIfElse_Message, name));
+                    AnalyzerMessages.Format(RDCoreDiagnosticsResources.BooleanAssignedInIfElse_Message, name))
+                {
+                    Fixes = FixOf(context.ParseResult, block, name, value) is { } fix ? new DiagnosticFixes { Edit = fix } : null,
+                };
             }
         }
     }
 
-    private static SDK.Model.Source.SourceRange Header(IfBlockStatementNode block)
+    private static SourceRange Header(IfBlockStatementNode block)
         => new(block.SourceLocation.Range.Start, block.ConditionExpression.SourceLocation.Range.End);
 
     // the one statement of the branch, when it Let-assigns True or False to a name.
     private static (string? Name, bool? Value) Assigned(StatementBlock body)
-        => body.Children is [AssignmentStatementNode { Kind: SDK.Model.AST.Statements.AssignmentKind.ImplicitLet or SDK.Model.AST.Statements.AssignmentKind.ExplicitLet } assignment]
+        => body.Children is [AssignmentStatementNode { Kind: AssignmentKind.ImplicitLet or AssignmentKind.ExplicitLet } assignment]
             && assignment.Value is LiteralExpressionNode { StaticValue: VBBooleanValue literal }
             && NameOf(assignment.Target) is { } name
                 ? (name, literal.Value.Equals(VBBooleanValue.True.Value))
@@ -55,5 +73,40 @@ internal sealed class BooleanAssignedInIfElseAnalyzer : SyntaxTreeAnalyzer
         MemberAccessExpressionNode { Owner: { } owner } member when NameOf(owner) is { } qualifier => $"{qualifier}.{member.Member.IdentifierName}",
         InstanceExpressionNode => "Me",
         _ => null,
+    };
+
+    // `name = condition` (or `name = Not (condition)`) in place of the block, the condition kept as it is written; not where a comment would go with the block.
+    private static EditFix? FixOf(ModuleParseResult parse, IfBlockStatementNode block, string name, bool value)
+    {
+        var range = block.SourceLocation.Range;
+        var condition = block.ConditionExpression.SourceLocation.Range;
+        if (!IsBoolean(block.ConditionExpression)
+            || parse.Trivia.Concat(parse.PrecompilerTrivia).Any(trivia => trivia.SourceLocation.Range is var at && at.End > range.Start && at.Start < range.End))
+        {
+            return null;
+        }
+
+        return new EditFix
+        {
+            Title = AnalyzerMessages.Format(value ? RDCoreDiagnosticsResources.BooleanAssignedInIfElse_Fix : RDCoreDiagnosticsResources.BooleanAssignedInIfElse_NegatedFix, name),
+            Edits =
+            [
+                new TextEdit { Range = new SourceRange(range.Start, condition.Start).ToLsp(), NewText = value ? $"{name} = " : $"{name} = Not (" },
+                new TextEdit { Range = new SourceRange(condition.End, range.End).ToLsp(), NewText = value ? string.Empty : ")" },
+            ],
+        };
+    }
+
+    // a Boolean, whatever the operands hold: never Null, never another number.
+    private static bool IsBoolean(ExpressionNode expression) => expression switch
+    {
+        TypeOfIsExpressionNode => true,
+        LiteralExpressionNode { StaticValue: VBBooleanValue } => true,
+        VBBinaryOperatorExpressionNode { Token: Tokens.CompareIsOp } => true,
+        VBBinaryOperatorExpressionNode { Token: Tokens.LogicalAndOp or Tokens.LogicalOrOp or Tokens.LogicalXOrOp or Tokens.LogicalEqvOp or Tokens.LogicalImpOp } operation
+            => IsBoolean(operation.Left) && IsBoolean(operation.Right),
+        VBUnaryOperatorExpressionNode { Token: Tokens.LogicalNotOp or OperatorSymbolNames.UnaryArithmeticPrecedenceOp or OperatorSymbolNames.UnaryLetCoerceOp } operation
+            => IsBoolean(operation.Operand),
+        _ => false,
     };
 }

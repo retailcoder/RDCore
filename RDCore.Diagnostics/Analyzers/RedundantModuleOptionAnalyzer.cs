@@ -1,5 +1,6 @@
 ﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.Diagnostics.Model;
+using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Directives;
 using RDCore.SDK.Extensibility.Diagnostics;
@@ -13,12 +14,22 @@ namespace RDCore.Diagnostics.Analyzers;
 internal sealed class RedundantModuleOptionAnalyzer : SyntaxTreeAnalyzer
 {
     protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
-        => module.Children
+    {
+        var nodes = module.Descendants().ToArray();
+        return module.Children
             .OfType<ModuleOptionDirectiveNode>()
             .Where(option => option.ModuleOption is ModuleOptions.OptionBase0 or ModuleOptions.OptionCompareBinary)
-            .Select(option => new AnalyzerFinding(
+            .Select(option => (Option: option, Name: option.ModuleOption is ModuleOptions.OptionBase0 ? "Option Base 0" : "Option Compare Binary"))
+            .Select(found => new AnalyzerFinding(
                 RDCoreDiagnosticId.RedundantModuleOption.ToCode(),
-                option.SourceLocation.Range,
+                found.Option.SourceLocation.Range,
                 DiagnosticSeverity.Information,
-                Say(RDCoreDiagnosticsResources.RedundantModuleOption_Message, option.ModuleOption is ModuleOptions.OptionBase0 ? "Option Base 0" : "Option Compare Binary")));
+                Say(RDCoreDiagnosticsResources.RedundantModuleOption_Message, found.Name))
+            {
+                // the module has the same option without it.
+                Fixes = LineRemoval.Of(found.Option, nodes, Say(RDCoreDiagnosticsResources.RedundantModuleOption_Fix, found.Name)) is { } fix
+                    ? new DiagnosticFixes { Edit = fix }
+                    : null,
+            });
+    }
 }
