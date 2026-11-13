@@ -22,6 +22,11 @@ namespace RDCore.Diagnostics.Analyzers;
 /// A reference to a member of the standard library, such as <c>Mid$</c> or <c>Error$</c>, has no declaration to change: it is not reported, and neither is a reference whose
 /// binding is not known.
 /// </para>
+/// <para>
+/// The fix of a declaration takes the character out of the name and writes the <c>As</c> clause it stands for after the declarator; the fix of a reference takes
+/// it out of the name, which a declared type allows with or without it. The fix is not offered for a function, whose <c>As</c> clause goes after a parameter list
+/// the tree does not place, nor for a name written between brackets.
+/// </para>
 /// </remarks>
 internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
 {
@@ -40,24 +45,58 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
 
         foreach (var node in module.Descendants())
         {
-            var (name, range) = node switch
+            var (name, range, fix) = node switch
             {
-                VariableDeclarationNode { TypeHint.Length: > 0 } variable => (variable.Name, NameOf(variable.NameRange, variable.SourceLocation)),
-                ConstantDeclarationNode { ConstKind: not ConstKind.EnumMember, TypeHint.Length: > 0 } constant => (constant.Name, NameOf(constant.NameRange, constant.Location)),
-                ParameterDeclarationNode { TypeHint.Length: > 0 } parameter => (parameter.Name, NameOf(parameter.NameRange, parameter.Location)),
-                MemberDeclarationNode { TypeHint.Length: > 0 } member => (member.Name, NameOf(member.NameRange, member.SourceLocation)),
+                VariableDeclarationNode { TypeHint.Length: > 0 } variable
+                    => (variable.Name, NameOf(variable.NameRange, variable.SourceLocation), DeclarationFix(variable.Name, variable.TypeHint, variable.NameRange, variable.SourceLocation.Range.End)),
+                ConstantDeclarationNode { ConstKind: not ConstKind.EnumMember, TypeHint.Length: > 0 } constant
+                    => (constant.Name, NameOf(constant.NameRange, constant.Location), DeclarationFix(constant.Name, constant.TypeHint, constant.NameRange, constant.NameRange?.End)),
+                ParameterDeclarationNode { TypeHint.Length: > 0 } parameter
+                    => (parameter.Name, NameOf(parameter.NameRange, parameter.Location),
+                        DeclarationFix(parameter.Name, parameter.TypeHint, parameter.NameRange, parameter.IsArray ? parameter.Location.Range.End : parameter.NameRange?.End)),
+                MemberDeclarationNode { TypeHint.Length: > 0 } member => (member.Name, NameOf(member.NameRange, member.SourceLocation), null),
                 SimpleNameExpressionNode { TypeHint.Length: > 0 } reference when bindings.TryGetValue(reference.Identity, out var binding) && declared.Contains(binding)
-                    => (reference.IdentifierName, reference.Location.Range),
-                _ => (null, default),
+                    => (reference.IdentifierName, reference.Location.Range, ReferenceFix(reference)),
+                _ => (null, default, null),
             };
 
             if (name is not null)
             {
                 yield return new AnalyzerFinding(
-                    RDCoreDiagnosticId.ObsoleteTypeHint.ToCode(), range, DiagnosticSeverity.Information, AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_Message, name));
+                    RDCoreDiagnosticId.ObsoleteTypeHint.ToCode(), range, DiagnosticSeverity.Information, AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_Message, name))
+                {
+                    Fixes = fix,
+                };
             }
         }
     }
 
     private static SourceRange NameOf(SourceRange? name, SourceLocation declaration) => name ?? declaration.Range;
+
+    // the character comes out of the name, and its As clause goes where the declarator ends: after the name, or after the bounds of an array.
+    private static DiagnosticFixes? DeclarationFix(string name, string? hint, SourceRange? nameRange, SourcePosition? declaratorEnd)
+    {
+        if (hint is null || TypeCharacters.TypeNameOf(hint) is not { } typeName || nameRange is not { } range || declaratorEnd is not { } end
+            || SyntaxEdits.Width(range.Start, range.End) != name.Length + hint.Length)
+        {
+            return null;
+        }
+
+        var character = new SourceRange(new SourcePosition(range.End.Line, range.End.Character - hint.Length), range.End);
+        var asClause = $" As {typeName}";
+        var title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_DeclarationFix, name, typeName);
+        return end == range.End
+            ? SyntaxEdits.Fix(title, SyntaxEdits.Replace(character, asClause))
+            : SyntaxEdits.Fix(title, SyntaxEdits.Remove(character), SyntaxEdits.Insert(end, asClause));
+    }
+
+    private static DiagnosticFixes? ReferenceFix(SimpleNameExpressionNode reference)
+    {
+        var range = reference.Location.Range;
+        var hint = reference.TypeHint!;
+        return SyntaxEdits.Width(range.Start, range.End) == reference.IdentifierName.Length + hint.Length
+            ? SyntaxEdits.Fix(AnalyzerMessages.Format(RDCoreDiagnosticsResources.ObsoleteTypeHint_ReferenceFix, reference.IdentifierName),
+                SyntaxEdits.Remove(new SourceRange(new SourcePosition(range.End.Line, range.End.Character - hint.Length), range.End)))
+            : null;
+    }
 }
