@@ -124,10 +124,10 @@
     <value>The result of this operation is resolved using bitwise arithmetic. This could produce unexpected results if the expectation is conventional '{0}' logic here. If this isn't intentional, it could be a bug.</value>
   </data>
   <data name="EmptyCodeBlock_Message" xml:space="preserve">
-    <value>Empty code block; implement a body or consider removing it.</value>
+    <value>This {0} block has no statement.</value>
   </data>
   <data name="EmptyIfBlock_Message" xml:space="preserve">
-    <value>Empty If block; consider reversing the conditional expression.</value>
+    <value>This {0} branch has no statement: it does nothing when its condition is True.</value>
   </data>
   <data name="EnumerationOverArray_Message" xml:space="preserve">
     <value>Array enumeration is inefficient and would perform better with a `For...Next` construct instead, with indexed (subscript) item access.</value>

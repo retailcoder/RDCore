@@ -106,22 +106,24 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Empty code block; implement a body or consider removing it..
+        ///   Looks up a localized string similar to This {0} block has no statement..
         /// </summary>
         public static string EmptyCodeBlock_Message {
             get {
                 return ResourceManager.GetString("EmptyCodeBlock_Message", resourceCulture);
             }
         }
+
         
         /// <summary>
-        ///   Looks up a localized string similar to Empty If block; consider reversing the conditional expression..
+        ///   Looks up a localized string similar to This {0} branch has no statement: it does nothing when its condition is True..
         /// </summary>
         public static string EmptyIfBlock_Message {
             get {
                 return ResourceManager.GetString("EmptyIfBlock_Message", resourceCulture);
             }
         }
+
         
         /// <summary>
         ///   Looks up a localized string similar to Array enumeration is inefficient and would perform better with a `For...Next` construct instead, with indexed (subscript) item access..
