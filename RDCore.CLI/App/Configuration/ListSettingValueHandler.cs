@@ -5,8 +5,8 @@ using RDCore.SDK.Server.Configuration;
 namespace RDCore.CLI.App.Configuration;
 
 /// <summary>
-/// Handles <c>rdcore/settings/listValue</c>: the language server asks the shell to add an item to the list of a setting, or to remove one from it: the code action
-/// that disables a diagnostic. The shell's settings are the user's: it changes the list as <c>CONFIG</c> would, and says its settings changed.
+/// Handles <c>rdcore/settings/listValue</c>, which the language server sends for the code action that disables a diagnostic: it asks the shell to add an item
+/// to the list of a setting, or to remove one from it. The shell's settings are the user's: it changes the list as <c>CONFIG</c> would, and says its settings changed.
 /// </summary>
 /// <remarks>
 /// The shell keeps the user's settings of the platform. A list of a workspace's settings is not one it keeps: it answers that it did not apply the change.
