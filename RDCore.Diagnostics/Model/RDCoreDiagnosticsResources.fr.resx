@@ -381,4 +381,10 @@
   <data name="TrueValueIsNotMinusOne_Message" xml:space="preserve">
     <value>&apos;{0}&apos; travaille sur les bits d&apos;une constante qui vaut True sans valoir -1 : cette condition ne donne donc pas la valeur de vérité qu&apos;elle semble donner (Not 1 vaut -2, qui est True). Testez la constante seule, ou comparez-la à 0; ou donnez la valeur True à une constante à vous.</value>
   </data>
+  <data name="ReservedNameAcceptedByMSVBA_Message" xml:space="preserve">
+    <value>&apos;{0}&apos; est un nom réservé, qu&apos;aucun membre d&apos;Enum ne peut porter selon MS-VBAL §3.3.5.2. MS-VBA le compile, et RD-VBA aussi. Donnez un autre nom au membre pour vous en tenir à la spécification.</value>
+  </data>
+  <data name="NameRefusedByMSVBA_Message" xml:space="preserve">
+    <value>MS-VBA refuse &apos;{0}&apos; comme ce nom, que MS-VBAL §3.3.5.2 permet : RD-VBA le compile, et MS-VBA ne compile pas le module. Donnez-lui un autre nom pour garder le module compatible avec MS-VBA.</value>
+  </data>
 </root>

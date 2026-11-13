@@ -108,6 +108,8 @@ public enum RDCoreDiagnosticId
     ObjectVariablePassedLateIsACopy = 11029, // o.Twice b.Count, o an Object: MS-VBA passes a copy of b's public variable to a procedure called late
     TrueValueIsNotMinusOne = 11031, // #If Not DEV with #Const DEV = 1: a True that is not -1, read through an operator that works on its bits (Not 1 is -2)
     ForEachControlEmptiedAfterLoop = 11032, // For Each c In r ... Next: Debug.Print c.Address - MS-VBAL keeps the last element in c; MS-VBA empties it (Nothing)
+    ReservedNameAcceptedByMSVBA = 11033, // Enum E: Date: End Enum - MS-VBAL §3.3.5.2 reserves Date; MS-VBA compiles it as an Enum member
+    NameRefusedByMSVBA = 11034, // Dim Long As Long - MS-VBAL §3.3.5.2 allows the name; MS-VBA refuses it (Expected: identifier)
 
     /*
      * [20000-20999]: the debugger and edit-and-continue, issued by the language server while a program waits
