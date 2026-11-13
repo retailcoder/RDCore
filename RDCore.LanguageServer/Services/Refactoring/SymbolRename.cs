@@ -66,7 +66,8 @@ public sealed record class RenameRefusal(RenameRefusalKind Kind, string Name, st
         => $"{SymbolUri.ModuleNameOf(module)} {position.Line + 1}:{position.Character + 1}";
 }
 
-public sealed record class RenameTarget(string Name, Uri Module, SourceRange Range, ImmutableArray<SemanticId> Symbols);
+// a line label is no symbol: Symbols is empty, and the label is renamed in its procedure.
+public sealed record class RenameTarget(string Name, Uri Module, SourceRange Range, ImmutableArray<SemanticId> Symbols, bool IsLabel = false);
 
 // MS-VBAL §6.1.2.8.1.1, §5.6.12
 public readonly record struct RenameEdit(Uri Module, SourceRange Range, string NewText, bool IsInString = false, bool IsLateBound = false, bool IsBacked = false);
@@ -85,6 +86,12 @@ public static class SymbolRename
 {
     public static RenamePreparation Prepare(RenameContext context, Uri module, SourcePosition position)
     {
+        if (context.Modules.FirstOrDefault(candidate => candidate.Module.AbsoluteUri == module.AbsoluteUri) is { } labelled
+            && LabelRename.At(labelled, position) is { } label)
+        {
+            return new(new RenameTarget(label.Name, module, label.Here, [], IsLabel: true), null);
+        }
+
         if (context.Modules.FirstOrDefault(candidate => candidate.Module.AbsoluteUri == module.AbsoluteUri) is not { } source
             || NameOccurrences.NameAt(source, position) is not { } name)
         {
@@ -134,7 +141,15 @@ public static class SymbolRename
             }
         }
 
-        return targets;
+        foreach (var start in LabelRename.DefinitionsIn(source, range))
+        {
+            if (Prepare(context, module, start).Target is { IsLabel: true } label)
+            {
+                targets.Add(label);
+            }
+        }
+
+        return [.. targets.OrderBy(target => target.Range.Start)];
     }
 
     public static RenamePlan Plan(RenameContext context, RenameTarget target, string newName)
@@ -152,6 +167,11 @@ public static class SymbolRename
         if (string.Equals(newName, target.Name, StringComparison.Ordinal))
         {
             return new([], null);
+        }
+
+        if (target.IsLabel)
+        {
+            return PlanLabel(context, target, newName);
         }
 
         var targets = target.Symbols.ToHashSet();
@@ -205,6 +225,28 @@ public static class SymbolRename
     }
 
     private static RenamePlan Refused(RenameRefusal refusal) => new([], refusal);
+
+    // MS-VBAL §5.4.1.1: a label is unique in its procedure, and is never named Randomize.
+    private static RenamePlan PlanLabel(RenameContext context, RenameTarget target, string newName)
+    {
+        if (string.Equals(newName, "Randomize", StringComparison.OrdinalIgnoreCase))
+        {
+            return Refused(new(RenameRefusalKind.Reserved, newName));
+        }
+
+        if (context.Modules.FirstOrDefault(candidate => candidate.Module.AbsoluteUri == target.Module.AbsoluteUri) is not { } source
+            || LabelRename.At(source, target.Range.Start) is not { } label)
+        {
+            return Refused(new(RenameRefusalKind.NoName, string.Empty));
+        }
+
+        if (label.Others.FirstOrDefault(other => string.Equals(other.Name, newName, StringComparison.OrdinalIgnoreCase)) is { Name: { } taken } conflict)
+        {
+            return Refused(new(RenameRefusalKind.Conflict, newName, $"{taken}:", target.Module, conflict.At));
+        }
+
+        return new([.. label.Occurrences.Select(range => new RenameEdit(target.Module, range, LabelRename.WrittenAs(source, range, newName)))], null);
+    }
 
     // what makes a symbol one that is not renamed: what the workspace does not declare, a type, and a name that something else is named after.
     private static RenameRefusal? RefusalOf(RenameContext context, Symbol symbol)
