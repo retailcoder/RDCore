@@ -24,16 +24,19 @@ internal static class RDFormsValues
 
     public static float SingleOf(object? value, CultureInfo culture)
     {
-        var number = Unwrapped(value) switch
-        {
-            null => 0d,
-            DBNull => throw new AutomationException(InvalidUseOfNull, "Invalid use of Null"),
-            bool truth => truth ? -1d : 0d,
-            DateTime date => date.ToOADate(),
-            var other => (double)FromNeutral(other, typeof(double), culture)!,
-        };
+        var number = DoubleOf(value, culture);
         return Math.Abs(number) <= float.MaxValue ? (float)number : throw new AutomationException(Overflow, "Overflow");
     }
+
+    // a value let-coerced to a Double: Empty is 0, a Boolean -1 or 0, and Null is no number.
+    public static double DoubleOf(object? value, CultureInfo culture) => Unwrapped(value) switch
+    {
+        null => 0d,
+        DBNull => throw new AutomationException(InvalidUseOfNull, "Invalid use of Null"),
+        bool truth => truth ? -1d : 0d,
+        DateTime date => date.ToOADate(),
+        var other => (double)FromNeutral(other, typeof(double), culture)!,
+    };
 
     private static FormValue VariantOf(object? value) => value switch
     {

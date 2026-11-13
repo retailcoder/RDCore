@@ -26,6 +26,7 @@ internal sealed class RDFormsForm : IComponentEventSink
     private readonly Dictionary<ComponentInstance, RDFormsObject> _handles = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<ComponentInstance, IAutomationEventSink> _sinks = new(ReferenceEqualityComparer.Instance);
     private DispatcherFrame? _modal;
+    private RDFormsControls? _controls;
 
     public RDFormsForm(Model.FormDefinition model, CodeUnit unit)
     {
@@ -44,6 +45,9 @@ internal sealed class RDFormsForm : IComponentEventSink
     public VBFormWindow Window { get; }
 
     public RDFormsObject Handle { get; }
+
+    // the form's Controls collection, the same object each time the program reads it.
+    public RDFormsControls Controls => _controls ??= new RDFormsControls(this);
 
     public bool IsDestroyed { get; private set; }
 

@@ -8,8 +8,8 @@ using System.Globalization;
 namespace RDCore.External.Forms.RDForms;
 
 /// <summary>
-/// The automation server of the RDForms forms a <see cref="RDFormsFormHost"/> hosts: a form and each of its controls are objects of it. An object's properties are
-/// those of its RDForms component, and a form's controls are reached by their names.
+/// The automation server of the RDForms forms a <see cref="RDFormsFormHost"/> hosts: a form, each of its controls and its <c>Controls</c> collection are objects of
+/// it. An object's properties are those of its RDForms component, and a form's controls are reached by their names, or through its <c>Controls</c> collection.
 /// </summary>
 /// <remarks>
 /// It creates nothing by name: a form is created by its form host, and its controls with it. Every call on its objects is made on the RDForms UI thread, inline
@@ -24,6 +24,9 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     private const int VisualBasicError = unchecked((int)0x800A0000);
     private const string VisualBasicLibrary = "VB";
     private const string PopupMenuMember = "PopupMenu";
+    private const string ControlsMember = "Controls";
+    private const string NameMember = "Name";
+    private const string ControlClass = "Control";
 
     /// <summary>
     /// Creates the server of the forms of a process, whose windows are on <paramref name="platform"/>.
@@ -46,7 +49,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     /// Whether an object is one of this server's: a form, or one of its controls.
     /// </summary>
     /// <param name="handle">The handle of the object.</param>
-    public bool Owns(object handle) => handle is RDFormsObject;
+    public bool Owns(object handle) => handle is RDFormsObject or RDFormsControls or RDFormsControls.Enumerator;
 
     /// <inheritdoc/>
     public bool IsAvailable => true;
@@ -57,6 +60,15 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     /// <inheritdoc/>
     public object? Invoke(object target, string member, AutomationInvocation invocation, object?[] arguments, bool[] byReference, CultureInfo culture)
     {
+        if (target is RDFormsControls controls)
+        {
+            return RDFormsUI.Run(() =>
+            {
+                Alive(controls.Form.Handle);
+                return controls.Invoke(member, invocation, arguments, culture);
+            });
+        }
+
         var handle = HandleOf(target);
         return RDFormsUI.Run(() =>
         {
@@ -80,6 +92,19 @@ public sealed class RDFormsAutomationServer : IAutomationServer
             if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && component.Class.Method(member) is { } method)
             {
                 return Call(handle, method, arguments, culture);
+            }
+
+            // the name the form's file gives the component, which a program reads and cannot set.
+            if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0
+                && string.Equals(member, NameMember, StringComparison.OrdinalIgnoreCase))
+            {
+                return component.Name;
+            }
+
+            if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0 && handle.IsForm
+                && string.Equals(member, ControlsMember, StringComparison.OrdinalIgnoreCase))
+            {
+                return handle.Form.Controls;
             }
 
             if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0
@@ -211,20 +236,44 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     }
 
     /// <inheritdoc/>
-    public string? ClassNameOf(object target) => HandleOf(target).Component.Class.TypeName;
+    public string? ClassNameOf(object target) => target is RDFormsControls ? null : HandleOf(target).Component.Class.TypeName;
 
     /// <inheritdoc/>
     public bool? IsInstanceOf(object target, string library, string className)
-        => string.Equals(library, VisualBasicLibrary, StringComparison.OrdinalIgnoreCase)
-            ? string.Equals(HandleOf(target).Component.Class.ClassName, className, StringComparison.OrdinalIgnoreCase)
-            : null;
+    {
+        if (!string.Equals(library, VisualBasicLibrary, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (target is RDFormsControls)
+        {
+            return false;
+        }
+
+        // VB's Control is the class of every control of a form, a menu included, and not of the form itself.
+        var handle = HandleOf(target);
+        return string.Equals(className, ControlClass, StringComparison.OrdinalIgnoreCase)
+            ? !handle.IsForm
+            : string.Equals(handle.Component.Class.ClassName, className, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <inheritdoc/>
     public bool MoveNext(object enumerator, out object? current)
-        => throw new AutomationException(NotImplemented, "RDForms objects have no enumerator.");
+        => enumerator is RDFormsControls.Enumerator controls
+            ? controls.MoveNext(out current)
+            : throw new AutomationException(NotImplemented, "Only the Controls collection of an RDForms form has an enumerator.");
 
     /// <inheritdoc/>
-    public void Reset(object enumerator) => throw new AutomationException(NotImplemented, "RDForms objects have no enumerator.");
+    public void Reset(object enumerator)
+    {
+        if (enumerator is not RDFormsControls.Enumerator controls)
+        {
+            throw new AutomationException(NotImplemented, "Only the Controls collection of an RDForms form has an enumerator.");
+        }
+
+        controls.Reset();
+    }
 
     /// <inheritdoc/>
     public void Advise(object source, IAutomationEventSink sink)
