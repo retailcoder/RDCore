@@ -257,6 +257,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00206](rdc00206.md)|Not all code paths return a value|A function or property getter with a code path that does not assign its return value|
 |[RDC00207](rdc00207.md)|IsMissing that is always False|IsMissing of a parameter that is not a Variant, or an Optional Variant with a default value|
 |[RDC00208](rdc00208.md)|Shadowed declaration|A local or a parameter named like a member of the module, of another module, or of a library|
+|[RDC00218](rdc00218.md)|IsMissing of a Variant that is not Optional|IsMissing of a required Variant parameter, or of a Variant variable|
 |[RDC00302](rdc00302.md)|Obsolete Call statement|A call statement written with the Call keyword|
 |[RDC00303](rdc00303.md)|Obsolete comment syntax|A comment written with the Rem keyword|
 |[RDC00304](rdc00304.md)|Obsolete error syntax|An Error statement|

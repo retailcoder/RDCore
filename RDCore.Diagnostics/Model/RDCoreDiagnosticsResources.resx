@@ -243,6 +243,15 @@
   <data name="IsMissingAlwaysFalse_AConstant" xml:space="preserve">
     <value>a constant</value>
   </data>
+  <data name="IsMissingOfAVariantThatIsNotOptional_Message" xml:space="preserve">
+    <value>IsMissing({0}) does not tell whether an argument was omitted: '{0}' is {1}, which holds the Missing value only when it is given one from an Optional parameter whose argument was omitted. To test for an omitted argument, declare the parameter Optional.</value>
+  </data>
+  <data name="IsMissingOfAVariantThatIsNotOptional_RequiredParameter" xml:space="preserve">
+    <value>a required Variant parameter</value>
+  </data>
+  <data name="IsMissingOfAVariantThatIsNotOptional_Variable" xml:space="preserve">
+    <value>a Variant variable</value>
+  </data>
   <data name="ShadowedDeclaration_Message" xml:space="preserve">
     <value>'{0}' hides '{1}': in this procedure, the name means '{0}', and '{1}' everywhere else. Give '{0}' a name of its own.</value>
   </data>

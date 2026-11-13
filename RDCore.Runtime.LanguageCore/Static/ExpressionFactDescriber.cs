@@ -104,13 +104,24 @@ internal static class ExpressionFactDescriber
     // IsMissing of a name that can never hold the Missing value: a parameter that is not a Variant, or an Optional Variant with a default value; a variable that
     // is not a Variant; a constant. A ParamArray with no elements is missing (observed in Excel), and a Variant variable holds the
     // Missing value that is assigned to it.
+    // A Variant that is not an Optional parameter - a required one, or a variable - holds it only when it was given one, from an Optional parameter whose argument
+    // was omitted.
     private static ValueExpressionSemanticFlags IsMissingFlags(StaticEvaluationContext context, IndexExpressionNode call, Symbol procedure)
-        => procedure.GetProperty(SymbolProperties.ExternalTarget) == IsMissingTarget
-            && call.Arguments is [SimpleNameExpressionNode argument]
-            && context.Resolver.ResolveValue(argument, ScopeKind.Local, context.Scope.Uri).Symbol is { } named
-            && CanNeverBeMissing(named)
-                ? ValueExpressionSemanticFlags.IsMissingAlwaysFalse
+        => procedure.GetProperty(SymbolProperties.ExternalTarget) != IsMissingTarget
+            || call.Arguments is not [SimpleNameExpressionNode argument]
+            || context.Resolver.ResolveValue(argument, ScopeKind.Local, context.Scope.Uri).Symbol is not { } named
+                ? 0
+                : CanNeverBeMissing(named) ? ValueExpressionSemanticFlags.IsMissingAlwaysFalse
+                : IsAVariantThatIsNotOptional(named) ? ValueExpressionSemanticFlags.IsMissingOfAVariantThatIsNotOptional
                 : 0;
+
+    private static bool IsAVariantThatIsNotOptional(Symbol named) => named switch
+    {
+        ParamArrayParameterSymbol => false,
+        VBParameterSymbol parameter => !parameter.IsOptional && parameter.ResolvedType is VBVariantType,
+        VBLocalVariableSymbol or VBModuleFieldVariableMemberSymbol => named is ITypedSymbol { ResolvedType: VBVariantType },
+        _ => false,
+    };
 
     private static bool CanNeverBeMissing(Symbol named) => named switch
     {
