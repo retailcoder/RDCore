@@ -395,6 +395,70 @@ public sealed class VisualBasicFormLanguageTests
         CollectionAssert.AreEqual(new[] { error }, printed);
     }
 
+    // ---- a TextBox's MultiLine and ScrollBars, a CommandButton's Style: set in the designer, read in code ----
+
+    [TestMethod]
+    [DataRow("Text1.MultiLine = True", DisplayName = "a TextBox's MultiLine")]
+    [DataRow("Text1.ScrollBars = 2", DisplayName = "a TextBox's ScrollBars")]
+    [DataRow("Command1.Style = 1", DisplayName = "a CommandButton's Style")]
+    public async Task AControlsDesignTimeProperty_AssignedEarlyBound_IsCantAssignToReadOnlyProperty(string assignment)
+    {
+        var errors = await ErrorsAsync(Form(), $"Public Sub Main()\r\n    Form1.{assignment}\r\nEnd Sub");
+
+        StringAssert.StartsWith(Assert.ContainsSingle(errors), nameof(VBCompileErrorId.CantAssignToReadOnlyProperty));
+    }
+
+    // o is an Object, c a Control and v a Variant, each set to Form1.Text1.
+    private static Task<string[]> RunWithText1Async(string statements)
+        => RunWithRDFormsAsync(
+            "On Error Resume Next\r\nDim o As Object, c As Control, v As Variant\r\nSet o = Form1.Text1\r\nSet c = Form1.Text1\r\nSet v = Form1.Text1\r\n" +
+            $"{statements}\r\nUnload Form1");
+
+    [TestMethod]
+    [Ignore("the RDForms TextBox this stack hosts has no MultiLine or ScrollBars property")]
+    [DataRow("o", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through an Object")]
+    [DataRow("o", "ScrollBars = 2", "ScrollBars", DisplayName = "ScrollBars, through an Object")]
+    [DataRow("c", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through a Control")]
+    [DataRow("c", "ScrollBars = 2", "ScrollBars", DisplayName = "ScrollBars, through a Control")]
+    [DataRow("Form1.Controls(\"Text1\")", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through the form's Controls")]
+    [DataRow("v", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through a Variant")]
+    [DataRow("o", "MultiLine = False", "MultiLine", DisplayName = "MultiLine, to the value it has")]
+    [DataRow("o", "ScrollBars = 0", "ScrollBars", DisplayName = "ScrollBars, to the value it has")]
+    public async Task ATextBoxsDesignTimeProperty_AssignedLateBound_IsError382(string target, string assignment, string property)
+    {
+        var printed = await RunWithText1Async($"{target}.{assignment}\r\nDebug.Print Err.Number & \"|\" & Err.Description");
+
+        CollectionAssert.AreEqual(new[] { $"382|'{property}' property cannot be set at run time" }, printed);
+    }
+
+    [TestMethod]
+    [Ignore("the RDForms TextBox this stack hosts has no MultiLine or ScrollBars property")]
+    public async Task AValueThatDoesNotCoerce_ToATextBoxsDesignTimeProperty_IsTheCoercionsError_Before382()
+    {
+        var printed = await RunWithText1Async("o.MultiLine = \"x\"\r\nDebug.Print Err.Number");
+
+        CollectionAssert.AreEqual(new[] { "13" }, printed);
+    }
+
+    [TestMethod]
+    [Ignore("the RDForms TextBox this stack hosts has no MultiLine or ScrollBars property")]
+    public async Task ATextBoxsDesignTimeProperty_IsReadLateBound_AsItsDesignerSetsIt()
+    {
+        var printed = await RunWithText1Async("o.MultiLine = True\r\nDebug.Print o.MultiLine & \"|\" & o.ScrollBars");
+
+        CollectionAssert.AreEqual(new[] { "False|0" }, printed, "the refused assignment leaves the designer's value");
+    }
+
+    [TestMethod]
+    [Ignore("the RDForms CommandButton this stack hosts has no Style property")]
+    public async Task ACommandButtonsStyle_AssignedLateBound_IsError382_AndKeepsTheDesignersValue()
+    {
+        var printed = await RunWithRDFormsAsync(
+            "On Error Resume Next\r\nDim o As Object\r\nSet o = Form1.Command1\r\no.Style = 1\r\nDebug.Print Err.Number\r\nErr.Clear\r\nDebug.Print o.Style & \"|\" & Err.Number\r\nUnload Form1");
+
+        CollectionAssert.AreEqual(new[] { "382", "0|0" }, printed);
+    }
+
     [TestMethod]
     public async Task AControlReachedLateBound_IsOfItsVBClass()
     {
