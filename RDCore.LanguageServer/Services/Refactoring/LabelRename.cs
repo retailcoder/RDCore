@@ -65,8 +65,9 @@ internal static class LabelRename
         {
             switch (node)
             {
-                case LineLabelNode label when !IsLineNumber(label.Name):
-                    yield return Defined(label);
+                // a line number has no name, and so no range of one.
+                case LineLabelNode { NameRange: { } name } label:
+                    yield return Defined(label, name);
                     break;
                 case GoToStatementNode { LabelExpression: SimpleNameExpressionNode name }:
                     yield return Reference(name);
@@ -98,26 +99,16 @@ internal static class LabelRename
         }
     }
 
-    // a label's definition starts with its name as it is written, brackets included; the colon after it is not the name's.
-    private static (string, SourceRange, bool, bool) Defined(LineLabelNode label)
+    // a label's definition is its name as it is written, brackets included, which its node keeps.
+    private static (string, SourceRange, bool, bool) Defined(LineLabelNode label, SourceRange name)
     {
-        var start = label.SourceLocation.Range.Start;
         var (unbracketed, isBracketed) = Unbracketed(label.Name);
-        return (unbracketed, new SourceRange(start, start with { Character = start.Character + label.Name.Length }), true, isBracketed);
+        return (unbracketed, name, true, isBracketed);
     }
 
-    // a name the node keeps its brackets in, or one written two characters wider than the name, in brackets: a label has no type hint.
     private static (string, SourceRange, bool, bool) Reference(SimpleNameExpressionNode name)
-    {
-        var range = name.Location.Range;
-        var (unbracketed, isBracketed) = Unbracketed(name.IdentifierName);
-        isBracketed |= range.Start.Line == range.End.Line && range.End.Character - range.Start.Character == name.IdentifierName.Length + 2;
-        return (unbracketed, range, false, isBracketed);
-    }
+        => (name.IdentifierName, name.Location.Range, false, name.IsBracketed);
 
     private static (string Name, bool IsBracketed) Unbracketed(string name)
         => name.Length > 1 && name[0] == '[' && name[^1] == ']' ? (name[1..^1], true) : (name, false);
-
-    // a line number, which a label node can be written as too: no identifier starts with a digit.
-    private static bool IsLineNumber(string name) => name.Length > 0 && (char.IsAsciiDigit(name[0]) || name[0] == '-');
 }
