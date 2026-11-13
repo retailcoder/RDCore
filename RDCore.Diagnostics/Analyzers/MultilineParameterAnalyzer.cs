@@ -18,8 +18,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// A parameter list with a parameter on each line is not reported: it is the declaration of one parameter that is broken, not the list.
 /// </para>
 /// <para>
-/// The fix writes the parameter on the line it starts on: what is between its parts - its modifiers, its name, its <c>As</c> clause and its default
-/// value - is written again with a space, which takes the line continuations out. The parts are what the syntax tree says they are, so it is not offered
+/// The fix writes the parameter on the line it starts on: what is between its parts (its modifiers, its name, its <c>As</c> clause and its default
+/// value) is written again with a space, which takes the line continuations out. The parts are what the syntax tree says they are, so it is not offered
 /// for a name or a type written between brackets, nor for a default value that is itself split.
 /// </para>
 /// </remarks>
