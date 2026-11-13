@@ -38,6 +38,7 @@ internal static class ExpressionFactDescriber
                 return symbol is null
                     ? new(expression.Identity, expression.Location, type, ExpressionClassification.Unknown, null, document, error)
                     : new(expression.Identity, expression.Location, type, ClassificationOf(symbol), symbol.SemanticId, FlagsOf(symbol, name.IdentifierName) | document
+                        | BindingFlagsOf(symbol)
                         | (Expressions.SimpleNameExpressionStaticSemantics.IgnoresTypeCharacter(name, symbol) ? ValueExpressionSemanticFlags.IgnoredTypeCharacter : 0), error);
             }
 
@@ -45,7 +46,7 @@ internal static class ExpressionFactDescriber
             {
                 var created = BoundClassOf(type);
                 var fails = created is not null && created.GetProperty(SymbolProperties.CreationAlwaysFails) ? ValueExpressionSemanticFlags.NewAlwaysFails : 0;
-                return new(expression.Identity, expression.Location, type, ExpressionClassification.Value, created?.SemanticId, fails, error);
+                return new(expression.Identity, expression.Location, type, ExpressionClassification.Value, created?.SemanticId, fails | BindingFlagsOf(created), error);
             }
 
             case MemberAccessExpressionNode access:
@@ -66,7 +67,7 @@ internal static class ExpressionFactDescriber
         StaticEvaluationContext context, IExpressionFactSink facts, IndexExpressionNode index, VBType? type, VBCompileErrorInfo? error)
     {
         ExpressionFact Fact(Symbol? binding, ValueExpressionSemanticFlags flags)
-            => new(index.Identity, index.Location, type, ExpressionClassification.Value, binding?.SemanticId, flags, error);
+            => new(index.Identity, index.Location, type, ExpressionClassification.Value, binding?.SemanticId, flags | BindingFlagsOf(binding), error);
 
         if (ExpressionStaticSemanticsEvaluator.ProcedureNamedBy(context, index.Callee) is { } procedure)
         {
@@ -122,7 +123,7 @@ internal static class ExpressionFactDescriber
         ExpressionNode expression, ValueExpressionSemanticFlags kind, VBCompileErrorInfo? error)
     {
         ExpressionFact Fact(ExpressionClassification classification, Symbol? binding, ValueExpressionSemanticFlags flags)
-            => new(expression.Identity, expression.Location, type, classification, binding?.SemanticId, flags, error);
+            => new(expression.Identity, expression.Location, type, classification, binding?.SemanticId, flags | BindingFlagsOf(binding), error);
 
         // an access with no owner is relative to the object of the enclosing With block.
         var flags = kind | (owner is null ? ValueExpressionSemanticFlags.WithBlockRelative : 0);
@@ -177,4 +178,8 @@ internal static class ExpressionFactDescriber
 
         return string.Equals(symbol.Name, written, StringComparison.Ordinal) ? flags : flags | ValueExpressionSemanticFlags.CaseMismatch;
     }
+
+    // MS-VBAL §4.1: what a library the project references declares - the standard library, a type library, another project - is no module of the project.
+    internal static ValueExpressionSemanticFlags BindingFlagsOf(Symbol? binding)
+        => binding?.GetProperty(SymbolProperties.Library) is not null ? ValueExpressionSemanticFlags.BoundToLibrary : 0;
 }

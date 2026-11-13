@@ -262,7 +262,8 @@ public static class ExpressionStaticSemanticsEvaluator
             MemberAccessExpressionNode access => access.Member.IdentifierName,
             _ => qualifier.Name,
         };
-        var flags = string.Equals(qualifier.Name, written, StringComparison.Ordinal) ? 0 : ValueExpressionSemanticFlags.CaseMismatch;
+        var flags = (string.Equals(qualifier.Name, written, StringComparison.Ordinal) ? 0 : ValueExpressionSemanticFlags.CaseMismatch)
+            | ExpressionFactDescriber.BindingFlagsOf(qualifier);
         facts.Record(new ExpressionFact(qualifierExpression.Identity, qualifierExpression.Location, null, ExpressionClassification.Namespace, qualifier.SemanticId, flags));
         if (qualifierExpression is MemberAccessExpressionNode { Owner: { } outer } && context.Resolver.NamespaceOf(outer, context.Scope.Uri) is { } outerQualifier)
         {
