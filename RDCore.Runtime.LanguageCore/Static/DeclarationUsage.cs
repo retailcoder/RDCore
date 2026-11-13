@@ -17,12 +17,14 @@ public static class DeclarationUsage
 {
     public static ImmutableArray<DeclarationFact> Of(
         IEnumerable<Symbol> declared, IEnumerable<ProcedureSemanticModel> procedures, IReadOnlyDictionary<SemanticId, DeclarationRole>? roles = null,
-        Func<Symbol, HiddenDeclaration?>? hides = null)
+        Func<Symbol, HiddenDeclaration?>? hides = null, ModuleDeclarationFacts? declarations = null)
     {
         var models = procedures.ToList();
-        var references = Tally(models);
+        var references = Tally(CodeOf(models, declarations));
 
         var moduleIsFullyAnalyzed = models.All(procedure => procedure.IsFullyAnalyzed);
+        // a constant of the module is also referred to by the expressions of the module's declarations: the facts of those are needed for its count.
+        var moduleConstantsAreFullyAnalyzed = moduleIsFullyAnalyzed && declarations is { IsFullyAnalyzed: true };
 
         // the accessors of a property are one declaration, though each has the identity of its own that an expression can be bound to: it is the first one
         // that stands for it.
@@ -44,7 +46,7 @@ public static class DeclarationUsage
             var role = roles is not null && roles.TryGetValue(symbol.SemanticId, out var found) ? found : DeclarationRole.None;
             References? counted = null;
             if ((IsAccessibleOnlyFromItsOwnCode(symbol, kind!.Value) || IsCalledOnlyByItsOwnCode(symbol, role))
-                && CodeThatCanReferToIt(symbol, models, moduleIsFullyAnalyzed))
+                && CodeThatCanReferToIt(symbol, models, symbol is VBConstantMemberSymbol ? moduleConstantsAreFullyAnalyzed : moduleIsFullyAnalyzed))
             {
                 counted = references.GetValueOrDefault(Key(symbol.SemanticId)) ?? new References();
             }
@@ -82,7 +84,7 @@ public static class DeclarationUsage
             return models;
         }
 
-        var references = Tally(inProject.SelectMany(model => model.Procedures));
+        var references = Tally(CodeOf(inProject.SelectMany(model => model.Procedures), declarations: null));
         return [.. models.Select(model => !modules.Contains(model.Module.AbsoluteUri) ? model : model with
         {
             Declarations = [.. model.Declarations.Select(fact => fact.References is null && IsAccessibleOnlyWithinTheProject(fact, privateModules.Contains(model.Module.AbsoluteUri))
@@ -110,12 +112,22 @@ public static class DeclarationUsage
         public ImmutableArray<DeclarationReference>.Builder Sites { get; } = ImmutableArray.CreateBuilder<DeclarationReference>();
     }
 
-    private static Dictionary<string, References> Tally(IEnumerable<ProcedureSemanticModel> procedures)
+    // code that refers to declarations: the body of a procedure, or the declarations of a module, which no procedure holds.
+    private readonly record struct Code(SemanticId? Procedure, IEnumerable<ExpressionFact> Expressions);
+
+    private static IEnumerable<Code> CodeOf(IEnumerable<ProcedureSemanticModel> procedures, ModuleDeclarationFacts? declarations)
+        => procedures.Select(procedure => new Code(procedure.Procedure, procedure.Expressions.Values))
+            .Concat(declarations is null ? Enumerable.Empty<Code>() : [new Code(null, declarations.Expressions.Values)]);
+
+    private static Dictionary<string, References> Tally(IEnumerable<Code> code)
     {
         var references = new Dictionary<string, References>(StringComparer.Ordinal);
-        foreach (var procedure in procedures)
+        foreach (var (procedure, expressions) in code)
         {
-            var bound = procedure.Expressions.Values.Where(fact => fact.Binding is not null)
+            // a reference is a place in the code: the tree can hold an expression twice (the bound of an array of the module is also a child of its
+            // declaration), and both are evaluated, as what the tree holds is.
+            var bound = expressions.Where(fact => fact.Binding is not null)
+                .DistinctBy(fact => (fact.Location, fact.Binding))
                 .GroupBy(fact => (Key: Key(fact.Binding!.Value), fact.Location.Range.Start))
                 .SelectMany(group => group.Any(fact => fact.Flags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall))
                     ? Call(procedure, [.. group])
@@ -136,7 +148,7 @@ public static class DeclarationUsage
                     DeclarationReferenceKind.PassedAsArgument => current with { PassedAsArguments = current.PassedAsArguments + 1 },
                     _ => current with { Reads = current.Reads + 1 },
                 };
-                found.Sites.Add(new DeclarationReference(fact.Location, procedure.Procedure.Uri, kind)
+                found.Sites.Add(new DeclarationReference(fact.Location, procedure?.Uri, kind)
                 {
                     DiscardsResult = flags.HasFlag(ValueExpressionSemanticFlags.ResultDiscarded),
                 });
@@ -157,10 +169,10 @@ public static class DeclarationUsage
     // reads it or, for a Property Let or Set, writes it. MS-VBAL §5.3.1, §5.6.2.1: in a Function or a Property Get, its own name with no argument list is its
     // function result variable, which no other code can refer to - and not a reference to the procedure.
     private static IEnumerable<(ExpressionFact Fact, DeclarationReferenceKind Kind, ValueExpressionSemanticFlags Flags)> Call(
-        ProcedureSemanticModel procedure, ExpressionFact[] call)
+        SemanticId? procedure, ExpressionFact[] call)
     {
         var name = call.MinBy(fact => fact.Location.Range.End)!;
-        if (call.Length == 1 && name.Binding == procedure.Procedure
+        if (call.Length == 1 && procedure is not null && name.Binding == procedure
             && name.Classification is ExpressionClassification.Function or ExpressionClassification.Property)
         {
             yield break;
@@ -202,9 +214,12 @@ public static class DeclarationUsage
         DeclarationKind.Variable when symbol is VBLocalVariableSymbol => true,
         // a variable that is declared with Dim or with no modifier at all is Private.
         DeclarationKind.Variable => symbol is AccessibleTypedSymbol { AccessModifier: AccessModifier.Private or AccessModifier.Implicit },
-        // a constant is referred to where its value is substituted, which includes the bounds of an array and the value of another constant, of an enumeration
-        // member and of an optional parameter: expressions of the declarations of a module, which the pass does not evaluate as it does those of its procedures.
-        // 🚧 TODO count the references of a constant once the expressions of declarations are evaluated.
+        // a constant of a procedure is referred to by that procedure's code alone: its statements, and the declarations of its body - the value of another of
+        // its constants, the bounds of its arrays - which are analyzed with the statements.
+        DeclarationKind.Constant when symbol is VBLocalConstantSymbol => true,
+        // a constant of the module is referred to where its value is substituted: by the code of the module, and by the expressions of its declarations - the
+        // bounds of an array, the value of another constant, of an enumeration member and of an optional parameter of a Declare.
+        DeclarationKind.Constant => symbol is AccessibleTypedSymbol { AccessModifier: AccessModifier.Private or AccessModifier.Implicit },
         _ => false,
     };
 
