@@ -837,6 +837,26 @@ public sealed class SymbolRenameTests
     }
 
     [TestMethod]
+    public void ALabelWrittenInBrackets_StaysInBrackets()
+    {
+        var context = Compose(("Main", Module("Main",
+            "Public Sub Main()",
+            "    GoTo [Try Again]",
+            "[Try Again]:",
+            "    Exit Sub",
+            "End Sub")));
+
+        var plan = Rename(context, "Main", "GoTo [Try Again]", "Try", "Again");
+
+        Assert.AreEqual(Module("Main",
+            "Public Sub Main()",
+            "    GoTo [Again]",
+            "[Again]:",
+            "    Exit Sub",
+            "End Sub"), Renamed(context, plan, "Main"));
+    }
+
+    [TestMethod]
     public void ALineNumber_IsNotRenamed()
     {
         var context = Compose(("Main", Module("Main",

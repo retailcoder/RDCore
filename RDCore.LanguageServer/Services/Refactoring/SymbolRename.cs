@@ -245,7 +245,8 @@ public static class SymbolRename
             return Refused(new(RenameRefusalKind.Conflict, newName, $"{taken}:", target.Module, conflict.At));
         }
 
-        return new([.. label.Occurrences.Select(range => new RenameEdit(target.Module, range, LabelRename.WrittenAs(source, range, newName)))], null);
+        // a name written in brackets stays in brackets.
+        return new([.. label.Occurrences.Select(name => new RenameEdit(target.Module, name.Range, name.IsBracketed ? $"[{newName}]" : newName))], null);
     }
 
     // what makes a symbol one that is not renamed: what the workspace does not declare, a type, and a name that something else is named after.
