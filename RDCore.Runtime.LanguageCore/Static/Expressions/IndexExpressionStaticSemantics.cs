@@ -67,10 +67,12 @@ public sealed record class IndexExpressionStaticSemantics : IStaticSemantics
         if (callee is VBClassType declaredClass)
         {
             // a specific class needs a public default member to be callable this way: the class as the composition has it now (CurrentTypes).
-            var classType = CurrentTypes.Of(context.Resolver, declaredClass);
-            return classType.DefaultMember is { } defaultMember
-                ? StaticSemanticsEvaluationResult.Success(defaultMember.ResolvedType)
-                : StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.MethodOrDataMemberNotFound, expression.Location, classType.Name));
+            return ObjectValueStaticSemantics.IndexedDefaultMemberOf(context, declaredClass, hasArguments: !IndexExpressionNode.IsEmptyArgumentList(index.Arguments)) switch
+            {
+                { IsLateBound: true } => StaticSemanticsEvaluationResult.Success(VBVariantType.TypeInfo),
+                { Member: { } defaultMember } => StaticSemanticsEvaluationResult.Success(defaultMember.ResolvedType),
+                var none => StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.MethodOrDataMemberNotFound, expression.Location, none.Class.Name)),
+            };
         }
 
         // a name that nothing compiled declares, written with an argument list, is no implicit variable: the language server declares one for each name a

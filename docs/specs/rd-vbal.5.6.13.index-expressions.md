@@ -121,6 +121,10 @@ An index expression whose `Callee` is an object - or a `Variant` holding one - c
 `c.Item(1)`, and `c(1)(2)` indexes what that returns. A class of the workspace and a class of the library are found alike
 ([**RD-VBAL §6.1.3.1** Collection Object](rd-vbal.6.1.3.1.collection-object.md)). An object with no such member is runtime error 438, and `Nothing` is runtime error 91.
 The target of an assignment is the same call: `c(1) = 5` assigns `c.Item(1)` ([**RD-VBAL §5.4.3.8** Let Statement](rd-vbal.5.4.3.8.let-statement.md#elements-of-an-array)).
+A default member that cannot accept any parameters, such as `Function Bags() As Bag`, is called with none, and the arguments
+go to the default member of the object it returns: `o(1)` is `o.Bags.Item(1)`. A default member that returns `Object` or
+`Variant` passes them on late-bound
+([**RD-VBAL §5.6.2.3** Default Member Recursion Limits](rd-vbal.5.6.2.expression-evaluation.md#5623-default-member-recursion-limits)).
 
 
 ## 5.6.13.1 Argument Lists

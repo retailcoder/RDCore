@@ -1,4 +1,7 @@
 using RDCore.SDK.Model.Symbols.Operators;
+using RDCore.SDK.Model.Symbols;
+using RDCore.SDK.Model.Types.Abstract;
+using RDCore.SDK.Model.Types.Complex;
 using RDCore.Runtime.Semantics.Abstract;
 using RDCore.Runtime.Semantics.LetCoercion;
 using RDCore.Runtime.Semantics.Operators.Arithmetic;
@@ -17,6 +20,9 @@ using RDCore.SDK.Runtime.Shared;
 using RDCore.SDK.Semantics.Context;
 using RDCore.SDK.Semantics.Context.Abstract;
 using RDCore.SDK.Semantics.Facts;
+using RDCore.SDK.Semantics;
+using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Model.Types;
 using RDCore.Runtime.LanguageCore.Errors;
 
 namespace RDCore.Runtime.Semantics.Operators;
@@ -221,6 +227,76 @@ public sealed class OperatorRuntimeSemanticsProvider : IOperatorRuntimeSemantics
         return null;
     }
 
+    // an operand that is an object is converted to its simple data value, a value its default member gives that the code does not name: an implicit conversion
+    // of an object operand, as a Let-coercion of an object is (ConversionSemanticFlags.ObjectOperand). One that has no value is the conversion that fails, and
+    // the operands after it are not read. An object an analysis assumes is not read: what it is converted to is the type its default members say, and the value
+    // is not known.
+    private static void ObserveObjectOperands(IRuntimeSession session,
+        AnalysisObservation observation, ExpressionNode expression, ConversionSite site, VBTypedValue[] written, VBTypedValue[] read, RuntimeSemanticsEvaluationResult? unreadable)
+    {
+        for (var index = 0; index < written.Length; index++)
+        {
+            if (written[index] is not (VBObjectValue or VBVariantValue { TypedValue: VBObjectValue or VBVariantValue }))
+            {
+                continue;
+            }
+
+            if (written[index].IsIndeterminate)
+            {
+                if (written[index] is VBObjectValue assumed)
+                {
+                    var assumedIndex = (InputIndex)index;
+                    observation.OnConversion(new ConversionFact(expression.Identity, expression.Location, site, assumedIndex, assumed.TypeInfo, ValueTypeOf(session, assumed),
+                        ConversionSemanticFlags.Implicit | ConversionSemanticFlags.ObjectOperand | OperandPositionFlags.Of(expression, assumedIndex),
+                        IsValueKnown: false, null));
+                }
+
+                continue;
+            }
+
+            var isRead = !ReferenceEquals(read[index], written[index]);
+            // a Variant that holds an object is converted too, and is no object operand: its declared type is Variant.
+            if (written[index] is not VBObjectValue operand)
+            {
+                if (!isRead)
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            var operandIndex = (InputIndex)index;
+            observation.OnConversion(new ConversionFact(expression.Identity, expression.Location, site, operandIndex, operand.TypeInfo,
+                isRead ? read[index].TypeInfo : VBVariantType.TypeInfo,
+                ConversionSemanticFlags.Implicit | ConversionSemanticFlags.ObjectOperand | OperandPositionFlags.Of(expression, operandIndex),
+                IsValueKnown: true, isRead ? null : unreadable?.ErrorInfo as RDCore.SDK.Model.Errors.Abstract.VBErrorInfo));
+            if (!isRead)
+            {
+                return;
+            }
+        }
+    }
+
+    // the declared type of the value an object stands for (MS-VBAL §5.6.2.2): what its default member returns, through each default member that returns an
+    // object of a specific class; Variant when that is not known.
+    private static VBType ValueTypeOf(IRuntimeSession session, VBObjectValue operand)
+    {
+        if (!session.Symbols.TryGetInstance(operand.Value, out var instance) || !ObjectDefaultMember.TryFind(instance.ClassModule, out var member))
+        {
+            return VBVariantType.TypeInfo;
+        }
+
+        var type = member.ResolvedType;
+        for (var depth = 0; depth < ObjectDefaultMember.DeepestDefaultMember
+            && type is VBClassType { Symbol: VBClassModuleSymbol next } && ObjectDefaultMember.TryFind(next, out var returned); depth++)
+        {
+            type = returned.ResolvedType;
+        }
+
+        return type is VBClassType or VBObjectType ? VBVariantType.TypeInfo : type;
+    }
+
     // the one place an operation is evaluated: what the evaluation says is the operation's, and is stated as it is, once the
     // operation is done, so that what is observed is what ran.
     private RuntimeSemanticsEvaluationResult Evaluate<TContext, TFlags>(
@@ -239,7 +315,12 @@ public sealed class OperatorRuntimeSemanticsProvider : IOperatorRuntimeSemantics
         // MS-VBAL 5.6.9.2: a simple data operator - every operator but Is, which compares references - "first evaluates its operands as simple data
         // values": an object is what its default member returns (MS-VBAL 5.6.2.2), before the operation is planned on what its operands are. An operand
         // that has no value is the operation's error, which is stated as the operation's like any other.
+        var written = IsObserved ? (VBTypedValue[])operands.Clone() : null;
         var unreadable = token != Tokens.CompareIsOp ? SimpleDataValues(session, expression, operands) : null;
+        if (written is not null && _observation is { } reading)
+        {
+            ObserveObjectOperands(session, reading, expression, site, written, operands, unreadable);
+        }
 
         // an operation nothing observes is evaluated by its plan when it can be (IR lowering §3.2), and by the pipeline otherwise. An observed operation
         // always goes through the pipeline, which is what describes the conversions of its operands.

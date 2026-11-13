@@ -108,6 +108,9 @@ public sealed class LetAssignmentEvaluator(
                 ? AssignObjectMember(session, context, statement, target, source, value, isSet: false)
                 : target is IndexExpressionNode element
                     ? AssignArrayElement(session, context, statement, element.Callee, element.Arguments, source, value, isSet: false)
+                // MS-VBAL §5.4.3.8: `Me = value` is a value of the class's type, let-assigned through the default member of the object, as a variable of a class is.
+                : target is InstanceExpressionNode
+                    ? AssignDefaultMember(session, context, statement, target, source, value)
                     // a variable is assigned through the slot it is bound to, by the plan of its coercion, when it can be (IR lowering S0.8c).
                     : expressions.TryAssignBound(session, target, value, context) is { } assigned
                         ? assigned.IsInternalError ? RuntimeExecutionOutcome.InternalError : RuntimeExecutionOutcome.Next
@@ -465,17 +468,18 @@ public sealed class LetAssignmentEvaluator(
     private RuntimeExecutionOutcome AssignObjectMember(
         IRuntimeSession session, RuntimeEvaluationContext context, StatementNode statement, MemberAccessExpressionNode memberAccess,
         System.Collections.Immutable.ImmutableArray<ExpressionNode> indexArguments, VBObjectValue owner, ExpressionNode source,
-        VBTypedValue value, bool isSet)
+        VBTypedValue value, bool isSet, MemberAccessOperationSemanticFlags access = MemberAccessOperationSemanticFlags.Explicit)
     {
         var assumedBefore = expressions.AssumedSoFar;
         var outcome = AssignMemberOf(session, context, statement, memberAccess, indexArguments, owner, source, value, isSet);
-        return ObservedAccess(session, context, memberAccess, owner, assumedBefore, outcome);
+        return ObservedAccess(session, context, memberAccess, owner, assumedBefore, outcome, access);
     }
 
-    // the member of an object or of a record that an assignment writes is a member the code accesses, and is stated as one (MemberAccessFact).
+    // the member of an object or of a record that an assignment writes is a member the code accesses, and is stated as one (MemberAccessFact): one the code
+    // names (Explicit), or the default member of an object the code assigns as if it were a value (Implicit).
     private RuntimeExecutionOutcome ObservedAccess(
         IRuntimeSession session, RuntimeEvaluationContext context, MemberAccessExpressionNode memberAccess, VBTypedValue owner, long assumedBefore,
-        RuntimeExecutionOutcome outcome)
+        RuntimeExecutionOutcome outcome, MemberAccessOperationSemanticFlags access = MemberAccessOperationSemanticFlags.Explicit)
     {
         if (expressions.Observation is not null)
         {
@@ -490,7 +494,7 @@ public sealed class LetAssignmentEvaluator(
             };
 
             expressions.ObserveMemberAccess(session, context, memberAccess, Tokens.MemberAccess, memberAccess.Owner, owner, memberAccess.Member.IdentifierName,
-                MemberAccessOperationSemanticFlags.Explicit, assumedBefore, result);
+                access, assumedBefore, result);
         }
 
         return outcome;
@@ -714,16 +718,18 @@ public sealed class LetAssignmentEvaluator(
                     string.Format(Exceptions.VBMemberAssignment_ReadOnlyProperty_Verbose, name)));
     }
 
-    // whether the member of the name is called when it is assigned, for what it returns to be assigned through: a function, or a Property Get that declares
-    // no parameter and is given arguments, which index what it returns.
+    // whether the member of the name is called when it is assigned, for what it returns to be assigned through: a function; a Property Get that declares no
+    // parameter and is given arguments, which index what it returns; and, for a Let, a Property Get declared a class, Object or Variant, which is invoked with
+    // the arguments it is given (MS-VBAL §5.4.3.8: `c.Item(1) = 5`, where Item(i) returns an object, assigns that object's default member; MS-VBA, recorded
+    // in Excel).
     private static bool IsCalledToBeAssignedThrough(
         IRuntimeSession session, VBObjectValue owner, string name, System.Collections.Immutable.ImmutableArray<ExpressionNode> arguments, bool isSet)
         => session.Symbols.TryGetInstance(owner.Value, out var instance)
             && instance.ClassModule.DefaultInterfaceMembers.FirstOrDefault(member => string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase)) switch
             {
                 VBFunctionMemberSymbol => true,
-                VBPropertyGetMemberSymbol get => RuntimeProcedureInvoker.GetParameters(get) is [] or [{ Name: Tokens.Me }]
-                    && (!arguments.IsEmpty || !isSet && get.ResolvedType is VBClassType or VBObjectType or VBVariantType),
+                VBPropertyGetMemberSymbol get => !isSet && get.ResolvedType is VBClassType or VBObjectType or VBVariantType
+                    || RuntimeProcedureInvoker.GetParameters(get) is [] or [{ Name: Tokens.Me }] && !arguments.IsEmpty,
                 _ => false,
             };
 
@@ -1128,7 +1134,8 @@ public sealed class LetAssignmentEvaluator(
 
         var access = DefaultMemberAccess(reachedThrough, defaultMember.Name);
         return observed
-            ? AssignObjectMember(session, context, statement, access, [], owner, source, value, isSet)
+            ? AssignObjectMember(session, context, statement, access, [], owner, source, value, isSet,
+                MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember)
             : AssignMemberOf(session, context, statement, access, [], owner, source, value, isSet);
     }
 

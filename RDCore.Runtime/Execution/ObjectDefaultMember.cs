@@ -93,7 +93,7 @@ internal static class ObjectDefaultMember
     }
 
     // how many objects deep a default member that returns an object is followed, before it is taken for one that never stops returning one.
-    private const int DeepestDefaultMember = 64;
+    internal const int DeepestDefaultMember = 64;
 
     /// <summary>
     /// The value a standard-library function reads of its argument: the argument itself, unless it is an object, which stands for its
