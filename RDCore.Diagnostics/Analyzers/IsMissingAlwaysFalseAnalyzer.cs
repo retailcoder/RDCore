@@ -5,7 +5,7 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Semantics.Flags;
 using ExpressionClassification = RDCore.SDK.Semantics.ExpressionClassification;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using RDCore.SDK.Server.ProtocolExtensions;
 using RDCore.SDK.Extensibility.Diagnostics;
 
 namespace RDCore.Diagnostics.Analyzers;
@@ -67,7 +67,6 @@ internal sealed class IsMissingAlwaysFalseAnalyzer : IModuleAnalyzer
                 }
 
                 // the call is always False, and its argument is a name, which evaluating does nothing else: False in its place does what it did.
-                var range = written.Call.Location.Range;
                 yield return new AnalyzerFinding(RDCoreDiagnosticId.IsMissingAlwaysFalse.ToCode(), fact.Location.Range, DiagnosticSeverity.Warning, message)
                 {
                     Fixes = new DiagnosticFixes
@@ -75,7 +74,7 @@ internal sealed class IsMissingAlwaysFalseAnalyzer : IModuleAnalyzer
                         Edit = new EditFix
                         {
                             Title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.IsMissingAlwaysFalse_Fix, argument.IdentifierName),
-                            Edits = [new TextEdit { Range = new Range(range.Start.Line, range.Start.Character, range.End.Line, range.End.Character), NewText = "False" }],
+                            Edits = [new TextEdit { Range = written.Call.Location.Range.ToLsp(), NewText = "False" }],
                         },
                     },
                 };
