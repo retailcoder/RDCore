@@ -169,6 +169,26 @@ public sealed class ExpressionFactTests
     }
 
     [TestMethod]
+    [DataRow("Public Function Work() As Long", "End Function", "Work", true)]
+    [DataRow("Public Function Work(ByVal n As Long) As Long", "End Function", "Work 1", true)]
+    [DataRow("Public Function Work(ByVal n As Long) As Long", "End Function", "Call Work(1)", true)]
+    [DataRow("Public Property Get Work() As Long", "End Property", "Work", true)]
+    [DataRow("Public Sub Work()", "End Sub", "Work", false)]
+    [DataRow("Public Sub Work()", "End Sub", "Call Work", false)]
+    public void TheCalleeOfACallStatement_RecordsWhetherTheValueItReturnsIsDiscarded(string declaration, string end, string statement, bool discarded)
+    {
+        var (model, run, _) = Analyze([declaration, end], [statement]);
+
+        var call = run.Children.OfType<CallStatementNode>().Single();
+        Assert.AreEqual(discarded, model.Expressions[call.Callee.Identity].Flags.HasFlag(ValueExpressionSemanticFlags.ResultDiscarded));
+    }
+
+    [TestMethod]
+    public void AFunctionCalledInAnExpression_DoesNotDiscardTheValueItReturns()
+        => Assert.IsFalse(LastValue(["Public Function Work() As Long", "End Function"], ["Dim x As Long", "x = Work"])
+            .Flags.HasFlag(ValueExpressionSemanticFlags.ResultDiscarded));
+
+    [TestMethod]
     public void AnOperand_HasAFactOfItsOwn()
     {
         var (model, run, _) = Analyze([], ["Dim x", "Dim n As Long", "x = n + 1"]);

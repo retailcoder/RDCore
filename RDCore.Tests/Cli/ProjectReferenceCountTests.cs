@@ -83,6 +83,17 @@ public sealed class ProjectReferenceCountTests
     }
 
     [TestMethod]
+    public async Task AFunctionCalledAsAStatement_IsAReferenceThatDiscardsTheValueItReturns()
+    {
+        (string, string) twice = ("Counter", ModuleWorkspace.ClassModule("Counter",
+            "Friend Function Twice(ByVal n As Long) As Long", "Twice = n * 2", "End Function"));
+        var model = await ModelOfAsync("Counter",
+            Program("Public Sub Main()", "Dim c As New Counter", "c.Twice 2", "Debug.Print c.Twice(2)", "End Sub"), classes: [twice]);
+
+        CollectionAssert.AreEqual(new[] { true, false }, Declaration(model, "Twice").ReferencedFrom!.Value.Select(site => site.DiscardsResult).ToArray());
+    }
+
+    [TestMethod]
     public async Task AModuleAskedForAlone_IsCountedOverTheWholeProject()
         => Assert.AreEqual(2, Declaration(await ModelOfAsync("Counter", Program(UsesCounter), moduleName: "Counter"), "Add").References?.Reads);
 
