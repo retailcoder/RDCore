@@ -61,8 +61,8 @@ public sealed class FixedStringByRefArgumentTests
             "    Grow E(1)",
             "    Debug.Print \"[\" & E(1) & \"] \" & Len(E(1))"), engine);
 
-    // an operand left of the call is read where it is written, before the call: what the variable held then, and the variable is let what the callee
-    // assigned after it (MS-VBA, observed in Excel for a variable).
+    // an operand left of the call is read at its place in the expression, before the call: it is what the variable held then, and once the call returns
+    // the variable holds what the callee assigned (MS-VBA, observed in Excel for a variable; the field and the element are expected to match it).
     [TestMethod]
     [DataRow(VBExecutionEngine.Interpreter, DisplayName = "Interpreter")]
     [DataRow(VBExecutionEngine.Compiled, DisplayName = "Compiled")]

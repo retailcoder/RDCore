@@ -524,7 +524,7 @@ public sealed partial class RuntimeExpressionEvaluator
         _ => false,
     };
 
-    // what a variable, an element of an array of one, a field of a record held by one, or one of them in parentheses is declared as.
+    // the declared type of a variable, of an element of an array variable, or of a field of a record variable, also in parentheses; null for anything else.
     private static VBType? DeclaredTypeOf(BoundNode node) => node switch
     {
         BoundVariable { Variable: ITypedSymbol { ResolvedType: var type } } => type,
@@ -540,7 +540,7 @@ public sealed partial class RuntimeExpressionEvaluator
     private static bool IsOfLateType(VBType type) => type is VBSingleType or VBDoubleType or VBDateType or VBVariantType or (VBStringType and not VBFixedStringType);
 
     // a fixed-length String is read where it is written too: s & Pre(s) is the characters s held before the call (MS-VBA, observed in Excel). Its value
-    // reads the characters where they are held, so it is given a String of them.
+    // reads the characters from the variable itself, which the call then changes, so the operand is given a String copy of them.
     private static RuntimeSemanticsEvaluationResult ReadWhereWritten(RuntimeSemanticsEvaluationResult read, BoundNode operand)
     {
         if (read.Result is VBStringValue { Value: var text } held && DeclaredTypeOf(operand) is VBFixedStringType)
