@@ -8,8 +8,8 @@ using RDCore.Tests.Cli;
 namespace RDCore.Tests.Diagnostics;
 
 /// <summary>
-/// <c>RDC11043</c>: a <c>Let</c> of a value declared as an object to a property whose value parameter is a <c>Variant</c>, which MS-VBA passes the object
-/// itself; not a value of another type, a <c>Variant</c>, or a property whose value parameter is not a <c>Variant</c>.
+/// <c>RDC11043</c>: a <c>Let</c> of a value declared as an object to a property whose value parameter is a <c>Variant</c>, to which MS-VBA passes the
+/// object itself; not a value of another type, a <c>Variant</c>, or a property whose value parameter is not a <c>Variant</c>.
 /// </summary>
 [TestClass]
 public sealed class ObjectLetToVariantPropertyAnalyzerTests
