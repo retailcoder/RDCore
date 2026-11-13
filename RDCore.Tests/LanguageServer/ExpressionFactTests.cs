@@ -172,7 +172,7 @@ public sealed class ExpressionFactTests
     [DataRow("Public Function Work() As Long", "End Function", "Work", true)]
     [DataRow("Public Function Work(ByVal n As Long) As Long", "End Function", "Work 1", true)]
     [DataRow("Public Function Work(ByVal n As Long) As Long", "End Function", "Call Work(1)", true)]
-    [DataRow("Public Property Get Work() As Long", "End Property", "Work", true)]
+    [DataRow("Public Property Get Work() As Long", "End Property", "Work", false)]
     [DataRow("Public Sub Work()", "End Sub", "Work", false)]
     [DataRow("Public Sub Work()", "End Sub", "Call Work", false)]
     public void TheCalleeOfACallStatement_RecordsWhetherTheValueItReturnsIsDiscarded(string declaration, string end, string statement, bool discarded)

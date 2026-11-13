@@ -195,7 +195,8 @@ public static class DeclarationUsage
     }
 
     // the accessors of a property are one declaration: a Property Let or Property Set is addressed with a suffix after the name it shares with the others
-    // (`Item]Let`). VBA names are not case sensitive.
+    // (`Item]Let`). VBA names are not case sensitive. A Let and a Set are both Writes of the one count, so the count cannot tell which accessor is never used,
+    // and the Get, the Let and the Set each state the property's whole count.
     private static string Key(SemanticId symbol)
     {
         var address = Uri.UnescapeDataString(symbol.Uri.AbsoluteUri).ToUpperInvariant();

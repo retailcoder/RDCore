@@ -83,6 +83,18 @@ public sealed class ProjectReferenceCountTests
     }
 
     [TestMethod]
+    public async Task AFunctionThatCallsItself_IsReadByItsOwnCall()
+    {
+        (string, string) recursive = ("Counter", ModuleWorkspace.ClassModule("Counter",
+            "Friend Function Again() As Long", "Again = Again()", "End Function"));
+        var again = Declaration(await ModelOfAsync("Counter", Program("Public Sub Main()", "End Sub"), classes: [recursive]), "Again");
+
+        Assert.AreEqual(new DeclarationReferences(1, 0, 0), again.References);
+        Assert.HasCount(1, again.ReferencedFrom!.Value);
+        Assert.AreEqual("Counter.Again", SymbolUri.QualifiedNameOf(again.ReferencedFrom.Value[0].Procedure!), "the site is in the function itself");
+    }
+
+    [TestMethod]
     public async Task AFunctionCalledAsAStatement_IsAReferenceThatDiscardsTheValueItReturns()
     {
         (string, string) twice = ("Counter", ModuleWorkspace.ClassModule("Counter",
