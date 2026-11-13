@@ -7,8 +7,9 @@ using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
+using RDCore.SDK.Model.Source;
+using RDCore.SDK.Server.ProtocolExtensions;
 using RDCore.SDK.Extensibility.Diagnostics;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace RDCore.Diagnostics.Analyzers;
 
@@ -90,7 +91,7 @@ internal sealed class IsMissingOfAVariantThatIsNotOptionalAnalyzer : IModuleAnal
         return new EditFix
         {
             Title = AnalyzerMessages.Format(RDCoreDiagnosticsResources.IsMissingOfAVariantThatIsNotOptional_Fix, name),
-            Edits = [new TextEdit { Range = new Range(start.Line, start.Character, start.Line, start.Character), NewText = "Optional " }],
+            Edits = [new TextEdit { Range = new SourceRange(start, start).ToLsp(), NewText = "Optional " }],
         };
     }
 }
