@@ -15,8 +15,8 @@ using RDCore.SDK.Extensibility.Diagnostics;
 namespace RDCore.Diagnostics.Analyzers;
 
 /// <summary>
-/// <c>RDC00209</c>: an <c>If…Else</c> whose two branches each assign one Boolean literal to the same name, <c>True</c> in one and <c>False</c> in the other
-/// (<strong>MS-VBAL §5.4.2.8</strong>): the assignment of the condition, or of its negation, says the same.
+/// <c>RDC00209</c>: an <c>If…Else</c>, on several lines or on one, whose two branches each assign one Boolean literal to the same name, <c>True</c> in one and
+/// <c>False</c> in the other (<strong>MS-VBAL §5.4.2.8</strong>, <strong>§5.4.2.9</strong>): the assignment of the condition, or of its negation, says the same.
 /// </summary>
 /// <remarks>
 /// An <c>ElseIf</c>, a second statement or a <c>Set</c> in a branch makes it something else. The name is a variable, or a member of one (<c>Me.Done</c>,
@@ -36,28 +36,32 @@ internal sealed class BooleanAssignedInIfElseAnalyzer : IModuleAnalyzer
             yield break;
         }
 
-        foreach (var block in module.Descendants().OfType<IfBlockStatementNode>())
+        foreach (var node in module.Descendants())
         {
-            if (block is { ElseIfBlocks.IsDefaultOrEmpty: true, ElseBlock: { } otherwise }
-                && Assigned(block.Body) is ({ } name, { } value)
-                && Assigned(otherwise.Body) is ({ } otherName, { } otherValue)
+            var (statement, condition, then, otherwise) = node switch
+            {
+                IfBlockStatementNode { ElseIfBlocks.IsDefaultOrEmpty: true, ElseBlock: { } elseBlock } block => (block, block.ConditionExpression, block.Body, elseBlock.Body),
+                InlineIfStatementNode { ElseBody: { } elseBody } inline => ((StatementNode?)inline, inline.ConditionExpression, inline.ThenBody, elseBody),
+                _ => (null, null, null, null),
+            };
+
+            if (statement is not null && condition is not null && then is not null && otherwise is not null
+                && Assigned(then) is ({ } name, { } value)
+                && Assigned(otherwise) is ({ } otherName, { } otherValue)
                 && string.Equals(name, otherName, StringComparison.OrdinalIgnoreCase)
                 && value != otherValue)
             {
                 yield return new AnalyzerFinding(
                     RDCoreDiagnosticId.BooleanAssignedInIfElse.ToCode(),
-                    Header(block),
+                    new SourceRange(statement.SourceLocation.Range.Start, condition.SourceLocation.Range.End),
                     DiagnosticSeverity.Information,
                     AnalyzerMessages.Format(RDCoreDiagnosticsResources.BooleanAssignedInIfElse_Message, name))
                 {
-                    Fixes = FixOf(context.ParseResult, block, name, value) is { } fix ? new DiagnosticFixes { Edit = fix } : null,
+                    Fixes = FixOf(context.ParseResult, statement, condition, name, value) is { } fix ? new DiagnosticFixes { Edit = fix } : null,
                 };
             }
         }
     }
-
-    private static SourceRange Header(IfBlockStatementNode block)
-        => new(block.SourceLocation.Range.Start, block.ConditionExpression.SourceLocation.Range.End);
 
     // the one statement of the branch, when it Let-assigns True or False to a name.
     private static (string? Name, bool? Value) Assigned(StatementBlock body)
@@ -75,12 +79,12 @@ internal sealed class BooleanAssignedInIfElseAnalyzer : IModuleAnalyzer
         _ => null,
     };
 
-    // `name = condition` (or `name = Not (condition)`) in place of the block, the condition kept as it is written; not where a comment would go with the block.
-    private static EditFix? FixOf(ModuleParseResult parse, IfBlockStatementNode block, string name, bool value)
+    // `name = condition` (or `name = Not (condition)`) in place of the statement, the condition kept as it is written; not where a comment would go with it.
+    private static EditFix? FixOf(ModuleParseResult parse, StatementNode statement, ExpressionNode conditionExpression, string name, bool value)
     {
-        var range = block.SourceLocation.Range;
-        var condition = block.ConditionExpression.SourceLocation.Range;
-        if (!IsBoolean(block.ConditionExpression)
+        var range = statement.SourceLocation.Range;
+        var condition = conditionExpression.SourceLocation.Range;
+        if (!IsBoolean(conditionExpression)
             || parse.Trivia.Concat(parse.PrecompilerTrivia).Any(trivia => trivia.SourceLocation.Range is var at && at.End > range.Start && at.Start < range.End))
         {
             return null;

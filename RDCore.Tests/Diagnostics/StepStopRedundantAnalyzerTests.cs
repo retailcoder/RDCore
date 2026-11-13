@@ -185,6 +185,29 @@ public sealed class StepStopRedundantAnalyzerTests
         => Assert.IsEmpty(Run(new BooleanAssignedInIfElseAnalyzer(),
             Module("Public Sub DoSomething(ByVal foo As Long)\n    Dim bar As Boolean\n    If foo > 0 Then\n        bar = True\n    ElseIf foo < 0 Then\n        bar = True\n    Else\n        bar = False\n    End If\nEnd Sub")));
 
+    [TestMethod]
+    public void AnIfOnOneLine_IsReported_AndOneWithNoElseIsNot()
+    {
+        var source = Module("Public Sub DoSomething(ByVal foo As Long)\n    Dim bar As Boolean\n    If foo > 0 Then bar = True Else bar = False\n    If foo > 0 Then bar = True\nEnd Sub");
+        var findings = Run(new BooleanAssignedInIfElseAnalyzer(), source);
+
+        CollectionAssert.AreEqual(new[] { 3 }, Lines(findings));
+        Assert.AreEqual("If foo > 0", Text(source, findings[0]));
+    }
+
+    [TestMethod]
+    [DataRow("True", "False", "found = o Is Nothing", DisplayName = "the condition")]
+    [DataRow("False", "True", "found = Not (o Is Nothing)", DisplayName = "its negation")]
+    public async Task TheFix_OfAnIfOnOneLine_AssignsTheCondition_AndTheProgramPrintsTheSame(string then, string otherwise, string assignment)
+    {
+        static string Source(string body) => $"Public Sub Main()\n    Dim o As Object\n    Dim found As Long\n    Dim i As Long\n    For i = 1 To 2\n{body}\n        Debug.Print found\n        Set o = New Collection\n    Next\nEnd Sub";
+
+        await AssertFixedAsync(new BooleanAssignedInIfElseAnalyzer(),
+            Source($"        If o Is Nothing Then found = {then} Else found = {otherwise}"),
+            Source($"        {assignment}"),
+            then == "True" ? "Assign the condition to 'found'" : "Assign Not the condition to 'found'");
+    }
+
     #endregion
 
     #region RDC00210 Stop

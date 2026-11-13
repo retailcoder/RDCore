@@ -50,7 +50,7 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00206`](../diagnostics/rdc00206.md)|Not all code paths return a value|Warning|`ProcedureSemanticModel.ReturnValue`, from the `ControlFlowGraph` of the procedure|
 |[`RDC00207`](../diagnostics/rdc00207.md)|IsMissing that is always False|Warning|`ValueExpressionSemanticFlags.IsMissingAlwaysFalse`|
 |[`RDC00208`](../diagnostics/rdc00208.md)|Shadowed declaration|Information|`DeclarationFact.Hides`, from the resolver: what the name of a local or a parameter means as seen from the module|
-|[`RDC00209`](../diagnostics/rdc00209.md)|Boolean assigned in If…Else|Information|the syntax tree: an `IfBlockStatementNode` whose `Body` and `ElseBlock` each hold one Let-assignment of a Boolean literal to the same name|
+|[`RDC00209`](../diagnostics/rdc00209.md)|Boolean assigned in If…Else|Information|the syntax tree: an `IfBlockStatementNode` whose `Body` and `ElseBlock`, or an `InlineIfStatementNode` whose `ThenBody` and `ElseBody`, each hold one Let-assignment of a Boolean literal to the same name|
 |[`RDC00210`](../diagnostics/rdc00210.md)|Stop statement|Information|the syntax tree: a `KeywordStatementNode` of `Stop`|
 |[`RDC00302`](../diagnostics/rdc00302.md)|Obsolete Call statement|Hint|`ValueExpressionSemanticFlags.ExplicitCallKeyword`|
 |[`RDC00303`](../diagnostics/rdc00303.md)|Obsolete comment syntax|Information|`ModuleSemanticModel.Language` (`SupportedLanguage.UsesClassicBasicSyntax`), and the comments of the syntax tree|
