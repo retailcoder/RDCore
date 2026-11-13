@@ -101,15 +101,25 @@ internal static class ExpressionFactDescriber
     private static readonly string IsMissingTarget = StdLibSymbolReader.ExternalTargetOf(
         typeof(IStdInformationModule), typeof(IStdInformationModule).GetMethod(nameof(IStdInformationModule.IsMissing))!);
 
-    // IsMissing of a parameter of the procedure that can never be missing: one that is not a Variant, or an Optional Variant with a default value. A ParamArray
-    // with no elements is missing (recorded in Excel: oracle\ismissing I01-I09).
+    // IsMissing of a name that can never hold the Missing value: a parameter that is not a Variant, or an Optional Variant with a default value; a variable that
+    // is not a Variant; a constant. A ParamArray with no elements is missing (recorded in Excel: oracle\ismissing I01-I09), and a Variant variable holds the
+    // Missing value that is assigned to it.
     private static ValueExpressionSemanticFlags IsMissingFlags(StaticEvaluationContext context, IndexExpressionNode call, Symbol procedure)
         => procedure.GetProperty(SymbolProperties.ExternalTarget) == IsMissingTarget
             && call.Arguments is [SimpleNameExpressionNode argument]
-            && context.Resolver.ResolveValue(argument, ScopeKind.Local, context.Scope.Uri).Symbol is VBParameterSymbol parameter and not ParamArrayParameterSymbol
-            && (parameter.ResolvedType is not VBVariantType || parameter.DefaultValue is not null)
+            && context.Resolver.ResolveValue(argument, ScopeKind.Local, context.Scope.Uri).Symbol is { } named
+            && CanNeverBeMissing(named)
                 ? ValueExpressionSemanticFlags.IsMissingAlwaysFalse
                 : 0;
+
+    private static bool CanNeverBeMissing(Symbol named) => named switch
+    {
+        ParamArrayParameterSymbol => false,
+        VBParameterSymbol parameter => parameter.ResolvedType is not VBVariantType || parameter.DefaultValue is not null,
+        VBConstantMemberSymbol or VBLocalConstantSymbol or VBEnumConstMemberSymbol => true,
+        VBLocalVariableSymbol or VBModuleFieldVariableMemberSymbol => named is ITypedSymbol { ResolvedType: { } type } && type is not (VBVariantType or VBUnknownType),
+        _ => false,
+    };
 
     // a name that resolves to nothing, or to the variable it declares by being named, written as a document module's: MS-VBA's host makes it the document, and
     // RD-VBA hosts none (ValueExpressionSemanticFlags.HostedDocumentName). A name the code declares as its own is its own, whatever modules there are.

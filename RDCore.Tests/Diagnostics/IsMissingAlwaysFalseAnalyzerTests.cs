@@ -9,14 +9,15 @@ namespace RDCore.Tests.Diagnostics;
 
 /// <summary>
 /// <c>RDC00207</c>: <c>IsMissing</c> of a parameter that can never be missing - one that is not a <c>Variant</c>, or an <c>Optional</c> <c>Variant</c> with a
-/// default value - which is always <c>False</c> (Excel-measured, oracle\ismissing I01-I09).
+/// default value - which is always <c>False</c> (Excel-measured, oracle\ismissing I01-I09); and of a variable that is not a <c>Variant</c>, or a constant, which
+/// never hold the Missing value.
 /// </summary>
 [TestClass]
 public sealed class IsMissingAlwaysFalseAnalyzerTests
 {
-    private static async Task<AnalyzerFinding[]> FindingsAsync(string signature, string body = "Debug.Print IsMissing(p)")
+    private static async Task<AnalyzerFinding[]> FindingsAsync(string signature, string body = "Debug.Print IsMissing(p)", string declarations = "")
     {
-        var program = $"Attribute VB_Name = \"Program\"\r\nPublic Sub Probe({signature})\r\n{body}\r\nEnd Sub\r\n";
+        var program = $"Attribute VB_Name = \"Program\"\r\n{declarations}Public Sub Probe({signature})\r\n{body}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], program);
         var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
         var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
@@ -53,8 +54,30 @@ public sealed class IsMissingAlwaysFalseAnalyzerTests
 
     [TestMethod]
     public async Task IsMissingOfSomethingElse_IsNotReported()
-        // I07: a local, or a value, is no parameter; what it holds is the run time's.
+        // I07: a Variant local holds the Missing value that is assigned to it (MS-VBAL §6.1.2.7.1.6), and a literal is no name.
         => Assert.IsEmpty(await FindingsAsync("Optional n As Long", "Dim w As Variant\r\nDebug.Print IsMissing(w)\r\nDebug.Print IsMissing(5)"));
+
+    [TestMethod]
+    public async Task IsMissingOfAVariantVariable_ThatHoldsAMissingArgument_IsNotReported()
+        => Assert.IsEmpty(await FindingsAsync("Optional p As Variant", "Dim w\r\nw = p\r\nDebug.Print IsMissing(w)", "Private mField As Variant\r\n"));
+
+    [TestMethod]
+    [DataRow("Dim w As Long", "w", "a variable that is not a Variant", DisplayName = "a Long local")]
+    [DataRow("Dim w As Object", "w", "a variable that is not a Variant", DisplayName = "an Object local")]
+    [DataRow("Dim w() As Variant", "w", "a variable that is not a Variant", DisplayName = "an array of Variant")]
+    [DataRow("Const W As Long = 1", "W", "a constant", DisplayName = "a local constant")]
+    [DataRow("", "mCount", "a variable that is not a Variant", DisplayName = "a Long field")]
+    [DataRow("", "LIMIT", "a constant", DisplayName = "a constant of the module")]
+    public async Task IsMissingOfANameThatNeverHoldsTheMissingValue_IsAWarning(string local, string name, string reason)
+    {
+        var finding = Assert.ContainsSingle(await FindingsAsync(
+            "Optional p As Variant", $"{local}\r\nDebug.Print IsMissing({name})", "Private mCount As Long\r\nPrivate Const LIMIT As Long = 3\r\n"));
+
+        Assert.AreEqual(RDCoreDiagnosticId.IsMissingAlwaysFalse, finding.Id);
+        StringAssert.Contains(finding.Message, $"IsMissing({name})");
+        StringAssert.Contains(finding.Message, reason);
+        StringAssert.Contains(finding.Message, "never holds the Missing value");
+    }
 
     [TestMethod]
     public async Task AProcedureNamedIsMissing_IsNotTheLibrarys()
