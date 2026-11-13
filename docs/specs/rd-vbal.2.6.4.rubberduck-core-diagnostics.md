@@ -60,13 +60,18 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00309`](../diagnostics/rdc00309.md)|Obsolete On Local Error statement|Information|the syntax tree: `OnErrorGoToStatementNode.IsLocal`|
 |[`RDC00310`](../diagnostics/rdc00310.md)|Redundant ByVal argument|Hint|`ValueExpressionSemanticFlags.RedundantByVal`|
 |[`RDC00311`](../diagnostics/rdc00311.md)|Early binding opportunity|Information|`ExpressionFact.Creates` (`ObjectClassSource.ReferencedLibrary`)|
+|[`RDC00312`](../diagnostics/rdc00312.md)|Empty string literal|Information|the syntax tree: a `LiteralExpressionNode` of a `String`, two characters long|
 |[`RDC00405`](../diagnostics/rdc00405.md)|Implementations should be private|Information|`DeclarationFact.Role` and `DeclarationFact.Access`|
 |[`RDC00407`](../diagnostics/rdc00407.md)|Unmatched event handler|Hint|`DeclarationFact.Role` (`DeclarationRole.UnmatchedEventHandler`) and `DeclarationFact.References`|
 |[`RDC01001`](../diagnostics/rdc01001.md)|Use meaningful identifier names|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.MeaningfulNames`|
 |[`RDC01002`](../diagnostics/rdc01002.md)|Hungarian notation|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.HungarianNotation`|
+|[`RDC01003`](../diagnostics/rdc01003.md)|Empty If block|Information|the syntax tree: the `Body` of an `IfBlockStatementNode` or an `ElseIfBlockStatementNode`, the `ThenBody` of an `InlineIfStatementNode`, with no `StatementNode`|
+|[`RDC01004`](../diagnostics/rdc01004.md)|Empty code block|Information|the syntax tree: the block of an `ElseBlockStatementNode`, a `CaseExpressionStatementNode`, a `Do` loop, a `ForStatementNode`, a `ForEachStatementNode` or a `WhileWendStatementNode`, with no `StatementNode`|
 |[`RDC01005`](../diagnostics/rdc01005.md)|Hosted document code|Error|the host's `DocumentModuleFact` of a document module whose code presumes its host, with the bindings of its expressions and its procedures named as the host's event handlers; and `ValueExpressionSemanticFlags.HostedDocumentName` of a name in another module, which it reports in place of _Variable not defined_|
 |[`RDC01006`](../diagnostics/rdc01006.md)|Unsupported document module|Error|the host's `DocumentModuleFact`, which names no host class; or a `.doccls` document that has none|
 |[`RDC01007`](../diagnostics/rdc01007.md)|Host library not referenced|Error|the host's `DocumentModuleFact`, whose host class the project's references do not have|
+|[`RDC01009`](../diagnostics/rdc01009.md)|Empty procedure|Information|the syntax tree: a procedure with no `StatementNode`; `ModuleSemanticModel.Class` and `Document`, and in a class module `MemberDeclarationNode.AccessModifier` and `DeclarationFact.Role` (a `Public` member with no role may be a member of an interface)|
+|[`RDC01010`](../diagnostics/rdc01010.md)|Empty module|Information|the syntax tree: no declaration, `Implements` or statement; `ModuleSemanticModel.Document`, and `ModuleParseResult.Designer` or a designer's `Begin` in the module header|
 |[`RDC11005`](../diagnostics/rdc11005.md)|Bitwise operator|Hint|`ProcedureSemanticModel.Runtime`: `LogicalOperatorSemanticFlags.IsBitwiseSemantics` of the `LogicalOperatorFact`s|
 |[`RDC11006`](../diagnostics/rdc11006.md)|Ambiguous concatenation|Information|`ProcedureSemanticModel.Runtime`: `ArithmeticOperatorSemanticFlags.VBStringEffectiveType` of the `ArithmeticOperatorFact`s of `+`|
 |[`RDC11011`](../diagnostics/rdc11011.md)|Variant number compared with a Variant String|Warning|`ProcedureSemanticModel.Runtime`: `ComparisonOperatorSemanticFlags.IsVariantStringNumericException` of the `ComparisonOperatorFact`s|
