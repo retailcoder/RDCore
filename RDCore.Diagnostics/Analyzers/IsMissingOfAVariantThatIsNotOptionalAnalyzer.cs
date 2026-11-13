@@ -1,5 +1,6 @@
 ﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using RDCore.Diagnostics.Model;
+using RDCore.SDK.Model;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
@@ -66,10 +67,12 @@ internal sealed class IsMissingOfAVariantThatIsNotOptionalAnalyzer : IModuleAnal
     }
 
     // Optional before the parameter. MS-VBAL §5.3.1.5 lets an Optional parameter be followed only by Optional parameters, never with a ParamArray, and makes the
-    // accessors of a property declare the same parameters; a handler or an implementation is declared as the event or the interface says.
+    // accessors of a property declare the same parameters; a handler or an implementation is declared as the event or the interface says, and a class that
+    // Implements this one declares each of its Public members as it is.
     private static EditFix? FixOf(MemberDeclarationNode member, string name, ModuleSemanticsDto semantics)
     {
         if (member.MemberKind is not (MemberKind.Procedure or MemberKind.Function)
+            || semantics.Class is not null && member.AccessModifier is AccessModifier.Public or AccessModifier.Implicit
             || semantics.Declarations.Any(declaration => declaration is { Kind: DeclarationKind.Procedure, Role: not DeclarationRole.None }
                 && string.Equals(declaration.Name, member.Name, StringComparison.OrdinalIgnoreCase)))
         {

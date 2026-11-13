@@ -78,4 +78,19 @@ public sealed class IsMissingOfAVariantThatIsNotOptionalAnalyzerTests
 
         Assert.IsNull(finding.Fixes?.Edit);
     }
+
+    [TestMethod]
+    [DataRow("Public", false, DisplayName = "a Public member, which a class that Implements this one declares as it is")]
+    [DataRow("Private", true, DisplayName = "a Private member")]
+    public async Task InAClassModule_OnlyAPrivateMemberIsDeclaredOptional(string access, bool offered)
+    {
+        var source = ModuleWorkspace.ClassModule("Report", $"{access} Sub Show(p As Variant)", "Debug.Print IsMissing(p)", "End Sub");
+        var payload = await ModuleWorkspace.SemanticsAsync([("Report", source)], "Attribute VB_Name = \"Program\"\r\nPublic Sub Main()\r\nEnd Sub\r\n");
+        var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Report");
+        var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Report.cls"));
+
+        var finding = Assert.ContainsSingle(new IsMissingOfAVariantThatIsNotOptionalAnalyzer().Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), model)));
+
+        Assert.AreEqual(offered, finding.Fixes?.Edit is not null);
+    }
 }
