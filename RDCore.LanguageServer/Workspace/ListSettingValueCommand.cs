@@ -25,12 +25,16 @@ namespace RDCore.LanguageServer.Workspace;
 /// </remarks>
 internal sealed class ListSettingValueCommand(ILanguageServerFacade server, IPlatformClientCapabilitiesService capabilities) : IServerCommand
 {
-    /// <summary>The name a client asks for the command by.</summary>
+    /// <summary>
+    /// The name a client asks for the command by.
+    /// </summary>
     public const string CommandName = "rdcore.listSettingValue";
 
     public string Name => CommandName;
 
-    /// <summary>The argument of the command that makes a change.</summary>
+    /// <summary>
+    /// The argument of the command that makes a change.
+    /// </summary>
     /// <param name="change">The change.</param>
     public static JArray ArgumentsOf(ListSettingValueParams change) => [JObject.FromObject(change, JsonSerializer.Create(Wire))];
 
