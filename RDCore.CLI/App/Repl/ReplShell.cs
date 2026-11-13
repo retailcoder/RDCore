@@ -33,7 +33,8 @@ internal sealed class ReplShell(
     ReplProgressDisplay? progress = null,
     ReplServerQuestions? questions = null,
     IConsoleKeys? keys = null,
-    IOptions<AppOptions>? options = null)
+    IOptions<AppOptions>? options = null,
+    ReplSessionStops? stops = null)
 {
     // the progress of the language server's work is drawn while the shell runs: its display is the shell's for as long.
     private readonly ReplProgressDisplay? _progress = progress;
@@ -68,6 +69,51 @@ internal sealed class ReplShell(
         };
         _debugger = context.Debugger;
 
+        // a handler of an event that stops while no program runs - a click on a form the shell loaded - breaks there, above the line being typed.
+        void OnSessionStopped(SDK.Platform.Protocol.ExecuteResult stop) => _ = SayTheSessionStopAsync(context, stop);
+        if (stops is not null)
+        {
+            stops.Stopped += OnSessionStopped;
+        }
+
+        try
+        {
+            await RunShellAsync(context, token);
+        }
+        finally
+        {
+            if (stops is not null)
+            {
+                stops.Stopped -= OnSessionStopped;
+            }
+        }
+    }
+
+    // what a stop is said with fails as a message of the shell's, and does not end it: the handler waits all the same, and STACK says where.
+    private async Task SayTheSessionStopAsync(ReplCommandContext context, SDK.Platform.Protocol.ExecuteResult stop)
+    {
+        try
+        {
+            await ReplExecution.RenderSessionStopAsync(context, stop, write =>
+            {
+                if (editor is not null)
+                {
+                    editor.WriteAbove(write);
+                }
+                else
+                {
+                    write();
+                }
+            });
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "A handler that stopped while no program runs could not be said.");
+        }
+    }
+
+    private async Task RunShellAsync(ReplCommandContext context, CancellationToken token)
+    {
         await dispatcher.DispatchAsync(context, "SPLASH", string.Empty, CancellationToken.None);
         await dispatcher.DispatchAsync(context, "MEMORY", string.Empty, CancellationToken.None);
         WriteReady();

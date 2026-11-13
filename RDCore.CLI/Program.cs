@@ -212,6 +212,8 @@ internal class RDCoreConsoleClientHost(ReplWorkspace? scratchWorkspace = null) :
             .AddSingleton(provider => new ConfigCommand(provider.GetRequiredService<IPlatformSettings>(), appliesLive: true, provider.GetRequiredService<RubberduckIndenterSettingsReader>()))
             .AddSingleton<IReplCommand, ConfigReplCommand>()
             .AddSingleton<IReplCommandDispatcher, ReplCommandDispatcher>()
+            // a handler of an event that stops while no program runs breaks at the shell's prompt.
+            .AddSingleton<ReplSessionStops>()
             .AddSingleton<ReplShell>()
             // the shell owns the break keys - Ctrl+C is BREAK, not quit - so the default console
             // lifetime must not be listening for them too. EXIT is how a session ends.
@@ -341,6 +343,7 @@ internal class RDCoreConsoleClientApp(
     ILiveSettings liveSettings,
     IOptions<AppOptions> appOptions,
     ReplServerQuestions questions,
+    ReplSessionStops sessionStops,
     ILogger<RDCoreConsoleClientApp> logger)
     : RDCoreClientApp(options, connectionFactory, logger)
 {
@@ -374,6 +377,8 @@ internal class RDCoreConsoleClientApp(
             SessionMemoryAccess = new SessionMemoryAccess(true),
             // the shell answers the dialogs a program opens, at its console - unless it runs unattended (--unattended), and nobody is there to.
             SessionInteraction = new SessionInteraction(!appOptions.Value.Unattended),
+            // and breaks where a handler of an event of a form stops while no program runs, as VB6 breaks in it - unless nobody is there to look.
+            SessionStops = new SessionStops(!appOptions.Value.Unattended),
             Unattended = new Unattended(appOptions.Value.Unattended),
             // the shell reads the indenter settings its user had in Rubberduck (on Windows), and takes the ones the language server maps as its own.
             RubberduckIndenterSettings = new RubberduckIndenterSettings(true),
@@ -390,6 +395,7 @@ internal class RDCoreConsoleClientApp(
             .AddSingleton(liveSettings)
             .AddSingleton(new ReplUnattended(appOptions.Value.Unattended))
             .AddSingleton(questions)
+            .AddSingleton(sessionStops)
             .AddSingleton(new LiveSettingsNotifier(NotifyLiveSettingsChangedAsync));
 
     protected override ClientCapabilities ConfigureClientCapabilities(ClientCapabilities capabilities)
@@ -404,6 +410,7 @@ internal class RDCoreConsoleClientApp(
             .WithHandler<ReplShowMessageRequestHandler>()
             .WithHandler<ReplShowMessageHandler>()
             .WithHandler<ReplInputBoxHandler>()
+            .WithHandler<ReplSessionStoppedHandler>()
             .WithHandler<RubberduckIndenterSettingsHandler>()
             .WithHandler<RubberduckIndenterSettingsApplyHandler>();
 
@@ -651,6 +658,9 @@ internal class RDCoreConsoleEnvironmentHostApp(
         sessionProvider.OutputStreamed = (lines, total) => _ = SendNotificationAsync(new HostOutputNotification { Lines = lines, Total = total }, CancellationToken.None);
         // and the dialogs it opens are asked of the language server, which asks its client if the client shows dialogs.
         sessionProvider.Interaction = new LanguageServerInteractionChannel(this);
+        // and a handler of an event that stops while no program runs is told of, and waits if the language server answers that a client takes the stop.
+        sessionProvider.SessionStopped = async stop => (await SendRequestAsync<HostDebugStoppedParams, HostDebugStoppedResult>(
+            new HostDebugStoppedParams { Stop = stop }, CancellationToken.None)).Taken;
         base.OnLanguageServerStarted(server);
     }
 
