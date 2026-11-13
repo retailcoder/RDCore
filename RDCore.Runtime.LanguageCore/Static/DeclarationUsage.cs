@@ -73,7 +73,8 @@ public static class DeclarationUsage
     // it is counted over all of them once each module has a model and every procedure of each was fully analyzed. A constant is counted once the expressions in
     // the declarations of each module were analyzed too (the value of another constant, the bounds of an array). A Public procedure of a private module is not counted
     // here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see. Nor is a
-    // declaration of a name that an excluded #If branch of a module of the project writes (ExcludedBranchNames), by the module's address.
+    // declaration of a name that an excluded #If branch of a module of the project writes (ExcludedBranchNames): excludedBranchNames holds those names for
+    // each module, by the module's address.
     public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(
         IReadOnlyCollection<ModuleSemanticModel> models, IReadOnlyDictionary<string, ModuleDeclarationFacts> declarations, IEnumerable<VBModuleSymbol> project,
         IReadOnlyDictionary<string, IReadOnlySet<string>>? excludedBranchNames = null)
