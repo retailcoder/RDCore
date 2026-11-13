@@ -292,4 +292,40 @@ public sealed class NameAnalyzerTests
     }
 
     #endregion
+
+    #region line labels
+
+    private const string Labels = """
+        Public Sub Process()
+        L1:
+            Debug.Print 1
+        Retry:
+            Debug.Print 2
+        strAgain:
+            Debug.Print 3
+        10  Debug.Print 4
+        End Sub
+        """;
+
+    [TestMethod]
+    public void ALineLabel_IsANameTheProcedureChooses_AndALineNumberIsNot()
+    {
+        var findings = Run(new UseMeaningfulIdentifierNamesAnalyzer(Options()), Labels);
+
+        CollectionAssert.AreEqual(new[] { "L1" }, Names(findings));
+        Assert.AreEqual(1, findings[0].Range.Start.Line);
+        Assert.IsNotNull(findings[0].Fixes?.Rename);
+    }
+
+    [TestMethod]
+    public void AHungarianLineLabel_IsFixedByARename_ToTheWordAfterItsPrefix()
+    {
+        var finding = Run(new HungarianNotationAnalyzer(Options()), Labels).Single();
+
+        Assert.AreEqual("strAgain", Names([finding])[0]);
+        Assert.AreEqual(5, finding.Range.Start.Line);
+        CollectionAssert.AreEqual(new[] { "Again" }, finding.Fixes?.Rename?.Suggestions.ToArray());
+    }
+
+    #endregion
 }
