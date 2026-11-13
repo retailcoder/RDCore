@@ -6,8 +6,8 @@ namespace RDCore.Tests.Cli;
 
 /// <summary>
 /// The environment host counts the references to a declaration that every module of the project can refer to, and nothing outside the project can, over every
-/// module of the project: a <c>Friend</c> procedure (MS-VBAL §5.3.1.1), and a <c>Public</c> variable of a module that is <c>Option Private Module</c>
-/// (MS-VBAL §5.2.1.4). Each counted reference is stated with where it is.
+/// module of the project: a <c>Friend</c> procedure (MS-VBAL §5.3.1.1), and a <c>Public</c> variable or constant of a module that is
+/// <c>Option Private Module</c> (MS-VBAL §5.2.1.4). Each counted reference is stated with where it is.
 /// </summary>
 [TestClass]
 [TestCategory("RD-VBAL 5.0.3 Semantic Analysis")]
@@ -94,6 +94,30 @@ public sealed class ProjectReferenceCountTests
 
         Assert.AreEqual(new DeclarationReferences(1, 1, 0), Declaration(model, "Total").References);
         Assert.AreEqual(new DeclarationReferences(0, 0, 0), Declaration(model, "Unread").References);
+    }
+
+    [TestMethod]
+    public async Task APublicConstantOfAPrivateModule_IsCountedAcrossTheProject_InTheCodeAndTheDeclarationsOfEachModule()
+    {
+        var model = await ModelOfAsync("Shared",
+            Program("Private Const Ceiling As Long = Limit + 1", "Public Sub Main()", "Debug.Print Limit, Ceiling", "End Sub"),
+            modules: [("Shared", ModuleWorkspace.StandardModule("Shared", "Option Private Module",
+                "Public Const Limit As Long = 10", "Public Const Twice As Long = Limit * 2", "Public Const Unread As Long = 1"))]);
+        var limit = Declaration(model, "Limit");
+
+        Assert.AreEqual(new DeclarationReferences(3, 0, 0), limit.References);
+        Assert.AreEqual(2, limit.ReferencedFrom!.Value.Count(site => site.Procedure is null), "the value of a constant is in no procedure");
+        Assert.AreEqual(new DeclarationReferences(0, 0, 0), Declaration(model, "Twice").References);
+        Assert.AreEqual(new DeclarationReferences(0, 0, 0), Declaration(model, "Unread").References);
+    }
+
+    [TestMethod]
+    public async Task APublicConstantOfAPublicModule_HasNoCount_TheProjectsThatReferenceThisOneCanReferToIt()
+    {
+        var model = await ModelOfAsync("Shared", Program("Public Sub Main()", "Debug.Print Limit", "End Sub"),
+            modules: [("Shared", ModuleWorkspace.StandardModule("Shared", "Public Const Limit As Long = 10"))]);
+
+        Assert.IsNull(Declaration(model, "Limit").References);
     }
 
     [TestMethod]

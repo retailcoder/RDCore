@@ -66,11 +66,13 @@ public static class DeclarationUsage
         return facts.ToImmutable();
     }
 
-    // MS-VBAL §5.3.1.1, §5.2.1.4: a Friend procedure, and a Public variable of a procedural module that is Option Private Module, are accessible within the
-    // project and from nowhere else - the projects that reference it included. Every reference to one is in the code of a module of the project, and it is
-    // counted over all of them once each module has a model and every procedure of each was fully analyzed. A Public procedure of a private module is not
-    // counted here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see.
-    public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(IReadOnlyCollection<ModuleSemanticModel> models, IEnumerable<VBModuleSymbol> project)
+    // MS-VBAL §5.3.1.1, §5.2.1.4: a Friend procedure, and a Public variable or constant of a procedural module that is Option Private Module, are accessible
+    // within the project and from nowhere else - the projects that reference it included. Every reference to one is in the code of a module of the project, and
+    // it is counted over all of them once each module has a model and every procedure of each was fully analyzed; a constant, once the expressions of the
+    // declarations of each module were as well (the value of another constant, the bounds of an array). A Public procedure of a private module is not counted
+    // here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see.
+    public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(
+        IReadOnlyCollection<ModuleSemanticModel> models, IReadOnlyDictionary<string, ModuleDeclarationFacts> declarations, IEnumerable<VBModuleSymbol> project)
     {
         var projectModules = project.DistinctBy(module => module.Uri.AbsoluteUri).ToList();
         var modules = projectModules.Select(module => module.Uri.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
@@ -84,20 +86,23 @@ public static class DeclarationUsage
             return models;
         }
 
-        var references = Tally(CodeOf(inProject.SelectMany(model => model.Procedures), declarations: null));
+        var constantsAreFullyAnalyzed = modules.All(module => declarations.TryGetValue(module, out var facts) && facts.IsFullyAnalyzed);
+        var references = Tally(inProject.SelectMany(model => CodeOf(model.Procedures, declarations.GetValueOrDefault(model.Module.AbsoluteUri))));
         return [.. models.Select(model => !modules.Contains(model.Module.AbsoluteUri) ? model : model with
         {
-            Declarations = [.. model.Declarations.Select(fact => fact.References is null && IsAccessibleOnlyWithinTheProject(fact, privateModules.Contains(model.Module.AbsoluteUri))
-                ? Counted(fact, references.GetValueOrDefault(Key(fact.Symbol)) ?? new References())
-                : fact)],
+            Declarations = [.. model.Declarations.Select(fact => fact.References is null
+                && IsAccessibleOnlyWithinTheProject(fact, privateModules.Contains(model.Module.AbsoluteUri), constantsAreFullyAnalyzed)
+                    ? Counted(fact, references.GetValueOrDefault(Key(fact.Symbol)) ?? new References())
+                    : fact)],
         })];
     }
 
-    private static bool IsAccessibleOnlyWithinTheProject(DeclarationFact fact, bool inPrivateModule) => fact switch
+    private static bool IsAccessibleOnlyWithinTheProject(DeclarationFact fact, bool inPrivateModule, bool constantsAreFullyAnalyzed) => fact switch
     {
         { Role: not DeclarationRole.None } => false,
         { Kind: DeclarationKind.Procedure or DeclarationKind.Property, Access: AccessModifier.Friend } => true,
         { Kind: DeclarationKind.Variable, Access: AccessModifier.Public or AccessModifier.Global } => inPrivateModule,
+        { Kind: DeclarationKind.Constant, Access: AccessModifier.Public or AccessModifier.Global } => inPrivateModule && constantsAreFullyAnalyzed,
         _ => false,
     };
 
