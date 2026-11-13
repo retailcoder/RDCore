@@ -123,11 +123,11 @@ public sealed class VisualBasicFormControlsTests
     [DataRow("Form1.Controls.Item(\"Text1\")", "Text1|0|", DisplayName = "Item, by its name")]
     [DataRow("Form1.Controls(\"Text2\")", "Text2|0|", DisplayName = "a control in a Frame")]
     [DataRow("Form1.Controls(\"mnuOpen\")", "mnuOpen|0|", DisplayName = "a menu's item")]
-    [DataRow("Form1.Controls(9)", "|9|Subscript out of range", DisplayName = "past the last is 9")]
-    [DataRow("Form1.Controls(-1)", "|9|Subscript out of range", DisplayName = "before the first is 9")]
-    [DataRow("Form1.Controls(\"Nope\")", "|730|Control 'Nope' not found", DisplayName = "a name no control has is 730")]
-    [DataRow("Form1.Controls(\"Form1\")", "|730|Control 'Form1' not found", DisplayName = "the form's own name is 730")]
-    [DataRow("Form1.Controls(Null)", "|13|Type mismatch", DisplayName = "Null is 13")]
+    [DataRow("Form1.Controls(9)", "|9|Subscript out of range", DisplayName = "past the last is error 9")]
+    [DataRow("Form1.Controls(-1)", "|9|Subscript out of range", DisplayName = "before the first is error 9")]
+    [DataRow("Form1.Controls(\"Nope\")", "|730|Control 'Nope' not found", DisplayName = "a name no control has is error 730")]
+    [DataRow("Form1.Controls(\"Form1\")", "|730|Control 'Form1' not found", DisplayName = "the form's own name is error 730")]
+    [DataRow("Form1.Controls(Null)", "|13|Type mismatch", DisplayName = "Null is error 13")]
     public async Task AControl_OfTheCollection_IsReachedByItsPosition_OrByItsName(string item, string printed)
     {
         var lines = await RunAsync("Dim x As Variant", $"x = {item}.Name", "Debug.Print x & \"|\" & Err.Number & \"|\" & Err.Description");
@@ -136,7 +136,7 @@ public sealed class VisualBasicFormControlsTests
     }
 
     [TestMethod]
-    [Ignore("not implemented: a control array of an RDForms form is no object of its own")]
+    [Ignore("not implemented: a control array of an RDForms form as an object of its own, reached by its name in Controls")]
     public async Task AControlArray_ReachedByItsName_IsTheArray_WhichHasNoName()
     {
         var lines = await RunAsync("Dim x As Variant", "x = Form1.Controls(\"Command2\").Name", "Debug.Print x & \"|\" & Err.Number & \"|\" & Err.Description");
@@ -160,8 +160,8 @@ public sealed class VisualBasicFormControlsTests
     [DataRow("Form1.Frame1", "0|True|True", DisplayName = "a Frame")]
     [DataRow("Form1.Controls(\"Text2\")", "0|True|True", DisplayName = "a control of the collection")]
     [DataRow("Form1.mnuFile", "0|True|True", DisplayName = "a menu")]
-    [DataRow("Form1", "13|False|False", DisplayName = "the form is 13")]
-    [DataRow("Form1.Controls", "13|False|False", DisplayName = "the collection is 13")]
+    [DataRow("Form1", "13|False|False", DisplayName = "the form is error 13")]
+    [DataRow("Form1.Controls", "13|False|False", DisplayName = "the collection is error 13")]
     public async Task AVariableAsControl_TakesEveryControlOfTheForm_AndNothingElse(string source, string printed)
     {
         var lines = await RunAsync(
