@@ -31,12 +31,21 @@ internal static class EveryAnalyzer
     /// </summary>
     /// <param name="program">The source of the module.</param>
     /// <param name="others">The other modules of the workspace, by name.</param>
-    public static async Task<string[]> FindingsAsync(string program, params (string Name, string Source)[] others)
+    public static Task<string[]> FindingsAsync(string program, params (string Name, string Source)[] others)
+        => FindingsOfAsync("Program", program, others);
+
+    /// <summary>
+    /// What every analyzer reports of one module of a workspace: the standard module <c>Program</c>, or one of its class modules.
+    /// </summary>
+    /// <param name="name">The name of the module analyzed.</param>
+    /// <param name="program">The source of the <c>Program</c> standard module.</param>
+    /// <param name="classes">The class modules of the workspace, by name.</param>
+    public static async Task<string[]> FindingsOfAsync(string name, string program, params (string Name, string Source)[] classes)
     {
-        var payload = await ModuleWorkspace.SemanticsAsync(others, program);
-        var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
-        var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
-        var parsed = new ModuleParser().Parse(uri, program);
+        var payload = await ModuleWorkspace.SemanticsAsync(classes, program);
+        var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == name);
+        var uri = new Uri(Path.Combine(ModuleWorkspace.Root, name == "Program" ? "Program.bas" : $"{name}.cls"));
+        var parsed = new ModuleParser().Parse(uri, name == "Program" ? program : classes.Single(module => module.Name == name).Source);
         return [.. Analyzers.SelectMany(analyzer => analyzer.Analyze(new ModuleAnalysisContext(uri, parsed, model))).Select(finding => $"{finding.Code}: {finding.Message}").Order(StringComparer.Ordinal)];
     }
 
@@ -78,6 +87,25 @@ internal static class EveryAnalyzer
         Assert.IsEmpty(errors, $"the program compiles after the fix: {string.Join("; ", errors)}");
         CollectionAssert.AreEqual(
             Array.Empty<string>(), Added(await FindingsAsync(before, others), await FindingsAsync(after, others)), "no analyzer reports what it did not before");
+    }
+
+    /// <summary>
+    /// That a fix of a class module brings nothing the language server reports, as <see cref="AssertBringsNothingNewAsync"/> says of the <c>Program</c> module.
+    /// </summary>
+    /// <param name="name">The name of the class module the fix is applied to.</param>
+    /// <param name="before">The source of the class module the fix is applied to.</param>
+    /// <param name="after">The source of the class module once the fix is applied.</param>
+    /// <param name="program">The source of the <c>Program</c> standard module.</param>
+    public static async Task AssertClassBringsNothingNewAsync(string name, string before, string after, string program)
+    {
+        var errors = await ModuleWorkspace.LoadErrorsAsync([(name, before)], program);
+        Assert.IsEmpty(errors, $"the program compiles before the fix: {string.Join("; ", errors)}");
+        errors = await ModuleWorkspace.LoadErrorsAsync([(name, after)], program);
+        Assert.IsEmpty(errors, $"the program compiles after the fix: {string.Join("; ", errors)}");
+        CollectionAssert.AreEqual(
+            Array.Empty<string>(),
+            Added(await FindingsOfAsync(name, program, (name, before)), await FindingsOfAsync(name, program, (name, after))),
+            "no analyzer reports what it did not before");
     }
 
     /// <summary>
