@@ -5,6 +5,7 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Extensibility.Diagnostics;
 
 namespace RDCore.Diagnostics.Analyzers;
@@ -16,11 +17,12 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <remarks>
 /// <para>
 /// The declaration of a variable, a constant, a parameter or a function that is written with one is reported where its name is written. So is a reference to a name
-/// that the host vouches is bound to a declaration of the module (<see cref="ExpressionFactDto.Binding"/>), since the declaration is what is changed to get rid of it.
+/// that the host vouches is bound to a declaration of the project (<see cref="ExpressionFactDto.Binding"/>), of this module or of another, since the declaration is
+/// what is changed to get rid of it.
 /// </para>
 /// <para>
-/// A reference to a member of the standard library, such as <c>Mid$</c> or <c>Error$</c>, has no declaration to change: it is not reported, and neither is a reference whose
-/// binding is not known.
+/// A reference to a member of a library (<see cref="ValueExpressionSemanticFlags.BoundToLibrary"/>), such as <c>Mid$</c> or <c>Error$</c> of the standard library,
+/// has no declaration to change: it is not reported, and neither is a reference whose binding is not known.
 /// </para>
 /// </remarks>
 internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
@@ -32,11 +34,12 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
             yield break;
         }
 
-        var declared = (context.Semantics?.Declarations ?? []).Select(declaration => declaration.Symbol.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
-        var bindings = (context.Semantics?.Procedures ?? [])
+        // a reference bound to a declaration of the project: of this module, or of another.
+        var boundToTheProject = (context.Semantics?.Procedures ?? [])
             .SelectMany(procedure => procedure.Expressions)
-            .Where(fact => fact.Binding is not null)
-            .ToDictionary(fact => fact.Node, fact => fact.Binding!.AbsoluteUri);
+            .Where(fact => fact.Binding is not null && !fact.Flags.HasFlag(ValueExpressionSemanticFlags.BoundToLibrary))
+            .Select(fact => fact.Node)
+            .ToHashSet();
 
         foreach (var node in module.Descendants())
         {
@@ -46,7 +49,7 @@ internal sealed class ObsoleteTypeHintAnalyzer : IModuleAnalyzer
                 ConstantDeclarationNode { ConstKind: not ConstKind.EnumMember, TypeHint.Length: > 0 } constant => (constant.Name, NameOf(constant.NameRange, constant.Location)),
                 ParameterDeclarationNode { TypeHint.Length: > 0 } parameter => (parameter.Name, NameOf(parameter.NameRange, parameter.Location)),
                 MemberDeclarationNode { TypeHint.Length: > 0 } member => (member.Name, NameOf(member.NameRange, member.SourceLocation)),
-                SimpleNameExpressionNode { TypeHint.Length: > 0 } reference when bindings.TryGetValue(reference.Identity, out var binding) && declared.Contains(binding)
+                SimpleNameExpressionNode { TypeHint.Length: > 0 } reference when boundToTheProject.Contains(reference.Identity)
                     => (reference.IdentifierName, reference.Location.Range),
                 _ => (null, default),
             };
