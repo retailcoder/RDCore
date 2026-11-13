@@ -15,12 +15,10 @@ namespace RDCore.Diagnostics.Analyzers;
 /// A <c>Stop</c> on a line of its own comes with the fix that removes the line. The fix changes what the program does, and its title says so: the program no
 /// longer breaks there.
 /// </remarks>
-internal sealed class StopStatementAnalyzer : SyntaxTreeAnalyzer
+internal sealed class StopStatementAnalyzer : IModuleAnalyzer
 {
-    protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
-    {
-        var nodes = module.Descendants().ToArray();
-        return nodes
+    public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
+        => (context.ParseResult.SyntaxTree?.Descendants() ?? [])
             .OfType<KeywordStatementNode>()
             .Where(statement => string.Equals(statement.Token, Tokens.Stop, StringComparison.OrdinalIgnoreCase))
             .Select(statement => new AnalyzerFinding(
@@ -29,7 +27,8 @@ internal sealed class StopStatementAnalyzer : SyntaxTreeAnalyzer
                 DiagnosticSeverity.Information,
                 RDCoreDiagnosticsResources.StopStatement_Message)
             {
-                Fixes = LineRemoval.Of(statement, nodes, RDCoreDiagnosticsResources.StopStatement_Fix) is { } fix ? new DiagnosticFixes { Edit = fix } : null,
+                Fixes = LineEdits.WholeLinesOf(context.ParseResult, statement) is { } lines
+                    ? new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.StopStatement_Fix, SyntaxEdits.Remove(lines)) }
+                    : null,
             });
-    }
 }

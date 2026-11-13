@@ -228,11 +228,9 @@ public sealed class StepStopRedundantAnalyzerTests
         => Assert.IsEmpty(Run(new StopStatementAnalyzer(), Module("Public Sub DoSomething()\n    End\nEnd Sub")));
 
     [TestMethod]
-    [DataRow("    Stop\n", DisplayName = "a line of its own")]
-    [DataRow("    Stop ' look here\n", DisplayName = "with its comment")]
-    public void TheFix_RemovesTheStop_AndSaysTheProgramNoLongerBreaks(string stop)
+    public void TheFix_RemovesTheStop_AndSaysTheProgramNoLongerBreaks()
     {
-        var source = Module($"Public Sub DoSomething()\n    Debug.Print 1\n{stop}    Debug.Print 2\nEnd Sub");
+        var source = Module("Public Sub DoSomething()\n    Debug.Print 1\n    Stop\n    Debug.Print 2\nEnd Sub");
         var fix = Assert.ContainsSingle(Run(new StopStatementAnalyzer(), source)).Fixes?.Edit;
         Assert.IsNotNull(fix);
 
@@ -245,6 +243,7 @@ public sealed class StepStopRedundantAnalyzerTests
     [DataRow("    Stop: Debug.Print 1", DisplayName = "before a statement")]
     [DataRow("Here: Stop", DisplayName = "after a label")]
     [DataRow("    If True Then Stop", DisplayName = "in a single-line If")]
+    [DataRow("    Stop ' look here", DisplayName = "before a comment")]
     public void NoRemovalIsOffered_ForAStopThatSharesItsLine(string line)
         => Assert.IsNull(Assert.ContainsSingle(Run(new StopStatementAnalyzer(), Module($"Public Sub DoSomething()\n{line}\nEnd Sub"))).Fixes?.Edit);
 

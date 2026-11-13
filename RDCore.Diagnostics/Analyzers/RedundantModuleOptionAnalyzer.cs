@@ -11,12 +11,10 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <c>RDC00315</c>: <c>Option Base 0</c> or <c>Option Compare Binary</c>, the options a module has when it states none (<strong>MS-VBAL §5.2.1.1</strong>,
 /// <strong>§5.2.1.2</strong>).
 /// </summary>
-internal sealed class RedundantModuleOptionAnalyzer : SyntaxTreeAnalyzer
+internal sealed class RedundantModuleOptionAnalyzer : IModuleAnalyzer
 {
-    protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
-    {
-        var nodes = module.Descendants().ToArray();
-        return module.Children
+    public IEnumerable<AnalyzerFinding> Analyze(ModuleAnalysisContext context)
+        => (context.ParseResult.SyntaxTree?.Children ?? [])
             .OfType<ModuleOptionDirectiveNode>()
             .Where(option => option.ModuleOption is ModuleOptions.OptionBase0 or ModuleOptions.OptionCompareBinary)
             .Select(option => (Option: option, Name: option.ModuleOption is ModuleOptions.OptionBase0 ? "Option Base 0" : "Option Compare Binary"))
@@ -24,12 +22,14 @@ internal sealed class RedundantModuleOptionAnalyzer : SyntaxTreeAnalyzer
                 RDCoreDiagnosticId.RedundantModuleOption.ToCode(),
                 found.Option.SourceLocation.Range,
                 DiagnosticSeverity.Information,
-                Say(RDCoreDiagnosticsResources.RedundantModuleOption_Message, found.Name))
+                AnalyzerMessages.Format(RDCoreDiagnosticsResources.RedundantModuleOption_Message, found.Name))
             {
                 // the module has the same option without it.
-                Fixes = LineRemoval.Of(found.Option, nodes, Say(RDCoreDiagnosticsResources.RedundantModuleOption_Fix, found.Name)) is { } fix
-                    ? new DiagnosticFixes { Edit = fix }
+                Fixes = LineEdits.WholeLinesOf(context.ParseResult, found.Option) is { } lines
+                    ? new DiagnosticFixes
+                    {
+                        Edit = SyntaxEdits.Fix(AnalyzerMessages.Format(RDCoreDiagnosticsResources.RedundantModuleOption_Fix, found.Name), SyntaxEdits.Remove(lines)),
+                    }
                     : null,
             });
-    }
 }
