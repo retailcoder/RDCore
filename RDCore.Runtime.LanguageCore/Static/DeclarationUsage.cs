@@ -67,7 +67,7 @@ public static class DeclarationUsage
     // MS-VBAL §5.3.1.1, §5.2.1.4: a Friend procedure, and a Public variable of a procedural module that is Option Private Module, are accessible within the
     // project and from nowhere else - the projects that reference it included. Every reference to one is in the code of a module of the project, and it is
     // counted over all of them once each module has a model and every procedure of each was fully analyzed. A Public procedure of a private module is not
-    // counted here: the name of a procedure can be given to the library members that call one by its name, which a count of the expressions does not see.
+    // counted here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see.
     public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(IReadOnlyCollection<ModuleSemanticModel> models, IEnumerable<VBModuleSymbol> project)
     {
         var projectModules = project.DistinctBy(module => module.Uri.AbsoluteUri).ToList();
