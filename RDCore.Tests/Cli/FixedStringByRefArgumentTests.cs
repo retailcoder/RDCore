@@ -5,7 +5,7 @@ namespace RDCore.Tests.Cli;
 
 /// <summary>
 /// A fixed-length <c>String</c> variable given to a <c>ByRef String</c> parameter (<strong>MS-VBAL §5.3.1.11</strong>): the parameter is a <c>String</c> of its own
-/// while the call runs, and the variable is let what it holds when the call is over, fitted to its length - in both engines, as MS-VBA does (observed in
+/// while the call runs, and the variable is let what it holds when the call is over, fitted to its length. Both engines do so, as MS-VBA does (observed in
 /// Excel).
 /// </summary>
 [TestClass]

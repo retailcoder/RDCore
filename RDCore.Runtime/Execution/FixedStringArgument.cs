@@ -8,7 +8,7 @@ namespace RDCore.Runtime.Execution;
 
 /// <summary>
 /// A fixed-length <c>String</c> variable given to a <c>ByRef String</c> parameter (<strong>MS-VBAL §5.3.1.11</strong>): the parameter is bound to a <c>String</c>
-/// of its own, made of the variable's characters, which the variable is let to when the call returns - padded with spaces, or cut, to its length.
+/// of its own, made of the variable's characters, which the variable is let to when the call returns, padded with spaces or cut to its length.
 /// </summary>
 /// <remarks>
 /// The parameter is not a second name for the variable while the call runs: what the callee assigns it is as long as it is, and the variable keeps what it
@@ -22,23 +22,18 @@ internal sealed class FixedStringArgument(IBindingHandle variable, int length, s
 {
     private IRuntimeValue _value = new VBStringValue(text).RuntimeValue;
 
-    /// <inheritdoc/>
     public IRuntimeValue Value => _value;
 
-    /// <inheritdoc/>
     public BindingCapabilities BindingCapabilities => BindingCapabilities.GetValue | BindingCapabilities.SetValue;
 
-    /// <inheritdoc/>
     public IRuntimeValue GetValue(IRuntimeSymbolResolver resolver) => _value;
 
-    /// <inheritdoc/>
     public void SetValue(IRuntimeSymbolResolver resolver, IRuntimeValue value) => _value = value;
 
-    /// <inheritdoc/>
     public IRuntimeValue Invoke(IRuntimeSymbolResolver resolver, IRuntimeValue[] args) => throw new NotSupportedException();
 
     /// <summary>
-    /// Lets the variable the <c>String</c> the parameter holds, fitted to its length.
+    /// Lets the variable to the <c>String</c> the parameter holds, fitted to its length.
     /// </summary>
     public void WriteBack(IRuntimeSymbolResolver resolver)
         => variable.SetValue(resolver, new VBStringValue(VBFixedStringLetCoercionRuntimeSemantics.Fit(_value.BoxedValue as string ?? string.Empty, length)).RuntimeValue);
