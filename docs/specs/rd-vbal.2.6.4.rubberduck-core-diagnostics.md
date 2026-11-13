@@ -61,8 +61,8 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00311`](../diagnostics/rdc00311.md)|Early binding opportunity|Information|`ExpressionFact.Creates` (`ObjectClassSource.ReferencedLibrary`)|
 |[`RDC00405`](../diagnostics/rdc00405.md)|Implementations should be private|Information|`DeclarationFact.Role` and `DeclarationFact.Access`|
 |[`RDC00407`](../diagnostics/rdc00407.md)|Unmatched event handler|Hint|`DeclarationFact.Role` (`DeclarationRole.UnmatchedEventHandler`) and `DeclarationFact.References`|
-|[`RDC01001`](../diagnostics/rdc01001.md)|Use meaningful identifier names|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.MeaningfulNames`|
-|[`RDC01002`](../diagnostics/rdc01002.md)|Hungarian notation|Information|the names the syntax tree declares, and the allow-list in `DiagnosticsOptions.HungarianNotation`|
+|[`RDC01001`](../diagnostics/rdc01001.md)|Use meaningful identifier names|Information|the names the syntax tree declares, `DeclarationFact.Role` (the members an interface or an event names), and the allow-list in `DiagnosticsOptions.MeaningfulNames`|
+|[`RDC01002`](../diagnostics/rdc01002.md)|Hungarian notation|Information|the names the syntax tree declares, `DeclarationFact.Role` (the members an interface or an event names), and the allow-list in `DiagnosticsOptions.HungarianNotation`|
 |[`RDC01005`](../diagnostics/rdc01005.md)|Hosted document code|Error|the host's `DocumentModuleFact` of a document module whose code presumes its host, with the bindings of its expressions and its procedures named as the host's event handlers; and `ValueExpressionSemanticFlags.HostedDocumentName` of a name in another module, which it reports in place of _Variable not defined_|
 |[`RDC01006`](../diagnostics/rdc01006.md)|Unsupported document module|Error|the host's `DocumentModuleFact`, which names no host class; or a `.doccls` document that has none|
 |[`RDC01007`](../diagnostics/rdc01007.md)|Host library not referenced|Error|the host's `DocumentModuleFact`, whose host class the project's references do not have|
