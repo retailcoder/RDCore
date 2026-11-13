@@ -183,8 +183,11 @@ Callee](rd-vbal.5.6.13.index-expressions.md#object-callee)).
 Some members of an object have no `Property Let` to assign through: a function; a `Property Get` declared a class, `Object` or `Variant`, given the
 arguments it takes (`c.Item(1) = 5` of a `Property Get Item(ByVal i As Long) As Slot`); and a `Property Get` that takes no argument, given arguments
 that index what it returns. Such a member is called, with the arguments written after it, and what it returns is assigned through its default member, as
-a function of a module is. A `Property Get` declared another type is error 451. `c(1) = 5` and `c.Item(1) = 5`, with `Dim c As Collection` holding a number, are error 424; an item that is an object is
-assigned its own default member, and one that takes an argument is error 438.
+a function of a module is. A `Property Get` declared another type is error 451. `c(1) = 5` and `c.Item(1) = 5`, with `Dim c As Collection`
+holding a number, are error 424; an item that is an object is assigned its own default member, and one that takes an argument is error 438.
+
+**RD-VBA differs from MS-VBAL:** **MS-VBAL §5.4.3.8** raises error 451 for a `Property Get` declared `Variant`, whatever it returns. RD-VBA
+calls it and assigns through what it returns, as MS-VBA does (observed in Excel): a `Variant` that holds a number is error 424.
 
 A `ReDim` of an array gives it the element type of the variable's declaration (`Dim a() As Long`), including a variable of an object.
 

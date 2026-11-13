@@ -6,9 +6,9 @@ namespace RDCore.Tests.Cli;
 /// (<strong>MS-VBAL §5.4.3.8</strong>).
 /// </summary>
 /// <remarks>
-/// MS-VBA refuses at compile time a Let to an object whose default member has no <c>Property Let</c> (<c>os = 5</c>, <c>Me = 5</c>): "Invalid use of
-/// property", or "Type mismatch" for a default member that is a <c>Function</c>. MS-VBAL §5.4.3.8 makes it valid, and RD-VBA runs it. Every other form here
-/// runs in MS-VBA as it does in RD-VBA (recorded in Excel).
+/// MS-VBA refuses at compile time a Let to a target of a specific class whose default member has no <c>Property Let</c> (<c>os = 5</c>, <c>Me = 5</c>):
+/// "Invalid use of property", or "Type mismatch" for a default member that is a <c>Function</c>. MS-VBAL §5.4.3.8 makes it valid, and RD-VBA runs it. Every
+/// other form here runs in MS-VBA as it does in RD-VBA (observed in Excel).
 /// </remarks>
 [TestClass]
 [TestCategory("MS-VBAL 5.4.3.8 Let Statement")]
