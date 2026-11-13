@@ -52,9 +52,10 @@ public static class MemberRoles
                 continue;
             }
 
+            // a property's accessors implement the interface's property together, its Get as much as its Let and its Set.
             foreach (var member in ImplementsSemantics.InterfaceMembersOf(implemented))
             {
-                Mark(module, $"{implemented.Name}_{member.Name}", DeclarationRole.InterfaceImplementation, roles);
+                Mark(module, $"{implemented.Name}_{member.Name}", DeclarationRole.InterfaceImplementation, roles, includeGetters: true);
             }
         }
 
@@ -121,11 +122,14 @@ public static class MemberRoles
         => handled.Parameters.Insert(0, new VBParameterSymbol(
             handled.WorkspaceRoot, handled.Uri, "Index", SourceRange.Empty, SourceRange.Empty, ParameterKind.ImplicitByRef, VBIntegerType.TypeInfo));
 
-    // the accessors of a property are procedures that derive from the subroutine's and the function's symbols.
-    private static void Mark(VBClassModuleSymbol module, string name, DeclarationRole role, Dictionary<SemanticId, DeclarationRole> roles)
+    // a Property Let and a Property Set derive from the subroutine's symbol, and a Property Get from neither the subroutine's nor the function's: it is
+    // marked only where it is asked for.
+    private static void Mark(
+        VBClassModuleSymbol module, string name, DeclarationRole role, Dictionary<SemanticId, DeclarationRole> roles, bool includeGetters = false)
     {
         foreach (var candidate in module.Members.Where(member =>
-            member is VBProcedureMemberSymbol or VBFunctionMemberSymbol && string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase)))
+            (member is VBProcedureMemberSymbol or VBFunctionMemberSymbol || includeGetters && member is VBPropertyGetMemberSymbol)
+            && string.Equals(member.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
             roles.TryAdd(candidate.SemanticId, role);
         }
