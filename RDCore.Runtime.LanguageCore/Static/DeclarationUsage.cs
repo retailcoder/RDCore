@@ -20,17 +20,7 @@ public static class DeclarationUsage
         Func<Symbol, HiddenDeclaration?>? hides = null)
     {
         var models = procedures.ToList();
-        var references = new Dictionary<SemanticId, DeclarationReferences>();
-        foreach (var fact in models.SelectMany(procedure => procedure.Expressions.Values).Where(fact => fact.Binding is not null))
-        {
-            var current = references.GetValueOrDefault(fact.Binding!.Value);
-            references[fact.Binding.Value] = fact.Flags switch
-            {
-                var flags when flags.HasFlag(ValueExpressionSemanticFlags.AssignmentTarget) => current with { Writes = current.Writes + 1 },
-                var flags when flags.HasFlag(ValueExpressionSemanticFlags.PassedAsArgument) => current with { PassedAsArguments = current.PassedAsArguments + 1 },
-                _ => current with { Reads = current.Reads + 1 },
-            };
-        }
+        var references = Tally(models);
 
         var moduleIsFullyAnalyzed = models.All(procedure => procedure.IsFullyAnalyzed);
 
@@ -52,16 +42,17 @@ public static class DeclarationUsage
             }
 
             var role = roles is not null && roles.TryGetValue(symbol.SemanticId, out var found) ? found : DeclarationRole.None;
-            DeclarationReferences? counted = null;
+            References? counted = null;
             if ((IsAccessibleOnlyFromItsOwnCode(symbol, kind!.Value) || IsCalledOnlyByItsOwnCode(symbol, role))
                 && CodeThatCanReferToIt(symbol, models, moduleIsFullyAnalyzed))
             {
-                counted = references.GetValueOrDefault(symbol.SemanticId);
+                counted = references.GetValueOrDefault(Key(symbol.SemanticId)) ?? new References();
             }
 
             facts.Add(new DeclarationFact(
-                symbol.SemanticId, symbol.Name, kind!.Value, AccessOf(symbol), IsImplicit(symbol), LocationOf(symbol), counted)
+                symbol.SemanticId, symbol.Name, kind!.Value, AccessOf(symbol), IsImplicit(symbol), LocationOf(symbol), counted?.Count)
             {
+                ReferencedFrom = counted?.Sites.ToImmutable(),
                 Role = role,
                 // a parameter is a local of its procedure that no statement declares.
                 DeclaredBy = symbol is not VBParameterSymbol && symbol is VBLocalVariableSymbol local ? local.DeclaredBy : null,
@@ -71,6 +62,120 @@ public static class DeclarationUsage
         }
 
         return facts.ToImmutable();
+    }
+
+    // MS-VBAL §5.3.1.1, §5.2.1.4: a Friend procedure, and a Public variable of a procedural module that is Option Private Module, are accessible within the
+    // project and from nowhere else - the projects that reference it included. Every reference to one is in the code of a module of the project, and it is
+    // counted over all of them once each module has a model and every procedure of each was fully analyzed. A Public procedure of a private module is not
+    // counted here: the name of a procedure can be given to the library members that call one by its name, which a count of the expressions does not see.
+    public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(IReadOnlyCollection<ModuleSemanticModel> models, IEnumerable<VBModuleSymbol> project)
+    {
+        var projectModules = project.DistinctBy(module => module.Uri.AbsoluteUri).ToList();
+        var modules = projectModules.Select(module => module.Uri.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
+        var privateModules = projectModules.Where(module => module is not VBClassModuleSymbol && module.Directives.PrivateModule)
+            .Select(module => module.Uri.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
+        var inProject = models.Where(model => modules.Contains(model.Module.AbsoluteUri)).ToList();
+        if (modules.Count == 0
+            || inProject.Select(model => model.Module.AbsoluteUri).Distinct(StringComparer.Ordinal).Count() < modules.Count
+            || !inProject.All(model => model.Procedures.All(procedure => procedure.IsFullyAnalyzed)))
+        {
+            return models;
+        }
+
+        var references = Tally(inProject.SelectMany(model => model.Procedures));
+        return [.. models.Select(model => !modules.Contains(model.Module.AbsoluteUri) ? model : model with
+        {
+            Declarations = [.. model.Declarations.Select(fact => fact.References is null && IsAccessibleOnlyWithinTheProject(fact, privateModules.Contains(model.Module.AbsoluteUri))
+                ? Counted(fact, references.GetValueOrDefault(Key(fact.Symbol)) ?? new References())
+                : fact)],
+        })];
+    }
+
+    private static bool IsAccessibleOnlyWithinTheProject(DeclarationFact fact, bool inPrivateModule) => fact switch
+    {
+        { Role: not DeclarationRole.None } => false,
+        { Kind: DeclarationKind.Procedure or DeclarationKind.Property, Access: AccessModifier.Friend } => true,
+        { Kind: DeclarationKind.Variable, Access: AccessModifier.Public or AccessModifier.Global } => inPrivateModule,
+        _ => false,
+    };
+
+    private static DeclarationFact Counted(DeclarationFact fact, References references)
+        => fact with { References = references.Count, ReferencedFrom = references.Sites.ToImmutable() };
+
+    // what refers to each declaration, by its key: the expressions of the procedures that are bound to it, counted by what they do.
+    private sealed class References
+    {
+        public DeclarationReferences Count { get; set; }
+
+        public ImmutableArray<DeclarationReference>.Builder Sites { get; } = ImmutableArray.CreateBuilder<DeclarationReference>();
+    }
+
+    private static Dictionary<string, References> Tally(IEnumerable<ProcedureSemanticModel> procedures)
+    {
+        var references = new Dictionary<string, References>(StringComparer.Ordinal);
+        foreach (var procedure in procedures)
+        {
+            var bound = procedure.Expressions.Values.Where(fact => fact.Binding is not null)
+                .GroupBy(fact => (Key: Key(fact.Binding!.Value), fact.Location.Range.Start))
+                .SelectMany(group => group.Any(fact => fact.Flags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall))
+                    ? Call(procedure, [.. group])
+                    : group.Select(fact => (Fact: fact, Kind: KindOf(fact.Flags), fact.Flags)))
+                .OrderBy(reference => reference.Fact.Location.Range.Start);
+            foreach (var (fact, kind, flags) in bound)
+            {
+                var key = Key(fact.Binding!.Value);
+                if (!references.TryGetValue(key, out var found))
+                {
+                    references[key] = found = new References();
+                }
+
+                var current = found.Count;
+                found.Count = kind switch
+                {
+                    DeclarationReferenceKind.Write => current with { Writes = current.Writes + 1 },
+                    DeclarationReferenceKind.PassedAsArgument => current with { PassedAsArguments = current.PassedAsArguments + 1 },
+                    _ => current with { Reads = current.Reads + 1 },
+                };
+                found.Sites.Add(new DeclarationReference(fact.Location, procedure.Procedure.Uri, kind)
+                {
+                    DiscardsResult = flags.HasFlag(ValueExpressionSemanticFlags.ResultDiscarded),
+                });
+            }
+        }
+
+        return references;
+    }
+
+    private static DeclarationReferenceKind KindOf(ValueExpressionSemanticFlags flags) => flags switch
+    {
+        _ when flags.HasFlag(ValueExpressionSemanticFlags.AssignmentTarget) => DeclarationReferenceKind.Write,
+        _ when flags.HasFlag(ValueExpressionSemanticFlags.PassedAsArgument) => DeclarationReferenceKind.PassedAsArgument,
+        _ => DeclarationReferenceKind.Read,
+    };
+
+    // a call written with an argument list is two expressions bound to what it calls, the name and the call (`Compute(1)`): one reference, at the name, that
+    // reads it or, for a Property Let or Set, writes it. MS-VBAL §5.3.1, §5.6.2.1: in a Function or a Property Get, its own name with no argument list is its
+    // function result variable, which no other code can refer to - and not a reference to the procedure.
+    private static IEnumerable<(ExpressionFact Fact, DeclarationReferenceKind Kind, ValueExpressionSemanticFlags Flags)> Call(
+        ProcedureSemanticModel procedure, ExpressionFact[] call)
+    {
+        var name = call.MinBy(fact => fact.Location.Range.End)!;
+        if (call.Length == 1 && name.Binding == procedure.Procedure
+            && name.Classification is ExpressionClassification.Function or ExpressionClassification.Property)
+        {
+            yield break;
+        }
+
+        var flags = call.Aggregate(default(ValueExpressionSemanticFlags), (all, fact) => all | fact.Flags);
+        yield return (name, flags.HasFlag(ValueExpressionSemanticFlags.AssignmentTarget) ? DeclarationReferenceKind.Write : DeclarationReferenceKind.Read, flags);
+    }
+
+    // the accessors of a property are one declaration: a Property Let or Property Set is addressed with a suffix after the name it shares with the others
+    // (`Item]Let`). VBA names are not case sensitive.
+    private static string Key(SemanticId symbol)
+    {
+        var address = Uri.UnescapeDataString(symbol.Uri.AbsoluteUri).ToUpperInvariant();
+        return address.EndsWith("]LET", StringComparison.Ordinal) || address.EndsWith("]SET", StringComparison.Ordinal) ? address[..^4] : address;
     }
 
     // a variable, or an array whose elements are, declared As New of a class whose objects are never created (Dim e As New ErrObject).
