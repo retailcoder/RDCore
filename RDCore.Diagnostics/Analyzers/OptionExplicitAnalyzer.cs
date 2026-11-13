@@ -23,9 +23,8 @@ namespace RDCore.Diagnostics.Analyzers;
 /// The fix writes <c>Option Explicit</c> before the first declaration of the module, and declares each variable the module declares implicitly, with a
 /// <c>Dim</c> before the first statement of its procedure (<strong>MS-VBAL §5.6.10</strong>): <c>As</c> the type of its type-declaration character where
 /// it is written with one, which then comes out of its uses; without a type where a <c>Def&lt;Type&gt;</c> directive gives it one; and <c>As Variant</c>
-/// otherwise. Alone, the option would make each of them
-/// an error. It is not offered where a procedure starts its body on the line of its declaration, or has a directive in it, which the <c>Dim</c> could
-/// not be placed before.
+/// otherwise. Alone, the option would make each of them an error. It is not offered where a procedure starts its body on the line of its declaration, or
+/// has a directive in it, which the <c>Dim</c> could not be placed before.
 /// </para>
 /// </remarks>
 internal sealed class OptionExplicitAnalyzer : IModuleAnalyzer
