@@ -95,6 +95,24 @@ public sealed class ProjectReferenceCountTests
     }
 
     [TestMethod]
+    public async Task AFriendProcedureThatAnExcludedBranchOfAnotherModuleCalls_HasNoCount()
+    {
+        var model = await ModelOfAsync("Counter", Program(
+            "#Const FEATURE = 0",
+            "Public Sub Main()",
+            "Dim c As New Counter",
+            "#If FEATURE Then",
+            "c.Unused",
+            "#Else",
+            "c.Add",
+            "#End If",
+            "End Sub"));
+
+        Assert.IsNull(Declaration(model, "Unused").References, "only the excluded branch calls it");
+        Assert.AreEqual(new DeclarationReferences(1, 0, 0), Declaration(model, "Add").References, "the live branch's call is counted");
+    }
+
+    [TestMethod]
     public async Task AFunctionCalledAsAStatement_IsAReferenceThatDiscardsTheValueItReturns()
     {
         (string, string) twice = ("Counter", ModuleWorkspace.ClassModule("Counter",

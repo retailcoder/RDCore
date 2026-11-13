@@ -17,7 +17,7 @@ public static class DeclarationUsage
 {
     public static ImmutableArray<DeclarationFact> Of(
         IEnumerable<Symbol> declared, IEnumerable<ProcedureSemanticModel> procedures, IReadOnlyDictionary<SemanticId, DeclarationRole>? roles = null,
-        Func<Symbol, HiddenDeclaration?>? hides = null, ModuleDeclarationFacts? declarations = null)
+        Func<Symbol, HiddenDeclaration?>? hides = null, ModuleDeclarationFacts? declarations = null, IReadOnlySet<string>? excludedBranchNames = null)
     {
         var models = procedures.ToList();
         var references = Tally(CodeOf(models, declarations));
@@ -45,8 +45,10 @@ public static class DeclarationUsage
 
             var role = roles is not null && roles.TryGetValue(symbol.SemanticId, out var found) ? found : DeclarationRole.None;
             References? counted = null;
+            // a name that a branch of a #If that is excluded writes can be a reference in another configuration (ExcludedBranchNames).
             if ((IsAccessibleOnlyFromItsOwnCode(symbol, kind!.Value) || IsCalledOnlyByItsOwnCode(symbol, role))
-                && CodeThatCanReferToIt(symbol, models, symbol is VBConstantMemberSymbol ? moduleConstantsAreFullyAnalyzed : moduleIsFullyAnalyzed))
+                && CodeThatCanReferToIt(symbol, models, symbol is VBConstantMemberSymbol ? moduleConstantsAreFullyAnalyzed : moduleIsFullyAnalyzed)
+                && excludedBranchNames?.Contains(symbol.Name) != true)
             {
                 counted = references.GetValueOrDefault(Key(symbol.SemanticId)) ?? new References();
             }
@@ -70,9 +72,11 @@ public static class DeclarationUsage
     // within the project and from nowhere else - the projects that reference it included. Every reference to one is in the code of a module of the project, and
     // it is counted over all of them once each module has a model and every procedure of each was fully analyzed. A constant is counted once the expressions in
     // the declarations of each module were analyzed too (the value of another constant, the bounds of an array). A Public procedure of a private module is not counted
-    // here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see.
+    // here: its name can be passed as a string to a library member that calls a procedure by its name, which a count of the expressions does not see. Nor is a
+    // declaration of a name that an excluded #If branch of a module of the project writes (ExcludedBranchNames), by the module's address.
     public static IReadOnlyCollection<ModuleSemanticModel> AcrossProject(
-        IReadOnlyCollection<ModuleSemanticModel> models, IReadOnlyDictionary<string, ModuleDeclarationFacts> declarations, IEnumerable<VBModuleSymbol> project)
+        IReadOnlyCollection<ModuleSemanticModel> models, IReadOnlyDictionary<string, ModuleDeclarationFacts> declarations, IEnumerable<VBModuleSymbol> project,
+        IReadOnlyDictionary<string, IReadOnlySet<string>>? excludedBranchNames = null)
     {
         var projectModules = project.DistinctBy(module => module.Uri.AbsoluteUri).ToList();
         var modules = projectModules.Select(module => module.Uri.AbsoluteUri).ToHashSet(StringComparer.Ordinal);
@@ -95,10 +99,13 @@ public static class DeclarationUsage
 
         var constantsAreFullyAnalyzed = modules.All(module => declarations.TryGetValue(module, out var facts) && facts.IsFullyAnalyzed);
         var references = Tally(inProject.SelectMany(model => CodeOf(model.Procedures, declarations.GetValueOrDefault(model.Module.AbsoluteUri))));
+        var excluded = modules.SelectMany(module => excludedBranchNames?.GetValueOrDefault(module) ?? Enumerable.Empty<string>())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return [.. models.Select(model => !modules.Contains(model.Module.AbsoluteUri) ? model : model with
         {
             Declarations = [.. model.Declarations.Select(fact => fact.References is null
                 && IsAccessibleOnlyWithinTheProject(fact, privateModules.Contains(model.Module.AbsoluteUri), constantsAreFullyAnalyzed)
+                && !excluded.Contains(fact.Name)
                     ? Counted(fact, references.GetValueOrDefault(Key(fact.Symbol)) ?? new References())
                     : fact)],
         })];
