@@ -61,7 +61,7 @@ internal sealed class DiagnoseDocumentHandler(
         {
             try
             {
-                diagnosticList.AddRange(analyzer.Analyze(context).Select(diagnostics.FromAnalyzerFinding));
+                diagnosticList.AddRange(analyzer.Analyze(context).Select(finding => diagnostics.FromAnalyzerFinding(finding with { Fixes = finding.Fixes?.AtVersion(payload.SourceVersion) })));
             }
             catch (Exception exception)
             {
