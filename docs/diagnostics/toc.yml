@@ -434,6 +434,8 @@
   href: rdc00215.md
 - name: "RDC00216: Function result discarded"
   href: rdc00216.md
+- name: "RDC00217: Function result always discarded"
+  href: rdc00217.md
 - name: "RDC00302: Obsolete Call statement"
   href: rdc00302.md
 - name: "RDC00303: Obsolete comment syntax"
