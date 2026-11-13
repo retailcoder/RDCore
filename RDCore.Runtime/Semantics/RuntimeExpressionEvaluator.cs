@@ -947,9 +947,22 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         return result;
     }
 
+    // MS-VBAL §5.6.13: an object of the class it is declared as, indexed, goes through more than one default member when its default member takes no argument
+    // and returns an object of a class that has one. What the declaration says, where the object is not known.
+    private static bool IndexesThroughMoreThanOneDefaultMember(IRuntimeSession session, VBType declared, ImmutableArray<ExpressionNode> arguments)
+        => !IndexExpressionNode.IsEmptyArgumentList(arguments)
+            && declared is VBClassType declaredClass
+            && CurrentTypes.Of(session.Symbols.Resolver, declaredClass) is { DefaultMember: VBReturningMemberSymbol member }
+            && RuntimeProcedureInvoker.GetParameters(member) is [] or [{ Name: Tokens.Me }]
+            && member.ResolvedType is VBClassType returned
+            && CurrentTypes.Of(session.Symbols.Resolver, returned).DefaultMember is not null;
+
     private RuntimeSemanticsEvaluationResult CallDefaultMember(
-        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, IndexExpressionNode indexExpression, VBObjectValue indexed, int depth = 0)
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, IndexExpressionNode indexExpression, VBObjectValue indexed,
+        out bool isRecursive, int depth = 0)
     {
+        // the call reads through more than one default member when the one it calls is that of an object a default member returned.
+        isRecursive = depth > 0;
         if (indexed.IsNothing())
         {
             return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
@@ -984,7 +997,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         }
 
         return returned.IsSuccess && value is VBObjectValue next
-            ? CallDefaultMember(session, context, expression, indexExpression, next, depth + 1)
+            ? CallDefaultMember(session, context, expression, indexExpression, next, out isRecursive, depth + 1)
             : IndexValue(session, context, expression, indexExpression, returned);
     }
 
@@ -1609,10 +1622,12 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             var unknown = RuntimeSemanticsEvaluationResult.Success(VBVariantType.TypeInfo.CreateIndeterminateValue());
 
             // what is not known is still declared: an object that is indexed is a call of its default member, whichever object it is.
-            if (Observation is not null && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is VBClassType or VBObjectType)
+            if (Observation is not null && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is { } declared && declared is VBClassType or VBObjectType)
             {
                 ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, indexExpression.Callee, calleeResult.Result, null,
-                    MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember, assumedBefore, unknown);
+                    MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember
+                        | (IndexesThroughMoreThanOneDefaultMember(session, declared, indexExpression.Arguments) ? MemberAccessOperationSemanticFlags.Recursive : 0),
+                    assumedBefore, unknown);
             }
 
             return unknown;
@@ -1622,9 +1637,10 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         if (calleeValue is VBObjectValue indexed)
         {
             var assumedBefore = AssumedSoFar;
-            var called = CallDefaultMember(session, context, expression, indexExpression, indexed);
+            var called = CallDefaultMember(session, context, expression, indexExpression, indexed, out var isRecursive);
             ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, indexExpression.Callee, calleeResult.Result, null,
-                MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember, assumedBefore, called);
+                MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember
+                    | (isRecursive ? MemberAccessOperationSemanticFlags.Recursive : 0), assumedBefore, called);
             return called;
         }
 
@@ -3157,17 +3173,20 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         IRuntimeSession session, RuntimeEvaluationContext context, DictionaryAccessExpressionNode dictionaryAccess, VBTypedValue owner)
     {
         var assumedBefore = AssumedSoFar;
-        var result = CallThroughDictionary(session, context, dictionaryAccess, dictionaryAccess, owner);
+        var result = CallThroughDictionary(session, context, dictionaryAccess, dictionaryAccess, owner, out var isRecursive);
         ObserveMemberAccess(session, context, dictionaryAccess, Tokens.DictionaryAccess, dictionaryAccess.Owner, owner, null,
-            MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember | MemberAccessOperationSemanticFlags.DictionaryAccess,
+            MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember | MemberAccessOperationSemanticFlags.DictionaryAccess
+                | (isRecursive ? MemberAccessOperationSemanticFlags.Recursive : 0),
             assumedBefore, result);
         return result;
     }
 
     private RuntimeSemanticsEvaluationResult CallThroughDictionary(
         IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, DictionaryAccessExpressionNode dictionaryAccess, VBTypedValue owner,
-        int depth = 0)
+        out bool isRecursive, int depth = 0)
     {
+        // the call reads through more than one default member when the one it calls is that of an object a default member returned.
+        isRecursive = depth > 0;
         while (owner is VBVariantValue { TypedValue: { } wrapped })
         {
             owner = wrapped;
@@ -3209,7 +3228,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         }
 
         var returned = InvokeProcedure(session, context, defaultMember.Member, [], defaultMember.Receiver, call: expression);
-        return returned.IsSuccess ? CallThroughDictionary(session, context, expression, dictionaryAccess, returned.Result!, depth + 1) : returned;
+        return returned.IsSuccess ? CallThroughDictionary(session, context, expression, dictionaryAccess, returned.Result!, out isRecursive, depth + 1) : returned;
     }
 
     private RuntimeSemanticsEvaluationResult EvaluateTypeOfIs(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, TypeOfIsExpressionNode typeOfIs)

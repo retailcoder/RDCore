@@ -250,6 +250,12 @@ public static class StatementStaticSemanticsEvaluator
                 MarkSetThroughACall(context, assignment.Target);
             }
 
+            if (isLet && targetResult.IsSuccess)
+            {
+                MarkLetToADefaultMemberWithNoPropertyLet(context, assignment.Target, targetResult.Result!);
+                MarkLetThroughAVariantGetOrFunction(context, assignment.Target);
+            }
+
             // a resizable array is assigned an array, or a Variant that may hold one (or a String, the data of a Byte array, §5.5.1.2.6); a number, a
             // String, a Boolean or a Date is never one, which MS-VBA refuses before the coercion of it is considered (Excel-verified, oracle\findings-labels
             // A03, A04, A06, R02, oracle\s44 G01-G08, G10: "Can't assign to array"; G09 assigns a Byte() a String).
@@ -1272,7 +1278,7 @@ public static class StatementStaticSemanticsEvaluator
             || ObjectValueStaticSemantics.MemberOfCallee(context, callee) is not VBReturningMemberSymbol { } member
             || member is not (VBFunctionMemberSymbol or VBPropertyGetMemberSymbol)
             || member.Uri.AbsoluteUri == context.Scope.Uri.AbsoluteUri
-            || member is VBPropertyGetMemberSymbol && HasAPropertySet(context, callee, member))
+            || member is VBPropertyGetMemberSymbol && HasAnAccessor<VBPropertySetMemberSymbol>(context, callee, member))
         {
             return;
         }
@@ -1283,8 +1289,53 @@ public static class StatementStaticSemanticsEvaluator
         }
     }
 
-    // whether the property a target names has a Property Set, which a Set of it invokes: among what its module declares of the name, or its class.
-    private static bool HasAPropertySet(StaticEvaluationContext context, ExpressionNode target, VBTypeMemberSymbol property)
+    // MS-VBAL §5.4.3.8: a Let to a variable of a specific class, written without an argument list, is a Let to the default member of its object. A default
+    // member with no Property Let is invoked, and the value let-assigned to the default member of the object it returns; MS-VBA refuses the statement at
+    // compile time (recorded in Excel). Written `os()`, `os.Value`, or through a variable declared Object or Variant, MS-VBA compiles it.
+    private static void MarkLetToADefaultMemberWithNoPropertyLet(StaticEvaluationContext context, ExpressionNode target, VBType targetType)
+    {
+        if (context.Facts is not { } facts
+            || target is not (SimpleNameExpressionNode or MemberAccessExpressionNode or InstanceExpressionNode)
+            || targetType is not VBClassType declaredClass
+            || CurrentTypes.Of(context.Resolver, declaredClass) is not { DefaultMember: VBFunctionMemberSymbol or VBPropertyGetMemberSymbol } classType
+            || classType.DefaultMember is not VBReturningMemberSymbol { Parameters: var parameters } defaultMember
+            || parameters.Any(parameter => !(parameter.Name == Tokens.Me && parameter.ParameterKind == ParameterKind.ImplicitByRef)
+                && !parameter.IsOptional && parameter is not ParamArrayParameterSymbol)
+            || (VBProjectSymbol.ResolveClass(context.Resolver, classType.Symbol) ?? classType.Symbol).DefaultInterfaceMembers.Any(member
+                => member is VBPropertyLetMemberSymbol && string.Equals(member.Name, defaultMember.Name, StringComparison.OrdinalIgnoreCase))
+            // a target that is a property with a Property Let of its own is assigned by it, and not through the default member of what it returns.
+            || ObjectValueStaticSemantics.MemberOfCallee(context, target) is VBPropertyGetMemberSymbol named && HasAnAccessor<VBPropertyLetMemberSymbol>(context, target, named)
+            || !facts.TryGet(target.Identity, out var fact))
+        {
+            return;
+        }
+
+        facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.LetToADefaultMemberWithNoPropertyLet });
+    }
+
+    // MS-VBAL §5.4.3.8: a Property Get with no Property Let, or a function, declared Variant and named as the target of a Let outside its own body, is run-time
+    // error 451 (the property) or 450 (the function). MS-VBA calls it and let-assigns the default member of the object it returns, or raises 424 when it
+    // returns none (recorded in Excel), which is what RD-VBA does. The fact is the callee's.
+    private static void MarkLetThroughAVariantGetOrFunction(StaticEvaluationContext context, ExpressionNode target)
+    {
+        var callee = target is IndexExpressionNode { Callee: var called } ? called : target;
+        if (context.Facts is not { } facts
+            || ObjectValueStaticSemantics.MemberOfCallee(context, callee) is not VBReturningMemberSymbol { ResolvedType: VBVariantType } member
+            || member is not (VBFunctionMemberSymbol or VBPropertyGetMemberSymbol)
+            || member.Uri.AbsoluteUri == context.Scope.Uri.AbsoluteUri
+            || member is VBPropertyGetMemberSymbol && HasAnAccessor<VBPropertyLetMemberSymbol>(context, callee, member)
+            || !facts.TryGet(callee.Identity, out var fact))
+        {
+            return;
+        }
+
+        facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.LetThroughAVariantGetOrFunction });
+    }
+
+    // whether the property a target names has the accessor a Let (a Property Let) or a Set (a Property Set) of it invokes: among what its module declares of
+    // the name, or its class.
+    private static bool HasAnAccessor<TAccessor>(StaticEvaluationContext context, ExpressionNode target, VBTypeMemberSymbol property)
+        where TAccessor : Symbol
     {
         IEnumerable<Symbol> named = target is MemberAccessExpressionNode { Owner: { } owner } access
             && ExpressionStaticSemanticsEvaluator.Evaluate(context with { Facts = null, Bindings = null }, owner).Result is VBClassType { Symbol: var snapshot }
@@ -1292,7 +1343,7 @@ public static class StatementStaticSemanticsEvaluator
                 .Where(member => string.Equals(member.Name, access.Member.IdentifierName, StringComparison.OrdinalIgnoreCase))
             : context.Scope.SelfAndAncestors().SelectMany(scope => scope.DeclaredAs(property.Name))
                 .Where(member => member.ParentUri.AbsoluteUri == property.ParentUri.AbsoluteUri);
-        return named.Any(member => member is VBPropertySetMemberSymbol);
+        return named.Any(member => member is TAccessor);
     }
 
     // a Set of a property that has no Property Set is a Set of the default member of what its Property Get returns (MS-VBA, Excel-measured): an object of a

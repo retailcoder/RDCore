@@ -4,6 +4,7 @@ using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
 using RDCore.SDK.Model.Types;
+using RDCore.SDK.Model.Types.Abstract;
 using RDCore.SDK.Model.Types.Complex;
 using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Workspace.Forms;
@@ -67,11 +68,27 @@ public static class DeclarationUsage
                 DeclaredBy = symbol is not VBParameterSymbol && symbol is VBLocalVariableSymbol local ? local.DeclaredBy : null,
                 Hides = hides?.Invoke(symbol),
                 AutoInstantiationAlwaysFails = AutoInstantiationAlwaysFails(symbol),
+                TypeKind = TypeKindOf(symbol),
+                IsArray = symbol is ITypedSymbol { ResolvedType: VBArrayType },
             });
         }
 
         return facts.ToImmutable();
     }
+
+    // MS-VBAL §5.2.3.1.4, §5.2.3.1.5: the type a declaration is declared as, of its elements for an array; what a function or a property returns. A Sub and an
+    // Event have none (Void), and a type that did not resolve is not known.
+    private static DeclaredTypeKind? TypeKindOf(Symbol symbol)
+        => (symbol is ITypedSymbol { ResolvedType: var type } ? type is VBArrayType array ? array.ItemType : type : null) switch
+        {
+            VBVariantType => DeclaredTypeKind.Variant,
+            VBObjectType => DeclaredTypeKind.Object,
+            VBClassType => DeclaredTypeKind.Class,
+            VBUserDefinedType => DeclaredTypeKind.UserDefinedType,
+            VBEnumType => DeclaredTypeKind.Enum,
+            VBIntrinsicType => DeclaredTypeKind.Intrinsic,
+            _ => null,
+        };
 
     // a variable, or an array whose elements are, declared As New of a class whose objects are never created (Dim e As New ErrObject).
     private static bool AutoInstantiationAlwaysFails(Symbol symbol)
