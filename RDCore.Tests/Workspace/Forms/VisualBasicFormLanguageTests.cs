@@ -449,7 +449,6 @@ public sealed class VisualBasicFormLanguageTests
 
     // VB6, as through an Object: c is a Control set to Form1.Text1.
     [TestMethod]
-    [Ignore("not implemented: a VB6 intrinsic control set to a variable declared As Control")]
     [DataRow("c.MultiLine = True", "382|'MultiLine' property cannot be set at run time", DisplayName = "MultiLine, through a Control")]
     [DataRow("c.ScrollBars = 2", "382|'ScrollBars' property cannot be set at run time", DisplayName = "ScrollBars, through a Control")]
     [DataRow("c.hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "a TextBox's hWnd, through a Control")]
@@ -462,7 +461,6 @@ public sealed class VisualBasicFormLanguageTests
 
     // VB6, as through an Object.
     [TestMethod]
-    [Ignore("the Controls collection of a VB6 form hosted by RDForms is not implemented")]
     [DataRow("Form1.Controls(\"Text1\").MultiLine = True", "382|'MultiLine' property cannot be set at run time", DisplayName = "MultiLine, through the form's Controls")]
     [DataRow("Form1.Controls(\"Text1\").hWnd = 1", "383|'hWnd' property is read-only", DisplayName = "a TextBox's hWnd, through the form's Controls")]
     public async Task AGetOnlyProperty_AssignedThroughTheFormsControls_IsWhatVB6Answers(string assignment, string error)
