@@ -11,6 +11,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </summary>
 /// <remarks>
 /// A module-level variable that states no access modifier can only have been declared with <c>Dim</c>. One finding is made for each statement, however many variables it declares.
+/// The fix writes <c>Private</c> in place of the <c>Dim</c> the statement starts with: its variables are as accessible as they were.
 /// </remarks>
 internal sealed class ModuleScopeDimAnalyzer : SyntaxTreeAnalyzer
 {
@@ -21,5 +22,9 @@ internal sealed class ModuleScopeDimAnalyzer : SyntaxTreeAnalyzer
                 RDCoreDiagnosticId.ModuleScopeDimDeclaration.ToCode(),
                 DeclarationStatements.RangeOf(statement),
                 DiagnosticSeverity.Information,
-                RDCoreDiagnosticsResources.ModuleScopeDimDeclaration_Message));
+                RDCoreDiagnosticsResources.ModuleScopeDimDeclaration_Message)
+            {
+                Fixes = SyntaxEdits.Fix(RDCoreDiagnosticsResources.ModuleScopeDimDeclaration_Fix,
+                    SyntaxEdits.Replace(SyntaxEdits.Following(statement[0].SourceLocation.Range.Start, "Dim".Length), "Private")),
+            });
 }

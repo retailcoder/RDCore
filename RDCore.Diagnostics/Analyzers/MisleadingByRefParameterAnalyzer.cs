@@ -9,6 +9,9 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <summary>
 /// <c>RDC00205</c>: <c>ByRef</c> written on the value parameter of a property <c>Let</c> or <c>Set</c>, which is always passed by value (<strong>MS-VBAL §5.3.1.7</strong>).
 /// </summary>
+/// <remarks>
+/// The fix writes <c>ByVal</c> in place of the <c>ByRef</c> the parameter starts with (it cannot be <c>Optional</c>): it is passed as it was.
+/// </remarks>
 internal sealed class MisleadingByRefParameterAnalyzer : SyntaxTreeAnalyzer
 {
     protected override IEnumerable<AnalyzerFinding> Analyze(ModuleNode module)
@@ -19,5 +22,11 @@ internal sealed class MisleadingByRefParameterAnalyzer : SyntaxTreeAnalyzer
                 RDCoreDiagnosticId.MisleadingByRefParameter.ToCode(),
                 parameter.Location.Range,
                 DiagnosticSeverity.Information,
-                Say(RDCoreDiagnosticsResources.MisleadingByRefParameter_Message, parameter.Name)));
+                Say(RDCoreDiagnosticsResources.MisleadingByRefParameter_Message, parameter.Name))
+            {
+                Fixes = parameter.IsOptional
+                    ? null
+                    : SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.MisleadingByRefParameter_Fix, parameter.Name),
+                        SyntaxEdits.Replace(SyntaxEdits.Following(parameter.Location.Range.Start, "ByRef".Length), "ByVal")),
+            });
 }
