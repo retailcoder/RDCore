@@ -12,6 +12,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </summary>
 /// <remarks>
 /// A <c>ParamArray</c> cannot state either, and the value parameter of a property <c>Let</c> or <c>Set</c> is always passed by value, so neither is reported.
+/// The fix writes <c>ByRef</c> before the name, after <c>Optional</c>: the parameter is passed as it was.
 /// </remarks>
 internal sealed class ImplicitByRefModifierAnalyzer : SyntaxTreeAnalyzer
 {
@@ -23,5 +24,10 @@ internal sealed class ImplicitByRefModifierAnalyzer : SyntaxTreeAnalyzer
                 RDCoreDiagnosticId.ImplicitByRefModifier.ToCode(),
                 parameter.Location.Range,
                 DiagnosticSeverity.Information,
-                Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Message, parameter.Name)));
+                Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Message, parameter.Name)) { Fixes = FixOf(parameter) });
+
+    private static DiagnosticFixes? FixOf(ParameterDeclarationNode parameter)
+        => parameter.NameRange is { } name
+            ? SyntaxEdits.Fix(Say(RDCoreDiagnosticsResources.ImplicitByRefModifier_Fix, parameter.Name), SyntaxEdits.Insert(name.Start, "ByRef "))
+            : null;
 }
