@@ -1958,7 +1958,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         {
             _errors.Report(location, VBCompileErrorId.NumericLiteralOverflow, Exceptions.VBCompileError_NumericLiteralOverflow_Verbose);
         }
-        OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value));
+        OnExpression(new LiteralExpressionNode(GetCurrentNodeId(), location, value) { Spelling = token.Length > 0 ? token : null });
     }
     // Operator alternatives of `expression` (a left-recursive rule) have no Enter override, so none of
     // the handlers below use one: each operator's operands are, at Exit time, always exactly the last
@@ -2378,7 +2378,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
                 OnExpression(new LiteralExpressionNode(
                     GetCurrentNodeId(),
                     location,
-                    new VBDateValue(rawValue.ToOADate())));
+                    new VBDateValue(rawValue.ToOADate())) { Spelling = dateLiteral.Symbol.Text });
             }
         }
         else if (context.STRINGLITERAL() is ITerminalNode stringLiteral)
@@ -2389,7 +2389,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             OnExpression(new LiteralExpressionNode(
                 GetCurrentNodeId(),
                 location,
-                VBStringValue.FromLiteralToken(stringLiteral.Symbol.Text)));
+                VBStringValue.FromLiteralToken(stringLiteral.Symbol.Text)) { Spelling = stringLiteral.Symbol.Text });
         }
     }
 
