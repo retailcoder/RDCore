@@ -102,7 +102,7 @@ internal static class ExpressionFactDescriber
         typeof(IStdInformationModule), typeof(IStdInformationModule).GetMethod(nameof(IStdInformationModule.IsMissing))!);
 
     // IsMissing of a name that can never hold the Missing value: a parameter that is not a Variant, or an Optional Variant with a default value; a variable that
-    // is not a Variant; a constant. A ParamArray with no elements is missing (recorded in Excel: oracle\ismissing I01-I09), and a Variant variable holds the
+    // is not a Variant; a constant. A ParamArray with no elements is missing (observed in Excel), and a Variant variable holds the
     // Missing value that is assigned to it.
     private static ValueExpressionSemanticFlags IsMissingFlags(StaticEvaluationContext context, IndexExpressionNode call, Symbol procedure)
         => procedure.GetProperty(SymbolProperties.ExternalTarget) == IsMissingTarget

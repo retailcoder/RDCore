@@ -9,7 +9,7 @@ namespace RDCore.Tests.Diagnostics;
 
 /// <summary>
 /// <c>RDC00207</c>: <c>IsMissing</c> of a parameter that can never be missing - one that is not a <c>Variant</c>, or an <c>Optional</c> <c>Variant</c> with a
-/// default value - which is always <c>False</c> (Excel-measured, oracle\ismissing I01-I09); and of a variable that is not a <c>Variant</c>, or a constant, which
+/// default value - which is always <c>False</c> (observed in Excel); and of a variable that is not a <c>Variant</c>, or a constant, which
 /// never hold the Missing value.
 /// </summary>
 [TestClass]
