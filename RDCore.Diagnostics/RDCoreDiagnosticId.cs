@@ -72,6 +72,7 @@ public enum RDCoreDiagnosticId
     EncapsulatePublicField = 409, // [RD2:EncapsulatePublicFieldInspection] a Public variable of a class module, which any code can assign
     SuspiciousPredeclaredInstanceAccess = 410, // [RD2:SuspiciousPredeclaredInstanceAccessInspection] a class's own code naming its default instance, where Me is the object running
     ImplementedInterfaceMember = 411, // [RD2:ImplementedInterfaceMemberInspection] a class the project implements as an interface, with code in a member
+    PublicControlFieldAccess = 412, // [RD2:PublicControlFieldAccessInspection] UserForm1.TextBox1.Text in another module: a form's control used outside the form
 
     // symbol traversals [0000]
     UseMeaningfulIdentifierNames = 1001,
