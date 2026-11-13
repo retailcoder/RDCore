@@ -243,6 +243,9 @@
   <data name="IsMissingAlwaysFalse_AConstant" xml:space="preserve">
     <value>a constant</value>
   </data>
+  <data name="IsMissingAlwaysFalse_Fix" xml:space="preserve">
+    <value>Replace 'IsMissing({0})' with False</value>
+  </data>
   <data name="ShadowedDeclaration_Message" xml:space="preserve">
     <value>'{0}' hides '{1}': in this procedure, the name means '{0}', and '{1}' everywhere else. Give '{0}' a name of its own.</value>
   </data>

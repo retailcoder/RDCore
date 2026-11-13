@@ -90,4 +90,21 @@ public sealed class IsMissingAlwaysFalseAnalyzerTests
 
         Assert.IsEmpty(new IsMissingAlwaysFalseAnalyzer().Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, program), model)));
     }
+
+    [TestMethod]
+    [DataRow("Optional p As Long", "If Not IsMissing(p) Then Debug.Print p", "If Not False Then Debug.Print p", DisplayName = "a parameter")]
+    [DataRow("Optional q As Variant", "Dim n As Long\r\nDebug.Print IsMissing(n)", "Debug.Print False", DisplayName = "a variable")]
+    public async Task TheFix_ReplacesTheCallWithFalse(string signature, string body, string fixedLine)
+    {
+        var finding = Assert.ContainsSingle(await FindingsAsync(signature, body));
+
+        var fix = finding.Fixes?.Edit;
+        Assert.IsNotNull(fix);
+        StringAssert.Contains(fix.Title, "False");
+        var edit = Assert.ContainsSingle(fix.Edits);
+        Assert.AreEqual(edit.Range.Start.Line, edit.Range.End.Line);
+        var lines = $"Attribute VB_Name = \"Program\"\r\nPublic Sub Probe({signature})\r\n{body}\r\nEnd Sub\r\n".Split("\r\n");
+        var line = lines[edit.Range.Start.Line];
+        Assert.AreEqual(fixedLine, line[..edit.Range.Start.Character] + edit.NewText + line[edit.Range.End.Character..]);
+    }
 }
