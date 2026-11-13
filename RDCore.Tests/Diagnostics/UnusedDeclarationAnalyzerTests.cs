@@ -82,6 +82,58 @@ public sealed class UnusedDeclarationAnalyzerTests
     public void WithNoSemantics_NoVariableIsCounted()
         => Assert.IsEmpty(WithoutSemantics(new VariableNotUsedAnalyzer(), "Public Sub Main()", "    Dim unused As Long", "End Sub"));
 
+    // the module with the one edit of the fix made, over lines too.
+    private static string Fixed(string program, EditFix fix)
+    {
+        var edit = Assert.ContainsSingle(fix.Edits);
+        var lines = program.Split("\r\n");
+        int OffsetOf(Position position) => lines.Take(position.Line).Sum(line => line.Length + 2) + position.Character;
+        return program[..OffsetOf(edit.Range.Start)] + edit.NewText + program[OffsetOf(edit.Range.End)..];
+    }
+
+    // the fix of the one finding of the analyzer leaves the module as it is expected, and the program prints the same.
+    private static async Task AssertRemovedAsync(IModuleAnalyzer analyzer, string[] before, string[] after)
+    {
+        var program = ModuleWorkspace.StandardModule("Program", before);
+        var fix = Assert.ContainsSingle(await ProgramAsync(analyzer, before)).Fixes?.Edit;
+        Assert.IsNotNull(fix);
+
+        var fixedProgram = Fixed(program, fix);
+        Assert.AreEqual(ModuleWorkspace.StandardModule("Program", after), fixedProgram);
+        CollectionAssert.AreEqual(await ModuleWorkspace.RunAsync([], program), await ModuleWorkspace.RunAsync([], fixedProgram), "the program prints the same");
+    }
+
+    [TestMethod]
+    public async Task TheFix_RemovesAVariableNothingRefersTo_OnALineOfItsOwn()
+        => await AssertRemovedAsync(new VariableNotUsedAnalyzer(),
+            ["Public Sub Main()", "    Dim unused As Long", "    Debug.Print 1", "End Sub"],
+            ["Public Sub Main()", "    Debug.Print 1", "End Sub"]);
+
+    [TestMethod]
+    [DataRow("Dim a As Long, unused As Long", "Dim a As Long", "    Debug.Print a", DisplayName = "after another")]
+    [DataRow("Dim unused As Long, a As Long", "Dim a As Long", "    Debug.Print a", DisplayName = "before another")]
+    [DataRow("Dim a As Long, unused As String, b As Long", "Dim a As Long, b As Long", "    Debug.Print a + b", DisplayName = "between two")]
+    public async Task TheFix_RemovesAVariableFromAStatementThatDeclaresOthers(string declaration, string remaining, string use)
+        => await AssertRemovedAsync(new VariableNotUsedAnalyzer(),
+            ["Public Sub Main()", $"    {declaration}", use, "End Sub"],
+            ["Public Sub Main()", $"    {remaining}", use, "End Sub"]);
+
+    [TestMethod]
+    public async Task TheFix_RemovesAPrivateVariableOfTheModule()
+        => await AssertRemovedAsync(new VariableNotUsedAnalyzer(),
+            ["Private unused As Long", "Public Sub Main()", "    Debug.Print 1", "End Sub"],
+            ["Public Sub Main()", "    Debug.Print 1", "End Sub"]);
+
+    [TestMethod]
+    [DataRow("    Dim unused As Long", "    unused = Len(\"x\")", DisplayName = "an assigned variable, whose assignment may call a procedure")]
+    [DataRow("    Dim unused As Long: Debug.Print 1", "", DisplayName = "a statement that shares its line")]
+    public async Task NoRemovalIsOffered_ForAnAssignedVariable_OrOneThatSharesItsLine(string declaration, string assignment)
+    {
+        string[] lines = ["Public Sub Main()", declaration, .. assignment.Length > 0 ? [assignment] : Array.Empty<string>(), "End Sub"];
+
+        Assert.IsNull(Assert.ContainsSingle(await ProgramAsync(new VariableNotUsedAnalyzer(), lines)).Fixes?.Edit);
+    }
+
     #endregion
 
     #region RDC01012 a variable never assigned
@@ -285,6 +337,18 @@ public sealed class UnusedDeclarationAnalyzerTests
         Assert.AreEqual(1, constants["Base"], "read by the value of another constant");
         Assert.AreEqual(1, constants["Derived"], "read by the bound of an array");
     }
+
+    [TestMethod]
+    public async Task TheFix_RemovesAConstantNothingRefersTo()
+        => await AssertRemovedAsync(new ConstantNotUsedAnalyzer(),
+            ["Public Sub Main()", "    Const Unused As Long = 1", "    Debug.Print 1", "End Sub"],
+            ["Public Sub Main()", "    Debug.Print 1", "End Sub"]);
+
+    [TestMethod]
+    public async Task TheFix_RemovesAConstantFromAStatementThatDeclaresOthers()
+        => await AssertRemovedAsync(new ConstantNotUsedAnalyzer(),
+            ["Public Sub Main()", "    Const Read = 1, Unused = 2", "    Debug.Print Read", "End Sub"],
+            ["Public Sub Main()", "    Const Read = 1", "    Debug.Print Read", "End Sub"]);
 
     #endregion
 

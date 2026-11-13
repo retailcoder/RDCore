@@ -40,7 +40,14 @@ internal sealed class VariableNotUsedAnalyzer : IModuleAnalyzer
                 RDCoreDiagnosticId.VariableNotUsed.ToCode(),
                 fact.Location.Range,
                 DiagnosticSeverity.Information,
-                AnalyzerMessages.Format(references.Writes > 0 ? RDCoreDiagnosticsResources.VariableNotUsed_Assigned_Message : RDCoreDiagnosticsResources.VariableNotUsed_Message, fact.Name));
+                AnalyzerMessages.Format(references.Writes > 0 ? RDCoreDiagnosticsResources.VariableNotUsed_Assigned_Message : RDCoreDiagnosticsResources.VariableNotUsed_Message, fact.Name))
+            {
+                // only when nothing refers to it: an assignment may call a procedure, or create an object whose Class_Initialize does the work.
+                Fixes = references.Writes == 0 && declaration is not null
+                    && DeclarationRemoval.FixOf(context.ParseResult, declaration, AnalyzerMessages.Format(RDCoreDiagnosticsResources.VariableNotUsed_Fix, fact.Name)) is { } fix
+                    ? new DiagnosticFixes { Edit = fix }
+                    : null,
+            };
         }
     }
 }
