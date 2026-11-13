@@ -2376,8 +2376,8 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
             if (DateTime.TryParse(dateLiteral.Symbol.Text.Trim('#'), CultureInfo.InvariantCulture, DateTimeStyles.None, out var rawValue))
             {
                 OnExpression(new LiteralExpressionNode(
-                    GetCurrentNodeId(), 
-                    location, 
+                    GetCurrentNodeId(),
+                    location,
                     new VBDateValue(rawValue.ToOADate())));
             }
         }
@@ -2451,11 +2451,13 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         }
 
         var identifierLabel = context.identifierStatementLabel() ?? context.combinedLabels()?.identifierStatementLabel();
+        SourceRange? nameRange = null;
         if (identifierLabel?.legalLabelIdentifier()?.identifier() is { } labelIdentifier)
         {
-            // `Label:` - the colon is part of the label as written.
+            // `Label:` - the colon is part of the label as written, and not of its name.
             labelLocation = identifierLabel.GetSourceLocation(_rootUri);
             name = labelIdentifier.GetText();
+            nameRange = labelIdentifier.GetSourceLocation(_rootUri).Range;
         }
 
         var number = numberContext is null ? null : LineNumber(numberContext);
@@ -2468,7 +2470,7 @@ internal class DeclarationsParseTreeListener(Uri sourceUri, ModuleNode moduleNod
         }
         if (name is not null)
         {
-            CurrentBuilder.AddChild(new LineLabelNode(GetCurrentNodeId(), labelLocation, name));
+            CurrentBuilder.AddChild(new LineLabelNode(GetCurrentNodeId(), labelLocation, name) { NameRange = nameRange });
         }
 
         // lineNumberLabel is `MINUS? numberLiteral`: VBE can prettify &HFFFFFFFF into -1, which is a legal line number, so a sign and the other radixes are read.
