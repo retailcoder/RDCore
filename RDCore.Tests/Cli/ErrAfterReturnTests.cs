@@ -7,8 +7,8 @@ namespace RDCore.Tests.Cli;
 /// The Err object after a procedure that met an error has returned (<strong>MS-VBAL §5.4.4.1</strong>, <strong>§5.4.4.2</strong>,
 /// <strong>§6.1.3.2.1.1</strong>): an <c>On Error</c> statement and a <c>Resume</c> reset it, and so does leaving the procedure while its handler runs. A
 /// procedure that resumed past an error and returned leaves the error in Err, an <c>Exit Sub</c> included, in both engines, as MS-VBA does (observed in
-/// Excel). A <c>Raise</c> with no description after it keeps the description of the error Err holds, as MS-VBA does; <strong>§6.1.3.2.1.2</strong> gives
-/// it the description of its own number instead.
+/// Excel). A <c>Raise</c> with no description after it keeps the description of the error Err holds: values of Err that have not been cleared serve as the
+/// values of the new error (<strong>§6.1.3.2.1.2</strong>).
 /// </summary>
 [TestClass]
 [TestCategory("MS-VBAL 5.4.4 Error Handling Statements")]
@@ -52,8 +52,8 @@ public sealed class ErrAfterReturnTests
             After("HandlerResumeNext"),
             After("ResumedThenOnErrorGoTo0")), engine);
 
-    // a Raise with no description keeps the description of the error Err holds, as MS-VBA does (observed in Excel). MS-VBAL §6.1.3.2.1.2 gives it the
-    // description of its own number (Type mismatch for 13).
+    // a Raise with no description keeps the description of the error Err holds, which has not been cleared (MS-VBAL §6.1.3.2.1.2): Err.Raise 13 is
+    // described "Division by zero", not "Type mismatch".
     [TestMethod]
     [DataRow(VBExecutionEngine.Interpreter, DisplayName = "Interpreter")]
     [DataRow(VBExecutionEngine.Compiled, DisplayName = "Compiled")]
