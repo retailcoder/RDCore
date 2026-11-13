@@ -382,7 +382,7 @@
     <value>&apos;{0}&apos; works on the bits of a constant that is True with a value other than -1, so this condition does not give the truth value it seems to give (Not 1 is -2, which is True). Test the constant by itself, or compare it with 0; or give a constant of your own the value True.</value>
   </data>
   <data name="OnErrorGoToMinusOne_Message" xml:space="preserve">
-    <value>On Error GoTo -1 ends the error being handled, and is not documented: a Resume ends the handler and says where the procedure goes on.</value>
+    <value>On Error GoTo -1 ends the error being handled, and MS-VBAL does not document it: a Resume ends the handler and says where the procedure goes on.</value>
   </data>
   <data name="UnrestoredOnErrorResumeNext_Message" xml:space="preserve">
     <value>No On Error GoTo follows this On Error Resume Next: every error in the rest of the procedure is ignored.</value>
