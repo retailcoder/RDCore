@@ -204,7 +204,6 @@ public sealed class EnvironmentSessionProvider(
     /// <inheritdoc/>
     public ProgramExecution Execution { get; private set; } = default!;
 
-    /// <inheritdoc/>
     public IReadOnlyList<VBModuleSymbol> ModulesOf(RDCoreProject project, Uri workspaceRoot)
         => [.. new ProjectSymbolProvider(workspaceRoot, project, fileSystem).ProvideSymbols().OfType<VBModuleSymbol>()];
 

@@ -215,7 +215,7 @@ namespace RDCore.Runtime.Support {
         public static string Host_Edit_ValueThatSizesStoredData => ResourceManager.GetString("Host_Edit_ValueThatSizesStoredData", resourceCulture)!;
 
         /// <summary>
-        ///   Looks up a localized string similar to a module added while the program waits: the program runs without it, and the module is part of the project once the program is over - remove it to go on.
+        ///   Looks up a localized string similar to a module added while the program waits, which the program has no code of, and which is part of the project once the program is over; remove it to go on.
         /// </summary>
         public static string Host_Edit_ModuleAdded => ResourceManager.GetString("Host_Edit_ModuleAdded", resourceCulture)!;
 
