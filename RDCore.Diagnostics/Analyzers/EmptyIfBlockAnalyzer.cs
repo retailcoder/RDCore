@@ -10,7 +10,6 @@ using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols.Operators;
 using RDCore.SDK.Model.Values.Intrinsic;
 using RDCore.SDK.Extensibility.Diagnostics;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace RDCore.Diagnostics.Analyzers;
 
@@ -42,7 +41,7 @@ internal sealed class EmptyIfBlockAnalyzer : IModuleAnalyzer
             switch (node)
             {
                 case IfBlockStatementNode block when block.Body.HasNoStatement():
-                    yield return Finding(EmptyBlocks.Header(block, block.ConditionExpression), "If", RemovalOf(context.ParseResult, module, nodes, block));
+                    yield return Finding(EmptyBlocks.Header(block, block.ConditionExpression), "If", RemovalOf(context.ParseResult, module, block));
                     break;
                 case ElseIfBlockStatementNode branch when branch.Body.HasNoStatement():
                     yield return Finding(EmptyBlocks.Header(branch, branch.ConditionExpression), "ElseIf", null);
@@ -64,7 +63,7 @@ internal sealed class EmptyIfBlockAnalyzer : IModuleAnalyzer
     };
 
     // the lines of the block, when nothing else is written on them and its condition is inert.
-    private static EditFix? RemovalOf(ModuleParseResult parse, ModuleNode module, SyntaxNode[] nodes, IfBlockStatementNode block)
+    private static EditFix? RemovalOf(ModuleParseResult parse, ModuleNode module, IfBlockStatementNode block)
     {
         var range = block.SourceLocation.Range;
         if (!block.Body.Children.IsDefaultOrEmpty || !block.ElseIfBlocks.IsDefaultOrEmpty || block.ElseBlock is not null
@@ -73,25 +72,15 @@ internal sealed class EmptyIfBlockAnalyzer : IModuleAnalyzer
             return null;
         }
 
-        var (first, last) = (range.Start.Line, range.End.Line);
-        bool Touches(SyntaxNode node) => node.SourceLocation.Range is var at && at.Start.Line <= last && at.End.Line >= first;
-        bool Around(SyntaxNode node) => node.SourceLocation.Range is var at && at.Start.Line < first && at.End.Line > last;
-        if (nodes.Any(node => Touches(node) && !Encloses(range, node.SourceLocation.Range) && !Around(node) && node is not ModuleNode)
-            || parse.Trivia.Any(Touches) || parse.PrecompilerTrivia.Any(Touches))
+        // a comment in the If is the user's, and is not removed with it.
+        if (parse.Trivia.Any(trivia => Encloses(range, trivia.SourceLocation.Range)) || LineEdits.WholeLinesOf(parse, block) is not { } lines)
         {
             return null;
         }
 
-        if (!IsValue(Evaluate(block.ConditionExpression, TypesOf(procedure))))
-        {
-            return null;
-        }
-
-        return new EditFix
-        {
-            Title = RDCoreDiagnosticsResources.EmptyIfBlock_Fix,
-            Edits = [new TextEdit { Range = new Range(first, 0, last + 1, 0), NewText = string.Empty }],
-        };
+        return IsValue(Evaluate(block.ConditionExpression, TypesOf(procedure)))
+            ? SyntaxEdits.Fix(RDCoreDiagnosticsResources.EmptyIfBlock_Fix, SyntaxEdits.Remove(lines))
+            : null;
     }
 
     private static bool Encloses(SourceRange outer, SourceRange inner) => outer.Start <= inner.Start && outer.End >= inner.End;

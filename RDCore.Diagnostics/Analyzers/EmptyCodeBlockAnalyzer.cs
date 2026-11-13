@@ -6,7 +6,6 @@ using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Statements;
 using RDCore.SDK.Model.Source;
 using RDCore.SDK.Extensibility.Diagnostics;
-using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace RDCore.Diagnostics.Analyzers;
 
@@ -40,7 +39,7 @@ internal sealed class EmptyCodeBlockAnalyzer : IModuleAnalyzer
                     DiagnosticSeverity.Information,
                     AnalyzerMessages.Format(RDCoreDiagnosticsResources.EmptyCodeBlock_Message, keyword))
                 {
-                    Fixes = node is ElseBlockStatementNode block && ifs.TryGetValue(block.Identity, out var owner) && RemovalOf(context.ParseResult, nodes, owner, block) is { } fix
+                    Fixes = node is ElseBlockStatementNode block && ifs.TryGetValue(block.Identity, out var owner) && RemovalOf(context.ParseResult, owner, block) is { } fix
                         ? new DiagnosticFixes { Edit = fix }
                         : null,
                 };
@@ -64,38 +63,20 @@ internal sealed class EmptyCodeBlockAnalyzer : IModuleAnalyzer
         _ => (null, null),
     };
 
-    // the lines from the Else to the End If, when nothing else is written on them: no label, declaration or comment in the Else, no statement of the If
-    // before it on its line, no #If directive.
-    private static EditFix? RemovalOf(ModuleParseResult parse, SyntaxNode[] nodes, IfBlockStatementNode owner, ElseBlockStatementNode block)
+    // the lines from the Else to the End If, when nothing else is written on them; a comment in the Else is the user's, and is not removed with it.
+    private static EditFix? RemovalOf(ModuleParseResult parse, IfBlockStatementNode owner, ElseBlockStatementNode block)
     {
-        if (!block.Body.Children.IsDefaultOrEmpty)
-        {
-            return null;
-        }
-
-        var first = block.SourceLocation.Range.Start.Line;
-        var last = owner.SourceLocation.Range.End.Line - 1;
-        if (last < first)
-        {
-            return null;
-        }
-
-        var outer = owner.SourceLocation.Range;
         var start = block.SourceLocation.Range.Start;
-        bool Touches(SyntaxNode node) => node.SourceLocation.Range is var range && range.Start.Line <= last && range.End.Line >= first;
-        // a block before the Else, such as an ElseIf, ends with the line break and the indentation in front of the Else.
-        bool EndsBefore(SyntaxNode node) => node.SourceLocation.Range is var range && range.Start.Line < first && range.End <= start;
-        bool Encloses(SyntaxNode node) => node.SourceLocation.Range is var range && range.Start <= outer.Start && range.End >= outer.End;
-
-        if (nodes.Any(node => !ReferenceEquals(node, block) && !Encloses(node) && !EndsBefore(node) && Touches(node)) || parse.Trivia.Any(Touches) || parse.PrecompilerTrivia.Any(Touches))
+        var endIf = owner.SourceLocation.Range.End.Line;
+        if (!block.Body.Children.IsDefaultOrEmpty || endIf <= start.Line)
         {
             return null;
         }
 
-        return new EditFix
-        {
-            Title = RDCoreDiagnosticsResources.EmptyElseBlock_Fix,
-            Edits = [new TextEdit { Range = new Range(first, 0, last + 1, 0), NewText = string.Empty }],
-        };
+        var span = new SourceRange(start, endIf - 1 > start.Line ? new SourcePosition(endIf - 1, 0) : block.SourceLocation.Range.End);
+        return parse.Trivia.Any(trivia => trivia.SourceLocation.Range.Start >= span.Start && trivia.SourceLocation.Range.Start.Line < endIf)
+            || LineEdits.WholeLinesOf(parse, span) is not { } lines
+            ? null
+            : SyntaxEdits.Fix(RDCoreDiagnosticsResources.EmptyElseBlock_Fix, SyntaxEdits.Remove(lines));
     }
 }
