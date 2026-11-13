@@ -300,6 +300,8 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC11031](rdc11031.md)|True value that is not -1|`#Const DEV = 1`, then `#If Not DEV`: `Not 1` is `-2`, which is `True`|
 |[RDC11032](rdc11032.md)|For Each variable read after the loop ran out|MS-VBA leaves it Empty or Nothing, where MS-VBAL says it keeps the last element|
 |[RDC11035](rdc11035.md)|Collection set to Nothing inside its own For Each loop|RD-VBA leaves it as it is while the loop runs; MS-VBA destroys it, and the loop ends|
+|[RDC11045](rdc11045.md)|Let through a default member with no Property Let|`total = 5` compiles in RD-VBA, where MS-VBA refuses it|
+|[RDC11046](rdc11046.md)|Let through a Variant property or function|RD-VBA assigns the returned object's default member, as MS-VBA does, where MS-VBAL raises 451 or 450|
 |[RDC20001](rdc20001.md)|Edit not applied to the waiting program|Made while it waits in the debugger, which can't go on with it|
 
 ---

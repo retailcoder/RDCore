@@ -110,6 +110,8 @@ public enum RDCoreDiagnosticId
     TrueValueIsNotMinusOne = 11031, // #If Not DEV with #Const DEV = 1: a True that is not -1, read through an operator that works on its bits (Not 1 is -2)
     ForEachControlEmptiedAfterLoop = 11032, // For Each c In r ... Next: Debug.Print c.Address - MS-VBAL keeps the last element in c; MS-VBA empties it (Nothing)
     CollectionSetToNothingInItsOwnLoop = 11035, // Set c = Nothing in For Each v In c: RD-VBA leaves c as it is while the loop runs; MS-VBA destroys the Collection, the loop ends
+    LetToADefaultMemberWithNoPropertyLet = 11045, // os = 5, os's default member a Property Get or a Function with no Property Let: MS-VBAL compiles it, MS-VBA refuses it
+    LetThroughAVariantGetOrFunction = 11046, // o.Value = 5, Value a Variant Property Get with no Let (or a Variant Function): MS-VBAL 451/450, MS-VBA assigns through what it returns, or 424
 
     /*
      * [20000-20999]: the debugger and edit-and-continue, issued by the language server while a program waits
