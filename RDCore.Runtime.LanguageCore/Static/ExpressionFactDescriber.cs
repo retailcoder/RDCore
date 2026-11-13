@@ -79,9 +79,11 @@ internal static class ExpressionFactDescriber
         // an object that is indexed is a call of its default member, and an object of no particular class has one that is found out when it runs.
         if (facts.TryGet(index.Callee.Identity, out var callee) && callee.DeclaredType is { } calleeType)
         {
-            if (calleeType is VBClassType declaredClass && CurrentTypes.Of(context.Resolver, declaredClass) is { DefaultMember: { } defaultMember })
+            if (calleeType is VBClassType declaredClass && ObjectValueStaticSemantics.IndexedDefaultMemberOf(
+                context, declaredClass, hasArguments: !IndexExpressionNode.IsEmptyArgumentList(index.Arguments)) is { Member: { } defaultMember } indexed)
             {
-                return Fact(defaultMember, ValueExpressionSemanticFlags.DefaultMember | ValueExpressionSemanticFlags.ProcedureCall);
+                return Fact(defaultMember, ValueExpressionSemanticFlags.DefaultMember | ValueExpressionSemanticFlags.ProcedureCall
+                    | (indexed.IsLateBound ? ValueExpressionSemanticFlags.LateBound : 0));
             }
 
             if (calleeType is VBVariantType or VBObjectType)

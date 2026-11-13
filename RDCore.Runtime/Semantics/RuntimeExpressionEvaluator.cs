@@ -948,7 +948,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     }
 
     private RuntimeSemanticsEvaluationResult CallDefaultMember(
-        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, IndexExpressionNode indexExpression, VBObjectValue indexed)
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, IndexExpressionNode indexExpression, VBObjectValue indexed, int depth = 0)
     {
         if (indexed.IsNothing())
         {
@@ -956,11 +956,36 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
                 VBRuntimeErrorId.ObjectVariableOrWithBlockVariableNotSet, expression.Location, Exceptions.VBMemberAccess_ObjectVariableNotSet_Verbose));
         }
 
-        return TryResolveDefaultMember(session, indexed) is { } defaultMember
-            ? InvokeProcedure(session, context, defaultMember.Member, indexExpression.Arguments, defaultMember.Receiver, reachedThrough: indexExpression.Callee,
-                call: indexExpression)
-            : RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
+        if (TryResolveDefaultMember(session, indexed) is not { } defaultMember)
+        {
+            return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(
                 VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, expression.Location, "The object has no default member to index."));
+        }
+
+        if (!ReturnsToBeIndexed(defaultMember.Member, defaultMember.Receiver, indexExpression.Arguments))
+        {
+            return InvokeProcedure(session, context, defaultMember.Member, indexExpression.Arguments, defaultMember.Receiver,
+                reachedThrough: depth == 0 ? indexExpression.Callee : null, call: indexExpression);
+        }
+
+        // MS-VBAL §5.6.13: a default member that cannot accept any parameters is called with none, and the arguments index what it returns - the default
+        // member of the object it returns, in turn.
+        if (depth == ObjectDefaultMember.DeepestDefaultMember)
+        {
+            return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.OutOfStackSpace, expression.Location,
+                $"A default member returned an object whose default member returned an object, {ObjectDefaultMember.DeepestDefaultMember} times."));
+        }
+
+        var returned = InvokeProcedure(session, context, defaultMember.Member, [], defaultMember.Receiver, call: indexExpression.Callee);
+        var value = returned.Result;
+        while (value is VBVariantValue { TypedValue: var wrapped })
+        {
+            value = wrapped;
+        }
+
+        return returned.IsSuccess && value is VBObjectValue next
+            ? CallDefaultMember(session, context, expression, indexExpression, next, depth + 1)
+            : IndexValue(session, context, expression, indexExpression, returned);
     }
 
     // a member of an object called with the arguments of the index (IsCall), or read to be indexed by them: a function that declares no parameters returns what is indexed.
@@ -3140,7 +3165,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     }
 
     private RuntimeSemanticsEvaluationResult CallThroughDictionary(
-        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, DictionaryAccessExpressionNode dictionaryAccess, VBTypedValue owner)
+        IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, DictionaryAccessExpressionNode dictionaryAccess, VBTypedValue owner,
+        int depth = 0)
     {
         while (owner is VBVariantValue { TypedValue: { } wrapped })
         {
@@ -3169,7 +3195,21 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
 
         var name = new LiteralExpressionNode(
             dictionaryAccess.Member.Identity, dictionaryAccess.Member.Location, new VBStringValue(dictionaryAccess.Member.IdentifierName));
-        return InvokeProcedure(session, context, defaultMember.Member, [name], defaultMember.Receiver, call: expression);
+        if (!ReturnsToBeIndexed(defaultMember.Member, defaultMember.Receiver, [name]))
+        {
+            return InvokeProcedure(session, context, defaultMember.Member, [name], defaultMember.Receiver, call: expression);
+        }
+
+        // MS-VBAL §5.6.13, as §5.6.14 has it: a default member that cannot accept any parameters is called with none, and the name goes to the default
+        // member of the object it returns.
+        if (depth == ObjectDefaultMember.DeepestDefaultMember)
+        {
+            return RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(VBRuntimeErrorId.OutOfStackSpace, expression.Location,
+                $"A default member returned an object whose default member returned an object, {ObjectDefaultMember.DeepestDefaultMember} times."));
+        }
+
+        var returned = InvokeProcedure(session, context, defaultMember.Member, [], defaultMember.Receiver, call: expression);
+        return returned.IsSuccess ? CallThroughDictionary(session, context, expression, dictionaryAccess, returned.Result!, depth + 1) : returned;
     }
 
     private RuntimeSemanticsEvaluationResult EvaluateTypeOfIs(IRuntimeSession session, RuntimeEvaluationContext context, ExpressionNode expression, TypeOfIsExpressionNode typeOfIs)

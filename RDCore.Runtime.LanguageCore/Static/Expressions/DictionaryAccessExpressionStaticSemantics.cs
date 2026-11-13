@@ -45,10 +45,12 @@ public sealed record class DictionaryAccessExpressionStaticSemantics : IStaticSe
                     $"'{owner.Name}' is not a specific class, Object, or Variant."));
         }
 
-        // the default member of the class as the composition has it now (CurrentTypes).
-        var classType = CurrentTypes.Of(context.Resolver, declaredClass);
-        return classType.DefaultMember is { } defaultMember
-            ? StaticSemanticsEvaluationResult.Success(defaultMember.ResolvedType)
-            : StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.MethodOrDataMemberNotFound, expression.Location, classType.Name));
+        // the default member of the class as the composition has it now (CurrentTypes), which takes the name as its argument.
+        return ObjectValueStaticSemantics.IndexedDefaultMemberOf(context, declaredClass, hasArguments: true) switch
+        {
+            { IsLateBound: true } => StaticSemanticsEvaluationResult.Success(VBVariantType.TypeInfo),
+            { Member: { } defaultMember } => StaticSemanticsEvaluationResult.Success(defaultMember.ResolvedType),
+            var none => StaticSemanticsEvaluationResult.Error(VBCompileErrorInfo.For(VBCompileErrorId.MethodOrDataMemberNotFound, expression.Location, none.Class.Name)),
+        };
     }
 }

@@ -21,6 +21,10 @@ using RDCore.Runtime.LanguageCore.Errors;
 
 namespace RDCore.Runtime.LanguageCore.Static;
 
+// the default member an argument list goes to, and the class it is a member of; none when that class has no default member. Late-bound when the member is
+// called with none, and returns an object of no particular class, whose default member is found out when it runs.
+public readonly record struct IndexedDefaultMember(VBClassType Class, VBTypeMemberSymbol? Member, bool IsLateBound);
+
 // MS-VBAL §5.5.1.2.13, §5.5.1.1; RD-VBAL §5.5.1.1
 public static class ObjectValueStaticSemantics
 {
@@ -62,6 +66,9 @@ public static class ObjectValueStaticSemantics
                 string.Format(Exceptions.VBCompileError_DefaultMemberTakesArguments_Verbose, classType.Name, defaultMember.Name)));
         }
 
+        // MS-VBAL §5.6.2.2 restarts the simple data value on the default member of the object a default member returns, and §5.6.2.3 lets an implementation
+        // refuse that recursion statically: MS-VBA does, for one that returns a specific class or Object - not for one that returns a Variant, which it reads
+        // when it runs (recorded in Excel). An index expression and a dictionary access restart on it (IndexedDefaultMemberOf).
         if (defaultMember.ResolvedType is VBClassType or VBObjectType)
         {
             return destination switch
@@ -75,6 +82,35 @@ public static class ObjectValueStaticSemantics
         }
 
         return StaticSemanticsEvaluationResult.Success(defaultMember.ResolvedType);
+    }
+
+    // MS-VBAL §5.6.13: the member an argument list goes to, when an object of the class is indexed with it, or accessed with a bang (§5.6.14). A default member
+    // that cannot accept any parameters is called with none, and the argument list goes to the default member of the object it returns: of a specific class, as
+    // the static analysis restarts; of Object or Variant, late-bound. A chain that comes back to a class it went through stops where it does.
+    public static IndexedDefaultMember IndexedDefaultMemberOf(StaticEvaluationContext context, VBClassType declaredClass, bool hasArguments)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var classType = CurrentTypes.Of(context.Resolver, declaredClass);
+        while (seen.Add(classType.Name) && classType.DefaultMember is { } member)
+        {
+            if (!hasArguments || OwnParameters(ParametersOf(member)).Any())
+            {
+                return new(classType, member, IsLateBound: false);
+            }
+
+            switch (member.ResolvedType)
+            {
+                case VBObjectType or VBVariantType:
+                    return new(classType, member, IsLateBound: true);
+                case VBClassType next when !seen.Contains(CurrentTypes.Of(context.Resolver, next).Name):
+                    classType = CurrentTypes.Of(context.Resolver, next);
+                    continue;
+                default:
+                    return new(classType, member, IsLateBound: false);
+            }
+        }
+
+        return new(classType, null, IsLateBound: false);
     }
 
     // MS-VBAL §5.5.1.1
