@@ -1290,8 +1290,9 @@ public static class StatementStaticSemanticsEvaluator
     }
 
     // MS-VBAL §5.4.3.8: a Let to a variable of a specific class, written without an argument list, is a Let to the default member of its object. A default
-    // member with no Property Let is invoked, and the value let-assigned to the default member of the object it returns; MS-VBA refuses the statement at
-    // compile time (recorded in Excel). Written `os()`, `os.Value`, or through a variable declared Object or Variant, MS-VBA compiles it.
+    // member with no Property Let is invoked, and the value let-assigned to the default member of the object it returns (a Property Get declared another type
+    // than a class, Object or Variant is error 451); MS-VBA refuses the statement at compile time (observed in Excel). Written `os()`, `os.Value`, or through
+    // a variable declared Object or Variant, MS-VBA compiles it.
     private static void MarkLetToADefaultMemberWithNoPropertyLet(StaticEvaluationContext context, ExpressionNode target, VBType targetType)
     {
         if (context.Facts is not { } facts
@@ -1315,7 +1316,7 @@ public static class StatementStaticSemanticsEvaluator
 
     // MS-VBAL §5.4.3.8: a Property Get with no Property Let, or a function, declared Variant and named as the target of a Let outside its own body, is run-time
     // error 451 (the property) or 450 (the function). MS-VBA calls it and let-assigns the default member of the object it returns, or raises 424 when it
-    // returns none (recorded in Excel), which is what RD-VBA does. The fact is the callee's.
+    // returns none (observed in Excel), which is what RD-VBA does. The fact is the callee's.
     private static void MarkLetThroughAVariantGetOrFunction(StaticEvaluationContext context, ExpressionNode target)
     {
         var callee = target is IndexExpressionNode { Callee: var called } ? called : target;
