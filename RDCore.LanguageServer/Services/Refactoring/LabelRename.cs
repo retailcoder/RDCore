@@ -21,7 +21,7 @@ namespace RDCore.LanguageServer.Services.Refactoring;
 internal sealed record class LabelOccurrences(
     string Name, MemberDeclarationNode Procedure, SourceRange Here, ImmutableArray<SourceRange> Occurrences, ImmutableArray<(string Name, SourcePosition At)> Others);
 
-// MS-VBAL §5.4.1.1, §5.4.2.12, §5.4.2.14, §5.4.2.16, §5.4.4.1, §5.4.4.2
+// MS-VBAL §5.4.1.1, §5.4.2.12, §5.4.2.13, §5.4.2.14, §5.4.2.16, §5.4.4.1, §5.4.4.2
 // a label is not a symbol: it is a name of its procedure only, which the statements that transfer execution to it name. A line number is not a name, and is
 // never renamed (Erl reads it).
 internal static partial class LabelRename
