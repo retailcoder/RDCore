@@ -494,7 +494,7 @@ public sealed partial class RuntimeExpressionEvaluator
 
         if (binary is { Left: BoundVariable or BoundMember or BoundIndex or BoundUnary, Right: not (BoundVariable or BoundLiteral) })
         {
-            leftResult = ReadWhereWritten(leftResult);
+            leftResult = ReadWhereWritten(leftResult, binary.Left);
         }
 
         var rightResult = EvaluateBoundNode(session, binary.Right, context);
@@ -524,10 +524,31 @@ public sealed partial class RuntimeExpressionEvaluator
         _ => false,
     };
 
+    // what a variable, an element of an array of one, a field of a record held by one, or one of them in parentheses is declared as.
+    private static VBType? DeclaredTypeOf(BoundNode node) => node switch
+    {
+        BoundVariable { Variable: ITypedSymbol { ResolvedType: var type } } => type,
+        BoundIndex { Callee: var callee } => DeclaredTypeOf(callee) is VBArrayType { ItemType: var item } ? item : null,
+        BoundMember { Member: { ResolvedType: var type } } => type,
+        BoundMember { Owner: { } owner, Access: var access }
+            => DeclaredTypeOf(owner) is VBUserDefinedType record ? record.Field(access.Member.IdentifierName)?.ResolvedType : null,
+        BoundUnary { Plan: null, Operation.Token: SDK.Model.Symbols.Operators.OperatorSymbolNames.UnaryArithmeticPrecedenceOp, Operand: var enclosed }
+            => DeclaredTypeOf(enclosed),
+        _ => null,
+    };
+
     private static bool IsOfLateType(VBType type) => type is VBSingleType or VBDoubleType or VBDateType or VBVariantType or (VBStringType and not VBFixedStringType);
 
-    private static RuntimeSemanticsEvaluationResult ReadWhereWritten(RuntimeSemanticsEvaluationResult read)
+    // a fixed-length String is read where it is written too: s & Pre(s) is the characters s held before the call (MS-VBA, observed in Excel). Its value
+    // reads the characters where they are held, so it is given a String of them.
+    private static RuntimeSemanticsEvaluationResult ReadWhereWritten(RuntimeSemanticsEvaluationResult read, BoundNode operand)
     {
+        if (read.Result is VBStringValue { Value: var text } held && DeclaredTypeOf(operand) is VBFixedStringType)
+        {
+            VBTypedValue characters = new VBStringValue(text);
+            return RuntimeSemanticsEvaluationResult.Success(held.IsIndeterminate ? characters.AsIndeterminate() : characters);
+        }
+
         if (read.Result is not { TypeInfo: VBByteType or VBBooleanType or VBIntegerType or VBLongType or VBLongLongType or VBCurrencyType } value
             || !ScalarPayload.TryOf(value.TypeInfo, value.RuntimeValue, out var payload))
         {

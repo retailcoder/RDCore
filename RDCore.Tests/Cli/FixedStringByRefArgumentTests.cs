@@ -20,6 +20,7 @@ public sealed class FixedStringByRefArgumentTests
             "Private Sub Shrink(ByRef S As String)\r\n    S = \"z\"\r\nEnd Sub\r\n" +
             "Private Sub GrowErr(ByRef S As String)\r\n    S = \"abcdef\"\r\n    Err.Raise 5\r\nEnd Sub\r\n" +
             "Private Sub GrowSee(ByRef S As String)\r\n    S = \"abcdef\"\r\n    Debug.Print \"in \" & Len(S) & \" [\" & S & \"] g[\" & G & \"]\"\r\nEnd Sub\r\n" +
+            "Private Function Pre(ByRef S As String) As String\r\n    S = \"b\" & S\r\n    Pre = S\r\nEnd Function\r\n" +
             "Public Sub Main()\r\n" + string.Join("\r\n", body) + "\r\nEnd Sub\r\n";
 
     private static async Task Expect(string[] expected, string program, VBExecutionEngine engine)
@@ -59,6 +60,22 @@ public sealed class FixedStringByRefArgumentTests
             "    Debug.Print \"[\" & T.F & \"] \" & Len(T.F)",
             "    Grow E(1)",
             "    Debug.Print \"[\" & E(1) & \"] \" & Len(E(1))"), engine);
+
+    // an operand left of the call is read where it is written, before the call: what the variable held then, and the variable is let what the callee
+    // assigned after it (MS-VBA, observed in Excel for a variable).
+    [TestMethod]
+    [DataRow(VBExecutionEngine.Interpreter, DisplayName = "Interpreter")]
+    [DataRow(VBExecutionEngine.Compiled, DisplayName = "Compiled")]
+    public async Task AnOperandLeftOfTheCall_IsWhatTheVariableHeldBeforeIt(VBExecutionEngine engine)
+        => await Expect(["[a  ba  ] [ba ]", "[a  ba  ] [ba ]", "[a  ba  ] [ba ]"], Program(
+            "    Dim F As String * 3, T As TF, E(1 To 2) As String * 3, R As String",
+            "    F = \"a\": T.F = \"a\": E(1) = \"a\"",
+            "    R = F & Pre(F)",
+            "    Debug.Print \"[\" & R & \"] [\" & F & \"]\"",
+            "    R = T.F & Pre(T.F)",
+            "    Debug.Print \"[\" & R & \"] [\" & T.F & \"]\"",
+            "    R = E(1) & Pre(E(1))",
+            "    Debug.Print \"[\" & R & \"] [\" & E(1) & \"]\""), engine);
 
     // a call that raises an error does not return, and the variable keeps what it held.
     [TestMethod]
