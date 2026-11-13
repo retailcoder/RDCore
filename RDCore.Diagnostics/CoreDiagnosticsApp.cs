@@ -61,6 +61,8 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, IsMissingAlwaysFalseAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ShadowedDeclarationAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, LineContinuationBetweenKeywordsAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ProcedureCanBeWrittenAsFunctionAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, SelfAssignedDeclarationAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ImplicitNarrowingConversionAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, BitwiseSemanticsAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, AmbiguousConcatenationAnalyzer>();
@@ -96,11 +98,19 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, ObsoleteWhileWendAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObsoleteOnLocalErrorStatementAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, EmptyStringLiteralAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, VariableNotUsedAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, VariableNotAssignedAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ParameterNotUsedAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, AssignedByValParameterAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ConstantNotUsedAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, LineLabelNotUsedAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, WriteOnlyPropertyAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, RedundantByValArgumentAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObjectVariablePassedByRefAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObjectVariablePassedLateAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ForEachControlEmptiedAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, CollectionSetToNothingInItsOwnLoopAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, IIfSideEffectAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, EarlyBindingOpportunityAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, SetThroughACallAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, NewOfAClassNotCreatableAnalyzer>();
@@ -116,6 +126,8 @@ internal class CoreDiagnosticsApp(
         // what the host vouches for about a member, and the names a module chooses.
         services.AddSingleton<IModuleAnalyzer, ImplementationsShouldBePrivateAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, UnmatchedEventHandlerAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, EncapsulatePublicFieldAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, SuspiciousPredeclaredInstanceAccessAnalyzer>();
 
         // what RD-VBA does not host: the code of a host's document, which is analyzed and does not run.
         services.AddSingleton<IModuleAnalyzer, HostedDocumentCodeAnalyzer>();
