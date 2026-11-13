@@ -29,8 +29,9 @@ public sealed class SemanticModelStore
     private volatile ImmutableDictionary<string, Stored> _models = ImmutableDictionary<string, Stored>.Empty;
     private readonly Dictionary<string, Evaluation> _evaluations = [];
 
-    // a module's model, and the facts of the expressions of its declarations that the model was made with: they are read together, from one snapshot.
-    private sealed record Stored(ModuleSemanticModel Model, ModuleDeclarationFacts? Declarations);
+    // a module's model, the facts of the expressions of its declarations that the model was made with, and the names its excluded #If branches write: they are
+    // read together, from one snapshot.
+    private sealed record Stored(ModuleSemanticModel Model, ModuleDeclarationFacts? Declarations, IReadOnlySet<string>? ExcludedBranchNames);
 
     private sealed record Evaluation(CancellationTokenSource Cancellation, Task Completion);
 
@@ -66,12 +67,18 @@ public sealed class SemanticModelStore
     /// The facts of the expressions in the module's declarations (the value of a constant, the bounds of an array) that the model was made with; <see langword="null"/>
     /// when the module has none to give. <see cref="AcrossProject"/> counts the references they make.
     /// </param>
-    public void Store(ModuleSemanticModel model, Func<CancellationToken, ImmutableDictionary<SemanticId, RuntimeFacts>>? evaluate, ModuleDeclarationFacts? declarations = null)
+    /// <param name="excludedBranchNames">
+    /// The names that the module's excluded <c>#If</c> branches write (<see cref="ExcludedBranchNames"/>); <see langword="null"/> when it has none.
+    /// <see cref="AcrossProject"/> states no count for a declaration of one of these names.
+    /// </param>
+    public void Store(
+        ModuleSemanticModel model, Func<CancellationToken, ImmutableDictionary<SemanticId, RuntimeFacts>>? evaluate, ModuleDeclarationFacts? declarations = null,
+        IReadOnlySet<string>? excludedBranchNames = null)
     {
         lock (_storing)
         {
             var key = model.Module.AbsoluteUri;
-            _models = _models.SetItem(key, new Stored(model, declarations));
+            _models = _models.SetItem(key, new Stored(model, declarations, excludedBranchNames));
             Stop(key);
 
             if (evaluate is not null)
@@ -177,7 +184,9 @@ public sealed class SemanticModelStore
         var snapshot = _models.Values.ToList();
         var declarations = snapshot.Where(stored => stored.Declarations is not null)
             .ToImmutableDictionary(stored => stored.Model.Module.AbsoluteUri, stored => stored.Declarations!, StringComparer.Ordinal);
-        return DeclarationUsage.AcrossProject([.. snapshot.Select(stored => stored.Model)], declarations, project);
+        var excluded = snapshot.Where(stored => stored.ExcludedBranchNames is { Count: > 0 })
+            .ToImmutableDictionary(stored => stored.Model.Module.AbsoluteUri, stored => stored.ExcludedBranchNames!, StringComparer.Ordinal);
+        return DeclarationUsage.AcrossProject([.. snapshot.Select(stored => stored.Model)], declarations, project, excluded);
     }
 
     /// <summary>

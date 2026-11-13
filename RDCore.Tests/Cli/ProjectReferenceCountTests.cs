@@ -83,6 +83,36 @@ public sealed class ProjectReferenceCountTests
     }
 
     [TestMethod]
+    public async Task AFunctionThatCallsItself_IsReadByItsOwnCall()
+    {
+        (string, string) recursive = ("Counter", ModuleWorkspace.ClassModule("Counter",
+            "Friend Function Again() As Long", "Again = Again()", "End Function"));
+        var again = Declaration(await ModelOfAsync("Counter", Program("Public Sub Main()", "End Sub"), classes: [recursive]), "Again");
+
+        Assert.AreEqual(new DeclarationReferences(1, 0, 0), again.References);
+        Assert.HasCount(1, again.ReferencedFrom!.Value);
+        Assert.AreEqual("Counter.Again", SymbolUri.QualifiedNameOf(again.ReferencedFrom.Value[0].Procedure!), "the site is in the function itself");
+    }
+
+    [TestMethod]
+    public async Task AFriendProcedureThatAnExcludedBranchOfAnotherModuleCalls_HasNoCount()
+    {
+        var model = await ModelOfAsync("Counter", Program(
+            "#Const FEATURE = 0",
+            "Public Sub Main()",
+            "Dim c As New Counter",
+            "#If FEATURE Then",
+            "c.Unused",
+            "#Else",
+            "c.Add",
+            "#End If",
+            "End Sub"));
+
+        Assert.IsNull(Declaration(model, "Unused").References, "only the excluded branch calls it");
+        Assert.AreEqual(new DeclarationReferences(1, 0, 0), Declaration(model, "Add").References, "the live branch's call is counted");
+    }
+
+    [TestMethod]
     public async Task AFunctionCalledAsAStatement_IsAReferenceThatDiscardsTheValueItReturns()
     {
         (string, string) twice = ("Counter", ModuleWorkspace.ClassModule("Counter",
