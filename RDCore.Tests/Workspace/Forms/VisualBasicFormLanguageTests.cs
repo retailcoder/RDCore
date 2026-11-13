@@ -415,15 +415,15 @@ public sealed class VisualBasicFormLanguageTests
             $"{statements}\r\nUnload Form1");
 
     [TestMethod]
-    [Ignore("the RDForms TextBox this stack hosts has no MultiLine or ScrollBars property")]
+    [Ignore("a TextBox's MultiLine and ScrollBars are not implemented in the RDForms version RDCore references")]
     [DataRow("o", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through an Object")]
     [DataRow("o", "ScrollBars = 2", "ScrollBars", DisplayName = "ScrollBars, through an Object")]
     [DataRow("c", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through a Control")]
     [DataRow("c", "ScrollBars = 2", "ScrollBars", DisplayName = "ScrollBars, through a Control")]
     [DataRow("Form1.Controls(\"Text1\")", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through the form's Controls")]
     [DataRow("v", "MultiLine = True", "MultiLine", DisplayName = "MultiLine, through a Variant")]
-    [DataRow("o", "MultiLine = False", "MultiLine", DisplayName = "MultiLine, to the value it has")]
-    [DataRow("o", "ScrollBars = 0", "ScrollBars", DisplayName = "ScrollBars, to the value it has")]
+    [DataRow("o", "MultiLine = False", "MultiLine", DisplayName = "MultiLine, assigned the value it already has")]
+    [DataRow("o", "ScrollBars = 0", "ScrollBars", DisplayName = "ScrollBars, assigned the value it already has")]
     public async Task ATextBoxsDesignTimeProperty_AssignedLateBound_IsError382(string target, string assignment, string property)
     {
         var printed = await RunWithText1Async($"{target}.{assignment}\r\nDebug.Print Err.Number & \"|\" & Err.Description");
@@ -432,7 +432,7 @@ public sealed class VisualBasicFormLanguageTests
     }
 
     [TestMethod]
-    [Ignore("the RDForms TextBox this stack hosts has no MultiLine or ScrollBars property")]
+    [Ignore("a TextBox's MultiLine and ScrollBars are not implemented in the RDForms version RDCore references")]
     public async Task AValueThatDoesNotCoerce_ToATextBoxsDesignTimeProperty_IsTheCoercionsError_Before382()
     {
         var printed = await RunWithText1Async("o.MultiLine = \"x\"\r\nDebug.Print Err.Number");
@@ -441,7 +441,7 @@ public sealed class VisualBasicFormLanguageTests
     }
 
     [TestMethod]
-    [Ignore("the RDForms TextBox this stack hosts has no MultiLine or ScrollBars property")]
+    [Ignore("a TextBox's MultiLine and ScrollBars are not implemented in the RDForms version RDCore references")]
     public async Task ATextBoxsDesignTimeProperty_IsReadLateBound_AsItsDesignerSetsIt()
     {
         var printed = await RunWithText1Async("o.MultiLine = True\r\nDebug.Print o.MultiLine & \"|\" & o.ScrollBars");
@@ -450,7 +450,7 @@ public sealed class VisualBasicFormLanguageTests
     }
 
     [TestMethod]
-    [Ignore("the RDForms CommandButton this stack hosts has no Style property")]
+    [Ignore("a CommandButton's Style is not implemented in the RDForms version RDCore references")]
     public async Task ACommandButtonsStyle_AssignedLateBound_IsError382_AndKeepsTheDesignersValue()
     {
         var printed = await RunWithRDFormsAsync(
