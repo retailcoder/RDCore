@@ -18,7 +18,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// (<see cref="DeclaredNames"/>).
 /// </para>
 /// <para>
-/// 🚧 TODO the names of the controls of a form (<c>txtName</c>, <c>cmdOK</c>) are not reported, since the platform has no source range for a control yet. A name that
+/// The names of the controls of a form (<c>txtName</c>, <c>cmdOK</c>) are not reported: the platform has no source range for a control. A name that
 /// begins with a control's prefix is reported wherever the module declares it.
 /// </para>
 /// </remarks>
