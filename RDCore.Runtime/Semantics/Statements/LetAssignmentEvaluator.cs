@@ -1132,6 +1132,21 @@ public sealed class LetAssignmentEvaluator(
                 VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod, reachedThrough.Location, Exceptions.VBMemberAssignment_NotAssignable_Verbose));
         }
 
+        // MS-VBAL §5.4.3.8 let-assigns the default property of the object, and a function is not a property: error 438. MS-VBA refuses the statement at
+        // compile time where the expression is declared a class, and raises 450 where it runs it late-bound, through an Object or a Variant (observed in
+        // Excel). A function that takes an argument, given none, is 438 late-bound as well: it is left to the assignment of the object's member below, which
+        // raises it.
+        if (!isSet && defaultMember is VBFunctionMemberSymbol function
+            && RuntimeProcedureInvoker.GetParameters(function).All(parameter
+                => parameter.Name == Tokens.Me || parameter is ParamArrayParameterSymbol || parameter.IsOptional))
+        {
+            return RuntimeExecutionOutcome.Error(VBRuntimeErrorInfo.For(
+                expressions.DeclaredTypeOf(session, reachedThrough, context) is VBClassType
+                    ? VBRuntimeErrorId.ObjectDoesntSupportThisPropertyOrMethod
+                    : VBRuntimeErrorId.WrongNumberOfArgumentsOrInvalidPropertyAssignment,
+                reachedThrough.Location, Exceptions.VBMemberAssignment_NotAssignable_Verbose));
+        }
+
         var access = DefaultMemberAccess(reachedThrough, defaultMember.Name);
         return observed
             ? AssignObjectMember(session, context, statement, access, [], owner, source, value, isSet,

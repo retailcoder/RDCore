@@ -96,14 +96,19 @@ property after the target would. This holds for a variable, `Me`, a public varia
 | `Nothing`, declared `As New` | The target is given its object first, and that object's property is assigned. |
 | `Nothing` | Error 91. |
 | An object whose class has no default property | Error 438. |
+| An object whose default member is a function that can be called with no argument | Error 438 when the target is declared as a class; error 450 when it is reached late-bound. |
 
-A default member with no `Property Let` is assigned as [Members of an object](#members-of-an-object) describes: a `Property Get` or a function that
-returns an object has that object's default member assigned.
+A default `Property Get` with no `Property Let` is assigned as [Members of an object](#members-of-an-object) describes: when it returns an object, that
+object's default member is assigned.
 
 **RD-VBA differs from MS-VBA:** MS-VBA refuses at compile time a Let to a target of a specific class whose default member has no `Property Let`:
 "Invalid use of property" when it is a `Property Get` (`os = 5`, `Me = 5`), "Type mismatch" when it is a function (observed in Excel). **MS-VBAL
-§5.4.3.8** makes the statement valid, and RD-VBA compiles and runs it. Naming the member (`os.S = 5`) or giving it an empty argument list
-(`os() = 5`) compiles in both. [RDC11045](../diagnostics/rdc11045.md) reports the statement.
+§5.4.3.8** makes the statement valid, and RD-VBA compiles it: it assigns through a `Property Get`, and raises error 438 for a function, which is not a
+default property. Naming the member (`os.S = 5`) or giving it an empty argument list (`os() = 5`) compiles in both.
+[RDC11045](../diagnostics/rdc11045.md) reports the statement.
+
+**RD-VBA differs from MS-VBAL:** a function default member reached late-bound, through an `Object` or a `Variant`, is error 450, as MS-VBA raises it
+(observed in Excel). **MS-VBAL §5.4.3.8** raises error 438.
 
 ### Function result variable
 
