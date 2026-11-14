@@ -41,7 +41,7 @@ internal sealed class StringComparedWithANumberAsADoubleAnalyzer : IModuleAnalyz
     // whether the comparison of the String's Double with the number can answer otherwise than the comparison of the String's value in the specified type. It
     // cannot for a String that both Let-coercions refuse alike ("abc" is 13 either way), nor for a known String and a known number the two answer alike for.
     // With the number not known, the two answer alike for every number but those next to the String's value: "2.5" is the table's 2, and 2.5 < n is 2 < n for
-    // every integer n, where 2.5 > n is not 2 > n for n = 2. Past 2^53, where a Double holds no longer every integer, a LongLong that is not known is not
+    // every integer n, where 2.5 > n is not 2 > n for n = 2. Past 2^53, where a Double does not hold every integer, a LongLong that is not known is not
     // compared alike.
     private static bool CanAnswerOtherwise(string op, StringOperandFact operand)
     {

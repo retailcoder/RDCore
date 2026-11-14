@@ -177,7 +177,7 @@ the table's type:
   It compares them for the number, when it is known, and otherwise for the numbers next to the `String`'s value. Only there can they differ: `"2.5"` is
   the table's `2`, and `"2.5" < n` is `2 < n` for every integer, where `"2.5" > n` is not `2 > n` for `n = 2`.
 
-It does not report a known `String` that is no number, a type mismatch (13) either way. RDCore.Diagnostics reports it as
+It does not report a known `String` that is not a number, a type mismatch (13) either way. RDCore.Diagnostics reports it as
 [`RDC11027`](../diagnostics/rdc11027.md), a warning.
 
 ### An expression over a Variant
