@@ -34,6 +34,7 @@ internal sealed class RDFormsForm : IComponentEventSink
         Window = new VBFormWindow(model) { UnloadRequestHandler = AskToUnload };
         VBControl.SetEventSink(Window, this);
         Handle = HandleOf(model.Root);
+        Controls = new RDFormsControls(this);
     }
 
     public Model.FormDefinition Model { get; }
@@ -44,6 +45,9 @@ internal sealed class RDFormsForm : IComponentEventSink
     public VBFormWindow Window { get; }
 
     public RDFormsObject Handle { get; }
+
+    // the form's Controls collection.
+    public RDFormsControls Controls { get; }
 
     public bool IsDestroyed { get; private set; }
 

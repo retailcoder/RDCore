@@ -179,7 +179,6 @@ public sealed class VisualBasicFormMethodTests
     }
 
     [TestMethod]
-    [Ignore("the Controls collection of a VB6 form hosted by RDForms is not implemented")]
     public async Task ZOrder_DoesNotReorderTheControlsCollection()
     {
         var printed = await ShownAsync("Form2.Text1.ZOrder 1", "Form2.Text3.ZOrder 0", "Dim c As Object", "For Each c In Form2.Controls", "Debug.Print c.Name", "Next");

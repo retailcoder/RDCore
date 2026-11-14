@@ -24,6 +24,8 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     private const int VisualBasicError = unchecked((int)0x800A0000);
     private const string VisualBasicLibrary = "VB";
     private const string PopupMenuMember = "PopupMenu";
+    private const string ControlsMember = "Controls";
+    private const string NameMember = "Name";
 
     /// <summary>
     /// Creates the server of the forms of a process, whose windows are on <paramref name="platform"/>.
@@ -46,7 +48,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     /// Whether an object is one of this server's: a form, or one of its controls.
     /// </summary>
     /// <param name="handle">The handle of the object.</param>
-    public bool Owns(object handle) => handle is RDFormsObject;
+    public bool Owns(object handle) => handle is RDFormsObject or RDFormsControls or RDFormsControlsEnumerator;
 
     /// <inheritdoc/>
     public bool IsAvailable => true;
@@ -57,6 +59,15 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     /// <inheritdoc/>
     public object? Invoke(object target, string member, AutomationInvocation invocation, object?[] arguments, bool[] byReference, CultureInfo culture)
     {
+        if (target is RDFormsControls collection)
+        {
+            return RDFormsUI.Run(() =>
+            {
+                Alive(collection.Form.Handle);
+                return RDFormsControlsMembers.Invoke(collection, member, invocation, arguments, culture);
+            });
+        }
+
         var handle = HandleOf(target);
         return RDFormsUI.Run(() =>
         {
@@ -80,6 +91,21 @@ public sealed class RDFormsAutomationServer : IAutomationServer
             if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && component.Class.Method(member) is { } method)
             {
                 return Call(handle, method, arguments, culture);
+            }
+
+            // a control's name is no property of its class: the file names the control, and Controls.Add names the one it adds.
+            if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0
+                && string.Equals(member, NameMember, StringComparison.OrdinalIgnoreCase))
+            {
+                return component.Name;
+            }
+
+            // the form's collection of its controls, which a control of its file cannot be named for; given arguments, its default member: Controls(0) is
+            // Controls.Item(0).
+            if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && handle.IsForm
+                && string.Equals(member, ControlsMember, StringComparison.OrdinalIgnoreCase))
+            {
+                return arguments.Length == 0 ? handle.Form.Controls : RDFormsControlsMembers.Invoke(handle.Form.Controls, "Item", invocation, arguments, culture);
             }
 
             if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0
@@ -211,31 +237,50 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     }
 
     /// <inheritdoc/>
-    public string? ClassNameOf(object target) => HandleOf(target).Component.Class.TypeName;
+    public string? ClassNameOf(object target)
+        // the Controls collection is of no class of a library: a late-bound Object.
+        => target is RDFormsControls ? null : HandleOf(target).Component.Class.TypeName;
 
     /// <inheritdoc/>
     public bool? IsInstanceOf(object target, string library, string className)
-        => string.Equals(library, VisualBasicLibrary, StringComparison.OrdinalIgnoreCase)
-            ? string.Equals(HandleOf(target).Component.Class.ClassName, className, StringComparison.OrdinalIgnoreCase)
-            : null;
+        => target is RDFormsControls
+            ? null
+            : string.Equals(library, VisualBasicLibrary, StringComparison.OrdinalIgnoreCase)
+                ? string.Equals(HandleOf(target).Component.Class.ClassName, className, StringComparison.OrdinalIgnoreCase)
+                : null;
 
     /// <inheritdoc/>
     public bool MoveNext(object enumerator, out object? current)
-        => throw new AutomationException(NotImplemented, "RDForms objects have no enumerator.");
+        => enumerator is RDFormsControlsEnumerator controls
+            ? controls.MoveNext(out current)
+            : throw new AutomationException(NotImplemented, "Only a form's Controls collection has an enumerator.");
 
     /// <inheritdoc/>
-    public void Reset(object enumerator) => throw new AutomationException(NotImplemented, "RDForms objects have no enumerator.");
+    public void Reset(object enumerator)
+    {
+        if (enumerator is not RDFormsControlsEnumerator controls)
+        {
+            throw new AutomationException(NotImplemented, "Only a form's Controls collection has an enumerator.");
+        }
+
+        controls.Reset();
+    }
 
     /// <inheritdoc/>
     public void Advise(object source, IAutomationEventSink sink)
     {
-        var handle = HandleOf(source);
+        var handle = source is RDFormsControls ? throw new AutomationException(NotImplemented, "A form's Controls collection raises no events.") : HandleOf(source);
         RDFormsUI.Run(() => handle.Form.Advise(handle.Component, sink));
     }
 
     /// <inheritdoc/>
     public void Unadvise(object source)
     {
+        if (source is RDFormsControls)
+        {
+            return;
+        }
+
         var handle = HandleOf(source);
         RDFormsUI.Run(() => handle.Form.Unadvise(handle.Component));
     }
@@ -268,5 +313,23 @@ public sealed class RDFormsAutomationServer : IAutomationServer
         {
             throw new AutomationException(unchecked((int)0x80010108), $"{handle}: its form was destroyed.");
         }
+
+        // a control Controls.Remove took out of the form, or one a control it took out held: any use of it is 735, whatever still holds its object.
+        if (!handle.IsForm && !IsPlaced(handle))
+        {
+            throw new AutomationException(VisualBasicError | FormError.ControlRemoved.Number, FormError.ControlRemoved.Description);
+        }
+    }
+
+    // whether a control is in its form: its containers lead to the form's root.
+    internal static bool IsPlaced(RDFormsObject handle)
+    {
+        var component = handle.Component;
+        while (component.Container is { } container)
+        {
+            component = container;
+        }
+
+        return ReferenceEquals(component, handle.Form.Model.Root);
     }
 }
