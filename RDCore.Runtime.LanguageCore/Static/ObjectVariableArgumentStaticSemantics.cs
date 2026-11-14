@@ -50,7 +50,7 @@ public static class ObjectVariableArgumentStaticSemantics
         for (var index = 0; index < arguments.Count; index++)
         {
             var (name, passed) = arguments[index] is NamedArgumentNode named ? (named.Name, named.Value) : ((string?)null, arguments[index]);
-            // what a ParamArray collects is passed by reference, as a ByRef parameter's argument is (MS-VBA, recorded in Excel: oracle\s58 F01).
+            // what a ParamArray collects is passed by reference, as a ByRef parameter's argument is (MS-VBA, observed in Excel).
             if (ParameterOf(parameters, index, name) is { } parameter && parameter.ParameterKind is not ParameterKind.ExplicitByVal)
             {
                 Mark(context, passed, ValueExpressionSemanticFlags.ObjectVariablePassedAsACopy);
@@ -66,7 +66,7 @@ public static class ObjectVariableArgumentStaticSemantics
         }
     }
 
-    // b.Count, or b.V(0): an element of the array a Variant variable holds, whose variable is the copy that is passed (s58 B01); a class has no public array
+    // b.Count, or b.V(0): an element of the array a Variant variable holds, whose variable is the copy that is passed; a class has no public array
     // variable. Of a variable of any other type (b.Items(1), Items a Collection) it is the value of the default member of what the variable holds, which
     // MS-VBAL passes as a copy too.
     private static bool IsObjectVariableOrElement(StaticEvaluationContext context, ExpressionNode passed) => passed switch

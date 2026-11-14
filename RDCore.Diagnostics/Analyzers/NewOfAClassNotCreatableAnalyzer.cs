@@ -13,7 +13,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </summary>
 /// <remarks>
 /// The class's library says it can be created, so <strong>MS-VBAL §5.6.8</strong> and <strong>§5.2.3.1.4</strong> make <c>New</c> of it valid; nothing
-/// creates one, and creating it raises run-time error -2147221164 <em>Class not registered</em> (recorded in Excel: <c>oracle\s62</c> X04, X06-X09). That
+/// creates one, and creating it raises run-time error -2147221164 <em>Class not registered</em> (observed in Excel). That
 /// holds of every path, whether or not the run-time facts reach the code, and it is reported wherever it is written, at Warning severity.
 /// </remarks>
 internal sealed class NewOfAClassNotCreatableAnalyzer : IModuleAnalyzer

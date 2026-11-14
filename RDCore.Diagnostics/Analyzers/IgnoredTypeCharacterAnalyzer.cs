@@ -11,7 +11,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <c>Abs%</c> - which <strong>MS-VBAL §5.6.10</strong> makes invalid, and <strong>MS-VBA</strong> compiles, the character ignored.
 /// </summary>
 /// <remarks>
-/// RD-VBA does as MS-VBA does (recorded in Excel: oracle\s46 F18, oracle\s44 D01-D18): <c>Len$("abc")</c> is <c>3</c>, a <c>Long</c>. A warning, because the
+/// RD-VBA does as MS-VBA does (observed in Excel): <c>Len$("abc")</c> is <c>3</c>, a <c>Long</c>. A warning, because the
 /// specification refuses the name, and the character says a type the call does not have. The host states it from the declarations
 /// (<see cref="ValueExpressionSemanticFlags.IgnoredTypeCharacter"/>).
 /// </remarks>

@@ -59,7 +59,7 @@ public sealed record class IndexExpressionStaticSemantics : IStaticSemantics
         {
             // MS-VBAL 5.6.13.1: an empty argument list, of an array that was not already given one, is the array itself - `f()` is `f`, as `UBound(f())` and
             // `Erase f()` read it. A second one, `f()()`, the specification makes invalid; MS-VBA compiles it as the array (`UBound(f()())` compiles), and
-            // raises 9 when it runs (Excel-verified, oracle\s53 E07, E08, F07, F08). RD-VBA does too, and warns (RDC11025,
+            // raises 9 when it runs (observed in Excel). RD-VBA does too, and warns (RDC11025,
             // ValueExpressionSemanticFlags.ArrayGivenASecondEmptyArgumentList).
             if (IndexExpressionNode.IsEmptyArgumentList(index.Arguments))
             {

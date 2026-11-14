@@ -12,7 +12,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <remarks>
 /// That the argument is one is a fact the language core states about it (<see cref="ValueExpressionSemanticFlags.ObjectVariablePassedLateAsACopy"/>). What the
 /// procedure does with it is not known until it runs: if it takes the argument <c>ByRef</c>, what it assigns to the parameter is not written back to the
-/// object's variable, as MS-VBA has it (oracle\s58 F04, RD-VBAL §5.3.1.11). A hint: a fact about how the argument is passed, not a problem to fix.
+/// object's variable, as MS-VBA has it (observed in Excel; RD-VBAL §5.3.1.11). A hint: a fact about how the argument is passed, not a problem to fix.
 /// </remarks>
 internal sealed class ObjectVariablePassedLateAnalyzer : IModuleAnalyzer
 {

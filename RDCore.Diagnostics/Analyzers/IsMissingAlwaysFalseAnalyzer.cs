@@ -13,7 +13,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <remarks>
 /// Only a <c>Variant</c> parameter can be missing: an omitted argument leaves a parameter of any other type its type's default value, and gives an
 /// <c>Optional</c> <c>Variant</c> its default value when it has one. An <c>IsMissing</c> of such a parameter looks like a test and never is one, which MS-VBA
-/// compiles without a word (recorded in Excel: oracle\ismissing I01-I09). The host states it from the parameter's declaration
+/// compiles without a word (observed in Excel). The host states it from the parameter's declaration
 /// (<see cref="ValueExpressionSemanticFlags.IsMissingAlwaysFalse"/>); the analyzer reads the argument's declared type only to say which of the two it is.
 /// </remarks>
 internal sealed class IsMissingAlwaysFalseAnalyzer : IModuleAnalyzer

@@ -44,7 +44,7 @@ public sealed class StdLibClassAttribute(string? name = null) : Attribute
     /// <remarks>
     /// MS-VBA's type library says the <c>ErrObject</c> class can be created, so <c>New ErrObject</c>
     /// compiles; no server creates one, and the program raises run-time error -2147221164 <em>Class not
-    /// registered</em> where it is created (recorded in Excel: <c>oracle\s62</c> X04, X06-X09). The one
+    /// registered</em> where it is created (observed in Excel). The one
     /// object of the class is the one the <c>Err</c> function returns.
     /// </remarks>
     public bool CreationAlwaysFails { get; init; }
@@ -59,7 +59,7 @@ public sealed class StdLibClassAttribute(string? name = null) : Attribute
 
     /// <summary>
     /// What <c>TypeName</c> says of an object of the class, when it is not the class's name: the VBA library's <c>UserForms</c> collection is an object whose class
-    /// MS-VBA names nothing, and <c>TypeName(UserForms)</c> is <c>Object</c> (Excel-measured, <c>oracle\s41</c> U01).
+    /// MS-VBA names nothing, and <c>TypeName(UserForms)</c> is <c>Object</c> (observed in Excel).
     /// </summary>
     public string? TypeName { get; init; }
 }

@@ -9,7 +9,7 @@ namespace RDCore.Tests.Diagnostics;
 
 /// <summary>
 /// <c>RDC11015</c>: an object of a class that has no default member, where a value is expected - which MS-VBA compiles, to raise 438 when it runs (91 when
-/// it is <c>Nothing</c>; Excel, <c>oracle\s46</c> F16a-c), and MS-VBAL §5.5.1.1 makes a compile error.
+/// it is <c>Nothing</c>; observed in Excel), and MS-VBAL §5.5.1.1 makes a compile error.
 /// </summary>
 [TestClass]
 public sealed class ValueOfObjectWithNoDefaultMemberAnalyzerTests
