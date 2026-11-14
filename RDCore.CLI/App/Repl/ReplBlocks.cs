@@ -26,17 +26,23 @@ namespace RDCore.CLI.App.Repl;
 /// <param name="program">The program buffer.</param>
 internal sealed class ReplBlocks(ReplProgram program)
 {
-    /// <summary>How far apart the numbers block completion suggests are.</summary>
+    /// <summary>
+    /// How far apart the numbers block completion suggests are.
+    /// </summary>
     public const int Step = 10;
 
     private readonly ModuleParser _parser = new();
     private IReadOnlyList<ProgramBlock> _open = [];
     private int _stored;
 
-    /// <summary>Whether block completion is on: the line last stored is in a block that has no closer.</summary>
+    /// <summary>
+    /// Whether block completion is on: the line last stored is in a block that has no closer.
+    /// </summary>
     public bool IsOpen => _open.Count > 0;
 
-    /// <summary>The closers of the open blocks, the innermost first.</summary>
+    /// <summary>
+    /// The closers of the open blocks, the innermost first.
+    /// </summary>
     public IReadOnlyList<string> Closers => [.. _open.Select(block => block.Closer)];
 
     /// <summary>
@@ -72,7 +78,9 @@ internal sealed class ReplBlocks(ReplProgram program)
         return null;
     }
 
-    /// <summary>Block completion ends: an empty line, a command or a statement to run was entered, or a line was deleted.</summary>
+    /// <summary>
+    /// Block completion ends: an empty line, a command or a statement to run was entered, or a line was deleted.
+    /// </summary>
     public void Leave() => _open = [];
 
     /// <summary>
