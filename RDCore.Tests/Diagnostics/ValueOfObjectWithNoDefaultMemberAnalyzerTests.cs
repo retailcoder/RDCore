@@ -30,9 +30,9 @@ public sealed class ValueOfObjectWithNoDefaultMemberAnalyzerTests
     }
 
     [TestMethod]
-    [DataRow("Set o = New Plain ;; c = o", DisplayName = "F16c Let to a Variant")]
-    [DataRow("c = CInt(o)", DisplayName = "F16b a conversion")]
-    [DataRow("Set o = New Plain ;; c = Split(\"a,b,c\", \",\", o)", DisplayName = "F16a an argument of the library")]
+    [DataRow("Set o = New Plain ;; c = o", DisplayName = "Let to a Variant")]
+    [DataRow("c = CInt(o)", DisplayName = "a conversion")]
+    [DataRow("Set o = New Plain ;; c = Split(\"a,b,c\", \",\", o)", DisplayName = "an argument of the library")]
     [DataRow("l = New Plain", DisplayName = "Let to a Long")]
     [DataRow("l = 1 + o", DisplayName = "an operand")]
     [DataRow("ByLng o", DisplayName = "an argument of a value type")]

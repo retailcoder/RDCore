@@ -29,8 +29,8 @@ public sealed class ObjectToFileTests
     }
 
     [TestMethod]
-    [DataRow("Set v = New Collection", DisplayName = "U02 an object")]
-    [DataRow("Set v = Nothing", DisplayName = "U06 Nothing")]
+    [DataRow("Set v = New Collection", DisplayName = "an object")]
+    [DataRow("Set v = Nothing", DisplayName = "Nothing")]
     public void Put_OfAVariantThatHoldsAnObject_IsATypeMismatch_OnceItsDescriptorIsWritten(string set)
     {
         var (printed, files) = Run($"Dim v As Variant ;; {set} ;; Open \"{Path}\" For Binary As #1 ;; Err.Clear ;; Put #1, , v ;; P Err.Number ;; Close #1");

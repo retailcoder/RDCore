@@ -233,9 +233,9 @@ public sealed class StdInteractionTests
     public void InputBox_AnswersWhatWasTyped()
     {
         var interaction = Substitute.For<IUserInteraction>();
-        interaction.Prompt(Arg.Any<InputBoxRequest>(), Arg.Any<CancellationToken>()).Returns("Mathieu");
+        interaction.Prompt(Arg.Any<InputBoxRequest>(), Arg.Any<CancellationToken>()).Returns("Duck");
 
-        CollectionAssert.AreEqual(new[] { "Hello, Mathieu" }, Run(With(interaction), "Debug.Print \"Hello, \" & InputBox(\"Name?\", \"Who\", \"you\", 100, 200)"));
+        CollectionAssert.AreEqual(new[] { "Hello, Duck" }, Run(With(interaction), "Debug.Print \"Hello, \" & InputBox(\"Name?\", \"Who\", \"you\", 100, 200)"));
         interaction.Received().Prompt(new InputBoxRequest("Name?", "Who", "you", 100, 200), Arg.Any<CancellationToken>());
     }
 
