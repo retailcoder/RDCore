@@ -405,6 +405,9 @@
   <data name="IIfSideEffect_Message" xml:space="preserve">
     <value>&apos;{0}&apos; est appelée quelle que soit la condition : IIf évalue son TruePart et son FalsePart avant de choisir l&apos;un des deux.</value>
   </data>
+  <data name="ObjectLetToObjectProperty_Message" xml:space="preserve">
+    <value>&apos;{0}&apos; reçoit l&apos;objet lui-même : MS-VBA passe un objet assigné par Let à une propriété dont la valeur est un objet comme le ferait un Set, là où MS-VBAL §5.5.1.1 fait de l&apos;assignation une incompatibilité de type. Assignez-le avec Set.</value>
+  </data>
   <data name="VariableNotUsed_Message" xml:space="preserve">
     <value>La variable &apos;{0}&apos; n&apos;est jamais utilisée.</value>
   </data>

@@ -142,7 +142,8 @@ error 424 (**MS-VBAL §5.5.1.2.13**; 91 for `Nothing`).
 
 A value that is not an object, given to a class or `Object` parameter, is a type mismatch: a compile error when its declared type is not `Variant`,
 run-time error 424 when a `Variant` holds it, and run-time error 13 late bound. A property that has both a `Property Let` and a `Property Set` runs
-its `Property Let` for a `Let`.
+its `Property Let` for a `Let`. An object declared as one, given early bound to a class or `Object` parameter, is reported as
+[`RDC11047`](../diagnostics/rdc11047.md).
 
 What happens to an object given to a `Variant` parameter is up to the property:
 

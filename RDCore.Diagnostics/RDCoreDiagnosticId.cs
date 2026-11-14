@@ -137,6 +137,7 @@ public enum RDCoreDiagnosticId
     NegativeLineNumber = 11036, // -5:, GoTo -5: a line number with a minus, which MS-VBAL's grammar has no form for and MS-VBA compiles
     NonBreakingSpaceInName = 11037, // a declared name with a U+00A0, which no MS-VBAL identifier has and MS-VBA compiles
     IIfSideEffect = 11039, // [RD2:IIfSideEffectInspection] IIf(c, Compute(1), 2): a Function or Property Get in the TruePart or FalsePart runs whatever the condition
+    ObjectLetToObjectProperty = 11047, // h.Pic = p, Property Let Pic(v As Object): MS-VBA passes the object; MS-VBAL §5.5.1.1 makes the Let invalid, §5.5.1.2.13 424
 
     /*
      * [20000-20999]: the debugger and edit-and-continue, issued by the language server while a program waits

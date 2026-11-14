@@ -176,6 +176,7 @@ public sealed class DiagnosticDocumentationTests
         (RDCoreDiagnosticId.NegativeLineNumber, 11036),
         (RDCoreDiagnosticId.NonBreakingSpaceInName, 11037),
         (RDCoreDiagnosticId.IIfSideEffect, 11039),
+        (RDCoreDiagnosticId.ObjectLetToObjectProperty, 11047),
     ];
 
     [TestMethod]
