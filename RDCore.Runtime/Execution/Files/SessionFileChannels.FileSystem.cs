@@ -412,6 +412,78 @@ internal sealed partial class SessionFileChannels
     }
 
     /// <inheritdoc/>
+    public RDCoreDiagnosticCode? TryReadAll(string path, out byte[] bytes)
+    {
+        bytes = [];
+        if (path.Length == 0)
+        {
+            return VBRuntimeErrorId.FileNotFound.ToCode();
+        }
+
+        if (Resolve(ref path) is { } unavailable)
+        {
+            return unavailable;
+        }
+
+        if (HasWildcard(path))
+        {
+            return VBRuntimeErrorId.BadFileNameOrNumber.ToCode();
+        }
+
+        if (fileSystem.Directory.Exists(path))
+        {
+            return VBRuntimeErrorId.PathOrFileAccessError.ToCode();
+        }
+
+        if (!fileSystem.File.Exists(path))
+        {
+            return ParentExists(path) ? VBRuntimeErrorId.FileNotFound.ToCode() : VBRuntimeErrorId.PathNotFound.ToCode();
+        }
+
+        byte[] read = [];
+        var error = Attempt(() => read = fileSystem.File.ReadAllBytes(path));
+        bytes = read;
+        return error;
+    }
+
+    /// <inheritdoc/>
+    public RDCoreDiagnosticCode? TryWriteAll(string path, byte[] bytes)
+    {
+        if (path.Length == 0)
+        {
+            return VBRuntimeErrorId.PathOrFileAccessError.ToCode();
+        }
+
+        if (Resolve(ref path) is { } unavailable)
+        {
+            return unavailable;
+        }
+
+        if (HasWildcard(path))
+        {
+            return VBRuntimeErrorId.BadFileNameOrNumber.ToCode();
+        }
+
+        // a file a channel has open is not replaced, as FileCopy's destination is not.
+        if (_channels.Values.Any(channel => PathsMatch(channel.FullPath, path)))
+        {
+            return VBRuntimeErrorId.FileAlreadyOpen.ToCode();
+        }
+
+        if (fileSystem.Directory.Exists(path))
+        {
+            return VBRuntimeErrorId.PathOrFileAccessError.ToCode();
+        }
+
+        if (!ParentExists(path))
+        {
+            return VBRuntimeErrorId.PathNotFound.ToCode();
+        }
+
+        return Attempt(() => fileSystem.File.WriteAllBytes(path, bytes));
+    }
+
+    /// <inheritdoc/>
     public RDCoreDiagnosticCode? TryGetLastWriteTime(string path, out DateTime modified)
     {
         modified = default;
