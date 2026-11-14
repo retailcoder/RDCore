@@ -527,5 +527,14 @@ namespace RDCore.LanguageServer.Debugging {
                 return ResourceManager.GetString("ResumeRefusedForReload", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The program is over, and its forms are still shown. Their events run here until the last form is unloaded..
+        /// </summary>
+        internal static string FormsStayShown {
+            get {
+                return ResourceManager.GetString("FormsStayShown", resourceCulture);
+            }
+        }
     }
 }

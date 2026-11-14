@@ -76,6 +76,12 @@ public interface IEnvironmentSessionProvider
     Func<ExecuteResult, Task<bool>>? SessionStopped { get; set; }
 
     /// <summary>
+    /// What is told when the session has no form loaded any more, after a program under a debugger completed with one shown
+    /// (<see cref="ExecuteResult.FormsShown"/>): whoever owns the connection to the language server sets it.
+    /// </summary>
+    Action? FormsUnloaded { get; set; }
+
+    /// <summary>
     /// The composed runtime session.
     /// </summary>
     /// <exception cref="InvalidOperationException">
@@ -169,6 +175,9 @@ public sealed class EnvironmentSessionProvider(
     }
 
     private Func<ExecuteResult, Task<bool>>? _sessionStopped;
+
+    /// <inheritdoc/>
+    public Action? FormsUnloaded { get; set; }
 
     private readonly Lock _eventLinesLock = new();
     private readonly List<string> _eventLines = [];

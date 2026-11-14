@@ -173,4 +173,7 @@
   <data name="ResumeRefusedForReload" xml:space="preserve">
     <value>The program can't go on: the saved code could not be loaded ({0}), and it waits on the code it had.</value>
   </data>
+  <data name="FormsStayShown" xml:space="preserve">
+    <value>The program is over, and its forms are still shown. Their events run here until the last form is unloaded.</value>
+  </data>
 </root>

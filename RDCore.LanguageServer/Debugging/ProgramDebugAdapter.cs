@@ -52,6 +52,7 @@ internal sealed class ProgramDebugAdapter(
     IHostOutputRelay output,
     IEditStatusMonitor editStatus,
     ISessionStopRelay stops,
+    IHostFormsRelay forms,
     ILogger<ProgramDebugAdapter> logger) :
     ILaunchHandler<ProgramLaunchRequestArguments>,
     IAttachHandler<AttachRequestArguments>,
@@ -126,6 +127,10 @@ internal sealed class ProgramDebugAdapter(
     private bool _waiting;
     private IDisposable? _takesStops;
 
+    // a launched program that completed with a form shown goes on in the handlers of its events, as in MS-VBA: its session stays, as one attached to, until the
+    // session has no form loaded any more.
+    private bool _formsShown;
+
     // an edit was loaded while the program waited, which it goes on with, and its next stop is told as invalidating what the client showed; and whether the client
     // takes that. One request at a time has the program go on.
     private bool _editedWhileWaiting;
@@ -155,6 +160,9 @@ internal sealed class ProgramDebugAdapter(
 
         // a handler of an event that stops while no program runs stops here, in a session attached to or launched.
         _takesStops = stops.Take(TakeSessionStop);
+
+        // and a program that completed with a form shown is over when the session has no form loaded any more.
+        forms.Unloaded += OnFormsUnloaded;
 
         // what the program prints is said as it prints.
         output.Printed += lines =>
@@ -323,6 +331,52 @@ internal sealed class ProgramDebugAdapter(
 
         Run(_ => Task.FromResult(stop));
         return true;
+    }
+
+    // the session of a launched program that completed with a form shown stays, as a session attached to: what waits in it is a handler of an event of the form,
+    // or a statement of the debug console. It is over once the session has no form loaded, with the program's exit code; ending it ends the forms (Terminate).
+    private async Task StayWhileFormsAreLoadedAsync()
+    {
+        lock (_sync)
+        {
+            _attached = true;
+            _formsShown = true;
+        }
+
+        Say(DebuggerMessages.FormsStayShown + "\n", OutputEventCategory.Console);
+
+        // the forms may have been unloaded already, and the host have said so before it answered.
+        await EndIfNoFormIsLoadedAsync();
+    }
+
+    private void OnFormsUnloaded() => _ = EndIfNoFormIsLoadedAsync();
+
+    // the host is asked rather than believed: what it said and how the program ended travel apart.
+    private async Task EndIfNoFormIsLoadedAsync()
+    {
+        lock (_sync)
+        {
+            if (!_formsShown || Volatile.Read(ref _terminated) != 0)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            if (await workspace.FormsLoadedAsync(_lifetime.Token) == 0)
+            {
+                await TerminateAsync(exitCode: 0);
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            // the client left.
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "❌ The forms the program left could not be counted.");
+        }
     }
 
     public async Task<ConfigurationDoneResponse> Handle(ConfigurationDoneArguments request, CancellationToken cancellationToken)
@@ -619,6 +673,9 @@ internal sealed class ProgramDebugAdapter(
                 break;
             case ExecutionOutcome.Completed or ExecutionOutcome.Halted when beside:
                 break;
+            case ExecutionOutcome.Completed when result.FormsShown:
+                await StayWhileFormsAreLoadedAsync();
+                break;
             case ExecutionOutcome.Completed:
             case ExecutionOutcome.Halted:
                 await TerminateAsync(exitCode: 0);
@@ -738,6 +795,7 @@ internal sealed class ProgramDebugAdapter(
         if (Interlocked.Exchange(ref _terminated, 1) == 0)
         {
             _takesStops?.Dispose();
+            forms.Unloaded -= OnFormsUnloaded;
             _server!.SendExited(new ExitedEvent { ExitCode = exitCode });
             _server!.SendTerminated(new TerminatedEvent());
         }
@@ -1099,6 +1157,7 @@ internal sealed class ProgramDebugAdapter(
         }
 
         _takesStops?.Dispose();
+        forms.Unloaded -= OnFormsUnloaded;
         await _lifetime.CancelAsync();
         _ = _closed.TrySetResult();
         return new DisconnectResponse();

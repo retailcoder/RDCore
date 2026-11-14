@@ -2,6 +2,9 @@
 using RDCore.External.Native;
 using RDCore.External.Windows.Automation;
 using RDCore.External.Windows.Forms;
+using RDCore.Runtime.Execution.External.Forms;
+using RDCore.Runtime.Support.Host;
+using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Libraries;
 using RDCore.SDK.Workspace.Forms;
 using RDCore.Tests.Cli;
@@ -759,6 +762,116 @@ public sealed class FormHostingTests
         var printed = await RunAsync(world, "On Error Resume Next", "ExampleView.Move 10", "Debug.Print Err.Number");
 
         CollectionAssert.AreEqual(new[] { "438" }, printed);
+    }
+
+    // ---- a program under a debugger that completes with a form shown ----
+
+    // the program, run as the language server runs one it debugs, and what is asked of the session once it is over.
+    private static Task InspectAsync(ExternalWorld world, string[] body, Func<EnvironmentSessionProvider, ExecuteResult, Task> inspect, bool debug = true,
+        bool unattended = false)
+        => ModuleWorkspace.InspectAsync([], Program(body), (provider, result, _) => inspect(provider, result), debug: debug,
+            libraries: new ModuleWorkspace.WorkspaceLibraries(["MSForms"], Shipped, Outside: world), forms: [ExampleView()], unattended: unattended);
+
+    // what the host tells once the session has no form loaded any more.
+    private static TaskCompletionSource Unloaded(EnvironmentSessionProvider provider)
+    {
+        var unloaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        provider.FormsUnloaded = () => unloaded.TrySetResult();
+        return unloaded;
+    }
+
+    [TestMethod]
+    public async Task AProgramUnderADebugger_ThatCompletesWithAFormShown_SaysSo_AndTheFormStaysLoaded()
+    {
+        RequireMicrosoftForms();
+        var (world, apartment) = InProcess();
+        using var _ = apartment;
+
+        await InspectAsync(world, ["ExampleView.Show vbModeless"], (provider, result) =>
+        {
+            Assert.AreEqual(ExecutionOutcome.Completed, result.Outcome);
+            Assert.IsTrue(result.FormsShown);
+            Assert.AreEqual(1, LoadedForms.Count(provider.Session));
+            return Task.CompletedTask;
+        });
+    }
+
+    [TestMethod]
+    [DataRow(new[] { "Load ExampleView" }, true, false, DisplayName = "a form loaded, and not shown")]
+    [DataRow(new[] { "ExampleView.Show vbModeless", "ExampleView.Hide" }, true, false, DisplayName = "a form shown, and hidden")]
+    [DataRow(new[] { "ExampleView.Show vbModeless", "Unload ExampleView" }, true, false, DisplayName = "a form shown, and unloaded")]
+    [DataRow(new[] { "ExampleView.Show vbModeless" }, false, false, DisplayName = "a program that is not under a debugger")]
+    [DataRow(new[] { "ExampleView.Show vbModeless" }, true, true, DisplayName = "a program nobody attends to")]
+    public async Task AProgramThatLeavesNoFormShown_OrThatNobodyDebugs_LeavesNoFormToTheDebugger(string[] body, bool debug, bool unattended)
+    {
+        RequireMicrosoftForms();
+        var (world, apartment) = InProcess();
+        using var _ = apartment;
+
+        await InspectAsync(world, body, (provider, result) =>
+        {
+            Assert.IsFalse(result.FormsShown, $"{result.Outcome}: {result.ErrorMessage}");
+            return Task.CompletedTask;
+        }, debug, unattended);
+    }
+
+    [TestMethod]
+    public async Task WhenTheLastFormIsClosed_TheHostSaysTheSessionHasNoFormLoaded()
+    {
+        RequireMicrosoftForms();
+        var (world, apartment) = InProcess();
+        using var _ = apartment;
+        var caption = $"ExampleView {Guid.NewGuid():N}";
+
+        await InspectAsync(world, [$"ExampleView.Caption = \"{caption}\"", "ExampleView.Show vbModeless"], async (provider, result) =>
+        {
+            Assert.IsTrue(result.FormsShown);
+            var unloaded = Unloaded(provider);
+
+            Assert.IsTrue(PostMessage(await WindowOfAsync(caption), WM_CLOSE, IntPtr.Zero, IntPtr.Zero));
+
+            await unloaded.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.AreEqual(0, LoadedForms.Count(provider.Session));
+        });
+    }
+
+    // ended, a program that completed with a form shown is over with its forms, as an End ends them.
+    [TestMethod]
+    public async Task ATerminate_EndsTheFormsAProgramUnderADebuggerLeftShown()
+    {
+        RequireMicrosoftForms();
+        var (world, apartment) = InProcess();
+        using var _ = apartment;
+        var caption = $"ExampleView {Guid.NewGuid():N}";
+
+        await InspectAsync(world, [$"ExampleView.Caption = \"{caption}\"", "ExampleView.Show vbModeless"], async (provider, result) =>
+        {
+            Assert.IsTrue(result.FormsShown);
+            await WindowOfAsync(caption);
+            var unloaded = Unloaded(provider);
+
+            var ended = await provider.Execution.TerminateAsync(wipe: true).WaitAsync(TimeSpan.FromSeconds(30));
+
+            Assert.IsTrue(ended.Acted);
+            await unloaded.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.AreEqual(0, LoadedForms.Count(provider.Session));
+            Assert.AreEqual(IntPtr.Zero, FindWindow("RDCore.UserForm", caption), "the form's window is closed");
+        });
+    }
+
+    // a form a program left loaded and not shown is not left to a debugger, and a terminate with no program has nothing to end.
+    [TestMethod]
+    public async Task ATerminate_WithNoFormLeftShown_EndsNothing()
+    {
+        RequireMicrosoftForms();
+        var (world, apartment) = InProcess();
+        using var _ = apartment;
+
+        await InspectAsync(world, ["Load ExampleView"], async (provider, result) =>
+        {
+            Assert.IsFalse((await provider.Execution.TerminateAsync(wipe: true).WaitAsync(TimeSpan.FromSeconds(30))).Acted);
+            Assert.AreEqual(1, LoadedForms.Count(provider.Session));
+        });
     }
 
     private static async Task<IntPtr> WindowOfAsync(string caption)

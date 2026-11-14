@@ -42,6 +42,77 @@ internal sealed class SessionForms
     private readonly HashSet<VBRuntimeObjectId> _unloading = [];
     private readonly List<VBRuntimeObjectId> _modal = [];
     private bool _holding;
+    private Action? _noneLoaded;
+
+    /// <summary>
+    /// What is called each time the last loaded form goes: unloaded, let go of, or forgotten by an <c>End</c>. Called on the thread that let it go, with nothing
+    /// locked.
+    /// </summary>
+    public Action? NoneLoaded
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _noneLoaded;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _noneLoaded = value;
+            }
+        }
+    }
+
+    // what is told once a form left the loaded forms, when it was the last one. Called with the gate held; the caller calls it once the gate is not.
+    private Action? Left(bool removed) => removed && _loaded.Count == 0 ? _noneLoaded : null;
+
+    /// <summary>
+    /// Whether a loaded form is shown.
+    /// </summary>
+    /// <param name="session">The session whose forms they are.</param>
+    public bool AnyShown(IRuntimeSession session)
+    {
+        RDCore.External.Forms.IFormHost? host;
+        VBRuntimeObjectId[] loaded;
+        lock (_gate)
+        {
+            host = _host;
+            loaded = [.. _loaded];
+        }
+
+        if (host is null)
+        {
+            return false;
+        }
+
+        foreach (var form in loaded)
+        {
+            if (!session.ExternalObjects.TryGet(form, out _, out var hosted) || hosted is null)
+            {
+                continue;
+            }
+
+            using (session.Turn.Yield())
+            {
+                try
+                {
+                    if (host.IsShown(hosted))
+                    {
+                        return true;
+                    }
+                }
+                catch (RDCore.External.Automation.AutomationException)
+                {
+                    // a form whose window is gone is not shown.
+                }
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Records which of a program's forms a Visual Basic 6.0 designer wrote: their lifecycle is VB6's, and their handlers are <c>Form_</c>'s.
@@ -128,14 +199,17 @@ internal sealed class SessionForms
     /// <param name="unloaded">Whether it was unloaded.</param>
     public void EndUnload(VBRuntimeObjectId form, bool unloaded)
     {
+        Action? none = null;
         lock (_gate)
         {
             _ = _unloading.Remove(form);
             if (unloaded)
             {
-                _ = _loaded.Remove(form);
+                none = Left(_loaded.Remove(form));
             }
         }
+
+        none?.Invoke();
     }
 
     /// <summary>
@@ -205,9 +279,12 @@ internal sealed class SessionForms
     /// </summary>
     public void Clear()
     {
+        Action? none;
         lock (_gate)
         {
+            var had = _loaded.Count > 0;
             _loaded.Clear();
+            none = Left(had);
             _unloaded.Clear();
             _held.Clear();
             _listening.Clear();
@@ -218,6 +295,8 @@ internal sealed class SessionForms
             Collection = null;
             FormsCollection = null;
         }
+
+        none?.Invoke();
     }
 
     /// <summary>
@@ -469,11 +548,14 @@ internal sealed class SessionForms
     /// <summary>A form is unloaded: it is no longer loaded, and its object is one whose form is gone.</summary>
     public void Unload(VBRuntimeObjectId form)
     {
+        Action? none;
         lock (_gate)
         {
-            _ = _loaded.Remove(form);
+            none = Left(_loaded.Remove(form));
             _ = _unloaded.Add(form);
         }
+
+        none?.Invoke();
     }
 
     /// <summary>
@@ -482,6 +564,8 @@ internal sealed class SessionForms
     /// <returns>Whether the form was still loaded, and is terminated now; <see langword="false"/> for one that was unloaded, and terminated then.</returns>
     public bool Release(VBRuntimeObjectId form)
     {
+        bool released;
+        Action? none;
         lock (_gate)
         {
             if (_unloaded.Remove(form))
@@ -489,8 +573,12 @@ internal sealed class SessionForms
                 return false;
             }
 
-            return _loaded.Remove(form);
+            released = _loaded.Remove(form);
+            none = Left(released);
         }
+
+        none?.Invoke();
+        return released;
     }
 }
 

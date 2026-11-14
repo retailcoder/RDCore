@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using RDCore.Runtime.Execution;
+using RDCore.Runtime.Execution.External.Forms;
 using RDCore.Runtime.Execution.Frames;
 using RDCore.Runtime.Semantics;
 using RDCore.SDK.Model.AST.Abstract;
@@ -79,6 +80,9 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
     private bool _streaming;
     private long _streamed;
     private bool _inTurn;
+
+    // a program under a debugger completed with a form shown, which is not unloaded yet: the program goes on in the handlers of its events, and ending it ends them.
+    private bool _formsLeft;
 
     // a statement or an expression runs alongside the program that waits, in its session and on its stack: nothing else resumes, moves, ends or runs beside the program
     // until it is done. Set and cleared with the lock held; the code itself runs with nothing locked (OffTheConnectionAsync).
@@ -955,6 +959,13 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
         {
             switch (_state)
             {
+                // a program that completed with a form shown goes on in the handlers of its events: ended, its forms close with the rest of what it left, as an
+                // End closes them.
+                case ProgramState.Idle when wipe && _formsLeft:
+                    _formsLeft = false;
+                    idle = EndFormsLeftAsync(provider.Session);
+                    break;
+
                 case ProgramState.Idle:
                     return new DebugAck();
 
@@ -1120,7 +1131,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
         {
             try
             {
-                return Report(stop.Result!.Value, session, output, CancellationToken.None);
+                return LeavesFormsShown(session, Report(stop.Result!.Value, session, output, CancellationToken.None));
             }
             finally
             {
@@ -1165,6 +1176,33 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
         };
     }
 
+    // a program under a debugger that completed with a form shown leaves it to the person using it, as MS-VBA does: the debugger is told, and told again when the
+    // session has no form loaded any more. A run nobody attends to is not left to anybody. Called before the program gives the turn back.
+    private ExecuteResult LeavesFormsShown(IRuntimeSession session, ExecuteResult ended)
+    {
+        if (ended.Outcome is not ExecutionOutcome.Completed || !_debugging || session.RunsUnattended || !LoadedForms.AnyShown(session))
+        {
+            return ended;
+        }
+
+        lock (_sync)
+        {
+            _formsLeft = true;
+        }
+
+        LoadedForms.WhenNoneLoaded(session, () =>
+        {
+            lock (_sync)
+            {
+                _formsLeft = false;
+            }
+
+            provider.FormsUnloaded?.Invoke();
+        });
+
+        return ended with { FormsShown = true };
+    }
+
     /// <summary>
     /// Says which run-time errors a program that runs under a debugger waits at, where they are raised.
     /// </summary>
@@ -1190,6 +1228,21 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
         OpenToSessionStops();
         _idle.TrySetResult();
     }
+
+    // ends what a program that completed with a form shown left, as an End does, once the handler of an event that runs is done: the session's turn is taken for it.
+    private static Task EndFormsLeftAsync(IRuntimeSession session)
+        => Task.Run(() =>
+        {
+            session.Turn.Enter();
+            try
+            {
+                SessionWipe.End(session);
+            }
+            finally
+            {
+                session.Turn.Exit();
+            }
+        });
 
     private void Finished(IRuntimeSession session)
     {

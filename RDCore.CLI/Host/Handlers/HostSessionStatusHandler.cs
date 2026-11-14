@@ -1,3 +1,4 @@
+using RDCore.Runtime.Execution.External.Forms;
 using RDCore.Runtime.Support.Host;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Platform.Components;
@@ -28,6 +29,7 @@ internal sealed class HostSessionStatusHandler(IEnvironmentSessionProvider sessi
             ModuleCount = sessionProvider.ModuleCount,
             ReferenceCount = session.References.Count,
             Memory = session.Memory.Info.ToStatus(),
+            FormsLoaded = LoadedForms.Count(session),
         });
     }
 }

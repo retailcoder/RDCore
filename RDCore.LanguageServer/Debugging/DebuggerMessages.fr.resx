@@ -173,4 +173,7 @@
   <data name="ResumeRefusedForReload" xml:space="preserve">
     <value>Le programme ne peut pas continuer : le code enregistré n'a pas pu être chargé ({0}), et il est interrompu sur le code qu'il avait.</value>
   </data>
+  <data name="FormsStayShown" xml:space="preserve">
+    <value>Le programme est terminé, et ses formulaires sont toujours affichés. Leurs événements s'exécutent ici jusqu'à ce que le dernier formulaire soit déchargé.</value>
+  </data>
 </root>

@@ -44,6 +44,9 @@ public sealed class ProgramDebugAdapterTests
         // where the language server takes the stops of the handlers of events that run while no program runs.
         public SessionStopRelay Stops { get; } = new();
 
+        // where the language server hears that the session has no form loaded any more.
+        public HostFormsRelay Forms { get; } = new();
+
         // what the program that waits does not have of the edits, as the host says it: nothing, unless a test says otherwise.
         public EditStatusMonitor EditStatus { get; }
         public ProgramDebugAdapter Adapter { get; }
@@ -74,7 +77,7 @@ public sealed class ProgramDebugAdapterTests
             Debugging.EditStatusAsync(Arg.Any<CancellationToken>()).Returns(new DebugEditStatusResult());
             Workspace.ReloadChangedAsync(Arg.Any<CancellationToken>()).Returns((string?)null);
             EditStatus = new EditStatusMonitor(Debugging, Substitute.For<IWorkspaceRefresh>(), NullLogger<EditStatusMonitor>.Instance);
-            Adapter = new ProgramDebugAdapter(Workspace, Debugging, Relay, EditStatus, Stops, NullLogger<ProgramDebugAdapter>.Instance);
+            Adapter = new ProgramDebugAdapter(Workspace, Debugging, Relay, EditStatus, Stops, Forms, NullLogger<ProgramDebugAdapter>.Instance);
         }
 
         // OmniSharp 0.19.9's client does not send supportsInvalidatedEvent, whatever its options say: a client that takes the event is one that initializes
@@ -1812,5 +1815,146 @@ public sealed class ProgramDebugAdapterTests
         await AttachedAsync(session);
 
         _ = await Assert.ThrowsAsync<JsonRpcException>(() => session.LaunchAsync());
+    }
+
+    // ---- a launched program that completed with a form shown ----
+
+    // the program completes with a form shown, and the host counts the forms loaded as given, one answer after the other (the last one again after that). Each
+    // time it is asked is released on what is returned, once the adapter asked after it said the session stays.
+    private static async Task<SemaphoreSlim> CompletedWithAFormShownAsync(Session session, params int[] formsLoaded)
+    {
+        var asked = new SemaphoreSlim(0);
+        var answers = new Queue<int>(formsLoaded);
+        session.Workspace.StartAsync(default!, default!, default).ReturnsForAnyArgs(Task.FromResult(new ExecuteResult { Outcome = ExecutionOutcome.Completed, FormsShown = true }));
+        session.Workspace.FormsLoadedAsync(Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var loaded = answers.Count > 1 ? answers.Dequeue() : answers.Peek();
+            _ = asked.Release();
+            return Task.FromResult(loaded);
+        });
+        session.Debugging.TerminateAsync(Arg.Any<bool>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(new DebugAck { Acted = true }));
+        await session.StartAsync();
+        await session.LaunchAsync();
+        _ = await session.SendAsync(new ConfigurationDoneArguments());
+        _ = await session.NextAsync<OutputEvent>(output => output.Output.Contains("forms are still shown", StringComparison.Ordinal));
+        Assert.IsTrue(await asked.WaitAsync(Patience), "the host is asked how many forms are loaded");
+        return asked;
+    }
+
+    [TestMethod]
+    public async Task AProgramThatCompletesWithAFormShown_StaysAttached_AndTakesTheStopsOfItsHandlers()
+    {
+        await using var session = new Session();
+        session.Debugging.StackAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(StackAt(line: 3, procedure: "Clicked")));
+        await CompletedWithAFormShownAsync(session, 1);
+
+        var answer = await session.Stops.StoppedAsync(HandlerStopped(line: 3), CancellationToken.None);
+
+        Assert.IsTrue(answer.Taken);
+        Assert.AreEqual(StoppedEventReason.Breakpoint, (await session.NextAsync<StoppedEvent>()).Reason);
+    }
+
+    [TestMethod]
+    public async Task AProgramThatCompletesWithAFormShown_RunsTheStatementsOfTheDebugConsole_AsAtAPrompt()
+    {
+        await using var session = new Session();
+        session.Workspace.RunStatementAsync("?Total", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ExecuteResult { Outcome = ExecutionOutcome.Completed, Output = ["42"] }));
+        await CompletedWithAFormShownAsync(session, 1);
+
+        _ = await session.SendAsync(new EvaluateArguments { Expression = "?Total", Context = EvaluateArgumentsContext.Repl });
+
+        _ = await session.NextAsync<OutputEvent>(output => output.Output == "42\n");
+        await session.Debugging.DidNotReceiveWithAnyArgs().ExecuteAsync(default, default!, default);
+    }
+
+    [TestMethod]
+    public async Task AProgramThatCompletesWithAFormShown_IsOver_WhenTheSessionHasNoFormLoaded()
+    {
+        await using var session = new Session();
+        await CompletedWithAFormShownAsync(session, 1, 0);
+
+        session.Forms.Publish();
+
+        Assert.AreEqual(0, (await session.NextAsync<ExitedEvent>()).ExitCode);
+        _ = await session.NextAsync<TerminatedEvent>();
+        await session.Debugging.DidNotReceiveWithAnyArgs().TerminateAsync(default, default);
+    }
+
+    // the host said there was no form loaded before the result of the run arrived, and the session is over as it is told it stays.
+    [TestMethod]
+    public async Task AProgramWhoseFormsWereUnloadedBeforeItsResultArrived_IsOverAtOnce()
+    {
+        await using var session = new Session();
+        await CompletedWithAFormShownAsync(session, 0);
+
+        Assert.AreEqual(0, (await session.NextAsync<ExitedEvent>()).ExitCode);
+        _ = await session.NextAsync<TerminatedEvent>();
+    }
+
+    // a notification that the forms are unloaded is a reason to ask the host, and a session that still has a form loaded stays.
+    [TestMethod]
+    public async Task AProgramThatCompletesWithAFormShown_Stays_WhileTheSessionHasAFormLoaded()
+    {
+        await using var session = new Session();
+        session.Debugging.StackAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(StackAt(line: 3, procedure: "Clicked")));
+        var asked = await CompletedWithAFormShownAsync(session, 1, 2);
+
+        session.Forms.Publish();
+
+        Assert.IsTrue(await asked.WaitAsync(Patience), "the host is asked again");
+        Assert.IsTrue((await session.Stops.StoppedAsync(HandlerStopped(line: 3), CancellationToken.None)).Taken, "the session stays attached to");
+    }
+
+    [TestMethod]
+    public async Task ATerminate_EndsAProgramThatCompletedWithAFormShown_AndItsForms()
+    {
+        await using var session = new Session();
+        await CompletedWithAFormShownAsync(session, 1);
+
+        _ = await session.SendAsync(new TerminateArguments());
+
+        await session.Debugging.Received(1).TerminateAsync(true, Arg.Any<CancellationToken>());
+        Assert.AreEqual(0, (await session.NextAsync<ExitedEvent>()).ExitCode);
+        _ = await session.NextAsync<TerminatedEvent>();
+    }
+
+    [TestMethod]
+    public async Task ADisconnect_EndsAProgramThatCompletedWithAFormShown_AndItsForms()
+    {
+        await using var session = new Session();
+        await CompletedWithAFormShownAsync(session, 1);
+
+        _ = await session.SendAsync(new DisconnectArguments { TerminateDebuggee = true });
+
+        await session.Debugging.Received(1).TerminateAsync(true, Arg.Any<CancellationToken>());
+    }
+
+    // a session the client attached to has no program of its own to end when the forms are unloaded.
+    [TestMethod]
+    public async Task ASessionAttachedTo_IsNotOver_WhenTheSessionHasNoFormLoaded()
+    {
+        await using var session = new Session();
+        session.Debugging.StackAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(StackAt(line: 3, procedure: "Clicked")));
+        session.Workspace.FormsLoadedAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(0));
+        await AttachedAsync(session);
+
+        session.Forms.Publish();
+
+        await session.Workspace.DidNotReceiveWithAnyArgs().FormsLoadedAsync(default);
+        Assert.IsTrue((await session.Stops.StoppedAsync(HandlerStopped(line: 3), CancellationToken.None)).Taken);
+    }
+
+    [TestMethod]
+    public async Task AProgramThatCompletesWithNoFormShown_IsOver()
+    {
+        await using var session = new Session();
+        session.Workspace.StartAsync(default!, default!, default).ReturnsForAnyArgs(Task.FromResult(new ExecuteResult { Outcome = ExecutionOutcome.Completed }));
+        await session.StartAsync();
+        await session.LaunchAsync();
+        _ = await session.SendAsync(new ConfigurationDoneArguments());
+
+        Assert.AreEqual(0, (await session.NextAsync<ExitedEvent>()).ExitCode);
+        await session.Workspace.DidNotReceiveWithAnyArgs().FormsLoadedAsync(default);
     }
 }

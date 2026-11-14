@@ -661,6 +661,8 @@ internal class RDCoreConsoleEnvironmentHostApp(
         // and a handler of an event that stops while no program runs is told of, and waits if the language server answers that a client takes the stop.
         sessionProvider.SessionStopped = async stop => (await SendRequestAsync<HostDebugStoppedParams, HostDebugStoppedResult>(
             new HostDebugStoppedParams { Stop = stop }, CancellationToken.None)).Taken;
+        // and the session having no form loaded any more, after a program under a debugger completed with one shown.
+        sessionProvider.FormsUnloaded = () => _ = SendNotificationAsync(new HostFormsUnloadedNotification(), CancellationToken.None);
         base.OnLanguageServerStarted(server);
     }
 

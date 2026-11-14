@@ -60,6 +60,12 @@ internal interface IDebugWorkspace
     Task<ExecuteResult> RunStatementAsync(string text, CancellationToken token);
 
     /// <summary>
+    /// The number of forms the session has loaded, as the environment host says it.
+    /// </summary>
+    /// <param name="token">A token that cancels the request.</param>
+    Task<int> FormsLoadedAsync(CancellationToken token);
+
+    /// <summary>
     /// Reads the files of the workspace's modules again, and has the environment host load each one whose text is not what it loaded: the edits saved while the
     /// program waits, which it is checked against before it goes on.
     /// </summary>

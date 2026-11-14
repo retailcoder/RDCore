@@ -270,6 +270,13 @@ internal sealed class PlatformDebugWorkspace(
         }, token);
     }
 
+    public async Task<int> FormsLoadedAsync(CancellationToken token)
+    {
+        var environment = orchestration.RuntimeEnvironment;
+        await environment.WaitForReadyAsync(token);
+        return (await environment.SendRequestAsync<HostSessionStatusParams, SessionStatusResult>(new(), token)).FormsLoaded;
+    }
+
     public async Task<string?> ReloadChangedAsync(CancellationToken token)
     {
         var baseline = Volatile.Read(ref _baseline);
