@@ -31,6 +31,9 @@ public sealed class DefaultMemberAccessAnalyzerTests
         "IndexAnObject|Dim b As New Bag|x = b(1)",
         "IndexAnUnboundObject|Dim v As Object|Set v = New Bag|x = v(1)",
         "NameTheIndexedMember|Dim b As New Bag|x = b.Item(1)",
+        "AssignAnIndexedObject|Dim bx As New Box|bx(1) = 5",
+        "AssignAnIndexedUnboundObject|Dim v As Object|Set v = New Box|v(1) = 5",
+        "AssignTheIndexedMember|Dim bx As New Box|bx.Item(1) = 5",
         "BangAnObject|Dim b As New Bag|x = b!key",
         "BangAnUnboundObject|Dim v As Object|Set v = New Bag|x = v!key",
         "LetAnObjectToAnObject|Dim h As New Holder|Dim h2 As New Holder|Let h = h2",
@@ -50,6 +53,8 @@ public sealed class DefaultMemberAccessAnalyzerTests
             "Public Property Let Value(ByVal v As Long)", "Attribute Value.VB_UserMemId = 0", "End Property");
         var bag = ModuleWorkspace.ClassModule("Bag", "Public Function Item(ByVal key As Variant) As Long", "Attribute Item.VB_UserMemId = 0", "Item = 1", "End Function");
         var outer = ModuleWorkspace.ClassModule("Outer", "Public Property Get Inner() As Holder", "Set Inner = New Holder", "End Property");
+        var box = ModuleWorkspace.ClassModule("Box", "Public Property Get Item(ByVal key As Variant) As Long", "Attribute Item.VB_UserMemId = 0", "Item = 1", "End Property",
+            "Public Property Let Item(ByVal key As Variant, ByVal v As Long)", "End Property");
 
         var lines = new List<string> { "Option Explicit" };
         foreach (var procedure in Procedures)
@@ -63,7 +68,7 @@ public sealed class DefaultMemberAccessAnalyzerTests
         lines.AddRange(["Public Sub Take(ByVal n As Long)", "End Sub"]);
 
         var program = ModuleWorkspace.StandardModule("Program", [.. lines]);
-        var payload = await ModuleWorkspace.SemanticsAsync([("Holder", holder), ("Bag", bag), ("Outer", outer)], program);
+        var payload = await ModuleWorkspace.SemanticsAsync([("Holder", holder), ("Bag", bag), ("Outer", outer), ("Box", box)], program);
         var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
         Assert.IsEmpty(model.Procedures.SelectMany(procedure => procedure.CompileErrors), string.Join("; ", model.Procedures.SelectMany(p => p.CompileErrors).Select(e => e.Description)));
         (_source, _model) = (program, model);
@@ -105,13 +110,14 @@ public sealed class DefaultMemberAccessAnalyzerTests
     [TestMethod]
     public void AnArgumentListGivenToAnObject_GoesToItsDefaultMember()
         => CollectionAssert.AreEqual(
-            new[] { "IndexAnObject: b(1)" },
-            Findings(new IndexedDefaultMemberAccessAnalyzer(), RDCoreDiagnosticId.IndexedDefaultMemberAccess, DiagnosticSeverity.Information));
+            new[] { "IndexAnObject: b(1)", "AssignAnIndexedObject: bx(1)" },
+            Findings(new IndexedDefaultMemberAccessAnalyzer(), RDCoreDiagnosticId.IndexedDefaultMemberAccess, DiagnosticSeverity.Information),
+            "read or assigned, and not a member named");
 
     [TestMethod]
     public void AnArgumentListGivenToAnObject_GoesToADefaultMemberKnownOnlyAtRunTime()
         => CollectionAssert.AreEqual(
-            new[] { "IndexAnUnboundObject: v(1)" },
+            new[] { "IndexAnUnboundObject: v(1)", "AssignAnIndexedUnboundObject: v(1)" },
             Findings(new IndexedUnboundDefaultMemberAccessAnalyzer(), RDCoreDiagnosticId.IndexedUnboundDefaultMemberAccess, DiagnosticSeverity.Warning));
 
     [TestMethod]

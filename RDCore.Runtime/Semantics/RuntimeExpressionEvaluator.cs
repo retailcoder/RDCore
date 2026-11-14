@@ -340,6 +340,10 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     /// <param name="kind">What the access is, of what the code writes: <c>Explicit</c>, or <c>Implicit</c> with the member it implies.</param>
     /// <param name="assumedBefore">What <see cref="AssumedSoFar"/> was before the member was accessed.</param>
     /// <param name="result">What the access evaluated to: its error, if it is the code's, is the fact's.</param>
+    // what a member access is given of the argument list the code writes for it: `f()` gives none.
+    internal static MemberAccessOperationSemanticFlags GivenArgumentList(ImmutableArray<ExpressionNode> arguments)
+        => arguments.IsDefaultOrEmpty || IndexExpressionNode.IsEmptyArgumentList(arguments) ? 0 : MemberAccessOperationSemanticFlags.ArgumentList;
+
     internal void ObserveMemberAccess(
         IRuntimeSession session,
         RuntimeEvaluationContext context,
@@ -1556,7 +1560,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             var assumedBefore = AssumedSoFar;
             var (accessed, isCall) = CallMember(session, context, indexExpression, qualified, ownerResult.Result!);
             ObserveMemberAccess(session, context, qualified, Tokens.MemberAccess, qualified.Owner, ownerResult.Result!, qualified.Member.IdentifierName,
-                MemberAccessOperationSemanticFlags.Explicit, assumedBefore, accessed);
+                MemberAccessOperationSemanticFlags.Explicit | (isCall ? GivenArgumentList(indexExpression.Arguments) : 0), assumedBefore, accessed);
             if (isCall)
             {
                 return accessed;
@@ -1610,7 +1614,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             if (Observation is not null && DeclaredTypeOfOwner(session, context, indexExpression.Callee) is VBClassType or VBObjectType)
             {
                 ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, indexExpression.Callee, calleeResult.Result, null,
-                    MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember, assumedBefore, unknown);
+                    MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember | GivenArgumentList(indexExpression.Arguments),
+                    assumedBefore, unknown);
             }
 
             return unknown;
@@ -1622,7 +1627,8 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             var assumedBefore = AssumedSoFar;
             var called = CallDefaultMember(session, context, expression, indexExpression, indexed);
             ObserveMemberAccess(session, context, expression, Tokens.MemberAccess, indexExpression.Callee, calleeResult.Result, null,
-                MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember, assumedBefore, called);
+                MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember | GivenArgumentList(indexExpression.Arguments),
+                assumedBefore, called);
             return called;
         }
 
