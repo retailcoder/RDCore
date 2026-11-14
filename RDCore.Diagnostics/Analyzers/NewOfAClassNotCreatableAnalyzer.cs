@@ -14,10 +14,10 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </summary>
 /// <remarks>
 /// The class's library says it can be created, so <strong>MS-VBAL §5.6.8</strong> and <strong>§5.2.3.1.4</strong> make <c>New</c> of it valid; nothing
-/// creates one, and creating it raises run-time error -2147221164 <em>Class not registered</em> (recorded in Excel). The analyzer reads the classes the
-/// module creates objects of off the module's class facts (a class that is not registered), the <c>New</c> expressions off the syntax tree and the class
-/// each is bound to, and the class of each variable declared <c>As New</c> off its declaration fact. That holds of every path, whether or not the run-time
-/// facts reach the code, and it is reported wherever it is written, at Warning severity.
+/// creates one, and creating it raises run-time error -2147221164 <em>Class not registered</em> (recorded in Excel). That holds of every
+/// path, whether or not the run-time facts reach the code, and it is reported wherever it is written, at Warning severity. The analyzer reads which classes
+/// are not registered off the module's class facts, each <c>New</c> expression off the syntax tree with the class it is bound to, and the class of each
+/// variable declared <c>As New</c> off its declaration fact.
 /// </remarks>
 internal sealed class NewOfAClassNotCreatableAnalyzer : IModuleAnalyzer
 {
