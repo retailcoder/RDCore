@@ -7,8 +7,9 @@ namespace RDCore.Tests.Cli;
 /// </summary>
 /// <remarks>
 /// MS-VBA refuses at compile time a Let to a target of a specific class whose default member has no <c>Property Let</c> (<c>os = 5</c>, <c>Me = 5</c>):
-/// "Invalid use of property", or "Type mismatch" for a default member that is a <c>Function</c>. MS-VBAL §5.4.3.8 makes it valid, and RD-VBA runs it. Every
-/// other form here runs in MS-VBA as it does in RD-VBA (observed in Excel).
+/// "Invalid use of property", or "Type mismatch" for a default member that is a <c>Function</c>. MS-VBAL §5.4.3.8 makes it valid, and RD-VBA runs it: a
+/// <c>Property Get</c> is assigned through, and a <c>Function</c>, which is no default property, is error 438. Every other form here runs in MS-VBA as it does in
+/// RD-VBA (observed in Excel).
 /// </remarks>
 [TestClass]
 [TestCategory("MS-VBAL 5.4.3.8 Let Statement")]
@@ -34,6 +35,10 @@ public sealed class LetThroughPropertyGetTests
         ("OuterSlotFn", ModuleWorkspace.ClassModule("OuterSlotFn", "Private mS As Slot", "Public Function S() As Slot", "Attribute S.VB_UserMemId = 0",
             "If mS Is Nothing Then Set mS = New Slot", "Set S = mS", "End Function")),
         ("SelfMeDefault", ModuleWorkspace.ClassModule("SelfMeDefault", [.. SlotGet, "Public Sub Assign()", "Me = 5", "End Sub"])),
+        ("SelfMeFn", ModuleWorkspace.ClassModule("SelfMeFn", "Private mS As Slot", "Public Function S() As Slot", "Attribute S.VB_UserMemId = 0",
+            "If mS Is Nothing Then Set mS = New Slot", "Set S = mS", "End Function", "Public Sub Assign()", "Me = 5", "End Sub")),
+        ("HoldsFn", ModuleWorkspace.ClassModule("HoldsFn", "Private mF As OuterSlotFn", "Public Property Get Inner() As OuterSlotFn",
+            "If mF Is Nothing Then Set mF = New OuterSlotFn", "Set Inner = mF", "End Property")),
     ];
 
     private static string Program(string body)
@@ -44,7 +49,6 @@ public sealed class LetThroughPropertyGetTests
     [DataRow("Dim os As New OuterSlot ;; Let os = 5 ;; Debug.Print os.S.V", "5|e0", DisplayName = "the default member returns a class, Let written")]
     [DataRow("Dim oo As New OuterSlotObj ;; oo = 5 ;; Debug.Print oo.S.V", "5|e0", DisplayName = "the default member returns an Object")]
     [DataRow("Dim ov As New OuterSlotVar ;; ov = 5 ;; Debug.Print ov.S.V", "5|e0", DisplayName = "the default member returns a Variant that holds an object")]
-    [DataRow("Dim ofn As New OuterSlotFn ;; ofn = 5 ;; Debug.Print ofn.S.V", "5|e0", DisplayName = "the default member is a Function")]
     [DataRow("Dim sd As New SelfMeDefault ;; sd.Assign ;; Debug.Print sd.S.V", "5|e0", DisplayName = "Me, in the class")]
     [DataRow("Dim ol As New OuterLong ;; ol = 5 ;; Debug.Print ol.N", "7|e451", DisplayName = "the default member returns a Long")]
     // MS-VBAL §5.4.3.8 raises 451 here. MS-VBA raises 424 for the same property named (`ovl.N = 5`), as RD-VBA does for both.
@@ -57,6 +61,19 @@ public sealed class LetThroughPropertyGetTests
     [DataRow("Dim oi As New OuterSlotIdx ;; oi.Item(1) = 5 ;; Debug.Print oi(1).V", "5|e0", DisplayName = "named, given its argument")]
     [DataRow("Dim os As New OuterSlot ;; os.S = 5 ;; Debug.Print os.S.V", "5|e0", DisplayName = "named")]
     [DataRow("Dim o As Object ;; Set o = New OuterSlot ;; o = 5 ;; Debug.Print o.S.V", "5|e0", DisplayName = "late-bound")]
+    [DataRow("Dim ofn As New OuterSlotFn ;; ofn() = 5 ;; Debug.Print ofn.S.V", "5|e0", DisplayName = "a Function default member, given an empty argument list")]
     public async Task ALetToAPropertyGetNamedOrGivenArguments_AssignsThroughWhatItReturnsAsMSVBADoes(string body, string printed)
+        => Assert.AreEqual(printed, string.Join("|", await ModuleWorkspace.RunAsync(Classes, Program(body))));
+
+    // MS-VBAL §5.4.3.8 raises 438: a function is no default property. MS-VBA refuses the early-bound forms at compile time ("Type mismatch"), and raises 450
+    // for the late-bound ones (observed in Excel).
+    [TestMethod]
+    [DataRow("Dim ofn As New OuterSlotFn ;; ofn = 5 ;; Debug.Print ofn.S.V", "0|e438", DisplayName = "a variable of the class")]
+    [DataRow("Dim sf As New SelfMeFn ;; sf.Assign ;; Debug.Print sf.S.V", "0|e438", DisplayName = "Me, in the class")]
+    [DataRow("Dim a(0) As OuterSlotFn ;; Set a(0) = New OuterSlotFn ;; a(0) = 5 ;; Debug.Print a(0).S.V", "0|e438", DisplayName = "an element of an array of the class")]
+    [DataRow("Dim h As New HoldsFn ;; h.Inner = 5 ;; Debug.Print h.Inner.S.V", "0|e438", DisplayName = "a Property Get that returns the class")]
+    [DataRow("Dim o As Object ;; Set o = New OuterSlotFn ;; o = 5 ;; Debug.Print o.S.V", "0|e450", DisplayName = "late-bound, an Object")]
+    [DataRow("Dim v As Variant ;; Set v = New HoldsFn ;; v.Inner = 5 ;; Debug.Print v.Inner.S.V", "0|e450", DisplayName = "late-bound, a Variant's Property Get")]
+    public async Task ALetThroughAFunctionDefaultMember_IsAnError(string body, string printed)
         => Assert.AreEqual(printed, string.Join("|", await ModuleWorkspace.RunAsync(Classes, Program(body))));
 }
