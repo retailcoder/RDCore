@@ -27,8 +27,10 @@ execution context to its initial state
 - every object is released;
 - every open file is closed.
 
-A program also ends this way, once its error is reported, when it raises a run-time error that no handler catches, or an internal error. A program
-that waits at an error under a debugger has not ended, and keeps its state until it ends.
+A program also ends this way when a run-time error reaches no handler, or when an internal error stops it, once the error is reported. An error
+that a handler catches unwinds the activations it leaves, and their objects terminate as they go. A program that waits at an error under a debugger
+has not ended, and keeps its state until it ends. A line the shell runs is a program of its own: one that ends on an error resets the session, the
+variables that earlier lines assigned included.
 
 ## Implementation
 

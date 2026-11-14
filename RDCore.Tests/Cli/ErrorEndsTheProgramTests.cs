@@ -11,7 +11,7 @@ namespace RDCore.Tests.Cli;
 
 /// <summary>
 /// A run-time error that nothing handles ends the program as <c>End</c> ends it: nothing is unwound, no <c>Class_Terminate</c> runs, and the session is
-/// reset once the error is said, its variables, its <c>Static</c> locals, its objects and its files with it. An error a handler catches unwinds the
+/// reset once the error is reported: its variables, its <c>Static</c> locals, its objects and its files. An error a handler catches unwinds the
 /// activations it leaves, and their objects terminate as they go. A program that waits at an error under a debugger is not over, and keeps what it made.
 /// </summary>
 [TestClass]

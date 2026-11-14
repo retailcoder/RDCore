@@ -1142,7 +1142,7 @@ public sealed class ProgramExecution(IEnvironmentSessionProvider provider, ILogg
     }
 
     // what the invoker answered of a program that is over: one that ended on an error nothing handled, or on an internal error, ends as an End ends it - the
-    // session is wiped, once the error is said, with where it was raised and the stack trace of it.
+    // session is wiped, once the error is reported with where it was raised and its stack trace.
     private ExecuteResult ReportEnd(
         RuntimeSemanticsEvaluationResult invocation, IRuntimeSession session, RuntimeOutputBuffer output, CancellationToken token)
     {
