@@ -104,7 +104,7 @@ public sealed class VisualBasicFormTextSelectionTests
         => PrintsAsync(RunAsync("Text1", "t.MaxLength = 5: t.Text = \"12345\": t.SelStart = 5: t.SelText = \"678\""), "12345|5|0||0");
 
     [TestMethod]
-    public Task TheSelectionProperties_AreLongLongAndString()
+    public Task SelStartAndSelLength_AreLongs_AndSelText_IsAString()
     {
         var form1 = Form1();
         var program = string.Join("\r\n", [
