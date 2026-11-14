@@ -199,7 +199,9 @@ public static class DeclarationUsage
     private static AccessModifier AccessOf(Symbol symbol)
         => symbol is AccessibleTypedSymbol accessible ? accessible.AccessModifier : AccessModifier.Private;
 
-    private static bool IsImplicit(Symbol symbol) => symbol is VBLocalVariableSymbol { DeclaredBy: var kind } && kind.IsImplicit();
+    // a local that no statement declares, or a variable of the module that a name declares by being written (SymbolBuilder.BuildImplicitModuleVariable).
+    private static bool IsImplicit(Symbol symbol) => symbol is VBLocalVariableSymbol { DeclaredBy: var kind } && kind.IsImplicit()
+        || symbol.GetProperty(SymbolProperties.ImplicitlyDeclared);
 
     private static SourceLocation LocationOf(Symbol symbol)
         => new(symbol.ParentUri, symbol switch
