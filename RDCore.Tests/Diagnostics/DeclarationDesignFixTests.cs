@@ -12,10 +12,18 @@ public sealed class DeclarationDesignFixTests
 {
     [TestMethod]
     [DataRow("Dim x As Long", "Private x As Long", DisplayName = "a variable")]
-    [DataRow("Dim x As Long, y As String", "Private x As Long, y As String", DisplayName = "two variables")]
+    [DataRow("Dim x As Long, y As String", "Private x As Long\r\nPrivate y As String", DisplayName = "two variables, each on a line of its own")]
+    [DataRow("Dim x As Long, _\r\n    y As String", "Private x As Long\r\nPrivate y As String", DisplayName = "two variables on two lines")]
     [DataRow("Dim x(1 To 3) As Long", "Private x(1 To 3) As Long", DisplayName = "an array")]
     public async Task AModuleLevelDim_IsWrittenPrivate(string declaration, string written)
         => await AssertFixedAsync(RDCoreDiagnosticId.ModuleScopeDimDeclaration, [declaration], [written]);
+
+    [TestMethod]
+    public async Task AModuleLevelDimOfSeveralNames_WrittenPrivate_KeepsTheTypeOfEach()
+        => await AssertFixedAsync(RDCoreDiagnosticId.ModuleScopeDimDeclaration,
+            ["Dim a, b As Long", "Public Sub Main()", "    Debug.Print TypeName(a); TypeName(b)", "End Sub"],
+            ["Private a", "Private b As Long", "Public Sub Main()", "    Debug.Print TypeName(a); TypeName(b)", "End Sub"],
+            runs: true);
 
     [TestMethod]
     public async Task AModuleLevelDim_WrittenPrivate_HoldsWhatItHeld()

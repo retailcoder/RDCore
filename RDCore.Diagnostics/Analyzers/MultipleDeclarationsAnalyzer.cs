@@ -19,6 +19,11 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <c>Dim b As Long</c>, and <c>a</c> is still the <c>Variant</c> it was. It is not offered in a single-line <c>If</c>, which a line break would end, nor
 /// for a statement that declares a <c>WithEvents</c> variable.
 /// </para>
+/// <para>
+/// A <c>Dim</c> statement at the module level is <c>RDC00202</c>'s first: its keyword declares every variable of its list (<strong>MS-VBAL §5.2.3.1</strong>),
+/// and its fix makes the statement <c>Private</c> and declares each name on a line of its own, where a split first would write a <c>Dim</c> statement for
+/// each name. A <c>Private</c> statement of several names is this finding's.
+/// </para>
 /// </remarks>
 internal sealed class MultipleDeclarationsAnalyzer : SyntaxTreeAnalyzer
 {
@@ -31,7 +36,7 @@ internal sealed class MultipleDeclarationsAnalyzer : SyntaxTreeAnalyzer
             .Prepend(module)
             .SelectMany(node => node.SiblingLists().Select(siblings => (Parent: node, Siblings: siblings)))
             .SelectMany(list => DeclarationStatements.In(list.Siblings).Select(statement => (list.Parent, Statement: statement)))
-            .Where(each => each.Statement.Count > 1)
+            .Where(each => each.Statement.Count > 1 && !(each.Parent is ModuleNode && ModuleScopeDimAnalyzer.IsDim(each.Statement)))
             .Select(each => new AnalyzerFinding(
                 RDCoreDiagnosticId.MultipleDeclarations.ToCode(),
                 DeclarationStatements.RangeOf(each.Statement),
@@ -45,18 +50,23 @@ internal sealed class MultipleDeclarationsAnalyzer : SyntaxTreeAnalyzer
             });
     }
 
-    // a line break and the statement's keywords in place of each comma between two names: the text between them is the comma and the blanks around it.
     private static DiagnosticFixes? FixOf(IReadOnlyList<SyntaxNode> statement, bool atModuleLevel)
+        => KeywordsOf(statement[0], atModuleLevel) is { } keywords && SplitEdits(statement, keywords) is { } edits
+            ? new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.MultipleDeclarations_Fix, edits) }
+            : null;
+
+    // a line break and the given keywords in place of each comma between two names: the text between them is the comma and the blanks around it.
+    // None for a statement that declares a WithEvents variable.
+    internal static TextEdit[]? SplitEdits(IReadOnlyList<SyntaxNode> statement, string keywords)
     {
-        if (KeywordsOf(statement[0], atModuleLevel) is not { } keywords || statement.Any(node => node is VariableDeclarationNode { IsWithEvents: true }))
+        if (statement.Any(node => node is VariableDeclarationNode { IsWithEvents: true }))
         {
             return null;
         }
 
         var indent = new string(' ', statement[0].SourceLocation.Range.Start.Character);
-        var edits = statement.Zip(statement.Skip(1), (before, after) => SyntaxEdits.Replace(
-            new SourceRange(before.SourceLocation.Range.End, after.SourceLocation.Range.Start), $"{NewLine}{indent}{keywords} "));
-        return new DiagnosticFixes { Edit = SyntaxEdits.Fix(RDCoreDiagnosticsResources.MultipleDeclarations_Fix, [.. edits]) };
+        return [.. statement.Zip(statement.Skip(1), (before, after) => SyntaxEdits.Replace(
+            new SourceRange(before.SourceLocation.Range.End, after.SourceLocation.Range.Start), $"{NewLine}{indent}{keywords} "))];
     }
 
     // the keywords the statement starts with, which the tree says by its access modifier and whether it is static or constant.
