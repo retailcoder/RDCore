@@ -20,6 +20,10 @@ internal static class ExpressionFactDescriber
 {
     public static ExpressionFact Describe(
         StaticEvaluationContext context, IExpressionFactSink facts, ExpressionNode expression, StaticSemanticsEvaluationResult result)
+        => MemberFacts.WithDefaultMember(context, DescribeExpression(context, facts, expression, result));
+
+    private static ExpressionFact DescribeExpression(
+        StaticEvaluationContext context, IExpressionFactSink facts, ExpressionNode expression, StaticSemanticsEvaluationResult result)
     {
         var type = result.IsError ? null : result.Result;
         var error = result.IsError ? result.ErrorInfo : null;
@@ -35,8 +39,8 @@ internal static class ExpressionFactDescriber
                 var document = NamesAHostedDocument(context, name, symbol) ? ValueExpressionSemanticFlags.HostedDocumentName : 0;
                 return symbol is null
                     ? new(expression.Identity, expression.Location, type, ExpressionClassification.Unknown, null, document, error)
-                    : new(expression.Identity, expression.Location, type, ClassificationOf(symbol), symbol.SemanticId, FlagsOf(symbol, name.IdentifierName) | document
-                        | BindingFlagsOf(symbol), error);
+                    : MemberFacts.WithAccessors(context, facts, expression, new(expression.Identity, expression.Location, type, ClassificationOf(symbol),
+                        symbol.SemanticId, FlagsOf(symbol, name.IdentifierName) | document | BindingFlagsOf(symbol), error), symbol);
             }
 
             case NewExpressionNode:
@@ -102,7 +106,8 @@ internal static class ExpressionFactDescriber
         ExpressionNode expression, ValueExpressionSemanticFlags kind, VBCompileErrorInfo? error)
     {
         ExpressionFact Fact(ExpressionClassification classification, Symbol? binding, ValueExpressionSemanticFlags flags)
-            => new(expression.Identity, expression.Location, type, classification, binding?.SemanticId, flags | BindingFlagsOf(binding), error);
+            => MemberFacts.WithAccessors(context, facts, expression,
+                new(expression.Identity, expression.Location, type, classification, binding?.SemanticId, flags | BindingFlagsOf(binding), error), binding);
 
         // an access with no owner is relative to the object of the enclosing With block.
         var flags = kind | (owner is null ? ValueExpressionSemanticFlags.WithBlockRelative : 0);
