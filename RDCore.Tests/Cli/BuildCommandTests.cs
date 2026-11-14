@@ -921,10 +921,34 @@ public sealed class BuildCommandTests
     {
         var fileSystem = Files(("Program.bas", Echo));
 
-        var run = await RunAsync(fileSystem, "--unattended", Root, "--seed", "42");
+        var run = await RunAsync(fileSystem, "-c", "Release", Root, "--seed", "42");
 
         Assert.AreEqual(0, run.Exit, run.Error);
         CollectionAssert.AreEqual(new[] { "1", "String:--seed", "String:42", "[--seed 42]" }, run.Output);
+    }
+
+    // a run that is unattended tells the program so, as a built program's command line does: --unattended is first on its command line.
+    [TestMethod]
+    public async Task Run_Unattended_GivesTheProgramTheSwitch_InCommandAndToMain()
+    {
+        var fileSystem = Files(("Program.bas", Echo));
+
+        var run = await RunAsync(fileSystem, "--unattended", Root, "--seed", "42");
+
+        Assert.AreEqual(0, run.Exit, run.Error);
+        CollectionAssert.AreEqual(new[] { "2", "String:--unattended", "String:--seed", "String:42", "[--unattended --seed 42]" }, run.Output);
+    }
+
+    // the switch is on the program's command line once, where the program's own arguments already have it.
+    [TestMethod]
+    public async Task Run_Unattended_GivesTheProgramTheSwitchOnce()
+    {
+        var fileSystem = Files(("Program.bas", Echo));
+
+        var run = await RunAsync(fileSystem, "--unattended", Root, "x", "--unattended");
+
+        Assert.AreEqual(0, run.Exit, run.Error);
+        CollectionAssert.AreEqual(new[] { "1", "String:x", "String:--unattended", "[x --unattended]" }, run.Output);
     }
 
     [TestMethod]

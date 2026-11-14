@@ -106,10 +106,10 @@ ne s'exécute pas non plus, pas plus qu'un projet dont un module ne se charge pa
 |Option|Ce qu'elle fait|
 |---|---|
 |`-c`, `--configuration`|`Debug` (par défaut) ou `Release`.|
-|`--unattended`|Personne ne répond aux boîtes de dialogue : un `MsgBox` ou un `InputBox` fait échouer l'exécution.|
+|`--unattended`|Personne ne répond aux boîtes de dialogue : un `MsgBox` ou un `InputBox` fait échouer l'exécution. Le programme le sait : l'option vient en premier dans `Command$` et dans les arguments de `Main`, comme pour un programme construit.|
 
 Les options viennent avant le chemin. Tout ce qui suit le chemin est la ligne de commande du programme, options comprises :
-`rdc run --unattended .` s'exécute sans surveillance, et `rdc run . --unattended` donne `--unattended` au programme. Un `--` juste après le
+`rdc run --unattended .` s'exécute sans surveillance, et `rdc run . --unattended` ne fait que donner `--unattended` au programme. Un `--` juste après le
 chemin est ignoré. Sans chemin, c'est le dossier courant qui s'exécute, et `--` précède la ligne de commande du programme. Sans chemin ni
 `--`, rien ne va au programme, et une option que `rdc` ne connaît pas est une erreur.
 

@@ -28,6 +28,8 @@ internal sealed class RunCommandOptions
 internal sealed class RunCommand(IFileSystem fileSystem, IProjectFileLoader projects, BenchRunner runner, IErrorDetailsRecorder errorDetails,
     TextWriter? output = null, TextWriter? error = null, IConsoleKeys? keys = null) : ICliCommand
 {
+    private const string UnattendedSwitch = "--unattended";
+
     private TextWriter Output => output ?? global::System.Console.Out;
     private TextWriter Error => error ?? global::System.Console.Error;
 
@@ -83,6 +85,10 @@ internal sealed class RunCommand(IFileSystem fileSystem, IProjectFileLoader proj
             return ProgramRunner.Refused;
         }
 
-        return await ProgramRunner.RunAsync(provider, entryPoint.Procedure, arguments, errorDetails, Output, Error, options.Unattended, token);
+        // --unattended is the program's to know as well, as it is a built program's: it is first on the program's command line, once.
+        IReadOnlyList<string> programArguments = options.Unattended && !arguments.Contains(UnattendedSwitch, StringComparer.Ordinal)
+            ? [UnattendedSwitch, .. arguments]
+            : arguments;
+        return await ProgramRunner.RunAsync(provider, entryPoint.Procedure, programArguments, errorDetails, Output, Error, options.Unattended, token);
     }
 }
