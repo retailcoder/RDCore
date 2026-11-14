@@ -18,7 +18,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <remarks>
 /// Only a <c>Variant</c> parameter can be missing: an omitted argument leaves a parameter of any other type its type's default value, and gives an
 /// <c>Optional</c> <c>Variant</c> its default value when it has one. An <c>IsMissing</c> of such a parameter looks like a test and never is one, which MS-VBA
-/// compiles without a word (recorded in Excel: oracle\ismissing I01-I09). The analyzer finds the call of the library's <c>IsMissing</c> by what it is bound
+/// compiles without a word (recorded in Excel). The analyzer finds the call of the library's <c>IsMissing</c> by what it is bound
 /// to, the parameter by the declaration its argument is bound to, and reads the parameter's declared type and its declaration in the syntax tree. A
 /// <c>ParamArray</c> with no elements is missing.
 /// </remarks>
