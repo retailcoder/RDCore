@@ -915,7 +915,7 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to &apos;{0}&apos; is a Property Get declared Variant, with no Property Let. MS-VBAL raises error 451 here. RD-VBA, like MS-VBA, assigns the value to the default member of the object &apos;{0}&apos; returns, and raises error 424 when it returns no object. Assign that object&apos;s member by name..
+        ///   Looks up a localized string similar to &apos;{0}&apos; is a Property Get declared Variant, with no Property Let. MS-VBAL specifies error 451 here. RD-VBA, like MS-VBA, assigns the value to the default member of the object &apos;{0}&apos; returns, and raises error 424 when it returns no object. Assign that object&apos;s member by name..
         /// </summary>
         public static string LetThroughAVariantGet_Message {
             get {
@@ -924,7 +924,7 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to &apos;{0}&apos; is a function declared Variant. MS-VBAL raises error 450 here. RD-VBA, like MS-VBA, assigns the value to the default member of the object &apos;{0}&apos; returns, and raises error 424 when it returns no object. Assign that object&apos;s member by name..
+        ///   Looks up a localized string similar to &apos;{0}&apos; is a function declared Variant. MS-VBAL specifies error 450 here. RD-VBA, like MS-VBA, assigns the value to the default member of the object &apos;{0}&apos; returns, and raises error 424 when it returns no object. Assign that object&apos;s member by name..
         /// </summary>
         public static string LetThroughAVariantFunction_Message {
             get {

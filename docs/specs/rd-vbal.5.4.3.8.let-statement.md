@@ -105,6 +105,7 @@ object's default member is assigned.
 "Invalid use of property" when it is a `Property Get` (`os = 5`, `Me = 5`), "Type mismatch" when it is a function (observed in Excel). **MS-VBAL
 §5.4.3.8** makes the statement valid, and RD-VBA compiles it: it assigns through a `Property Get`, and raises error 438 for a function, which is not a
 default property. Naming the member (`os.S = 5`) or giving it an empty argument list (`os() = 5`) compiles in both.
+[RDC11045](../diagnostics/rdc11045.md) reports the statement.
 
 **RD-VBA differs from MS-VBAL:** a function default member reached late-bound, through an `Object` or a `Variant`, is error 450, as MS-VBA raises it
 (observed in Excel). **MS-VBAL §5.4.3.8** raises error 438.
@@ -190,8 +191,9 @@ that index what it returns. Such a member is called, with the arguments written 
 a function of a module is. A `Property Get` declared another type is error 451. `c(1) = 5` and `c.Item(1) = 5`, with `Dim c As Collection`
 holding a number, are error 424; an item that is an object is assigned its own default member, and one that takes an argument is error 438.
 
-**RD-VBA differs from MS-VBAL:** **MS-VBAL §5.4.3.8** raises error 451 for a `Property Get` declared `Variant`, whatever it returns. RD-VBA
-calls it and assigns through what it returns, as MS-VBA does (observed in Excel): a `Variant` that holds a number is error 424.
+**RD-VBA differs from MS-VBAL:** **MS-VBAL §5.4.3.8** raises error 451 for a `Property Get` declared `Variant`, and error 450 for a function
+declared `Variant`, whatever they return. RD-VBA calls the member and assigns through what it returns, as MS-VBA does (observed in Excel): a `Variant`
+that holds a number is error 424. [RDC11046](../diagnostics/rdc11046.md) reports the statement.
 
 A `ReDim` of an array gives it the element type of the variable's declaration (`Dim a() As Long`), including a variable of an object.
 
