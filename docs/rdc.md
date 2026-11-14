@@ -101,7 +101,7 @@ nor a project with a module that does not load. `Debug.Print` writes to the stan
 |Option|What it does|
 |---|---|
 |`-c`, `--configuration`|`Debug` (the default) or `Release`.|
-|`--unattended`|Nobody answers a dialog: a `MsgBox` or an `InputBox` fails the run. The program knows it: the switch is first in `Command$` and in the arguments of `Main`, as it is for a built program.|
+|`--unattended`|Nobody answers a dialog: a `MsgBox` or an `InputBox` fails the run. The program knows it: the switch is first in `Command$` and in the arguments of `Main`, as it is for a built program, unless the program's command line already has it.|
 
 The options go before the path. Everything after the path is the program's command line, switches included: `rdc run --unattended .` runs
 unattended, and `rdc run . --unattended` only gives `--unattended` to the program. A `--` right after the path is skipped. With no path, the
