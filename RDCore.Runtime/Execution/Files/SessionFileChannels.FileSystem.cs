@@ -464,12 +464,6 @@ internal sealed partial class SessionFileChannels
             return VBRuntimeErrorId.BadFileNameOrNumber.ToCode();
         }
 
-        // a file a channel has open is not replaced, as FileCopy's destination is not.
-        if (_channels.Values.Any(channel => PathsMatch(channel.FullPath, path)))
-        {
-            return VBRuntimeErrorId.FileAlreadyOpen.ToCode();
-        }
-
         if (fileSystem.Directory.Exists(path))
         {
             return VBRuntimeErrorId.PathOrFileAccessError.ToCode();
@@ -480,7 +474,12 @@ internal sealed partial class SessionFileChannels
             return VBRuntimeErrorId.PathNotFound.ToCode();
         }
 
-        return Attempt(() => fileSystem.File.WriteAllBytes(path, bytes));
+        // shared as a channel opens a file: one the program has open is written too, unless its channel locked it.
+        return Attempt(() =>
+        {
+            using var stream = fileSystem.FileStream.New(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            stream.Write(bytes);
+        });
     }
 
     /// <inheritdoc/>
