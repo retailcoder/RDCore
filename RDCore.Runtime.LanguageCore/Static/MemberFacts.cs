@@ -33,7 +33,7 @@ internal static class MemberFacts
         };
     }
 
-    // the default member of the class an expression is of, as the composition has it now.
+    // the default member of the class an expression is of, as the class's current composition has it (CurrentTypes).
     public static ExpressionFact WithDefaultMember(StaticEvaluationContext context, ExpressionFact fact)
     {
         if (fact.DeclaredType is not VBClassType declaredClass || CurrentTypes.Of(context.Resolver, declaredClass) is not { DefaultMember: { } member } classType)
@@ -85,7 +85,7 @@ internal static class MemberFacts
         _ => ExpressionClassification.Variable,
     };
 
-    // the parameters a call is to be given: none of Me, the implicit first parameter of a member of a class.
+    // the parameters a call must be given, leaving out Me, the implicit first parameter of a member of a class.
     private static int RequiredParametersOf(Symbol member) => (member switch
     {
         VBReturningMemberSymbol returning => returning.Parameters,
