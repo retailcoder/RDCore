@@ -40,7 +40,10 @@ internal static class ExpressionFactDescriber
                 return symbol is null
                     ? new(expression.Identity, expression.Location, type, ExpressionClassification.Unknown, null, document, error)
                     : MemberFacts.WithAccessors(context, facts, expression, new(expression.Identity, expression.Location, type, ClassificationOf(symbol),
-                        symbol.SemanticId, FlagsOf(symbol, name.IdentifierName) | document | BindingFlagsOf(symbol), error), symbol);
+                        symbol.SemanticId, FlagsOf(symbol, name.IdentifierName) | document | BindingFlagsOf(symbol), error)
+                    {
+                        ConstantValue = ConstantBindings.Of(context, symbol),
+                    }, symbol);
             }
 
             case NewExpressionNode:
@@ -107,7 +110,10 @@ internal static class ExpressionFactDescriber
     {
         ExpressionFact Fact(ExpressionClassification classification, Symbol? binding, ValueExpressionSemanticFlags flags)
             => MemberFacts.WithAccessors(context, facts, expression,
-                new(expression.Identity, expression.Location, type, classification, binding?.SemanticId, flags | BindingFlagsOf(binding), error), binding);
+                new(expression.Identity, expression.Location, type, classification, binding?.SemanticId, flags | BindingFlagsOf(binding), error)
+                {
+                    ConstantValue = ConstantBindings.Of(context, binding),
+                }, binding);
 
         // an access with no owner is relative to the object of the enclosing With block.
         var flags = kind | (owner is null ? ValueExpressionSemanticFlags.WithBlockRelative : 0);
