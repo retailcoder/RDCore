@@ -70,7 +70,7 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00307`](../diagnostics/rdc00307.md)|Obsolete type hint|Information|the syntax tree: the type hints of declarations; `ExpressionFact.Binding` of the references|
 |[`RDC00308`](../diagnostics/rdc00308.md)|Obsolete While…Wend|Information|the syntax tree: a `WhileWendStatementNode`|
 |[`RDC00309`](../diagnostics/rdc00309.md)|Obsolete On Local Error statement|Information|the syntax tree: `OnErrorGoToStatementNode.IsLocal`|
-|[`RDC00310`](../diagnostics/rdc00310.md)|Redundant ByVal argument|Hint|`ValueExpressionSemanticFlags.RedundantByVal`|
+|[`RDC00310`](../diagnostics/rdc00310.md)|Redundant ByVal argument|Hint|the syntax tree: a `ByVal` argument with no compile error; its `ArgumentFact`: `Mechanism` `ExplicitByVal`, not a `ParamArray`, and a `ParameterType` other than the unknown type (`As Any`)|
 |[`RDC00311`](../diagnostics/rdc00311.md)|Early binding opportunity|Information|`ExpressionFact.Creates` (`ObjectClassSource.ReferencedLibrary`)|
 |[`RDC00405`](../diagnostics/rdc00405.md)|Implementations should be private|Information|`DeclarationFact.Role` and `DeclarationFact.Access`|
 |[`RDC00407`](../diagnostics/rdc00407.md)|Unmatched event handler|Hint|`DeclarationFact.Role` (`DeclarationRole.UnmatchedEventHandler`) and `DeclarationFact.References`|
