@@ -95,8 +95,8 @@ internal sealed class ObjectVariableArguments
     private ExpressionFactDto? OwnerFactOf(MemberAccessExpressionNode access)
         => FactOf(access.Owner ?? (_withTargets.TryGetValue(access.Identity, out var target) ? target : null));
 
-    // b.Count: a variable named as a member of an object of a class, which is the class's public variable. A member of a module the owner names has no kind of
-    // type, and is the module's variable.
+    // b.Count: a variable named as a member of an object of a class, which is the class's public variable. A member of a module the owner names has no TypeKind,
+    // and is the module's variable.
     private bool IsObjectVariable(MemberAccessExpressionNode access)
         => OwnerFactOf(access) is { TypeKind: DeclaredTypeKind.Class, IsArray: false } && FactOf(access) is { Classification: SDK.Semantics.ExpressionClassification.Variable };
 

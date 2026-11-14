@@ -38,7 +38,7 @@ public sealed class ObjectVariablePassedByRefAnalyzerTests
         return [.. new ObjectVariablePassedByRefAnalyzer().Analyze(new ModuleAnalysisContext(uri, parsed, semantics)).OrderBy(finding => finding.Range.Start)];
     }
 
-    // the payload as the host sends it, without the flags that said an argument is a copy: the analyzers judge from the tree, the argument facts and the
+    // the payload as the host sends it, without the flags that mark an argument as a copy: the analyzers judge from the tree, the argument facts and the
     // kinds of the declared types of the expressions.
     internal static ModuleSemanticsDto WithoutCopyFlags(ModuleSemanticsDto semantics) => semantics with
     {

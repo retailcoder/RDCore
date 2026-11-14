@@ -11,7 +11,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </summary>
 /// <remarks>
 /// The analyzer reads the argument off the argument facts and the syntax tree. It is given to a parameter that takes it by reference, of a procedure that is
-/// no library's; and it is a member access whose owner (or the target of the enclosing <c>With</c> block) is of a class and which is classified as a variable,
+/// not a library's; and it is a member access whose owner (or the target of the enclosing <c>With</c> block) is of a class and which is classified as a variable,
 /// or an element of such a variable declared <c>Variant</c>. RD-VBA passes the copy, as MS-VBA does (RD-VBAL §5.3.1.11): what the procedure assigns to its
 /// parameter is lost, where the specification has it written to the object's variable. A warning, for code that relies on what the specification says. The
 /// same copy given to a procedure called late is RDC11029's.
