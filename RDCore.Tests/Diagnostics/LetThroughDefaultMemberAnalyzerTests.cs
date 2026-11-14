@@ -57,6 +57,8 @@ public sealed class LetThroughDefaultMemberAnalyzerTests
     [DataRow("Dim l As New Leaf", "l = 5", DisplayName = "a default member with a Property Let")]
     [DataRow("Dim r As New ReadOnly", "Debug.Print r", DisplayName = "a read")]
     [DataRow("Dim o As Object", "Set o = New ReadOnly: o = 5", DisplayName = "an Object")]
+    [DataRow("Dim r As New ReadOnly", "r() = 5", DisplayName = "an empty argument list")]
+    [DataRow("Dim r(1) As ReadOnly", "r(0) = 5", DisplayName = "an element of an array")]
     public async Task ALetThatMSVBACompiles_IsNotReportedAsRDC11045(string declaration, string statement)
         => Assert.IsEmpty(await FindingsAsync(new LetToADefaultMemberWithNoPropertyLetAnalyzer(), declaration, statement));
 
