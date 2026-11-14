@@ -1,5 +1,3 @@
-using RDCore.Runtime.LanguageCore.StdLib;
-using RDCore.Runtime.LanguageCore.StdLib.Abstract;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Runtime.Abstract.Execution;
@@ -38,8 +36,7 @@ internal static class ExpressionFactDescriber
                 return symbol is null
                     ? new(expression.Identity, expression.Location, type, ExpressionClassification.Unknown, null, document, error)
                     : new(expression.Identity, expression.Location, type, ClassificationOf(symbol), symbol.SemanticId, FlagsOf(symbol, name.IdentifierName) | document
-                        | BindingFlagsOf(symbol)
-                        | (Expressions.SimpleNameExpressionStaticSemantics.IgnoresTypeCharacter(name, symbol) ? ValueExpressionSemanticFlags.IgnoredTypeCharacter : 0), error);
+                        | BindingFlagsOf(symbol), error);
             }
 
             case NewExpressionNode:
@@ -71,7 +68,7 @@ internal static class ExpressionFactDescriber
 
         if (ExpressionStaticSemanticsEvaluator.ProcedureNamedBy(context, index.Callee) is { } procedure)
         {
-            return Fact(procedure, ValueExpressionSemanticFlags.ProcedureCall | IsMissingFlags(context, index, procedure)) with
+            return Fact(procedure, ValueExpressionSemanticFlags.ProcedureCall) with
             {
                 Creates = ObjectCreationFacts.Of(context, index, procedure),
             };
@@ -89,28 +86,10 @@ internal static class ExpressionFactDescriber
             {
                 return Fact(null, ValueExpressionSemanticFlags.LateBound | ValueExpressionSemanticFlags.ProcedureCall);
             }
-
-            if (calleeType is VBArrayType && Expressions.IndexExpressionStaticSemantics.IsASecondEmptyArgumentList(index))
-            {
-                return Fact(null, ValueExpressionSemanticFlags.ArrayGivenASecondEmptyArgumentList);
-            }
         }
 
         return Fact(null, 0);
     }
-
-    private static readonly string IsMissingTarget = StdLibSymbolReader.ExternalTargetOf(
-        typeof(IStdInformationModule), typeof(IStdInformationModule).GetMethod(nameof(IStdInformationModule.IsMissing))!);
-
-    // IsMissing of a parameter of the procedure that can never be missing: one that is not a Variant, or an Optional Variant with a default value. A ParamArray
-    // with no elements is missing (recorded in Excel: oracle\ismissing I01-I09).
-    private static ValueExpressionSemanticFlags IsMissingFlags(StaticEvaluationContext context, IndexExpressionNode call, Symbol procedure)
-        => procedure.GetProperty(SymbolProperties.ExternalTarget) == IsMissingTarget
-            && call.Arguments is [SimpleNameExpressionNode argument]
-            && context.Resolver.ResolveValue(argument, ScopeKind.Local, context.Scope.Uri).Symbol is VBParameterSymbol parameter and not ParamArrayParameterSymbol
-            && (parameter.ResolvedType is not VBVariantType || parameter.DefaultValue is not null)
-                ? ValueExpressionSemanticFlags.IsMissingAlwaysFalse
-                : 0;
 
     // a name that resolves to nothing, or to the variable it declares by being named, written as a document module's: MS-VBA's host makes it the document, and
     // RD-VBA hosts none (ValueExpressionSemanticFlags.HostedDocumentName). A name the code declares as its own is its own, whatever modules there are.
