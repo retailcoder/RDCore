@@ -67,7 +67,7 @@ internal static class LabelRename
             {
                 // a line number has no name, and so no range of one.
                 case LineLabelNode { NameRange: { } name } label:
-                    yield return Defined(label, name);
+                    yield return (label.Name, name, true, label.IsBracketed);
                     break;
                 case GoToStatementNode { LabelExpression: SimpleNameExpressionNode name }:
                     yield return Reference(name);
@@ -99,16 +99,6 @@ internal static class LabelRename
         }
     }
 
-    // a label's definition is its name as it is written, brackets included, which its node keeps.
-    private static (string, SourceRange, bool, bool) Defined(LineLabelNode label, SourceRange name)
-    {
-        var (unbracketed, isBracketed) = Unbracketed(label.Name);
-        return (unbracketed, name, true, isBracketed);
-    }
-
     private static (string, SourceRange, bool, bool) Reference(SimpleNameExpressionNode name)
         => (name.IdentifierName, name.Location.Range, false, name.IsBracketed);
-
-    private static (string Name, bool IsBracketed) Unbracketed(string name)
-        => name.Length > 1 && name[0] == '[' && name[^1] == ']' ? (name[1..^1], true) : (name, false);
 }
