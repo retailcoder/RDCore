@@ -152,7 +152,11 @@ public static class ObjectValueStaticSemantics
                 continue;
             }
 
-            if (ValueOf(context, passed, type, destination) is { IsError: true } refused)
+            // MS-VBAL §5.3.1.11: a variable of the parameter's own type, given to a ByRef parameter, is passed by reference; its value is not taken.
+            var byReference = value is not ByValArgumentExpressionNode && parameter.ParameterKind is ParameterKind.ImplicitByRef or ParameterKind.ExplicitByRef
+                && passed is not VBUnaryOperatorExpressionNode { Token: OperatorSymbolNames.UnaryLetCoerceOp } && DenotesAVariable(context, passed)
+                && string.Equals(type.Name, parameter.ResolvedType.Name, StringComparison.OrdinalIgnoreCase);
+            if (ValueOf(byReference ? context with { Facts = null } : context, passed, type, destination) is { IsError: true } refused)
             {
                 return refused.ErrorInfo as VBCompileErrorInfo;
             }
