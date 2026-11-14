@@ -138,7 +138,7 @@ internal static class RDFormsControlsMembers
         }
     }
 
-    // the container Add is given: a control of the same form. Anything else is no container of it.
+    // the container Add is given: a control of the same form. Anything else is not a container for it.
     private static ComponentInstance ContainerOf(RDFormsForm form, object? container)
         => container is RDFormsObject handle && ReferenceEquals(handle.Form, form) && (handle.IsForm || RDFormsAutomationServer.IsPlaced(handle))
             ? handle.Component

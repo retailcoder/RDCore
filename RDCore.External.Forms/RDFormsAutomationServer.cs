@@ -93,7 +93,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
                 return Call(handle, method, arguments, culture);
             }
 
-            // a control's name is no property of its class: the file names the control, and Controls.Add names the one it adds.
+            // a control's name is not a property of its class: the file names the control, and Controls.Add names the one it adds.
             if (invocation is AutomationInvocation.Get or AutomationInvocation.Method && arguments.Length == 0
                 && string.Equals(member, NameMember, StringComparison.OrdinalIgnoreCase))
             {
@@ -238,7 +238,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
 
     /// <inheritdoc/>
     public string? ClassNameOf(object target)
-        // the Controls collection is of no class of a library: a late-bound Object.
+        // the Controls collection is not of a library's class: a late-bound Object.
         => target is RDFormsControls ? null : HandleOf(target).Component.Class.TypeName;
 
     /// <inheritdoc/>
