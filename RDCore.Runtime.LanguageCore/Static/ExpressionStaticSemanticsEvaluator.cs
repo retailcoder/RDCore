@@ -477,7 +477,7 @@ public static class ExpressionStaticSemanticsEvaluator
         => new(argument.Identity, parameter.Uri,
             !isLibrary ? parameter.ParameterKind
                 : parameter.GetProperty(SymbolProperties.TypeLibraryByRef) ? ParameterKind.ExplicitByRef : ParameterKind.ExplicitByVal,
-            parameter.ResolvedType.Name, parameter.IsOptional, parameter.DefaultValue is not null, parameter is ParamArrayParameterSymbol, isExternal);
+            parameter.ResolvedType.Name, parameter.IsOptional, parameter.DefaultValue is not null, parameter is ParamArrayParameterSymbol, isExternal, isLibrary);
 
     // the Function or Property Get a callee names, by its bare name, qualified by the project or module that declares it, or as a member of an object
     // of a class; null for anything that is not one (an array, a variable that holds an object, a Sub).
