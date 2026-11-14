@@ -83,7 +83,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
             }
 
             // a control assigned a value through its form (Form1.Text1 = "abc") is assigned it through its own default member: the form's control is a property
-            // that returns the control, which takes the value as an object assigned a value does.
+            // that returns the control, and an object assigned a value gives it to its default member.
             if (invocation is AutomationInvocation.Let && arguments.Length == 1 && component.Class.Property(member) is null && Control(handle, member) is { } assigned)
             {
                 return Invoke(assigned, DefaultMemberName, invocation, arguments, byReference, culture);
