@@ -76,7 +76,7 @@ internal sealed class IsMissingAlwaysFalseAnalyzer : IModuleAnalyzer
                     continue;
                 }
 
-                // the call is always False, and its argument is a name, which evaluating has no other effect: False in its place does what it did.
+                // the call is always False, and its argument is a name, whose evaluation has no other effect: False in its place does what it did.
                 yield return new AnalyzerFinding(RDCoreDiagnosticId.IsMissingAlwaysFalse.ToCode(), fact.Location.Range, DiagnosticSeverity.Warning, message)
                 {
                     Fixes = new DiagnosticFixes
