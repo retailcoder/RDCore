@@ -323,6 +323,10 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     /// </summary>
     internal long AssumedSoFar => Observation?.Assumptions ?? 0;
 
+    // the ArgumentList flag of a member access, given the argument list the code writes for it: `f()` gives none.
+    internal static MemberAccessOperationSemanticFlags GivenArgumentList(ImmutableArray<ExpressionNode> arguments)
+        => arguments.IsDefaultOrEmpty || IndexExpressionNode.IsEmptyArgumentList(arguments) ? 0 : MemberAccessOperationSemanticFlags.ArgumentList;
+
     /// <summary>
     /// States a member access that was just evaluated as a <see cref="MemberAccessFact"/>, if the evaluation is observed.
     /// </summary>
@@ -340,10 +344,6 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
     /// <param name="kind">What the access is, of what the code writes: <c>Explicit</c>, or <c>Implicit</c> with the member it implies.</param>
     /// <param name="assumedBefore">What <see cref="AssumedSoFar"/> was before the member was accessed.</param>
     /// <param name="result">What the access evaluated to: its error, if it is the code's, is the fact's.</param>
-    // what a member access is given of the argument list the code writes for it: `f()` gives none.
-    internal static MemberAccessOperationSemanticFlags GivenArgumentList(ImmutableArray<ExpressionNode> arguments)
-        => arguments.IsDefaultOrEmpty || IndexExpressionNode.IsEmptyArgumentList(arguments) ? 0 : MemberAccessOperationSemanticFlags.ArgumentList;
-
     internal void ObserveMemberAccess(
         IRuntimeSession session,
         RuntimeEvaluationContext context,

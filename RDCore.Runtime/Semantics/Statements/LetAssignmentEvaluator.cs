@@ -479,9 +479,9 @@ public sealed class LetAssignmentEvaluator(
         return ObservedAccess(session, context, memberAccess, owner, assumedBefore, outcome, kind | given);
     }
 
-    // whether the member of the name is given the arguments an assignment's target writes for it: what reads it declares parameters (a Property Get, a
-    // Function), or, with nothing that reads it, what assigns it declares some besides the value. A public variable is indexed by them instead, and a
-    // Property Get that declares none returns what they apply to.
+    // whether the member of that name takes the arguments an assignment's target writes for it: the member that reads it (a Property Get, a Function)
+    // declares parameters, or, where none reads it, the one that assigns it declares some besides the value. A public variable is indexed by them instead,
+    // and a Property Get that declares none returns what they apply to.
     private static bool TakesArguments(IRuntimeSession session, VBObjectValue owner, string name)
     {
         if (!session.Symbols.TryGetInstance(owner.Value, out var instance))
