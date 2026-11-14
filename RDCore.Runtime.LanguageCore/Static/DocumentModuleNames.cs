@@ -7,8 +7,8 @@ using System.Collections.Immutable;
 namespace RDCore.Runtime.LanguageCore.Static;
 
 // the names of the document modules a name written in a module can refer to: each name of a document module, of the module's project or of a project it
-// references, that the module looks up as one. MS-VBA's host makes such a name refer to its document; RD-VBA hosts none, and what a name of one that the code
-// declares for itself refers to is told by its binding.
+// references, that the module looks up as one. MS-VBA's host makes such a name refer to its document; RD-VBA has no host, and such a name that the code
+// declares for itself refers to what its binding says.
 public static class DocumentModuleNames
 {
     public static ImmutableArray<string> Of(IRuntimeSymbolResolver resolver, LexicalScope global, Uri module) => [.. global.Declarations

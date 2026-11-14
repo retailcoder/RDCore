@@ -28,7 +28,7 @@ namespace RDCore.Diagnostics.Analyzers;
 /// <para>
 /// A name of a document module in another module (<c>GameSheet.Reset</c>) is reported where it is written: MS-VBA's host makes it the document, and here it
 /// stands for nothing. It is what the platform says in place of <em>Variable not defined</em> at that name. The analyzer reads which names those are off the
-/// module's document-module names (<see cref="ModuleSemanticsDto.DocumentModules"/>), and each name written so off the syntax tree, with what it is bound to.
+/// module's document-module names (<see cref="ModuleSemanticsDto.DocumentModules"/>), and each use of one off the syntax tree, with what it is bound to.
 /// </para>
 /// </remarks>
 internal sealed class HostedDocumentCodeAnalyzer : IModuleAnalyzer
