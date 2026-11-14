@@ -80,6 +80,18 @@ public sealed class RDFormsAutomationServer : IAutomationServer
 
             if (component.Class.Property(member) is { } property)
             {
+                // the class says which of its properties only a form's file and a designer set (382 on an assignment), and which a program cannot reach at
+                // all (393 on a read): the Timer's Left and Top are its class's, not the property's.
+                if (invocation is AutomationInvocation.Let or AutomationInvocation.Set && component.Class.IsReadOnlyAtRunTime(property))
+                {
+                    throw FormFailure(FormError.SetNotSupportedAtRuntime);
+                }
+
+                if (invocation is not (AutomationInvocation.Let or AutomationInvocation.Set) && component.Class.IsNotAvailableAtRunTime(property))
+                {
+                    throw FormFailure(FormError.GetNotSupportedAtRuntime);
+                }
+
                 return invocation switch
                 {
                     AutomationInvocation.Let or AutomationInvocation.Set => Assign(component, property, arguments, culture, handle.Form.Unit),
@@ -144,7 +156,7 @@ public sealed class RDFormsAutomationServer : IAutomationServer
         }
         catch (FormErrorException exception)
         {
-            throw new AutomationException(VisualBasicError | exception.Error.Number, exception.Error.Description);
+            throw FormFailure(exception.Error);
         }
     }
 
@@ -317,9 +329,12 @@ public sealed class RDFormsAutomationServer : IAutomationServer
         // a control Controls.Remove took out of the form, or one a control it took out held: any use of it is 735, whatever still holds its object.
         if (!handle.IsForm && !IsPlaced(handle))
         {
-            throw new AutomationException(VisualBasicError | FormError.ControlRemoved.Number, FormError.ControlRemoved.Description);
+            throw FormFailure(FormError.ControlRemoved);
         }
     }
+
+    // what a form raises, as the program's Err has it.
+    private static AutomationException FormFailure(FormError error) => new(VisualBasicError | error.Number, error.Description);
 
     // whether a control is in its form: its containers lead to the form's root.
     internal static bool IsPlaced(RDFormsObject handle)

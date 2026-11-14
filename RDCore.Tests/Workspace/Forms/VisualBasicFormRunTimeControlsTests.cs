@@ -179,7 +179,6 @@ public sealed class VisualBasicFormRunTimeControlsTests
     }
 
     [TestMethod]
-    [Ignore("RDForms' CommandButton has no Value property: assigning True to it does not click the button.")]
     public async Task AControlAddedToAWithEventsVariable_RaisesItsClick_ToTheVariablesHandlerOnly()
     {
         var printed = await RunAsync(

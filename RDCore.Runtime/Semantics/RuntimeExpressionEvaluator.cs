@@ -1072,6 +1072,14 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
         => classModule.GetProperty(SymbolProperties.Extensible)
             && session.ExternalObjects.TryGet(identity, out var owner, out _) && owner is RDCore.External.Automation.IAutomationServer;
 
+    // a property a server's object can be read through and its library declares no Let or Set of: the object is assigned it by name all the same, as MS-VBA's
+    // late-bound call of the object's IDispatch is, and the object answers whether it takes it (a form's StartUpPosition, which VB6 refuses with 382 at run time).
+    // An early-bound assignment of one does not compile.
+    private static bool IsServersReadableProperty(IRuntimeSession session, VBRuntimeObjectId identity, VBClassModuleSymbol classModule, string memberName)
+        => session.ExternalObjects.TryGet(identity, out var owner, out _) && owner is RDCore.External.Automation.IAutomationServer
+            && classModule.DefaultInterfaceMembers.Any(candidate => candidate is VBPropertyGetMemberSymbol
+                && string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase));
+
     // a member of a class's own interface that a read or a call invokes by name. A Property Let or Set derives from the subroutine's symbol and is not one:
     // reading the property is its Get.
     // A late-bound object's class declares nothing, and every name reaches the member of that name, which the object answers to or not when it is called.
@@ -1288,7 +1296,7 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             _assignmentSites[memberAccess] = new AssignmentSite(scopes, actual, isSet, member, isAccessor);
         }
 
-        if (member is null && IsReachedByName(session, owner.Value, actual))
+        if (member is null && (IsReachedByName(session, owner.Value, actual) || IsServersReadableProperty(session, owner.Value, actual, memberAccess.Member.IdentifierName)))
         {
             (member, isAccessor) = (Execution.External.Automation.LateBinding.MemberOf(
                 actual, memberAccess.Member.IdentifierName, isSet ? RDCore.External.Automation.AutomationInvocation.Set : RDCore.External.Automation.AutomationInvocation.Let), true);
