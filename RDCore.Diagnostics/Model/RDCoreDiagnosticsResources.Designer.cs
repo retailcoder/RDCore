@@ -906,6 +906,15 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to &apos;{0}&apos; is given the object itself: MS-VBA passes an object Let-assigned to a property whose value is an object as a Set would, where MS-VBAL §5.5.1.1 makes the assignment a type mismatch. Assign it with Set..
+        /// </summary>
+        public static string ObjectLetToObjectProperty_Message {
+            get {
+                return ResourceManager.GetString("ObjectLetToObjectProperty_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to New {0} compiles, and fails whenever it runs: no object of the class {0} is ever created, and MS-VBA raises run-time error -2147221164 (Class not registered)..
         /// </summary>
         public static string NewOfAClassNotCreatable_New_Message {

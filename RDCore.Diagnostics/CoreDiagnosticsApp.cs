@@ -116,6 +116,7 @@ internal class CoreDiagnosticsApp(
         services.AddSingleton<IModuleAnalyzer, ForEachControlEmptiedAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, CollectionSetToNothingInItsOwnLoopAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, IIfSideEffectAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, ObjectLetToObjectPropertyAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, DeclarationNameDivergenceAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, EarlyBindingOpportunityAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, SetThroughACallAnalyzer>();
