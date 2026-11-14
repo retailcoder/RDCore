@@ -5,8 +5,8 @@ using RDCore.Tests.Cli;
 namespace RDCore.Tests.Workspace.Forms;
 
 /// <summary>
-/// The <c>Value</c> of a Visual Basic 6.0 <c>CommandButton</c>, its default member: set to <c>True</c>, it raises the button's <c>Click</c> at once, enabled,
-/// shown or neither; <c>Click</c> reads it <c>True</c>, and it is <c>False</c> again after. The value assigned is let-coerced to <c>Boolean</c>.
+/// The <c>Value</c> of a Visual Basic 6.0 <c>CommandButton</c>, its default member: set to <c>True</c>, it raises the button's <c>Click</c> at once, whether or
+/// not the button is enabled or shown; <c>Click</c> reads it <c>True</c>, and it is <c>False</c> again after. The value assigned is let-coerced to <c>Boolean</c>.
 /// </summary>
 [TestClass]
 public sealed class VisualBasicFormCommandButtonValueTests
