@@ -439,6 +439,42 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to IsMissing({0}) does not tell whether an argument was omitted: &apos;{0}&apos; is {1}, which holds the Missing value only when it is given one from an Optional parameter whose argument was omitted. To test for an omitted argument, declare the parameter Optional..
+        /// </summary>
+        public static string IsMissingOfAVariantThatIsNotOptional_Message {
+            get {
+                return ResourceManager.GetString("IsMissingOfAVariantThatIsNotOptional_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a required Variant parameter.
+        /// </summary>
+        public static string IsMissingOfAVariantThatIsNotOptional_RequiredParameter {
+            get {
+                return ResourceManager.GetString("IsMissingOfAVariantThatIsNotOptional_RequiredParameter", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a Variant variable.
+        /// </summary>
+        public static string IsMissingOfAVariantThatIsNotOptional_Variable {
+            get {
+                return ResourceManager.GetString("IsMissingOfAVariantThatIsNotOptional_Variable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Declare the parameter &apos;{0}&apos; Optional, which lets a call omit it.
+        /// </summary>
+        public static string IsMissingOfAVariantThatIsNotOptional_Fix {
+            get {
+                return ResourceManager.GetString("IsMissingOfAVariantThatIsNotOptional_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to Replace &apos;IsMissing({0})&apos; with False.
         /// </summary>
         public static string IsMissingAlwaysFalse_Fix {
