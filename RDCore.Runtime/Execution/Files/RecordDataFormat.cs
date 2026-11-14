@@ -206,7 +206,7 @@ internal static class RecordDataFormat
     /// </summary>
     /// <remarks>
     /// The array's own bounds say how many elements the record holds, which is how MS-VBA reads a fixed-size array, and a resizable one of a Binary
-    /// channel: an array that has none reads nothing (recorded in Excel).
+    /// channel. An array with no elements, such as a resizable one that was never sized, reads nothing (recorded in Excel).
     /// </remarks>
     /// <param name="stream">The channel's stream, already positioned.</param>
     /// <param name="array">The array whose elements are replaced.</param>

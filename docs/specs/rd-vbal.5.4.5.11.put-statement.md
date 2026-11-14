@@ -29,7 +29,7 @@ The record format follows MS-VBA's, so that a file RD-VBA writes is a file MS-VB
 |---|---|
 |`Boolean`|Two bytes. `True` is `FF FF`.|
 |`String`, in `Random` mode|Carries a two-byte length prefix.|
-|`String`, in `Binary` mode|Carries no length prefix.|
+|`String`, in `Binary` mode|Carries no length prefix. A `String` that a `Variant` holds, an array element and a UDT field carry one.|
 |`Variant`|Preceded by its two-byte type descriptor.|
 |A `Variant` that holds a `Byte`|The descriptor `vbByte` (`11 00`), then the one byte.|
 |An array variable, in `Binary` mode|Its elements, the first subscript varying fastest. A `String` element carries a two-byte length prefix; a `Variant` element, its descriptor. An array that was never sized writes nothing.|
@@ -60,8 +60,8 @@ UDT field declaration order is the order `Put` writes a record in
 
 |UDT field|In a record|
 |---|---|
-|Variable-length `String`|Its characters.|
-|Fixed-length `String`|ANSI.|
+|Variable-length `String`|A two-byte length prefix, then its characters, in `Random` and `Binary` mode alike.|
+|Fixed-length `String`|Its characters in ANSI, padded with spaces or cut to its length. No length prefix.|
 
 ### Record Positioning
 
