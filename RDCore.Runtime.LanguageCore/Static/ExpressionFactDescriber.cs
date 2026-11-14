@@ -179,7 +179,7 @@ internal static class ExpressionFactDescriber
         return string.Equals(symbol.Name, written, StringComparison.Ordinal) ? flags : flags | ValueExpressionSemanticFlags.CaseMismatch;
     }
 
-    // MS-VBAL §4.1: what a library the project references declares (the standard library, a type library, another project) is no module of the project.
+    // MS-VBAL §4.1: what a library the project references declares (the standard library, a type library, another project) is not a module of the project.
     internal static ValueExpressionSemanticFlags BindingFlagsOf(Symbol? binding)
         => binding?.GetProperty(SymbolProperties.Library) is not null ? ValueExpressionSemanticFlags.BoundToLibrary : 0;
 }
