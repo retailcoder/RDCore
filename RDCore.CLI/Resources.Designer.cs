@@ -960,6 +960,15 @@ namespace RDCore.CLI {
                 return ResourceManager.GetString("Repl_Help_Summary", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to A numbered line in an open block (If, Select Case, a loop, With) opens the next line on its number plus 10, with the closers under it..
+        /// </summary>
+        public static string Repl_Help_Blocks {
+            get {
+                return ResourceManager.GetString("Repl_Help_Blocks", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to Type HELP for a list of commands..
@@ -1300,6 +1309,15 @@ namespace RDCore.CLI {
         public static string Repl_UndefinedModule {
             get {
                 return ResourceManager.GetString("Repl_UndefinedModule", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to No line number is free for {0} before line {1}..
+        /// </summary>
+        public static string Repl_BlockNoRoom {
+            get {
+                return ResourceManager.GetString("Repl_BlockNoRoom", resourceCulture);
             }
         }
 
