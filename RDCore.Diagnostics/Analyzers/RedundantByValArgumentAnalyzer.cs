@@ -13,8 +13,9 @@ namespace RDCore.Diagnostics.Analyzers;
 /// </summary>
 /// <remarks>
 /// MS-VBA compiles it and MS-VBAL §5.6.13.1 refuses it. The analyzer reads the <c>ByVal</c> arguments off the syntax tree, and what the procedure called
-/// declares of each one's parameter off the argument facts: a parameter taken by value, which is not a <c>ParamArray</c>, and not declared <c>As Any</c>
-/// (where <c>ByVal</c> passes a value for an address). A <c>ByVal</c> that is a compile error is not reported.
+/// declares of each one's parameter off the argument facts: a parameter declared <c>ByVal</c> (or a library's parameter taken by value), which is not
+/// a <c>ParamArray</c>, and not declared <c>As Any</c> (where <c>ByVal</c> passes a value for an address). A <c>ByVal</c> that is a compile error is
+/// not reported.
 /// </remarks>
 internal sealed class RedundantByValArgumentAnalyzer : IModuleAnalyzer
 {

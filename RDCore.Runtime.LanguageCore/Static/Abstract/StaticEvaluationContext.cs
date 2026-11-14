@@ -21,7 +21,7 @@ public readonly record struct StaticEvaluationContext(
     public ArgumentParameters? Arguments { get; init; }
 
     // where the static pass of a procedure states the parameter each argument of its calls is mapped to, with what the procedure called declares of it
-    // (ProcedureSemanticModel.Arguments). Like the evaluations, it is no part of what the context is.
+    // (ProcedureSemanticModel.Arguments). Like the evaluations, it is not part of what the context is.
     public ArgumentFactCollector? ArgumentFacts { get; init; }
 
     public bool Equals(StaticEvaluationContext other)

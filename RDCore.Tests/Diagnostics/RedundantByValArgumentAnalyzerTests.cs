@@ -21,7 +21,7 @@ public sealed class RedundantByValArgumentAnalyzerTests
         + "Private Function Twice(ByVal n As Long) As Long\n    Twice = n * 2\nEnd Function\n"
         + "Private Sub Bump(n As Long)\n    n = n + 1\nEnd Sub\n";
 
-    // the payload as the host sends it, but for the flag that once stated the finding: the analyzer judges from the argument facts.
+    // the payload as the host sends it, without the RedundantByVal flag: the analyzer judges from the argument facts.
     private static async Task<AnalyzerFinding[]> RunAsync(string body)
     {
         var source = $"Attribute VB_Name = \"Program\"\r\n{(Declarations + $"Public Sub Main()\n    Dim x As Long\n{body}\nEnd Sub").ReplaceLineEndings("\r\n")}\r\n";
