@@ -55,7 +55,7 @@ internal sealed class SetThroughACallAnalyzer : IModuleAnalyzer
     }
 
     // a function, or a property with a Property Get and no Property Set, of a class whose default member has no Property Set (or that has none). The name of
-    // a function in its own body is its result, which is no call.
+    // a function in its own body is its result, which is not a call.
     private static bool SetsNothing(ProcedureSemanticsDto procedure, ExpressionFactDto callee)
         => callee is { Error: null, TypeKind: DeclaredTypeKind.Class, IsArray: false, Binding: { } binding }
             && binding.AbsoluteUri != procedure.Procedure.AbsoluteUri

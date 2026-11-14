@@ -177,7 +177,7 @@ public static class ReferenceQuery
         return new Argument(parent!, callee, position, name, isByVal);
     }
 
-    // whether the call may write to what the argument names: the static pass flags it passed, it is no copy of an object's variable, and the parameter it is
+    // whether the call may write to what the argument names: the static pass flags it passed, it is not a copy of an object's variable, and the parameter it is
     // given to, when the procedure called is known, is not ByVal.
     private static bool MayBePassedByRef(RenameContext context, ModuleIndex index, NameOccurrence occurrence, ExpressionNode expression, Argument argument)
     {
