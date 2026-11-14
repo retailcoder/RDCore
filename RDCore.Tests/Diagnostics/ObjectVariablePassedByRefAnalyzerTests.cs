@@ -4,6 +4,8 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
+using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -32,9 +34,22 @@ public sealed class ObjectVariablePassedByRefAnalyzerTests
             ? (new Uri(Path.Combine(ModuleWorkspace.Root, "Box.cls")), BoxSource)
             : (new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas")), program);
         var parsed = new ModuleParser().Parse(uri, source);
-        var semantics = payload.Modules.Single(candidate => candidate.Module.Fragment.TrimStart('#') == module);
+        var semantics = WithoutCopyFlags(payload.Modules.Single(candidate => candidate.Module.Fragment.TrimStart('#') == module));
         return [.. new ObjectVariablePassedByRefAnalyzer().Analyze(new ModuleAnalysisContext(uri, parsed, semantics)).OrderBy(finding => finding.Range.Start)];
     }
+
+    // the payload as the host sends it, without the flags that mark an argument as a copy: the analyzers judge from the tree, the argument facts and the
+    // kinds of the declared types of the expressions.
+    internal static ModuleSemanticsDto WithoutCopyFlags(ModuleSemanticsDto semantics) => semantics with
+    {
+        Procedures = [.. semantics.Procedures.Select(procedure => procedure with
+        {
+            Expressions = [.. procedure.Expressions.Select(fact => fact with
+            {
+                Flags = fact.Flags & ~(ValueExpressionSemanticFlags.ObjectVariablePassedAsACopy | ValueExpressionSemanticFlags.ObjectVariablePassedLateAsACopy),
+            })],
+        })],
+    };
 
     [TestMethod]
     [DataRow("    Bump b.Count", "b.Count", DisplayName = "a call statement")]
@@ -66,6 +81,7 @@ public sealed class ObjectVariablePassedByRefAnalyzerTests
     [DataRow("    Bump Program.Counter", DisplayName = "a module's variable, named through its module")]
     [DataRow("    Bump (b.Count)", DisplayName = "in parentheses, a value")]
     [DataRow("    Show b.Count", DisplayName = "a ByVal parameter")]
+    [DataRow("    Debug.Print Replace(b.Count, \"1\", \"2\")", DisplayName = "a library's procedure, whose type library declares the parameter ByRef")]
     [DataRow("    Set o = b\n    Bump o.Count", DisplayName = "bound late: what it is, is not known")]
     public async Task AnythingElse_IsNoWarning(string body)
         => Assert.IsEmpty(await RunAsync("Program", body));

@@ -4,6 +4,7 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
+using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -17,15 +18,25 @@ public sealed class RedundantByValArgumentAnalyzerTests
     private const string Declarations = "Option Explicit\n"
         + "Private Declare PtrSafe Sub Sleep Lib \"kernel32\" (ByVal ms As Long)\n"
         + "Private Declare PtrSafe Sub Fill Lib \"kernel32\" Alias \"RtlFillMemory\" (Destination As Any, ByVal Length As LongPtr, ByVal Fill As Byte)\n"
-        + "Private Function Twice(ByVal n As Long) As Long\n    Twice = n * 2\nEnd Function\n";
+        + "Private Function Twice(ByVal n As Long) As Long\n    Twice = n * 2\nEnd Function\n"
+        + "Private Sub Bump(n As Long)\n    n = n + 1\nEnd Sub\n";
 
+    // the payload as the host sends it, without the RedundantByVal flag: the analyzer judges from the argument facts.
     private static async Task<AnalyzerFinding[]> RunAsync(string body)
     {
         var source = $"Attribute VB_Name = \"Program\"\r\n{(Declarations + $"Public Sub Main()\n    Dim x As Long\n{body}\nEnd Sub").ReplaceLineEndings("\r\n")}\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], source);
         var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
         var parsed = new ModuleParser().Parse(uri, source);
-        return [.. new RedundantByValArgumentAnalyzer().Analyze(new ModuleAnalysisContext(uri, parsed, payload.Modules.Single())).OrderBy(finding => finding.Range.Start)];
+        var model = payload.Modules.Single();
+        model = model with
+        {
+            Procedures = [.. model.Procedures.Select(procedure => procedure with
+            {
+                Expressions = [.. procedure.Expressions.Select(fact => fact with { Flags = fact.Flags & ~ValueExpressionSemanticFlags.RedundantByVal })],
+            })],
+        };
+        return [.. new RedundantByValArgumentAnalyzer().Analyze(new ModuleAnalysisContext(uri, parsed, model)).OrderBy(finding => finding.Range.Start)];
     }
 
     [TestMethod]
@@ -48,6 +59,8 @@ public sealed class RedundantByValArgumentAnalyzerTests
     [DataRow("    Fill ByVal 0&, 4, 0", DisplayName = "a Declare's As Any parameter, where ByVal passes a value for an address")]
     [DataRow("    Debug.Print VarPtr(ByVal 0)", DisplayName = "VarPtr's As Any")]
     [DataRow("    Debug.Print Twice(2)", DisplayName = "no ByVal")]
+    [DataRow("    Bump ByVal x", DisplayName = "a ByRef parameter, where ByVal is a compile error")]
+    [DataRow("    Debug.Print Len(ByVal x)", DisplayName = "a function MS-VBA parses inline, where ByVal is a syntax error")]
     public async Task ByValThatMeansSomething_OrNoByVal_IsNoHint(string body)
         => Assert.IsEmpty(await RunAsync(body));
 }

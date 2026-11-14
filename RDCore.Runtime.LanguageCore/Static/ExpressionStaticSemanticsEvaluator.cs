@@ -397,7 +397,9 @@ public static class ExpressionStaticSemanticsEvaluator
     {
         var member = ObjectValueStaticSemantics.MemberOfCallee(context, callee);
         MarkPassedAsArguments(context, member is null ? null : ObjectValueStaticSemantics.ParametersOfCallee(context, callee), arguments,
-            recordsParameters: member is not null && CallsItsOwnProcedure(context, callee, member));
+            recordsParameters: member is not null && CallsItsOwnProcedure(context, callee, member),
+            isExternal: member is VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol,
+            isLibrary: member is not (null or VBExternalFunctionMemberSymbol or VBExternalSubMemberSymbol) && member.GetProperty(SymbolProperties.ExternalTarget) is not null);
     }
 
     // a procedure of the module the call is written in, called by its name or through Me: the procedure that runs is the one the module declares. A call
@@ -410,7 +412,8 @@ public static class ExpressionStaticSemanticsEvaluator
 
     // the handlers of an event are the procedures a RaiseEvent calls, which no parameter of the event stands for: what it is given is followed no further.
     internal static void MarkPassedAsArguments(
-        StaticEvaluationContext context, ImmutableArray<VBParameterSymbol>? parameters, IReadOnlyList<ExpressionNode> arguments, bool recordsParameters)
+        StaticEvaluationContext context, ImmutableArray<VBParameterSymbol>? parameters, IReadOnlyList<ExpressionNode> arguments, bool recordsParameters,
+        bool isExternal = false, bool isLibrary = false)
     {
         if (context.Facts is not { } facts)
         {
@@ -423,12 +426,22 @@ public static class ExpressionStaticSemanticsEvaluator
         for (var index = 0; index < arguments.Count; index++)
         {
             var (name, passed) = arguments[index] is NamedArgumentNode named ? (named.Name, named.Value) : ((string?)null, arguments[index]);
-            if (passed is ByValArgumentExpressionNode or AddressOfExpressionNode or MissingArgumentNode)
+            if (passed is MissingArgumentNode)
             {
                 continue;
             }
 
             var parameter = own is { } ownParameters ? ObjectVariableArgumentStaticSemantics.ParameterOf(ownParameters, index, name) : null;
+            if (parameter is not null)
+            {
+                context.ArgumentFacts?.Record(ArgumentFactOf(passed, parameter, isExternal, isLibrary));
+            }
+
+            if (passed is ByValArgumentExpressionNode or AddressOfExpressionNode)
+            {
+                continue;
+            }
+
             if (parameter is { ParameterKind: ParameterKind.ExplicitByVal } || !facts.TryGet(passed.Identity, out var fact))
             {
                 continue;
@@ -441,6 +454,14 @@ public static class ExpressionStaticSemanticsEvaluator
             }
         }
     }
+
+    // what the procedure called declares of the parameter an argument is mapped to. A library's procedure takes an argument by reference where its type
+    // library declares the parameter so (SymbolProperties.TypeLibraryByRef), and by value otherwise, whatever keyword the declaration it is read from has.
+    private static ArgumentFact ArgumentFactOf(ExpressionNode argument, VBParameterSymbol parameter, bool isExternal, bool isLibrary)
+        => new(argument.Identity, parameter.Uri,
+            !isLibrary ? parameter.ParameterKind
+                : parameter.GetProperty(SymbolProperties.TypeLibraryByRef) ? ParameterKind.ExplicitByRef : ParameterKind.ExplicitByVal,
+            parameter.ResolvedType.Name, parameter.IsOptional, parameter.DefaultValue is not null, parameter is ParamArrayParameterSymbol, isExternal, isLibrary);
 
     // the Function or Property Get a callee names, by its bare name, qualified by the project or module that declares it, or as a member of an object
     // of a class; null for anything that is not one (an array, a variable that holds an object, a Sub).

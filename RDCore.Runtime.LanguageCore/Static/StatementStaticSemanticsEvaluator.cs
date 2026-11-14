@@ -46,8 +46,14 @@ public static class StatementStaticSemanticsEvaluator
         }
 
         var facts = new ExpressionFactCollector();
-        var errors = Evaluate(resolved with { Facts = facts }, block, options, kind);
-        return new(procedure, errors) { Expressions = facts.ToImmutable(), IsFullyAnalyzed = errors.IsEmpty && ExpressionCoverage.IsCovered(block, options, facts) };
+        var arguments = new ArgumentFactCollector();
+        var errors = Evaluate(resolved with { Facts = facts, ArgumentFacts = arguments }, block, options, kind);
+        return new(procedure, errors)
+        {
+            Expressions = facts.ToImmutable(),
+            IsFullyAnalyzed = errors.IsEmpty && ExpressionCoverage.IsCovered(block, options, facts),
+            Arguments = arguments.ToImmutable(),
+        };
     }
 
     private static ImmutableArray<VBCompileErrorInfo> Run(StaticEvaluationContext context, StatementBlock block, Walk walk)
