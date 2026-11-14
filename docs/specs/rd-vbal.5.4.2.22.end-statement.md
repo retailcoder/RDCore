@@ -21,6 +21,17 @@ The static execution context retains the state of immediate commands until an `E
 execution context to its initial state
 ([**RD-VBAL §4.0** Program Structure and Organization](rd-vbal.4.0.program-structure.md)).
 
+`End` ends the program where it is, without unwinding the call stack: no `Class_Terminate` runs, for any object. The session is then reset:
+
+- module variables and `Static` locals return to their initial values;
+- every object is released;
+- every open file is closed.
+
+A program also ends this way, once its error is reported, when it raises a run-time error that no handler catches, or an internal error. A program
+that waits at an error under a debugger has not ended, and keeps its state until it ends.
+
 ## Implementation
 
 - `RDCore.Runtime.Execution.ProcedureExecutor` dispatches `Halt` instructions.
+- `RDCore.Runtime.Execution.RuntimeProcedureInvoker` leaves the activations of a program that ends as they are.
+- `RDCore.Runtime.Execution.SessionWipe` resets the session.
