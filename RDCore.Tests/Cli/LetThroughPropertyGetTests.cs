@@ -8,8 +8,8 @@ namespace RDCore.Tests.Cli;
 /// <remarks>
 /// MS-VBA refuses at compile time a Let to a target of a specific class whose default member has no <c>Property Let</c> (<c>os = 5</c>, <c>Me = 5</c>):
 /// "Invalid use of property", or "Type mismatch" for a default member that is a <c>Function</c>. MS-VBAL §5.4.3.8 makes it valid, and RD-VBA runs it: a
-/// <c>Property Get</c> is assigned through, and a <c>Function</c>, which is no default property, is error 438. Every other form here runs in MS-VBA as it does in
-/// RD-VBA (observed in Excel).
+/// <c>Property Get</c> is assigned through, and a <c>Function</c>, which is not a default property, is error 438. Every other form here runs in MS-VBA as it
+/// does in RD-VBA (observed in Excel).
 /// </remarks>
 [TestClass]
 [TestCategory("MS-VBAL 5.4.3.8 Let Statement")]
@@ -65,7 +65,7 @@ public sealed class LetThroughPropertyGetTests
     public async Task ALetToAPropertyGetNamedOrGivenArguments_AssignsThroughWhatItReturnsAsMSVBADoes(string body, string printed)
         => Assert.AreEqual(printed, string.Join("|", await ModuleWorkspace.RunAsync(Classes, Program(body))));
 
-    // MS-VBAL §5.4.3.8 raises 438: a function is no default property. MS-VBA refuses the early-bound forms at compile time ("Type mismatch"), and raises 450
+    // MS-VBAL §5.4.3.8 raises 438: a function is not a default property. MS-VBA refuses the early-bound forms at compile time ("Type mismatch"), and raises 450
     // for the late-bound ones (observed in Excel).
     [TestMethod]
     [DataRow("Dim ofn As New OuterSlotFn ;; ofn = 5 ;; Debug.Print ofn.S.V", "0|e438", DisplayName = "a variable of the class")]
