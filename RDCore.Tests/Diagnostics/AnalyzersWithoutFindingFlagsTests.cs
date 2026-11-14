@@ -42,10 +42,12 @@ public sealed class AnalyzersWithoutFindingFlagsTests
     {
         var (with, without) = await FindingsAsync(new IsMissingAlwaysFalseAnalyzer(),
             "Public Sub Probe(Optional p As Long, Optional q As Variant = 5, Optional r As Variant)",
-            "    Debug.Print IsMissing(p), IsMissing(q), IsMissing(r)",
+            "    Const C As Long = 1",
+            "    Dim n As Long, v As Variant",
+            "    Debug.Print IsMissing(p), IsMissing(q), IsMissing(r), IsMissing(C), IsMissing(n), IsMissing(v)",
             "End Sub");
 
-        Assert.HasCount(2, with);
+        Assert.HasCount(4, with);
         CollectionAssert.AreEqual(with, without);
     }
 

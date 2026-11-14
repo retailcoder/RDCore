@@ -234,6 +234,18 @@
   <data name="IsMissingAlwaysFalse_HasADefault" xml:space="preserve">
     <value>given a default value</value>
   </data>
+  <data name="IsMissingAlwaysFalse_NotAParameter_Message" xml:space="preserve">
+    <value>IsMissing({0}) is always False: '{0}' is {1}, which never holds the Missing value. IsMissing tells whether a Variant parameter was given no argument.</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_AVariableNotAVariant" xml:space="preserve">
+    <value>a variable that is not a Variant</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_AConstant" xml:space="preserve">
+    <value>a constant</value>
+  </data>
+  <data name="IsMissingAlwaysFalse_Fix" xml:space="preserve">
+    <value>Replace 'IsMissing({0})' with False</value>
+  </data>
   <data name="ShadowedDeclaration_Message" xml:space="preserve">
     <value>'{0}' hides '{1}': in this procedure, the name means '{0}', and '{1}' everywhere else. Give '{0}' a name of its own.</value>
   </data>

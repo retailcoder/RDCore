@@ -412,6 +412,42 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to IsMissing({0}) is always False: &apos;{0}&apos; is {1}, which never holds the Missing value. IsMissing tells whether a Variant parameter was given no argument..
+        /// </summary>
+        public static string IsMissingAlwaysFalse_NotAParameter_Message {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_NotAParameter_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a variable that is not a Variant.
+        /// </summary>
+        public static string IsMissingAlwaysFalse_AVariableNotAVariant {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_AVariableNotAVariant", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a constant.
+        /// </summary>
+        public static string IsMissingAlwaysFalse_AConstant {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_AConstant", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Replace &apos;IsMissing({0})&apos; with False.
+        /// </summary>
+        public static string IsMissingAlwaysFalse_Fix {
+            get {
+                return ResourceManager.GetString("IsMissingAlwaysFalse_Fix", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to &apos;{0}&apos; hides &apos;{1}&apos;: in this procedure, the name means &apos;{0}&apos;, and &apos;{1}&apos; everywhere else. Give &apos;{0}&apos; a name of its own..
         /// </summary>
         public static string ShadowedDeclaration_Message {
