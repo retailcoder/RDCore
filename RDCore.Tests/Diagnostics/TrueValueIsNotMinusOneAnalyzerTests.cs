@@ -4,6 +4,7 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
+using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -20,6 +21,14 @@ public sealed class TrueValueIsNotMinusOneAnalyzerTests
         var program = $"Attribute VB_Name = \"Program\"\r\n{declarations}\r\nPublic Sub Probe()\r\n{body}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], program);
         var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
+        // the payload as the host sends it, without the flag that marks an operation as one: the analyzer judges from the tree and the constant values.
+        model = model with
+        {
+            Procedures = [.. model.Procedures.Select(procedure => procedure with
+            {
+                Expressions = [.. procedure.Expressions.Select(fact => fact with { Flags = fact.Flags & ~ValueExpressionSemanticFlags.TrueValueIsNotMinusOne })],
+            })],
+        };
         var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
         return [.. new TrueValueIsNotMinusOneAnalyzer().Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, program), model))];
     }
@@ -43,6 +52,8 @@ public sealed class TrueValueIsNotMinusOneAnalyzerTests
     [DataRow("Private Const DEV = 1\r\nPrivate Const LOG = 2", "If DEV And LOG Then Debug.Print 1", "And", DisplayName = "And of two constants with no bit in common")]
     [DataRow("Private Const DEV As Long = 2", "If Not DEV Then Debug.Print 1", "Not", DisplayName = "a Const As Long")]
     [DataRow("Private Const ONE = 1\r\nPrivate Const DEV = ONE", "If Not DEV Then Debug.Print 1", "Not", DisplayName = "a Const valued with another")]
+    [DataRow("Private Const DEV = -(-2)", "If Not DEV Then Debug.Print 1", "Not", DisplayName = "a Const valued with a negated literal")]
+    [DataRow("Private Const DEV As Long = 1.5", "If Not DEV Then Debug.Print 1", "Not", DisplayName = "a Const As Long of a Double, which rounds to 2")]
     [DataRow("", "Const DEV = 1\r\nIf Not DEV Then Debug.Print 1", "Not", DisplayName = "a procedure's Const")]
     [DataRow("", "If Not 1 Then Debug.Print 1", "Not", DisplayName = "a literal")]
     [DataRow("Private Const DEV = 1", "Dim n As Long\r\nIf n > 0 And Not DEV Then Debug.Print 1", "Not", DisplayName = "through And with a comparison")]
@@ -65,6 +76,8 @@ public sealed class TrueValueIsNotMinusOneAnalyzerTests
     [DataRow("Private Const DEV = True", "If Not DEV Then Debug.Print 1", DisplayName = "a Const of True")]
     [DataRow("Private Const DEV = 0", "If Not DEV Then Debug.Print 1", DisplayName = "a Const of 0")]
     [DataRow("Private Const DEV As Boolean = 1", "If Not DEV Then Debug.Print 1", DisplayName = "a Boolean Const, which 1 makes True")]
+    [DataRow("Private Const ON1 As Boolean = 1\r\nPrivate Const DEV = ON1", "If Not DEV Then Debug.Print 1", DisplayName = "a Const valued with a Boolean Const")]
+    [DataRow("Private Const DEV As Long = 0.5", "If Not DEV Then Debug.Print 1", DisplayName = "a Const As Long of a Double, which rounds to 0")]
     [DataRow("Private Const DEV = 1", "If DEV Or False Then Debug.Print 1", DisplayName = "Or")]
     [DataRow("Private Const DEV = 1", "If DEV And True Then Debug.Print 1", DisplayName = "And with True")]
     [DataRow("Private Const DEV = 1\r\nPrivate Const LOG = 3", "If DEV And LOG Then Debug.Print 1", DisplayName = "And of two constants with a bit in common")]
