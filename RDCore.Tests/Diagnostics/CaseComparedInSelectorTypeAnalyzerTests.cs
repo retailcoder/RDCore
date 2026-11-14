@@ -4,6 +4,8 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
+using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -20,8 +22,25 @@ public sealed class CaseComparedInSelectorTypeAnalyzerTests
         var source = $"Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPublic Sub Main()\r\n{string.Join("\r\n", body)}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], source);
 
-        return [.. new CaseComparedInSelectorTypeAnalyzer().Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), payload.Modules.Single()))];
+        return [.. new CaseComparedInSelectorTypeAnalyzer().Analyze(
+            new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), WithoutVerdicts(payload.Modules.Single())))];
     }
+
+    // the payload as the host sends it, without the flag that marks a clause as compared in another type than the expression's: the analyzer judges from the
+    // two types each clause states.
+    private static ModuleSemanticsDto WithoutVerdicts(ModuleSemanticsDto model) => model with
+    {
+        Procedures = [.. model.Procedures.Select(procedure => procedure.Runtime is not { } runtime ? procedure : procedure with
+        {
+            Runtime = runtime with
+            {
+                Statements = [.. runtime.Statements.Select(statement => statement.CaseClauseFlags is not { } flags ? statement : statement with
+                {
+                    CaseClauseFlags = flags & ~CaseClauseSemanticFlags.ComparedInSelectorType,
+                })],
+            },
+        })],
+    };
 
     [TestMethod]
     [DataRow("Dim i As Integer", "i = 5", "Case Is < 5.4", DisplayName = "an Integer, Is < 5.4")]

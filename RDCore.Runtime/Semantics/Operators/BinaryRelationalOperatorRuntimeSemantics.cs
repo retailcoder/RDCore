@@ -73,6 +73,39 @@ public abstract record class BinaryRelationalOperatorRuntimeSemantics(
         StringComparisonRules comparison, bool isValueKnown, VBErrorInfo? error)
         => new ComparisonOperatorFact(expression.Identity, expression.Location, token, effectiveType, isValueKnown, error, flags, comparison);
 
+    protected sealed override OperatorFact WithOperands(OperatorFact fact, IRuntimeSymbolResolver resolver, ExpressionNode expression, VBTypedValue[] operands)
+        => fact is ComparisonOperatorFact comparison && StringOperandOf(resolver, expression, operands) is { } operand
+            ? comparison with { StringOperand = operand }
+            : fact;
+
+    // MS-VBAL 5.6.9.5: a String compared with a number is Let-coerced to the effective type of the table, which MS-VBA does not always compare it in (it
+    // compares a String with a Byte, an Integer or a Long as Doubles). What the String is either way is stated, with the error each Let-coercion raises.
+    private StringOperandFact? StringOperandOf(IRuntimeSymbolResolver resolver, ExpressionNode expression, VBTypedValue[] operands)
+    {
+        if (!ComparesValues || operands is not [var left, var right]
+            || !IsStringAgainstAnother(left, right, out var text, out var number, out var stringIsLeft)
+            || HeldValueOf(number) is not { TypeInfo: VBNumericType } held
+            || OperationPlanner.SpecifiedRelationalEffectiveType(left.GetTargetType(), right.GetTargetType()) is not { } specified)
+        {
+            return null;
+        }
+
+        var known = number.IsIndeterminate ? null : held;
+        if (text.IsIndeterminate)
+        {
+            return new StringOperandFact(stringIsLeft, specified.Name, null, null, null, null, known);
+        }
+
+        var asDouble = CoerceUnstated(resolver, expression, text, VBDoubleType.TypeInfo);
+        var asSpecified = CoerceUnstated(resolver, expression, text, specified);
+        return new StringOperandFact(stringIsLeft, specified.Name,
+            asDouble.ErrorInfo is null ? asDouble.Result : null, asDouble.ErrorInfo?.ErrorId,
+            asSpecified.ErrorInfo is null ? asSpecified.Result : null, asSpecified.ErrorInfo?.ErrorId,
+            known);
+    }
+
+    private static VBTypedValue HeldValueOf(VBTypedValue value) => value is VBVariantValue { TypedValue: var held } ? held : value;
+
     protected override ISemanticContextContributor<BinaryOperatorSemanticContext<ComparisonOperatorSemanticFlags>, ComparisonOperatorSemanticFlags> Analyze(
         IRuntimeSymbolResolver resolver, 
         ConversionOperationSemanticContext coercionContext, 

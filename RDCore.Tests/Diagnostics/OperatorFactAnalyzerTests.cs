@@ -4,6 +4,8 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
+using RDCore.SDK.Platform.Protocol;
+using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -19,8 +21,24 @@ public sealed class OperatorFactAnalyzerTests
         var source = $"Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPublic Sub Main({parameters})\r\n{string.Join("\r\n", body)}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], source);
 
-        return [.. analyzer.Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), payload.Modules.Single()))];
+        return [.. analyzer.Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, source), WithoutVerdicts(payload.Modules.Single())))];
     }
+
+    // the payload as the host sends it, without the flag that marks a String compared with a number as one reported: the analyzer judges from the effective
+    // type and what the String operand is Let-coerced to.
+    private static ModuleSemanticsDto WithoutVerdicts(ModuleSemanticsDto model) => model with
+    {
+        Procedures = [.. model.Procedures.Select(procedure => procedure.Runtime is not { } runtime ? procedure : procedure with
+        {
+            Runtime = runtime with
+            {
+                Operations = [.. runtime.Operations.Select(op => op.ComparisonOpSemanticFlags is not { } flags ? op : op with
+                {
+                    ComparisonOpSemanticFlags = flags & ~ComparisonOperatorSemanticFlags.IsStringComparedAsADouble,
+                })],
+            },
+        })],
+    };
 
     [TestMethod]
     public async Task TheAdditionOfTwoStrings_IsAConcatenation_ThatTheConcatenationOperatorSays()
