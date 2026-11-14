@@ -5,31 +5,46 @@ namespace RDCore.Tests.Runtime.Pictures;
 // picture files written byte by byte, as a program would find them on disk.
 internal static class TestPictureFiles
 {
-    // a bitmap file: a BITMAPINFOHEADER of the given resolution, a colour table for 8 bits or fewer, then rows whose padding is 0xEE.
-    public static byte[] Bitmap(int width, int height, int bits = 24, int pixelsPerMeter = 3780)
+    // a bitmap file: a BITMAPINFOHEADER of the given resolution, bottom-up or top-down, or a BITMAPCOREHEADER; a colour table for 8 bits or fewer; then rows
+    // whose padding is 0xEE.
+    public static byte[] Bitmap(int width, int height, int bits = 24, int pixelsPerMeter = 3780, bool topDown = false, bool core = false)
     {
         var stride = (width * bits + 31) / 32 * 4;
         var row = (width * bits + 7) / 8;
         var colours = bits <= 8 ? 1 << bits : 0;
-        var offset = 14 + 40 + colours * 4;
+        var header = core ? 12 : 40;
+        var entry = core ? 3 : 4;
+        var offset = 14 + header + colours * entry;
         var bytes = new byte[offset + stride * height];
         "BM"u8.CopyTo(bytes);
         BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(2), bytes.Length);
         BinaryPrimitives.WriteInt32LittleEndian(bytes.AsSpan(10), offset);
         var dib = bytes.AsSpan(14);
-        BinaryPrimitives.WriteInt32LittleEndian(dib, 40);
-        BinaryPrimitives.WriteInt32LittleEndian(dib[4..], width);
-        BinaryPrimitives.WriteInt32LittleEndian(dib[8..], height);
-        BinaryPrimitives.WriteInt16LittleEndian(dib[12..], 1);
-        BinaryPrimitives.WriteInt16LittleEndian(dib[14..], (short)bits);
-        BinaryPrimitives.WriteInt32LittleEndian(dib[20..], stride * height);
-        BinaryPrimitives.WriteInt32LittleEndian(dib[24..], pixelsPerMeter);
-        BinaryPrimitives.WriteInt32LittleEndian(dib[28..], pixelsPerMeter);
+        BinaryPrimitives.WriteInt32LittleEndian(dib, header);
+        if (core)
+        {
+            BinaryPrimitives.WriteInt16LittleEndian(dib[4..], (short)width);
+            BinaryPrimitives.WriteInt16LittleEndian(dib[6..], (short)height);
+            BinaryPrimitives.WriteInt16LittleEndian(dib[8..], 1);
+            BinaryPrimitives.WriteInt16LittleEndian(dib[10..], (short)bits);
+        }
+        else
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(dib[4..], width);
+            BinaryPrimitives.WriteInt32LittleEndian(dib[8..], topDown ? -height : height);
+            BinaryPrimitives.WriteInt16LittleEndian(dib[12..], 1);
+            BinaryPrimitives.WriteInt16LittleEndian(dib[14..], (short)bits);
+            BinaryPrimitives.WriteInt32LittleEndian(dib[20..], stride * height);
+            BinaryPrimitives.WriteInt32LittleEndian(dib[24..], pixelsPerMeter);
+            BinaryPrimitives.WriteInt32LittleEndian(dib[28..], pixelsPerMeter);
+        }
+
         for (var i = 0; i < colours; i++)
         {
-            bytes[54 + i * 4] = (byte)(i * 37);
-            bytes[54 + i * 4 + 1] = (byte)(i * 91);
-            bytes[54 + i * 4 + 2] = (byte)(255 - i);
+            var at = 14 + header + i * entry;
+            bytes[at] = (byte)(i * 37);
+            bytes[at + 1] = (byte)(i * 91);
+            bytes[at + 2] = (byte)(255 - i);
         }
 
         for (var y = 0; y < height; y++)

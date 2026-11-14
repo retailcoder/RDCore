@@ -27,7 +27,7 @@ namespace RDCore.Runtime.Execution.External.Pictures;
 /// <remarks>
 /// <para>
 /// A picture is what its file's header says it is (<see cref="PictureHeader"/>): its <c>Type</c>, and its <c>Width</c> and <c>Height</c> in HIMETRIC units. An
-/// icon or a cursor is the one of its images that the size asked for is closest to. A PNG is no picture to <c>LoadPicture</c>, as in MS-VBA.
+/// icon or a cursor is its image of the size asked for, or its first. A PNG is no picture to <c>LoadPicture</c>, as in MS-VBA.
 /// </para>
 /// <para>
 /// <c>Handle</c>, the default member, is a value that tells one picture from another, and 0 for none: there is no graphics device behind it to hand to a
@@ -144,22 +144,29 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
             : Error(VBRuntimeErrorId.InvalidPicture, request, $"'{text}' is no picture LoadPicture reads");
     }
 
-    // a folder is no file (a name ending in a separator is a path that does not reach one), and a pattern names none.
     private RuntimeSemanticsEvaluationResult? ReadFile(string path, ExternalCallRequest request, out byte[] bytes)
     {
         bytes = [];
+        if (NoFileNamed(path, request) is { } unnamed)
+        {
+            return unnamed;
+        }
+
+        var error = session.Files.TryReadAll(path, out bytes);
+        return error is { } code ? RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(code, request.CallSite, $"{request.Describe()}: '{path}'")) : null;
+    }
+
+    // a name ending in a separator is a path that reaches no file, and a pattern names none: to load and to save alike.
+    private static RuntimeSemanticsEvaluationResult? NoFileNamed(string path, ExternalCallRequest request)
+    {
         if (path.EndsWith('\\') || path.EndsWith('/'))
         {
             return Error(VBRuntimeErrorId.PathNotFound, request, $"'{path}' names a folder");
         }
 
-        if (path.IndexOfAny(['*', '?']) >= 0)
-        {
-            return Error(VBRuntimeErrorId.PathOrFileAccessError, request, $"'{path}' is a pattern");
-        }
-
-        var error = session.Files.TryReadAll(path, out bytes);
-        return error is { } code ? RuntimeSemanticsEvaluationResult.Error(VBRuntimeErrorInfo.For(code, request.CallSite, $"{request.Describe()}: '{path}'")) : null;
+        return path.IndexOfAny(['*', '?']) >= 0
+            ? Error(VBRuntimeErrorId.PathOrFileAccessError, request, $"'{path}' is a pattern")
+            : null;
     }
 
     // the picture a file is, at the size asked of an icon; null for a file that is none.
@@ -184,7 +191,7 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
                 throw new AutomationException(Failed, $"{request.Describe()}: the metafile states no size.");
             case PictureFormat.Icon or PictureFormat.Cursor:
                 _ = PictureHeader.TryReadIconImages(bytes, out var images);
-                var image = Closest(images, width, height);
+                var image = Chosen(images, width, height);
                 return new StdPictureObject
                 {
                     Format = info.Format, Bytes = bytes, Image = image, Handle = NextHandle(),
@@ -195,27 +202,18 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
         }
     }
 
-    // the image whose size is closest to the one asked for - the sum of how far its width and its height are from it - the first of those that are, and of them
-    // the one of the most bits per pixel. Asking for no size (0 by 0) is asking for the system's icon size.
-    private static IconImage Closest(System.Collections.Immutable.ImmutableArray<IconImage> images, int width, int height)
+    // the image of the size asked for, of the most bits per pixel when there are several; with none of that size, the first of the file, whatever its size:
+    // no size near the one asked for is preferred to it (observed in Excel). Asking for no size (0 by 0) is asking for the system's icon size.
+    private static IconImage Chosen(System.Collections.Immutable.ImmutableArray<IconImage> images, int width, int height)
     {
         if (width == 0 && height == 0)
         {
             (width, height) = (IconSide, IconSide);
         }
 
-        var best = images[0];
-        var distance = long.MaxValue;
-        foreach (var image in images)
-        {
-            var from = Math.Abs((long)image.Width - width) + Math.Abs((long)image.Height - height);
-            if (from < distance || from == distance && image.Width == best.Width && image.Height == best.Height && image.BitCount > best.BitCount)
-            {
-                (best, distance) = (image, from);
-            }
-        }
-
-        return best;
+        return images.Where(image => image.Width == width && image.Height == height).OrderByDescending(image => image.BitCount).FirstOrDefault() is { Length: > 0 } sized
+            ? sized
+            : images[0];
     }
 
     // Size: the system's small icon or its large one, the shell's (the same sizes here), or X by Y; nothing is the size stdole's LoadPicture takes for none.
@@ -265,6 +263,11 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
             return Error(VBRuntimeErrorId.FileNotFound, request, "no file name");
         }
 
+        if (NoFileNamed(path, request) is { } unnamed)
+        {
+            return unnamed;
+        }
+
         if (SavedPicture.BytesOf(picture) is not { } bytes)
         {
             return Error(VBRuntimeErrorId.ObjectDoesntSupportThisAction, request, $"saving a picture of the format {picture.Format} is not implemented");
@@ -291,7 +294,8 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
             ("HEIGHT", "get") => Success(new VBLongValue(picture.Height)),
             ("HPAL", "get") when picture.Format is PictureFormat.Bitmap or PictureFormat.Gif or PictureFormat.Jpeg => Success(new VBLongValue(picture.Palette)),
             ("HPAL", "let") when picture.Format is PictureFormat.Bitmap or PictureFormat.Gif or PictureFormat.Jpeg => SetPalette(picture, request, resolver),
-            ("HPAL", _) => Error(VBRuntimeErrorId.AutomationError, request, "a picture that is no bitmap has no palette"),
+            // a picture that is no bitmap has no palette, to read or to assign: the method fails.
+            ("HPAL", _) => throw new AutomationException(Failed, "Method 'hPal' of object 'Picture' failed"),
             _ => Error(VBRuntimeErrorId.ObjectDoesntSupportThisAction, request, $"{name} is not implemented for a picture"),
         };
     }
