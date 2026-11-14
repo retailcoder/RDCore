@@ -962,7 +962,7 @@ namespace RDCore.CLI {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to A numbered line in an open block (If, Select Case, a loop, With) opens the next line on its number plus 10, with the closers under it..
+        ///   Looks up a localized string similar to A numbered line in an open block (If, Select Case, a loop, With) opens the next line on its number plus 10, with the closers under it. Tab takes the number; once the block has a statement, Tab takes its closer and enters the line..
         /// </summary>
         public static string Repl_Help_Blocks {
             get {

@@ -122,8 +122,8 @@ public sealed class ConsolePromptEditor(IConsoleKeys keys, TextWriter output, Fu
     public Func<string, string?>? Ghost { get; init; }
 
     /// <summary>
-    /// Whether the line, once <kbd>Tab</kbd> has taken all of its ghost text (<see cref="Ghost"/>), is entered with it: a line the ghost text makes whole - the
-    /// closer of a block a shell offers, say. Given the line with the ghost text typed. Taken with <kbd>End</kbd> or <kbd>→</kbd>, the ghost text never enters
+    /// Whether the line, once <kbd>Tab</kbd> has taken all of its ghost text (<see cref="Ghost"/>), is entered with it: a line the ghost text makes whole, such as
+    /// the closer of a block a shell offers. Given the line with the ghost text typed. Taken with <kbd>End</kbd> or <kbd>→</kbd>, the ghost text never enters
     /// the line.
     /// </summary>
     public Func<string, bool>? EntersWithGhost { get; init; }
@@ -211,8 +211,8 @@ public sealed class ConsolePromptEditor(IConsoleKeys keys, TextWriter output, Fu
     /// </summary>
     /// <param name="token">Stops waiting for a key.</param>
     /// <param name="start">
-    /// What the line starts as: a snippet of one line, put in place with the cursor at its first tab stop - a number a shell suggests, selected so that typing
-    /// replaces it, say. A snippet of more lines, or none, starts an empty line; so does an input that is read as a whole line.
+    /// What the line starts as: a snippet of one line, put in place with the cursor at its first tab stop, such as a number a shell suggests, selected so
+    /// that typing replaces it. A snippet of more lines, or none, starts an empty line; so does an input that is read as a whole line.
     /// </param>
     /// <returns>The line entered, or <see langword="null"/> at the end of the input.</returns>
     /// <exception cref="OperationCanceledException"><paramref name="token"/> was cancelled before the line was entered.</exception>

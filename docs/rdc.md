@@ -21,7 +21,7 @@ The shell runs what you type. A line with no line number runs right away: `Debug
 the _current program_: `10 Debug.Print "Hello"`. The current program is the body of an implicit procedure named `Main`, in an implicit module named
 `Program`. It stays in memory until `NEW`, `LOAD` or `EXIT`.
 
-A numbered line in a block the program has no closer for yet (an `If`, a `Select Case`, a loop, a `With`) starts _block completion_. The next line
+A numbered line in a block the program has no closer for (an `If`, a `Select Case`, a loop, a `With`) starts _block completion_. The next line
 opens on the number plus 10, selected, and the closers the block needs are shown faint under it, with their numbers: after `120 If x > 0 Then`, the
 line is `130` and `140 End If` is under it. Tab takes the number, and a number you type replaces it. Once the block has a statement, the closer is
 offered after the number, and Tab takes it and enters the line. Each line is written into the program as you enter it. Block completion ends at the

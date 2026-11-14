@@ -10,8 +10,8 @@ namespace RDCore.CLI.App.Repl;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The open blocks come from a parse of the program as it is, after each line is stored: a block whose closer the program has is not open, and a one-line
-/// <c>If</c> is no block. Each line is stored as it is entered, so what block completion offers is never more than a suggestion: the program has every line
+/// The open blocks come from a parse of the program as it is, after each line is stored: a block whose closer the program has is not open, and a single-line
+/// <c>If</c> is not a block. Each line is stored as it is entered, so what block completion offers is never more than a suggestion: the program has every line
 /// that was entered, whatever key leaves block completion.
 /// </para>
 /// <para>
