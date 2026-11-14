@@ -340,14 +340,8 @@ public static class StatementStaticSemanticsEvaluator
             if (isLet && targetResult.IsSuccess && valueResult.IsSuccess
                 && LetValueParameterTypeOf(context, assignment) is { } objectParameter && objectParameter is VBClassType or VBObjectType)
             {
-                var givesAnObject = valueResult.Result is VBClassType or VBObjectType;
-                var objectCoercion = givesAnObject ? SetCoercionStaticSemantics.Instance : LetCoercionStaticSemantics.Instance;
+                var objectCoercion = valueResult.Result is VBClassType or VBObjectType ? SetCoercionStaticSemantics.Instance : LetCoercionStaticSemantics.Instance;
                 CollectError(objectCoercion.DetermineDeclaredType(context, assignment.Value, valueResult.Result!, objectParameter), walk);
-                if (givesAnObject)
-                {
-                    MarkObjectGivenToObjectProperty(context, assignment.Target);
-                }
-
                 return;
             }
 
@@ -1261,17 +1255,6 @@ public static class StatementStaticSemanticsEvaluator
     {
         var property = assignment.Target is IndexExpressionNode { Callee: var called } ? called : assignment.Target;
         return AccessorsOf(context, property)?.OfType<VBPropertyLetMemberSymbol>().FirstOrDefault() is { Parameters: [.., var value] } ? value.ResolvedType : null;
-    }
-
-    // the property's name is stated as given an object by a Let (ObjectGivenToObjectProperty), which is what binds to the property: MS-VBA passes it the
-    // object, where MS-VBAL §5.5.1.1 makes the Let invalid.
-    private static void MarkObjectGivenToObjectProperty(StaticEvaluationContext context, ExpressionNode target)
-    {
-        var property = target is IndexExpressionNode { Callee: var called } ? called : target;
-        if (context.Facts is { } facts && facts.TryGet(property.Identity, out var fact))
-        {
-            facts.Record(fact with { Flags = fact.Flags | ValueExpressionSemanticFlags.ObjectGivenToObjectProperty });
-        }
     }
 
     // the accessors of the property the target names, and whatever else the module declares of the name; none when the target names no property, or names
