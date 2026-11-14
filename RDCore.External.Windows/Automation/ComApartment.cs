@@ -249,8 +249,13 @@ public sealed class ComApartment : IDisposable
         _ = _ready.Set();
     }
 
-    private void Post(Action action)
+    /// <summary>
+    /// Queues <paramref name="action"/> on the apartment, which runs it when it next looks for work, and does not wait for it.
+    /// </summary>
+    /// <param name="action">What to run on the apartment.</param>
+    public void Post(Action action)
     {
+        _ = _thread.Value;
         _work.Enqueue(action);
         _ = _ready.Set();
     }

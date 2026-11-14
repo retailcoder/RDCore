@@ -39,7 +39,7 @@ public sealed class MachineExternalHost(string? logFileName) : RDCorePlatformSer
         }
 
         var apartment = new ComApartment();
-        return new ExternalAutomationService(new ComAutomationServer(apartment), new WindowsFormHost(apartment));
+        return new ExternalAutomationService(new ComAutomationServer(apartment), new WindowsFormHost(apartment), apartment.Post);
     }
 
     protected override string? LogFileName => logFileName;

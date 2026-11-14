@@ -25,7 +25,7 @@ namespace RDCore.External.Hosting;
 /// The form host of the platform, whose forms are objects of <paramref name="platform"/> like any other: they share its handles, and a member of a form is an
 /// <see cref="ExternalProtocol.AutomationInvoke"/> of one. A platform that hosts no forms is told so when one is asked for.
 /// </param>
-public sealed class ExternalAutomationService(IAutomationServer platform, Forms.IFormHost? forms = null)
+public sealed class ExternalAutomationService(IAutomationServer platform, Forms.IFormHost? forms = null, Action<Action>? callsOn = null)
 {
     private readonly Forms.IFormHost _forms = forms ?? Forms.UnavailableFormHost.Instance;
 
@@ -45,16 +45,16 @@ public sealed class ExternalAutomationService(IAutomationServer platform, Forms.
     public void ServeOn(CallChannel channel)
     {
         channel.Handle<AutomationStatusParams, AutomationStatusResult>(ExternalProtocol.AutomationStatus, Status);
-        channel.Handle<AutomationCreateParams, AutomationObjectResult>(ExternalProtocol.AutomationCreate, Create);
-        channel.Handle<AutomationObtainParams, AutomationObjectResult>(ExternalProtocol.AutomationObtain, Obtain);
-        channel.Handle<AutomationInvokeParams, AutomationInvokeResult>(ExternalProtocol.AutomationInvoke, Invoke);
-        channel.Handle<AutomationClassNameParams, AutomationClassNameResult>(ExternalProtocol.AutomationClassName, ClassName);
-        channel.Handle<AutomationIsInstanceOfParams, AutomationIsInstanceOfResult>(ExternalProtocol.AutomationIsInstanceOf, IsInstanceOf);
-        channel.Handle<AutomationMoveNextParams, AutomationMoveNextResult>(ExternalProtocol.AutomationMoveNext, MoveNext);
-        channel.Handle<AutomationResetParams, ExternalDoneResult>(ExternalProtocol.AutomationReset, Reset);
-        channel.Handle<AutomationAdviseParams, ExternalDoneResult>(ExternalProtocol.AutomationAdvise, Advise);
-        channel.Handle<AutomationUnadviseParams, ExternalDoneResult>(ExternalProtocol.AutomationUnadvise, Unadvise);
-        channel.Handle<AutomationReleaseParams, ExternalDoneResult>(ExternalProtocol.AutomationRelease, Release);
+        Serve<AutomationCreateParams, AutomationObjectResult>(channel, ExternalProtocol.AutomationCreate, Create);
+        Serve<AutomationObtainParams, AutomationObjectResult>(channel, ExternalProtocol.AutomationObtain, Obtain);
+        Serve<AutomationInvokeParams, AutomationInvokeResult>(channel, ExternalProtocol.AutomationInvoke, Invoke);
+        Serve<AutomationClassNameParams, AutomationClassNameResult>(channel, ExternalProtocol.AutomationClassName, ClassName);
+        Serve<AutomationIsInstanceOfParams, AutomationIsInstanceOfResult>(channel, ExternalProtocol.AutomationIsInstanceOf, IsInstanceOf);
+        Serve<AutomationMoveNextParams, AutomationMoveNextResult>(channel, ExternalProtocol.AutomationMoveNext, MoveNext);
+        Serve<AutomationResetParams, ExternalDoneResult>(channel, ExternalProtocol.AutomationReset, Reset);
+        Serve<AutomationAdviseParams, ExternalDoneResult>(channel, ExternalProtocol.AutomationAdvise, Advise);
+        Serve<AutomationUnadviseParams, ExternalDoneResult>(channel, ExternalProtocol.AutomationUnadvise, Unadvise);
+        Serve<AutomationReleaseParams, ExternalDoneResult>(channel, ExternalProtocol.AutomationRelease, Release);
         channel.Handle<FormCreateParams, AutomationObjectResult>(ExternalProtocol.FormCreate, CreateForm);
         channel.Handle<FormShowParams, ExternalDoneResult>(ExternalProtocol.FormShow, ShowForm);
         channel.Handle<FormParams, ExternalDoneResult>(ExternalProtocol.FormHide, HideForm);
@@ -67,6 +67,39 @@ public sealed class ExternalAutomationService(IAutomationServer platform, Forms.
         RaiseOnClient = raised => channel.CallAsync<AutomationEventParams, AutomationEventResult>(ExternalProtocol.AutomationEvent, raised);
         InvokeOnClient = call => channel.CallAsync<SessionInvokeParams, SessionInvokeResult>(ExternalProtocol.SessionInvoke, call);
         ReleaseOnClient = released => channel.CallAsync<SessionReleaseParams, ExternalDoneResult>(ExternalProtocol.SessionRelease, released);
+    }
+
+    // a call of the platform's servers is handed to the thread they make their calls on, which answers it: the thread that reads the channel neither waits for
+    // it nor is woken to write the answer. One a handler of an event makes is handed to the thread that waits for the handlers.
+    private void Serve<TCall, TAnswer>(CallChannel channel, string method, Func<TCall, TAnswer> answer) where TCall : AutomationRequest
+    {
+        if (callsOn is not { } post)
+        {
+            channel.Handle(method, answer);
+            return;
+        }
+
+        channel.Handle<TCall, TAnswer>(method, (call, reply) =>
+        {
+            void Make()
+            {
+                try
+                {
+                    reply.Answer(answer(call));
+                }
+                catch (Exception exception)
+                {
+                    reply.Fail(exception);
+                }
+            }
+
+            if (call.HandlingEvent != 0 && _events.TryGetValue(call.HandlingEvent, out var waiting) && waiting.TryPost(Make))
+            {
+                return;
+            }
+
+            post(Make);
+        });
     }
 
     /// <summary>
@@ -384,10 +417,32 @@ public sealed class ExternalAutomationService(IAutomationServer platform, Forms.
         private readonly BlockingCollection<Action> _calls = [];
         private readonly object _gate = new();
         private bool _over;
+        private int _thread = -1;
 
-        // makes the call on the waiting thread, and waits for it; a call that comes once the thread has stopped waiting is made where it comes.
+        // hands a call to the waiting thread, which makes it and answers it; false once the thread has stopped waiting.
+        public bool TryPost(Action call)
+        {
+            lock (_gate)
+            {
+                if (_over)
+                {
+                    return false;
+                }
+
+                _calls.Add(call);
+                return true;
+            }
+        }
+
+        // makes the call on the waiting thread, and waits for it; a call that comes once the thread has stopped waiting is made where it comes, and so is one the
+        // waiting thread makes itself.
         public T Run<T>(Func<T> call)
         {
+            if (Volatile.Read(ref _thread) == Environment.CurrentManagedThreadId)
+            {
+                return call();
+            }
+
             T result = default!;
             Exception? failure = null;
             using var done = new ManualResetEventSlim();
@@ -429,6 +484,8 @@ public sealed class ExternalAutomationService(IAutomationServer platform, Forms.
         // makes the calls the handlers make until they are done; an asynchronous event also does the work the server asks of its thread meanwhile.
         public void Serve(Task reply, Action<TimeSpan>? serve)
         {
+            Volatile.Write(ref _thread, Environment.CurrentManagedThreadId);
+
             // the answer wakes the thread as a call would.
             _ = reply.ContinueWith(_ => Wake(), TaskScheduler.Default);
             var patience = serve is null ? Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(5);
