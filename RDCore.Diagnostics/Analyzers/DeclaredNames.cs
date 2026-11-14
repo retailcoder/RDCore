@@ -46,7 +46,7 @@ internal static class DeclaredNames
                     break;
 
                 case LineLabelNode label when label is not LineNumberNode:
-                    yield return new(label.Name, label.SourceLocation.Range);
+                    yield return new(label.Name, label.NameRange ?? label.SourceLocation.Range);
                     break;
 
                 case ExternalMemberDeclarationNode:
