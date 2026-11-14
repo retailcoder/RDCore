@@ -364,6 +364,16 @@ public sealed class SyntaxTreeAnalyzerTests
         CollectionAssert.AreEqual(new[] { 0, 1, 3 }, Lines(Run(new MultipleDeclarationsAnalyzer(), source.Replace("Dim a", "Private a"))), "and has it once it is Private");
     }
 
+    [TestMethod]
+    [DataRow("Dim WithEvents app As Application, n As Long", false, DisplayName = "several names, one WithEvents: no fix, it would not split")]
+    [DataRow("Dim WithEvents app As Application", true, DisplayName = "one WithEvents name: written Private")]
+    public void AModuleLevelDimWithAWithEventsVariable_IsFixedOnlyWhenNothingIsLeftToSplit(string declaration, bool isFixed)
+    {
+        var finding = Run(new ModuleScopeDimAnalyzer(), $"{declaration}\r\n").Single();
+
+        Assert.AreEqual(isFixed, finding.Fixes?.Edit is not null);
+    }
+
     #endregion
 
     #region RDC00205 misleading ByRef
