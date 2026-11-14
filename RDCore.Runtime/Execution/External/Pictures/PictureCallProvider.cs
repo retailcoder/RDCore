@@ -21,13 +21,13 @@ using RDCore.SDK.Workspace.Pictures;
 namespace RDCore.Runtime.Execution.External.Pictures;
 
 /// <summary>
-/// Runs <c>LoadPicture</c> and <c>SavePicture</c> - stdole's (<c>StdFunctions</c>) and Visual Basic 6.0's (<c>VB.Global</c>), one implementation - and the
+/// Runs <c>LoadPicture</c> and <c>SavePicture</c> (stdole's, of <c>StdFunctions</c>, and Visual Basic 6.0's, of <c>VB.Global</c>: one implementation) and the
 /// members of the <c>stdole.StdPicture</c> objects they make, which the platform holds itself: a picture is its file, read through the session's file channels.
 /// </summary>
 /// <remarks>
 /// <para>
 /// A picture is what its file's header says it is (<see cref="PictureHeader"/>): its <c>Type</c>, and its <c>Width</c> and <c>Height</c> in HIMETRIC units. An
-/// icon or a cursor is its image of the size asked for, or its first. A PNG is no picture to <c>LoadPicture</c>, as in MS-VBA.
+/// icon or a cursor is its image of the size asked for, or its first. A PNG is not a picture <c>LoadPicture</c> reads, as in MS-VBA.
 /// </para>
 /// <para>
 /// <c>Handle</c>, the default member, is a value that tells one picture from another, and 0 for none: there is no graphics device behind it to hand to a
@@ -141,7 +141,7 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
 
         return Picture(bytes, width, height, request) is { } picture
             ? Made(picture, resolver)
-            : Error(VBRuntimeErrorId.InvalidPicture, request, $"'{text}' is no picture LoadPicture reads");
+            : Error(VBRuntimeErrorId.InvalidPicture, request, $"'{text}' is not a picture LoadPicture reads");
     }
 
     private RuntimeSemanticsEvaluationResult? ReadFile(string path, ExternalCallRequest request, out byte[] bytes)
@@ -174,7 +174,7 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
     {
         if (!PictureHeader.TryRead(bytes, out var info))
         {
-            // a bitmap file that is cut short is no failure of the format MS-VBA can name.
+            // a bitmap file that is cut short is not a failure of the format that MS-VBA can name.
             if (bytes.AsSpan().StartsWith("BM"u8))
             {
                 throw new AutomationException(Unexpected, $"{request.Describe()}: the bitmap is cut short.");
@@ -294,7 +294,7 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
             ("HEIGHT", "get") => Success(new VBLongValue(picture.Height)),
             ("HPAL", "get") when picture.Format is PictureFormat.Bitmap or PictureFormat.Gif or PictureFormat.Jpeg => Success(new VBLongValue(picture.Palette)),
             ("HPAL", "let") when picture.Format is PictureFormat.Bitmap or PictureFormat.Gif or PictureFormat.Jpeg => SetPalette(picture, request, resolver),
-            // a picture that is no bitmap has no palette, to read or to assign: the method fails.
+            // a picture that is not a bitmap has no palette, to read or to assign: the method fails.
             ("HPAL", _) => throw new AutomationException(Failed, "Method 'hPal' of object 'Picture' failed"),
             _ => Error(VBRuntimeErrorId.ObjectDoesntSupportThisAction, request, $"{name} is not implemented for a picture"),
         };
@@ -344,7 +344,7 @@ public sealed class PictureCallProvider(IRuntimeSession session) : IExternalCall
 
     private static VBTypedValue? Variant(VBTypedValue? value) => value is VBVariantValue { TypedValue: var wrapped } ? wrapped : value;
 
-    // a whole-number argument, 0 when it is omitted or is no number.
+    // a whole-number argument, 0 when it is omitted or is not a number.
     private static int Whole(VBTypedValue?[] arguments, int index)
         => index < arguments.Length && Variant(arguments[index]) is { } value and not (VBMissingValue or VBEmptyValue)
             && ValueConversions.ToNumeric(value, VBLongType.TypeInfo) is { IsSuccess: true, Value: VBLongValue { Value: var whole } }
