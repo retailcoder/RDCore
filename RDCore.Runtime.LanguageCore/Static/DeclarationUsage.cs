@@ -70,6 +70,7 @@ public static class DeclarationUsage
                 DeclaredBy = symbol is not VBParameterSymbol && symbol is VBLocalVariableSymbol local ? local.DeclaredBy : null,
                 Hides = hides?.Invoke(symbol),
                 AutoInstantiationAlwaysFails = AutoInstantiationAlwaysFails(symbol),
+                AutoInstantiates = ClassFacts.AutoInstantiatedClassOf(symbol)?.SemanticId,
             });
         }
 
