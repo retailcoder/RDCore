@@ -4,6 +4,7 @@ using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Declarations;
 using RDCore.SDK.Model.AST.Expressions;
 using RDCore.SDK.Model.Symbols;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Semantics;
 using RDCore.SDK.Semantics.Flags;
@@ -48,7 +49,7 @@ internal sealed class IsMissingAlwaysFalseAnalyzer : IModuleAnalyzer
                     continue;
                 }
 
-                var isVariant = string.Equals(argumentType, "Variant", StringComparison.OrdinalIgnoreCase);
+                var isVariant = string.Equals(argumentType, VBTypeNames.VBVariant, StringComparison.OrdinalIgnoreCase);
                 if (isVariant && !HasADefaultValue(parameter))
                 {
                     continue;

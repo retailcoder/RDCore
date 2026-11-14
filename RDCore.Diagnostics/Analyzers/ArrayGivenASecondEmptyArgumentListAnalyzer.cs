@@ -3,6 +3,7 @@ using RDCore.Diagnostics.Model;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.SDK.Model.AST.Abstract;
 using RDCore.SDK.Model.AST.Expressions;
+using RDCore.SDK.Model.Types;
 using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Diagnostics.Analyzers;
@@ -29,7 +30,7 @@ internal sealed class ArrayGivenASecondEmptyArgumentListAnalyzer : IModuleAnalyz
         return module.Descendants().OfType<IndexExpressionNode>()
             .Where(index => IndexExpressionNode.IsEmptyArgumentList(index.Arguments)
                 && index.Callee is IndexExpressionNode given && IndexExpressionNode.IsEmptyArgumentList(given.Arguments)
-                && facts.TryGetValue(given.Identity, out var callee) && callee.DeclaredType == "Array"
+                && facts.TryGetValue(given.Identity, out var callee) && callee.DeclaredType == VBTypeNames.VBArray
                 && facts.TryGetValue(index.Identity, out var fact) && !fact.Flags.HasFlag(ValueExpressionSemanticFlags.ProcedureCall))
             .Select(index => new AnalyzerFinding(
                 RDCoreDiagnosticId.ArrayGivenASecondEmptyArgumentList.ToCode(),

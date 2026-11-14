@@ -14,7 +14,8 @@ namespace RDCore.Tests.Diagnostics;
 public sealed class AnalyzersWithoutFindingFlagsTests
 {
     private const ValueExpressionSemanticFlags Findings = ValueExpressionSemanticFlags.IsMissingAlwaysFalse
-        | ValueExpressionSemanticFlags.ArrayGivenASecondEmptyArgumentList | ValueExpressionSemanticFlags.CollectionSetToNothingInItsOwnLoop;
+        | ValueExpressionSemanticFlags.ArrayGivenASecondEmptyArgumentList | ValueExpressionSemanticFlags.CollectionSetToNothingInItsOwnLoop
+        | ValueExpressionSemanticFlags.IgnoredTypeCharacter | ValueExpressionSemanticFlags.OverflowsWhereVariantWidens;
 
     private static ModuleSemanticsDto WithoutFindings(ModuleSemanticsDto model)
         => model with
@@ -57,6 +58,32 @@ public sealed class AnalyzersWithoutFindingFlagsTests
             "    Debug.Print UBound(f()())",
             "    v = a()()",
             "    Debug.Print UBound(f())",
+            "End Sub");
+
+        Assert.HasCount(2, with);
+        CollectionAssert.AreEqual(with, without);
+    }
+
+    [TestMethod]
+    public async Task IgnoredTypeCharacter()
+    {
+        var (with, without) = await FindingsAsync(new IgnoredTypeCharacterAnalyzer(),
+            "Public Sub Probe()",
+            "    Debug.Print Len$(\"abc\"), Abs%(-3), CStr$(1), Left$(\"ab\", 1)",
+            "End Sub");
+
+        Assert.HasCount(2, with);
+        CollectionAssert.AreEqual(with, without);
+    }
+
+    [TestMethod]
+    public async Task ArgumentTypedArithmetic()
+    {
+        var (with, without) = await FindingsAsync(new ArgumentTypedArithmeticAnalyzer(),
+            "Public Sub Probe()",
+            "    Dim n As Integer, d As Double, x As Variant",
+            "    x = Fix(n) * 7000 + Int(n)",
+            "    x = Fix(d) * 7000",
             "End Sub");
 
         Assert.HasCount(2, with);
