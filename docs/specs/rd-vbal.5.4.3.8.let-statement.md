@@ -103,7 +103,7 @@ object's default member is assigned.
 
 **RD-VBA differs from MS-VBA:** MS-VBA refuses at compile time a Let to a target of a specific class whose default member has no `Property Let`:
 "Invalid use of property" when it is a `Property Get` (`os = 5`, `Me = 5`), "Type mismatch" when it is a function (observed in Excel). **MS-VBAL
-§5.4.3.8** makes the statement valid, and RD-VBA compiles it: it assigns through a `Property Get`, and raises error 438 for a function, which is no
+§5.4.3.8** makes the statement valid, and RD-VBA compiles it: it assigns through a `Property Get`, and raises error 438 for a function, which is not a
 default property. Naming the member (`os.S = 5`) or giving it an empty argument list (`os() = 5`) compiles in both.
 
 **RD-VBA differs from MS-VBAL:** a function default member reached late-bound, through an `Object` or a `Variant`, is error 450, as MS-VBA raises it
