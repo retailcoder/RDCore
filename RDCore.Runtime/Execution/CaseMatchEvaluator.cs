@@ -255,8 +255,7 @@ public sealed class CaseMatchEvaluator(
             _ => CaseClauseSemanticFlags.ValueForm,
         };
 
-        var compared = effective is not null && effective.Equals(destination) ? 0 : CaseClauseSemanticFlags.ComparedInSelectorType;
-        into.OnStatement(new CaseClauseStatementFact(clause.Identity, clause.SourceLocation, Tokens.Case, form | compared,
+        into.OnStatement(new CaseClauseStatementFact(clause.Identity, clause.SourceLocation, Tokens.Case, form,
             IsValueKnown: !selector.IsIndeterminate && !value.IsIndeterminate)
         {
             ComparedIn = destination,

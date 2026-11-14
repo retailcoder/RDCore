@@ -5,7 +5,6 @@ using RDCore.Parsing;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Semantics;
-using RDCore.SDK.Semantics.Flags;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
@@ -23,22 +22,11 @@ public sealed class NewOfAClassNotCreatableAnalyzerTests
     {
         var program = $"Attribute VB_Name = \"Program\"\r\nOption Explicit\r\n{declarations}\r\nPublic Sub Main()\r\n{body}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], program);
-        var model = WithoutVerdicts(payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program"));
+        var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
         var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
         return ([.. new NewOfAClassNotCreatableAnalyzer().Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, program), model))
             .OrderBy(finding => finding.Range.Start)], program.Split("\r\n"));
     }
-
-    // the payload as the host sends it, without the flag and the declaration fact that mark a creation as one that fails: the analyzer judges from the class
-    // facts, the tree and the class each As New declaration creates.
-    private static ModuleSemanticsDto WithoutVerdicts(ModuleSemanticsDto model) => model with
-    {
-        Procedures = [.. model.Procedures.Select(procedure => procedure with
-        {
-            Expressions = [.. procedure.Expressions.Select(fact => fact with { Flags = fact.Flags & ~ValueExpressionSemanticFlags.NewAlwaysFails })],
-        })],
-        Declarations = [.. model.Declarations.Select(declaration => declaration with { AutoInstantiationAlwaysFails = false })],
-    };
 
     [TestMethod]
     [DataRow("", "    Dim e As ErrObject\r\n    Set e = New ErrObject", "    Set e = New ErrObject", DisplayName = "s62 X04 New ErrObject")]
@@ -62,7 +50,7 @@ public sealed class NewOfAClassNotCreatableAnalyzerTests
     {
         var program = "Attribute VB_Name = \"Program\"\r\nOption Explicit\r\nPublic Sub Main()\r\n    Dim e As ErrObject\r\n    Set e = New ErrObject\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], program);
-        var model = WithoutVerdicts(payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program"));
+        var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
         var errObject = Assert.ContainsSingle(model.Classes ?? []).Class.AbsoluteUri;
         var binding = SymbolUri.Member(SymbolUri.Module(new Uri("file:///libraries/"), "Bibliothèque"), "Modèle");
         model = model with

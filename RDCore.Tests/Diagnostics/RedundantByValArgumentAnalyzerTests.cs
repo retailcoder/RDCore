@@ -4,7 +4,6 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
-using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -21,7 +20,6 @@ public sealed class RedundantByValArgumentAnalyzerTests
         + "Private Function Twice(ByVal n As Long) As Long\n    Twice = n * 2\nEnd Function\n"
         + "Private Sub Bump(n As Long)\n    n = n + 1\nEnd Sub\n";
 
-    // the payload as the host sends it, without the RedundantByVal flag: the analyzer judges from the argument facts.
     private static async Task<AnalyzerFinding[]> RunAsync(string body)
     {
         var source = $"Attribute VB_Name = \"Program\"\r\n{(Declarations + $"Public Sub Main()\n    Dim x As Long\n{body}\nEnd Sub").ReplaceLineEndings("\r\n")}\r\n";
@@ -29,13 +27,6 @@ public sealed class RedundantByValArgumentAnalyzerTests
         var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
         var parsed = new ModuleParser().Parse(uri, source);
         var model = payload.Modules.Single();
-        model = model with
-        {
-            Procedures = [.. model.Procedures.Select(procedure => procedure with
-            {
-                Expressions = [.. procedure.Expressions.Select(fact => fact with { Flags = fact.Flags & ~ValueExpressionSemanticFlags.RedundantByVal })],
-            })],
-        };
         return [.. new RedundantByValArgumentAnalyzer().Analyze(new ModuleAnalysisContext(uri, parsed, model)).OrderBy(finding => finding.Range.Start)];
     }
 

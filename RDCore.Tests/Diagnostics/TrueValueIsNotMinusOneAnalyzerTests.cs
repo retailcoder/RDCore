@@ -4,7 +4,6 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
-using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -21,14 +20,6 @@ public sealed class TrueValueIsNotMinusOneAnalyzerTests
         var program = $"Attribute VB_Name = \"Program\"\r\n{declarations}\r\nPublic Sub Probe()\r\n{body}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([], program);
         var model = payload.Modules.Single(module => module.Module.Fragment.TrimStart('#') == "Program");
-        // the payload as the host sends it, without the flag that marks an operation as one: the analyzer judges from the tree and the constant values.
-        model = model with
-        {
-            Procedures = [.. model.Procedures.Select(procedure => procedure with
-            {
-                Expressions = [.. procedure.Expressions.Select(fact => fact with { Flags = fact.Flags & ~ValueExpressionSemanticFlags.TrueValueIsNotMinusOne })],
-            })],
-        };
         var uri = new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas"));
         return [.. new TrueValueIsNotMinusOneAnalyzer().Analyze(new ModuleAnalysisContext(uri, new ModuleParser().Parse(uri, program), model))];
     }

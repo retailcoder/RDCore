@@ -7,7 +7,6 @@ using RDCore.SDK.Model.Diagnostics;
 using RDCore.SDK.Model.Errors;
 using RDCore.SDK.Platform.Protocol;
 using RDCore.SDK.Runtime.Libraries;
-using RDCore.SDK.Semantics.Flags;
 using RDCore.SDK.Workspace;
 using RDCore.Tests.Cli;
 using System.IO.Abstractions;
@@ -64,7 +63,7 @@ public sealed class DocumentModuleDiagnosticsTests
         var (file, text) = module == "Program" ? ("Program.bas", program) : ($"{name}.doccls", source);
         // a file URI, as the language server sends a document's: on Linux, a bare path is no absolute URI once the payload has been through JSON.
         var uri = Platform.Wire.FileUri(Path.Combine(ModuleWorkspace.Root, file));
-        var semantics = WithoutVerdicts(payload.Modules.Single(candidate => SDK.Model.Symbols.SymbolUri.ModuleNameOf(candidate.Module) == module));
+        var semantics = payload.Modules.Single(candidate => SDK.Model.Symbols.SymbolUri.ModuleNameOf(candidate.Module) == module);
         var parse = new ModuleParser().Parse(uri, text);
 
         IModuleAnalyzer[] analyzers = [new HostedDocumentCodeAnalyzer(), new DocumentModuleHostAnalyzer(), new ImplementsInDocumentModuleAnalyzer()];
@@ -72,16 +71,6 @@ public sealed class DocumentModuleDiagnosticsTests
             new DiagnoseDocumentParams { Json = PlatformJson.Serialize(new DiagnoseDocumentPayload(uri, 1, parse, semantics)) }, CancellationToken.None);
         return (new ModuleAnalysisContext(uri, parse, semantics), [.. response.Diagnostics]);
     }
-
-    // the payload as the host sends it, without the flag that marks a name as a document's: the analyzer judges from the module's document-module names, the
-    // tree and what each name is bound to.
-    private static ModuleSemanticsDto WithoutVerdicts(ModuleSemanticsDto model) => model with
-    {
-        Procedures = [.. model.Procedures.Select(procedure => procedure with
-        {
-            Expressions = [.. procedure.Expressions.Select(fact => fact with { Flags = fact.Flags & ~ValueExpressionSemanticFlags.HostedDocumentName })],
-        })],
-    };
 
     private static string CodeOf(Diagnostic diagnostic) => diagnostic.Code?.String ?? string.Empty;
 

@@ -4,8 +4,6 @@ using RDCore.Parsing;
 using RDCore.Tests.Cli;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Diagnostics;
-using RDCore.SDK.Platform.Protocol;
-using RDCore.SDK.Semantics.Flags;
 
 namespace RDCore.Tests.Diagnostics;
 
@@ -34,22 +32,9 @@ public sealed class ObjectVariablePassedByRefAnalyzerTests
             ? (new Uri(Path.Combine(ModuleWorkspace.Root, "Box.cls")), BoxSource)
             : (new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas")), program);
         var parsed = new ModuleParser().Parse(uri, source);
-        var semantics = WithoutCopyFlags(payload.Modules.Single(candidate => candidate.Module.Fragment.TrimStart('#') == module));
+        var semantics = payload.Modules.Single(candidate => candidate.Module.Fragment.TrimStart('#') == module);
         return [.. new ObjectVariablePassedByRefAnalyzer().Analyze(new ModuleAnalysisContext(uri, parsed, semantics)).OrderBy(finding => finding.Range.Start)];
     }
-
-    // the payload as the host sends it, without the flags that mark an argument as a copy: the analyzers judge from the tree, the argument facts and the
-    // kinds of the declared types of the expressions.
-    internal static ModuleSemanticsDto WithoutCopyFlags(ModuleSemanticsDto semantics) => semantics with
-    {
-        Procedures = [.. semantics.Procedures.Select(procedure => procedure with
-        {
-            Expressions = [.. procedure.Expressions.Select(fact => fact with
-            {
-                Flags = fact.Flags & ~(ValueExpressionSemanticFlags.ObjectVariablePassedAsACopy | ValueExpressionSemanticFlags.ObjectVariablePassedLateAsACopy),
-            })],
-        })],
-    };
 
     [TestMethod]
     [DataRow("    Bump b.Count", "b.Count", DisplayName = "a call statement")]
