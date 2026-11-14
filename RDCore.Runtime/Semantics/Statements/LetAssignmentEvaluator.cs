@@ -226,7 +226,7 @@ public sealed class LetAssignmentEvaluator(
             var outcome = AssignThroughDefaultMember(session, context, statement, arrayExpression, subscripts, indexed, source, value, isSet);
             return ObservedAccess(session, context, ElementOf(statement, arrayExpression, subscripts), arrayExpression, indexed, memberName: null,
                 assumedBefore, outcome, MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember
-                    | RuntimeExpressionEvaluator.GivenArgumentList(subscripts));
+                    | MemberAccessOperationSemanticFlags.ArgumentList);
         }
 
         if (held is not VBArrayValue array)
@@ -475,7 +475,9 @@ public sealed class LetAssignmentEvaluator(
     {
         var assumedBefore = expressions.AssumedSoFar;
         var outcome = AssignMemberOf(session, context, statement, memberAccess, indexArguments, owner, source, value, isSet);
-        var given = TakesArguments(session, owner, memberAccess.Member.IdentifierName) ? RuntimeExpressionEvaluator.GivenArgumentList(indexArguments) : 0;
+        var given = !indexArguments.IsDefaultOrEmpty && TakesArguments(session, owner, memberAccess.Member.IdentifierName)
+            ? MemberAccessOperationSemanticFlags.ArgumentList
+            : 0;
         return ObservedAccess(session, context, memberAccess, owner, assumedBefore, outcome, kind | given);
     }
 

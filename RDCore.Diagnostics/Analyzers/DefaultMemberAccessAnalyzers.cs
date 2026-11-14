@@ -103,7 +103,8 @@ internal static class DefaultMemberAccesses
         // argument list: RDC00119 and RDC00120 report it.
         => MemberAccesses(semantics).Where(access => access.MemberAccessOpSemanticFlags!.Value is var flags
             && flags.HasFlag(MemberAccessOperationSemanticFlags.Implicit | MemberAccessOperationSemanticFlags.DefaultMember)
-            && flags.HasFlag(dictionaryAccess ? MemberAccessOperationSemanticFlags.DictionaryAccess : MemberAccessOperationSemanticFlags.ArgumentList)
+            && flags.HasFlag(MemberAccessOperationSemanticFlags.DictionaryAccess) == dictionaryAccess
+            && (dictionaryAccess || flags.HasFlag(MemberAccessOperationSemanticFlags.ArgumentList))
             && flags.HasFlag(MemberAccessOperationSemanticFlags.LateBound) == unbound);
 
     /// <summary>
