@@ -20,7 +20,8 @@ public sealed class ValueOfObjectWithNoDefaultMemberAnalyzerTests
 
     private static async Task<AnalyzerFinding[]> FindingsAsync(string statement)
     {
-        var program = "Attribute VB_Name = \"Program\"\r\nPrivate Sub ByLng(ByVal x As Long)\r\nEnd Sub\r\nPrivate Sub ByVar(ByVal x As Variant)\r\nEnd Sub\r\n"
+        var program = "Attribute VB_Name = \"Program\"\r\nPrivate Sub ByLng(ByVal x As Long)\r\nEnd Sub\r\nPrivate Sub RefLng(ByRef x As Long)\r\nEnd Sub\r\n"
+            + "Private Sub ByVar(ByVal x As Variant)\r\nEnd Sub\r\n"
             + "Public Sub Main()\r\nOn Error Resume Next\r\nDim o As Plain, w As Widget, c As Variant, l As Long\r\n"
             + $"{statement.Replace(" ;; ", "\r\n")}\r\nEnd Sub\r\n";
         var payload = await ModuleWorkspace.SemanticsAsync([Plain, Widget], program);
@@ -36,6 +37,7 @@ public sealed class ValueOfObjectWithNoDefaultMemberAnalyzerTests
     [DataRow("l = New Plain", DisplayName = "Let to a Long")]
     [DataRow("l = 1 + o", DisplayName = "an operand")]
     [DataRow("ByLng o", DisplayName = "an argument of a value type")]
+    [DataRow("RefLng o", DisplayName = "an argument of a ByRef parameter of a value type")]
     public async Task AnObjectWithNoDefaultMember_WhereAValueIsExpected_IsReported(string statement)
     {
         var finding = Assert.ContainsSingle(await FindingsAsync(statement));
