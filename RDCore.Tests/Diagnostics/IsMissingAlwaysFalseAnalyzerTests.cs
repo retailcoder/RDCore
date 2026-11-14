@@ -54,7 +54,7 @@ public sealed class IsMissingAlwaysFalseAnalyzerTests
 
     [TestMethod]
     public async Task IsMissingOfSomethingElse_IsNotReported()
-        // a Variant local holds the Missing value that is assigned to it (MS-VBAL §6.1.2.7.1.6), and a literal is no name.
+        // a Variant local holds the Missing value that is assigned to it (MS-VBAL §6.1.2.7.1.6), and a literal is not a name.
         => Assert.IsEmpty(await FindingsAsync("Optional n As Long", "Dim w As Variant\r\nDebug.Print IsMissing(w)\r\nDebug.Print IsMissing(5)"));
 
     [TestMethod]
