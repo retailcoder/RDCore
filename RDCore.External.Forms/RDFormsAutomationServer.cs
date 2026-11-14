@@ -26,6 +26,8 @@ public sealed class RDFormsAutomationServer : IAutomationServer
     private const string PopupMenuMember = "PopupMenu";
     private const string ControlsMember = "Controls";
     private const string NameMember = "Name";
+    private const string DefaultMemberName = "_Default";
+    private const string DefaultMemberDispatchName = "[DISPID=0]";
 
     /// <summary>
     /// Creates the server of the forms of a process, whose windows are on <paramref name="platform"/>.
@@ -73,6 +75,20 @@ public sealed class RDFormsAutomationServer : IAutomationServer
         {
             Alive(handle);
             var component = handle.Component;
+
+            // a control's default member (_Default early bound, DISPID 0 late bound) is the member its class names for it, reached as if the program named it.
+            if (IsDefaultMember(member) && component.Class.DefaultMember is { } named)
+            {
+                member = named;
+            }
+
+            // a control assigned a value through its form (Form1.Text1 = "abc") is assigned it through its own default member: the form's control is a property
+            // that returns the control, which takes the value as an object assigned a value does.
+            if (invocation is AutomationInvocation.Let && arguments.Length == 1 && component.Class.Property(member) is null && Control(handle, member) is { } assigned)
+            {
+                return Invoke(assigned, DefaultMemberName, invocation, arguments, byReference, culture);
+            }
+
             if (RDFormsGraphics.TryInvoke(component, member, invocation, arguments, culture, out var drawn))
             {
                 return drawn;
@@ -335,6 +351,9 @@ public sealed class RDFormsAutomationServer : IAutomationServer
 
     // what a form raises, as the program's Err has it.
     private static AutomationException FormFailure(FormError error) => new(VisualBasicError | error.Number, error.Description);
+
+    private static bool IsDefaultMember(string member)
+        => string.Equals(member, DefaultMemberName, StringComparison.OrdinalIgnoreCase) || string.Equals(member, DefaultMemberDispatchName, StringComparison.Ordinal);
 
     // whether a control is in its form: its containers lead to the form's root.
     internal static bool IsPlaced(RDFormsObject handle)

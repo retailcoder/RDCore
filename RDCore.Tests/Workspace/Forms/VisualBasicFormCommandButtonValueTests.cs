@@ -69,10 +69,11 @@ public sealed class VisualBasicFormCommandButtonValueTests
     }
 
     [TestMethod]
-    [Ignore("not implemented: an RDForms class names no default property, so the default member of a control (_Default, DISPID 0) reaches nothing")]
-    public async Task TheDefaultMemberSetToTrue_RaisesClick()
+    [DataRow("Form1.Command1 = True", DisplayName = "early-bound")]
+    [DataRow("Dim o As Object: Set o = Form1.Command1: o = True", DisplayName = "late-bound")]
+    public async Task TheDefaultMemberSetToTrue_RaisesClick(string set)
     {
-        var printed = await RunAsync("Load Form1", "Form1.Command1 = True");
+        var printed = await RunAsync("Load Form1", set);
 
         CollectionAssert.AreEqual(new[] { "Command1_Click 1 True", "after 1", "Value False" }, printed, string.Join(" | ", printed));
     }
