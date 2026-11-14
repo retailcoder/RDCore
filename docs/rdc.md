@@ -79,7 +79,7 @@ Each command takes a workspace as a folder, with or without a `.rdproj`, or as a
 |---|---|---|
 |`rdc new <path>`|`n`|Makes a workspace of a folder: writes a `.rdproj` that names each module file the folder holds. `--name` sets the project's name (the folder's by default), `--empty` writes a project with no files, and `--force` replaces an existing `.rdproj`.|
 |`rdc import <path>`|`i`|Makes the `.rdproj` of a VB6 project, next to its `.vbp` (see [VB6 projects](vb6-projects.md)). `--force` replaces an existing `.rdproj`.|
-|`rdc run [<path>] [-- <arguments>]`|`r`|Runs the workspace's program (below). What follows `--` is the program's command line, which `Command$` returns.|
+|`rdc run [<options>] [<path>] [<arguments>]`|`r`|Runs the workspace's program (below). What follows the path is the program's command line, which `Command$` returns.|
 |`rdc build [<path>]`|`bd`|Builds the workspace into a program: its executable, and the runtime it runs on (below).|
 |`rdc config`|`configure`|Shows the platform's settings and sets them, as the shell's `CONFIG` does, without starting the platform.|
 |`rdc export-library <library>`|`xl`|Describes a type library of this machine (a file such as `scrrun.dll`, its identifier, or its name) as a file a project can reference by name. `--dependencies` describes the libraries it depends on too.|
@@ -102,6 +102,17 @@ nor a project with a module that does not load. `Debug.Print` writes to the stan
 |---|---|
 |`-c`, `--configuration`|`Debug` (the default) or `Release`.|
 |`--unattended`|Nobody answers a dialog: a `MsgBox` or an `InputBox` fails the run.|
+
+The options go before the path. Everything after the path is the program's command line, switches included: `rdc run --unattended .` runs
+unattended, and `rdc run . --unattended` gives `--unattended` to the program. A `--` right after the path is skipped. With no path, the
+current folder runs, and `--` comes before the program's command line. Without a path or a `--`, nothing is the program's, and an option
+`rdc` does not know is an error.
+
+```
+rdc run . --seed 42
+rdc run . -- --seed 42
+rdc run -- --seed 42
+```
 
 The exit code says how the run went:
 
