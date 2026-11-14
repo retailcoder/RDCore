@@ -20,7 +20,7 @@ namespace RDCore.Runtime.LanguageCore.Static;
 // rounding to even), or to the value's own type or a Variant.
 internal static class ConstantBindings
 {
-    // how many constants a constant's value may name in turn before its binding is no longer looked for.
+    // the most constants a binding is looked for through, each naming the next: past them, the binding is not known.
     private const int Depth = 8;
 
     public static VBTypedValue? Of(StaticEvaluationContext context, Symbol? constant) => Of(context, constant, 0);
