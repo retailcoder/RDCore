@@ -44,7 +44,7 @@ public sealed class ObjectVariablePassedByRefFormsAnalyzerTests
             ? (new Uri(Path.Combine(ModuleWorkspace.Root, "Box.cls")), BoxSource)
             : (new Uri(Path.Combine(ModuleWorkspace.Root, "Program.bas")), program);
         var parsed = new ModuleParser().Parse(uri, source);
-        var semantics = payload.Modules.Single(candidate => candidate.Module.Fragment.TrimStart('#') == module);
+        var semantics = ObjectVariablePassedByRefAnalyzerTests.WithoutCopyFlags(payload.Modules.Single(candidate => candidate.Module.Fragment.TrimStart('#') == module));
         var analyzed = new ModuleAnalysisContext(uri, parsed, semantics);
         return [.. new ObjectVariablePassedByRefAnalyzer().Analyze(analyzed).Concat(new ObjectVariablePassedLateAnalyzer().Analyze(analyzed))
             .OrderBy(finding => finding.Range.Start)];
