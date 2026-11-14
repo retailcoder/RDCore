@@ -126,19 +126,41 @@ internal sealed partial class SessionFileChannels(IFileSystem fileSystem, Encodi
         }
 
         public bool TryWriteRecord(VBTypedValue value, bool isVariant, out int written)
-            => RecordDataFormat.TryWrite(Stream, value, Mode, isVariant, out written);
-
-        public bool TryReadRecord(VBType declaredType, int currentLength, out VBTypedValue? value)
         {
-            var read = RecordDataFormat.TryRead(Stream, declaredType, Mode, currentLength, out value);
-            IsPastEndOfRecords = !read;
-            return read;
+            if (Mode is not VBFileMode.Random || RecordLength <= 0)
+            {
+                return RecordDataFormat.TryWrite(Stream, value, Mode, isVariant, out written);
+            }
+
+            // a record longer than the channel's records is not written at all, which Put then raises 59 for (MS-VBA, recorded in Excel).
+            using var record = new MemoryStream();
+            if (!RecordDataFormat.TryWrite(record, value, Mode, isVariant, out written))
+            {
+                return false;
+            }
+
+            if (written <= RecordLength)
+            {
+                record.WriteTo(Stream);
+                Stream.Flush();
+            }
+
+            return true;
         }
 
+        public bool TryReadRecord(VBType declaredType, int currentLength, out VBTypedValue? value)
+            => Read(RecordDataFormat.TryRead(Stream, declaredType, Mode, currentLength, out value));
+
         public bool TryReadRecordInto(VBUserDefinedTypeValue userDefinedType)
+            => Read(RecordDataFormat.TryReadInto(Stream, userDefinedType, Mode));
+
+        public bool TryReadRecordInto(VBArrayValue array)
+            => Read(RecordDataFormat.TryReadInto(Stream, array, Mode));
+
+        // a read past the end of the file reads zeros and moves past them (RecordDataFormat), which is what leaves the position past the end.
+        private bool Read(bool read)
         {
-            var read = RecordDataFormat.TryReadInto(Stream, userDefinedType, Mode);
-            IsPastEndOfRecords = !read;
+            IsPastEndOfRecords = !read || Stream.Position > Stream.Length;
             return read;
         }
 
