@@ -2449,10 +2449,11 @@ public sealed partial class RuntimeExpressionEvaluator(IOperatorRuntimeSemantics
             }
 
             // an object is Set-assigned to the Variant it is collected into, as it is to a Variant parameter of its own (MS-VBAL §5.3.1.11): the element holds the
-            // object, and nothing asks it for a default value it may not have - which is what CallByName(obj, "Prop", VbSet, other) passes.
-            if (SetCoercion is { } setCoercion && argumentResult.Value.Result is VBObjectValue)
+            // object, and nothing asks it for a default value it may not have - which is what CallByName(obj, "Prop", VbSet, other) passes. So is the object a
+            // Variant holds, which a late-bound member returns: `Controls.Remove Controls("x")` is given the control.
+            if (SetCoercion is { } setCoercion && HeldObject(argumentResult.Value.Result) is { } heldObject)
             {
-                var setResult = setCoercion.EvaluateSetCoercion(session, argumentNode, argumentResult.Value.Result!, VBVariantType.TypeInfo);
+                var setResult = setCoercion.EvaluateSetCoercion(session, argumentNode, heldObject, VBVariantType.TypeInfo);
                 if (!setResult.IsSuccess)
                 {
                     return new ParamArrayCollectResult(null, RuntimeSemanticsEvaluationResult.Error(setResult.ErrorInfo!));
