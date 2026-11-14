@@ -44,7 +44,7 @@ The severity of a finding is a choice of the analyzer ([**RD-VBAL §2.6** Diagno
 |[`RDC00117`](../diagnostics/rdc00117.md)|Implicit constant type|Information|the syntax tree: a `ConstantDeclarationNode` with no `As` clause and no type hint|
 |[`RDC00119`](../diagnostics/rdc00119.md)|Implicit default member access|Information|`ProcedureSemanticModel.Runtime`: a `ConversionFact` with `ConversionSemanticFlags.ObjectOperand`, at its operand of a class type; and the syntax tree's `Let` assignments whose target has a `MemberAccessOperationSemanticFlags.DefaultMember` access without `ArgumentList`|
 |[`RDC00120`](../diagnostics/rdc00120.md)|Implicit unbound default member access|Warning|the same facts as `RDC00119`, at an operand or a `Let` target declared `Object`|
-|[`RDC00121`](../diagnostics/rdc00121.md)|Indexed default member access|Information|`ProcedureSemanticModel.Runtime`: the member accesses with `MemberAccessOperationSemanticFlags.Implicit`, `DefaultMember` and `ArgumentList`, and not `LateBound`, read or assigned|
+|[`RDC00121`](../diagnostics/rdc00121.md)|Indexed default member access|Information|`ProcedureSemanticModel.Runtime`: the member accesses with `MemberAccessOperationSemanticFlags.Implicit`, `DefaultMember` and `ArgumentList` (an empty list included), and neither `DictionaryAccess` nor `LateBound`, read or assigned|
 |[`RDC00122`](../diagnostics/rdc00122.md)|Indexed unbound default member access|Warning|the same, with `LateBound`|
 |[`RDC00123`](../diagnostics/rdc00123.md)|Bang notation|Information|the member accesses with `Implicit`, `DefaultMember` and `DictionaryAccess`, and not `LateBound`|
 |[`RDC00124`](../diagnostics/rdc00124.md)|Unbound bang notation|Warning|the same, with `DictionaryAccess` and `LateBound`|
