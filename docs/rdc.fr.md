@@ -111,7 +111,7 @@ ne s'exécute pas non plus, pas plus qu'un projet dont un module ne se charge pa
 Les options viennent avant le chemin. Tout ce qui suit le chemin est la ligne de commande du programme, options comprises :
 `rdc run --unattended .` s'exécute sans surveillance, et `rdc run . --unattended` donne `--unattended` au programme. Un `--` juste après le
 chemin est ignoré. Sans chemin, c'est le dossier courant qui s'exécute, et `--` précède la ligne de commande du programme. Sans chemin ni
-`--`, rien n'est au programme, et une option que `rdc` ne connaît pas est une erreur.
+`--`, rien ne va au programme, et une option que `rdc` ne connaît pas est une erreur.
 
 ```
 rdc run . --seed 42

@@ -105,7 +105,7 @@ nor a project with a module that does not load. `Debug.Print` writes to the stan
 
 The options go before the path. Everything after the path is the program's command line, switches included: `rdc run --unattended .` runs
 unattended, and `rdc run . --unattended` gives `--unattended` to the program. A `--` right after the path is skipped. With no path, the
-current folder runs, and `--` comes before the program's command line. Without a path or a `--`, nothing is the program's, and an option
+current folder runs, and `--` comes before the program's command line. Without a path or a `--`, nothing goes to the program, and an option
 `rdc` does not know is an error.
 
 ```
