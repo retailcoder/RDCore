@@ -46,6 +46,28 @@ public sealed class ImplicitDeclarationFixTests
             runs: true);
 
     [TestMethod]
+    [DataRow("Private Function F()", "Private Function F() As Variant", DisplayName = "a function")]
+    [DataRow("Private Function F(ByVal x As Long, _\r\n        ByVal y As Long)", "Private Function F(ByVal x As Long, _\r\n        ByVal y As Long) As Variant", DisplayName = "a parameter list on two lines")]
+    [DataRow("Private Function F() ' a comment", "Private Function F() As Variant ' a comment", DisplayName = "a comment after it")]
+    public async Task AFunctionOfNoReturnType_IsDeclaredToReturnAVariant(string header, string written)
+        => await AssertFixedAsync(RDCoreDiagnosticId.ImplicitVariantReturnType, [header, "End Function"], [written, "End Function"]);
+
+    [TestMethod]
+    public async Task APropertyGetOfNoReturnType_IsDeclaredToReturnAVariant()
+        => await AssertFixedAsync(RDCoreDiagnosticId.ImplicitVariantReturnType, ["Public Property Get P()", "End Property"], ["Public Property Get P() As Variant", "End Property"]);
+
+    [TestMethod]
+    public async Task AFunctionDeclaredToReturnAVariant_ReturnsWhatItReturned()
+        => await AssertFixedAsync(RDCoreDiagnosticId.ImplicitVariantReturnType,
+            ["Public Sub Main()", "    Debug.Print TypeName(F())", "End Sub", "Private Function F()", "    F = \"a\"", "End Function"],
+            ["Public Sub Main()", "    Debug.Print TypeName(F())", "End Sub", "Private Function F() As Variant", "    F = \"a\"", "End Function"],
+            runs: true);
+
+    [TestMethod]
+    public async Task ADeclareOfNoReturnType_HasNoFix()
+        => await AssertNoFixAsync(RDCoreDiagnosticId.ImplicitVariantReturnType, "Private Declare PtrSafe Function GetTickCount Lib \"kernel32\" ()");
+
+    [TestMethod]
     public async Task OptionExplicit_IsWritten_WithADimForEachImplicitVariable()
         => await AssertFixedAsync(RDCoreDiagnosticId.ImplicitDeclarationsEnabled,
             ["Private Const K As Long = 2", "Public Sub Main()", "    total = 1", "    total = total + K", "    name$ = \"a\"", "    Debug.Print total; name$", "End Sub",
