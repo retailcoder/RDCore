@@ -244,10 +244,6 @@
       "msvba": 8.963,
       "rdvba": 137.8
     },
-    "StdLib.BenchNow": {
-      "msvba": 13.733,
-      "rdvba": 87.7
-    },
     "StdLib.BenchUBound": {
       "msvba": 0.722,
       "rdvba": 4.1
