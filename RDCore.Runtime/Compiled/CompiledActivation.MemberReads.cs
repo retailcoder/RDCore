@@ -45,7 +45,7 @@ public sealed partial class CompiledActivation
     /// <param name="integral">What it holds, of an integral kind.</param>
     /// <param name="floating">What it holds, of a floating-point kind.</param>
     public bool TryReadMemberField(int number, object? cell, out long integral, out double floating)
-        => TryReadFieldOf(number, InstanceIn(cell), out integral, out floating);
+        => TryReadFieldOf(number, FieldIn(number, cell), out integral, out floating);
 
     /// <summary>
     /// Reads the <c>String</c> public variable numbered <paramref name="number"/> of the body, of variable length, of the object the variable whose cell is
@@ -55,13 +55,26 @@ public sealed partial class CompiledActivation
     /// <param name="number">The number of the variable among the body's.</param>
     /// <param name="cell">The cell of the object variable the variable is read of.</param>
     /// <param name="text">The text; <see langword="null"/> for <c>vbNullString</c>.</param>
-    public bool TryReadMemberText(int number, object? cell, out string? text) => TryReadTextOf(number, InstanceIn(cell), out text);
+    public bool TryReadMemberText(int number, object? cell, out string? text) => TryReadTextOf(FieldIn(number, cell), out text);
 
-    // the object the object variable whose cell is cell refers to, when compiled code reads a variable of it: none under a debugger that observes member
-    // accesses, nor of Nothing, nor of an object the session has no instance of.
-    private IObjectInstance? InstanceIn(object? cell)
-        => _executor.Observation is null && ObjectOperations.TryRead(cell, out var id) && !id.Equals(default(VBRuntimeObjectId))
-            && _session.Symbols.TryGetInstance(id, out var instance) ? instance : null;
+    // the public variable the member access numbered number finds of the object the object variable whose cell is cell refers to, when compiled code reads
+    // or writes it: none under a debugger that observes member accesses, nor of Nothing, nor of an object the session has no instance of. The access the
+    // body keeps for the object (MemberFieldOf) is found by the object's identity, as the variable holds it: the session is asked for the object only when
+    // the access keeps none for it, and the object a variable refers to is one the session has an instance of.
+    private MemberFieldCell? FieldIn(int number, object? cell)
+    {
+        if (_executor.Observation is not null || !ObjectOperations.TryRead(cell, out var id) || id.Equals(default(VBRuntimeObjectId)))
+        {
+            return null;
+        }
+
+        if (_body.MemberFieldCells?[number] is { } cached && cached.Object.Equals(id) && ReferenceEquals(cached.Scopes, _session.Symbols.Scopes))
+        {
+            return cached;
+        }
+
+        return _session.Symbols.TryGetInstance(id, out var instance) ? MemberFieldOf(number, instance) : null;
+    }
 
     /// <summary>
     /// Reads the public variable numbered <paramref name="number"/> of the body, of the object of the <c>With</c> block opened at
@@ -73,7 +86,7 @@ public sealed partial class CompiledActivation
     /// <param name="integral">What it holds, of an integral kind.</param>
     /// <param name="floating">What it holds, of a floating-point kind.</param>
     public bool TryReadMemberFieldOfWith(int number, int opener, out long integral, out double floating)
-        => TryReadFieldOf(number, InstanceOfBlock(opener), out integral, out floating);
+        => TryReadFieldOf(number, FieldOfBlock(number, opener), out integral, out floating);
 
     /// <summary>
     /// Reads the <c>String</c> public variable numbered <paramref name="number"/> of the body, of the object of the <c>With</c> block opened at
@@ -82,13 +95,14 @@ public sealed partial class CompiledActivation
     /// <param name="number">The number of the variable among the body's.</param>
     /// <param name="opener">The offset of the <c>With</c> statement of the block.</param>
     /// <param name="text">The text; <see langword="null"/> for <c>vbNullString</c>.</param>
-    public bool TryReadMemberTextOfWith(int number, int opener, out string? text) => TryReadTextOf(number, InstanceOfBlock(opener), out text);
+    public bool TryReadMemberTextOfWith(int number, int opener, out string? text) => TryReadTextOf(FieldOfBlock(number, opener), out text);
 
-    // the object the interpreter holds for the With block opened at opener, where it holds it: none for a block that holds none, or Nothing.
-    private IObjectInstance? InstanceOfBlock(int opener)
+    // the public variable the member access numbered number finds of the object the interpreter holds for the With block opened at opener, where it holds
+    // it: none for a block that holds none, or Nothing.
+    private MemberFieldCell? FieldOfBlock(int number, int opener)
         => _executor.Observation is null && Frame.TryGetBlockState(opener, out var held)
             && (held is VBVariantValue { TypedValue: var inner } ? inner : held) is VBObjectValue target && !target.IsNothing()
-            && _session.Symbols.TryGetInstance(target.Value, out var instance) ? instance : null;
+            && _session.Symbols.TryGetInstance(target.Value, out var instance) ? MemberFieldOf(number, instance) : null;
 
     // the public variable the member access numbered number finds of instance, and its cell: found as the interpreter finds it (EvaluateBoundMember), and
     // kept for the access until it is of another object or a module is defined again (MemberFieldCell). None when the class has a procedure for the member.
@@ -112,19 +126,17 @@ public sealed partial class CompiledActivation
         return found;
     }
 
-    // the text of a String public variable of variable length of instance, in its cell.
-    private bool TryReadTextOf(int number, IObjectInstance? instance, out string? text)
+    // the text of a String public variable of variable length, in its cell.
+    private static bool TryReadTextOf(MemberFieldCell? found, out string? text)
     {
         text = null;
-        return instance is not null && MemberFieldOf(number, instance) is { Field.ResolvedType: VBStringType and not VBFixedStringType } found
-            && StringOperations.TryRead(found.Held, out text);
+        return found is { Field.ResolvedType: VBStringType and not VBFixedStringType } && StringOperations.TryRead(found.Held, out text);
     }
 
-    private bool TryReadFieldOf(int number, IObjectInstance? instance, out long integral, out double floating)
+    private bool TryReadFieldOf(int number, MemberFieldCell? found, out long integral, out double floating)
     {
         (integral, floating) = (0, 0);
-        if (instance is null || MemberFieldOf(number, instance) is not { Held: ScalarCell cell } found || found.Kind != _body.MemberFields[number].Kind
-            || !cell.TryRead(out var payload))
+        if (found is not { Held: ScalarCell cell } || found.Kind != _body.MemberFields[number].Kind || !cell.TryRead(out var payload))
         {
             return false;
         }
@@ -144,7 +156,8 @@ public sealed partial class CompiledActivation
     /// <param name="cell">The cell of the object variable the variable is written of.</param>
     /// <param name="integral">The value, of an integral kind.</param>
     /// <param name="floating">The value, of a floating-point kind.</param>
-    public bool TryLetMemberField(int number, object? cell, long integral, double floating) => TryLetFieldOf(number, InstanceIn(cell), integral, floating);
+    public bool TryLetMemberField(int number, object? cell, long integral, double floating)
+        => !FailsAccessAtRandom() && TryLetFieldOf(number, FieldIn(number, cell), integral, floating);
 
     /// <summary>
     /// Writes the public variable numbered <paramref name="number"/> of the body, of the object of the <c>With</c> block opened at
@@ -155,13 +168,12 @@ public sealed partial class CompiledActivation
     /// <param name="integral">The value, of an integral kind.</param>
     /// <param name="floating">The value, of a floating-point kind.</param>
     public bool TryLetMemberFieldOfWith(int number, int opener, long integral, double floating)
-        => TryLetFieldOf(number, InstanceOfBlock(opener), integral, floating);
+        => !FailsAccessAtRandom() && TryLetFieldOf(number, FieldOfBlock(number, opener), integral, floating);
 
     // the value written in the cell of a scalar public variable of an instance, of the kind it was let-coerced to; nothing written when the cell is of another kind.
-    private bool TryLetFieldOf(int number, IObjectInstance? instance, long integral, double floating)
+    private bool TryLetFieldOf(int number, MemberFieldCell? found, long integral, double floating)
     {
-        if (FailsAccessAtRandom() || instance is null || MemberFieldOf(number, instance) is not { Held: ScalarCell cell } found
-            || found.Kind != _body.MemberFields[number].Kind)
+        if (found is not { Held: ScalarCell cell } || found.Kind != _body.MemberFields[number].Kind)
         {
             return false;
         }
