@@ -20,12 +20,13 @@ internal readonly record struct DeclaredName(string Name, SourceRange Range, boo
 /// The names a module chooses: the ones a rule about names applies to.
 /// </summary>
 /// <remarks>
-/// Not every name is chosen by the module. A procedure of an external library is named by the library; the implementation of an interface member, the handler of
-/// an event and a lifecycle handler (<c>Class_Initialize</c>) are named by the interface, the event or the language. They are left out. That a member is one of
-/// them is a fact the host vouches for (<see cref="SDK.Semantics.DeclarationFact.Role"/>), and not the underscore in its name: <c>Test_1</c> is the module's
-/// choice. The parameters of a handler are named by the event, as Rubberduck's inspections take them; those of an implementation are the module's. Without the
-/// facts, no member is taken for one. The accessors of a property are one declaration, and its name is reported once. A line label is a name the procedure
-/// chooses; a line number is a number, and is left out. The module's own name, where its <c>Attribute VB_Name</c> says it, is a name the module chooses.
+/// Not every name is chosen by the module. A procedure of an external library is named by the library; the implementation of an interface member, the
+/// handler of an event and a lifecycle handler (<c>Class_Initialize</c>) are named by the interface, the event or the language. They are left out. That a
+/// member is one of them is a fact the host vouches for (<see cref="SDK.Semantics.DeclarationFact.Role"/>), and not the underscore in its name:
+/// <c>Test_1</c> is the module's choice. The parameters of a handler are named by the event, as Rubberduck's inspections take them; those of an
+/// implementation are the module's. Without the facts, no member is taken for one. The accessors of a property are one declaration, and its name is
+/// reported once. A line label is a name the procedure chooses; a line number is a number, and is left out. The module's own name, where its
+/// <c>Attribute VB_Name</c> says it, is a name the module chooses.
 /// </remarks>
 internal static class DeclaredNames
 {
