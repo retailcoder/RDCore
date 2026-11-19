@@ -227,8 +227,8 @@ public sealed class CompiledCallerWaitingTests
             "        Next",
             "    Next"), null), "| 129 |");
 
-    // Outer's s = is a statement the interpreter runs alone: a Currency joined to a String is the interpreter's to write (MS-VBAL §5.5.1.2.4). The program
-    // waits in Inner.
+    // Outer's assignment to s is a statement the interpreter runs alone: a Currency joined to a String is the interpreter's to write (MS-VBAL §5.5.1.2.4).
+    // The program waits in Inner.
     private static readonly string SteppedCalling = Program(
         "Public Sub Main()",
         "    Stop",
