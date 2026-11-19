@@ -227,7 +227,8 @@ public sealed class CompiledCallerWaitingTests
             "        Next",
             "    Next"), null), "| 129 |");
 
-    // Outer's call of Inner is a statement the interpreter runs alone - its argument is a String - and the program waits in Inner.
+    // Outer's s = is a statement the interpreter runs alone: a Currency joined to a String is the interpreter's to write (MS-VBAL §5.5.1.2.4). The program
+    // waits in Inner.
     private static readonly string SteppedCalling = Program(
         "Public Sub Main()",
         "    Stop",
@@ -236,7 +237,7 @@ public sealed class CompiledCallerWaitingTests
         "Private Function Outer(ByVal n As Long) As Long",
         "    Dim i As Long, t As Long, s As String, u As Long",
         "    For i = 1 To n",
-        "        s = \"n\" & CDbl(i)",
+        "        s = \"n\" & CCur(i)",
         "        t = t + Inner(s)",
         "        u = u + i",
         "    Next",
