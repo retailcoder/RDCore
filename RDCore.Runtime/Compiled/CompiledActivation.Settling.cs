@@ -27,8 +27,8 @@ public sealed partial class CompiledActivation
     }
 
     /// <summary>
-    /// The temporaries made from now on are those of the argument given to the parameter at <paramref name="owner"/>, or of the target
-    /// (<see cref="int.MaxValue"/>).
+    /// Ends the piece open, if any, and marks the temporaries made from now on as those of the argument given to the parameter at
+    /// <paramref name="owner"/>, or of the target (<see cref="int.MaxValue"/>).
     /// </summary>
     /// <param name="callee">The number of the call among the body's callees.</param>
     /// <param name="owner">The index of the parameter, or <see cref="int.MaxValue"/> for the target.</param>
@@ -53,7 +53,8 @@ public sealed partial class CompiledActivation
         settlement.Count = 0;
     }
 
-    // what the open piece made, from its start to now: the first of it, up to where the calls inside it put their own in order, put by them.
+    // what the open piece made, from its start to now, and where the part of it that the calls inside it put in order ends (Settled, when it was set
+    // since the piece opened).
     private void ClosePiece(CallSettlement settlement)
     {
         if (settlement.Open.Owner < 0)

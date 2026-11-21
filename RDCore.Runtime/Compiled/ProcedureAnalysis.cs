@@ -1132,8 +1132,9 @@ internal sealed partial class ProcedureAnalysis
         // MS-VBA makes the calls among the arguments first, left to right, then evaluates the others, right to left, the target last (ArgumentOrder); the
         // objects the calls returned are let go of in the order of the parameters, then the target's (ObjectReferences.SettleCall). Compiled code
         // evaluates them in that order; a call more than one of whose arguments and target hold what their calls returned puts what each made in MS-VBA's
-        // order once they are evaluated (CompiledCallee.SettlesTemporaries), which one alone holds in the order it made it. A call that makes a call inside
-        // an argument that is not a call ahead of a call after it, or whose target's member calls make calls among their arguments, is the interpreter's.
+        // order once they are evaluated (CompiledCallee.SettlesTemporaries); when only one holds them, the order it made them in is MS-VBA's. A call that
+        // makes a call inside an argument that is not a call ahead of a call after it, or whose target's member calls make calls among their arguments, is
+        // the interpreter's.
         var order = ArgumentOrder.Of(arguments);
         var returnedObjects = values.Count(static value => value is ObjectArgumentNode { Call: not null });
         var holdingObjects = values.Count(static value => Within(value).Any(static node => ReceiverCallsOf(node).Any()));
