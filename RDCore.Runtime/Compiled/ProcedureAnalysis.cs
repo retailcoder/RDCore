@@ -1131,16 +1131,14 @@ internal sealed partial class ProcedureAnalysis
 
         // MS-VBA makes the calls among the arguments first, left to right, then evaluates the others, right to left, the target last (ArgumentOrder); the
         // objects the calls returned are let go of in the order of the parameters, then the target's (ObjectReferences.SettleCall). Compiled code
-        // evaluates them in that order, and lets go of them in the opposite order, the last made first: an argument, or the target, that holds what its
-        // calls returned is let go of in MS-VBA's order only when no other does. A call that makes a call inside an argument that is not a call ahead of a
-        // call after it, more than one of whose arguments and target hold objects, or whose target's member calls make calls among their arguments, is the
-        // interpreter's.
+        // evaluates them in that order; a call more than one of whose arguments and target hold what their calls returned puts what each made in MS-VBA's
+        // order once they are evaluated (CompiledCallee.SettlesTemporaries), which one alone holds in the order it made it. A call that makes a call inside
+        // an argument that is not a call ahead of a call after it, or whose target's member calls make calls among their arguments, is the interpreter's.
         var order = ArgumentOrder.Of(arguments);
         var returnedObjects = values.Count(static value => value is ObjectArgumentNode { Call: not null });
         var holdingObjects = values.Count(static value => Within(value).Any(static node => ReceiverCallsOf(node).Any()));
         var targetReturned = site is { Owner: { } target } && ArgumentOrder.IsCall(target) ? 1 : 0;
-        if (CallsAheadOfACall(order) || returnedObjects > 0 && returnsObject || holdingObjects + targetReturned > 1
-            || site is { Owner: { } owner } && TargetArgumentsCall(owner))
+        if (CallsAheadOfACall(order) || returnedObjects > 0 && returnsObject || site is { Owner: { } owner } && TargetArgumentsCall(owner))
         {
             return null;
         }
@@ -1159,6 +1157,7 @@ internal sealed partial class ProcedureAnalysis
             ReturnsObject = returnsObject,
             ReturnsText = returnsText,
             ReturnsValue = returnsValue,
+            SettlesTemporaries = holdingObjects + targetReturned > 1,
             ObjectParameters = objects ?? [],
             Omitted = omitted ?? [],
             VariantReferences = variants ?? [],

@@ -918,6 +918,19 @@ internal sealed partial class ProcedureEmitter
         EmitAfterCall(call, integral, floating);
     }
 
+    // a call of the activation's settlement of the call callee (CompiledActivation.BeginSettling, OpenPiece, SettleCall), given the owner of a piece.
+    private void EmitSettling(string method, int callee, int? owner = null)
+    {
+        _il.Emit(OpCodes.Ldarg_0);
+        _il.Emit(OpCodes.Ldc_I4, callee);
+        if (owner is { } piece)
+        {
+            _il.Emit(OpCodes.Ldc_I4, piece);
+        }
+
+        _il.Emit(OpCodes.Call, Activation.GetMethod(method)!);
+    }
+
     // the call made, what it returned in integral or floating, by its kind.
     private (LocalBuilder Integral, LocalBuilder Floating) EmitCallOf(CallStep call, Label failure)
     {
@@ -932,17 +945,39 @@ internal sealed partial class ProcedureEmitter
             order = LanguageCore.Binding.ArgumentOrder.InPlace(arguments.Length);
         }
 
+        // a call more than one of whose arguments and target hold what calls inside them returned marks what each makes, and puts it in MS-VBA's order once
+        // they are evaluated (CompiledCallee.SettlesTemporaries).
+        var settles = _analysis.Callees[call.Callee].SettlesTemporaries;
+        if (settles)
+        {
+            EmitSettling(nameof(CompiledActivation.BeginSettling), call.Callee);
+        }
+
         foreach (var step in order)
         {
             if (step.CallsOnly || !order.Hoists(step.Index))
             {
+                if (settles)
+                {
+                    EmitSettling(nameof(CompiledActivation.OpenPiece), call.Callee, step.Index);
+                }
+
                 arguments[step.Index] = EmitArgument(call.Arguments[step.Index],
                     call.Arguments[step.Index] is TextArgumentNode or TextReferenceNode ? Fail(RecoverAt(call.Offset)) : failure);
             }
         }
 
         // a member of what a call returns: that call made after the arguments, as the interpreter evaluates the target of a member call.
+        if (settles && call.ReceiverCall is not null)
+        {
+            EmitSettling(nameof(CompiledActivation.OpenPiece), call.Callee, int.MaxValue);
+        }
+
         var returnedTo = call.ReceiverCall is { } receiverCall ? EmitObjectCall(receiverCall, failure) : null;
+        if (settles)
+        {
+            EmitSettling(nameof(CompiledActivation.SettleCall), call.Callee);
+        }
 
         // a member of an object: the object the variable refers to, and the member its class invokes, found before anything is called.
         if (call.Receiver is { } receiver)
