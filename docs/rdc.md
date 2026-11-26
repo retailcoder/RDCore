@@ -112,7 +112,7 @@ On a console, a command starts with the platform's splash. Output redirected to 
 
 Given a module file that the `.rdproj` of its folder lists, `rdc run` runs that project from the file's module: from its script, or else from its `Sub Main`. The entry point the `build` section names does not apply, and the rest of the project does. A module file that no `.rdproj` of its folder lists is a project of its own.
 
-A project with no entry point ([RDC30001](diagnostics/rdc30001.md)), or with a `Sub Main` in more than one standard module ([RDC30002](diagnostics/rdc30002.md)), does not run. Neither does a library (`"build": { "outputType": "Library" }`),
+A project with no entry point ([RDC30001](diagnostics/rdc30001.md)), or with more than one, such as a `Sub Main` in two standard modules or two scripts ([RDC30002](diagnostics/rdc30002.md)), does not run. Neither does a library (`"build": { "outputType": "Library" }`),
 nor a project with a module that does not load. `Debug.Print` writes to the standard output. In a console application (`"build": { "outputType": "ConsoleApplication" }`), a `MsgBox` or an `InputBox` is drawn in the console and answered there, as in the shell, on every operating system. In any other program, they are RDForms dialogs, shown over its forms, on every operating system. On Windows, the `CLI.NativeDialogs` setting shows them as Windows dialog boxes instead, in either kind of program; on any other operating system it changes nothing. A form opens a window of its own in either.
 
 |Option|What it does|
