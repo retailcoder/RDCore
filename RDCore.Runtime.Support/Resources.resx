@@ -253,7 +253,16 @@
     <value>No standard module declares a Public Sub Main() or Sub Main(ParamArray Args()): the program has nowhere to start.</value>
   </data>
   <data name="Build_AmbiguousEntryPoint" xml:space="preserve">
-    <value>More than one module declares a Sub Main, so the program has more than one place to start: {0}.</value>
+    <value>More than one module declares the procedure the program starts at, so it has more than one place to start: {0}. Name one as Module.Procedure in the project's build section (entryPoint).</value>
+    <comment>{0}: each candidate as Module.Procedure.</comment>
+  </data>
+  <data name="Build_AmbiguousScripts" xml:space="preserve">
+    <value>More than one module of the project is a script, so the program has more than one place to start: {0}. Run one by its file (rdc run &lt;file&gt;), or name its module in the project's build section (entryPoint).</value>
+    <comment>{0}: each script as Module.(Script).</comment>
+  </data>
+  <data name="Build_AmbiguousScriptOrProcedure" xml:space="preserve">
+    <value>The entry point the project's build section names is both a module's script and a procedure: {0}. Name the script as Module.(Script), or the procedure as Module.Procedure.</value>
+    <comment>{0}: each candidate, a script as Module.(Script) and a procedure as Module.Procedure.</comment>
   </data>
   <data name="Build_NamedEntryPointNotFound" xml:space="preserve">
     <value>No standard module declares {0}, the entry point the project's build section names: the program has nowhere to start.</value>

@@ -61,11 +61,29 @@ namespace RDCore.Runtime.Support {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to More than one module declares a Sub Main, so the program has more than one place to start: {0}..
+        ///   Looks up a localized string similar to More than one module declares the procedure the program starts at, so it has more than one place to start: {0}. Name one as Module.Procedure in the project&apos;s build section (entryPoint)..
         /// </summary>
         public static string Build_AmbiguousEntryPoint {
             get {
                 return ResourceManager.GetString("Build_AmbiguousEntryPoint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to More than one module of the project is a script, so the program has more than one place to start: {0}. Run one by its file (rdc run &lt;file&gt;), or name its module in the project&apos;s build section (entryPoint)..
+        /// </summary>
+        public static string Build_AmbiguousScripts {
+            get {
+                return ResourceManager.GetString("Build_AmbiguousScripts", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to The entry point the project&apos;s build section names is both a module&apos;s script and a procedure: {0}. Name the script as Module.(Script), or the procedure as Module.Procedure..
+        /// </summary>
+        public static string Build_AmbiguousScriptOrProcedure {
+            get {
+                return ResourceManager.GetString("Build_AmbiguousScriptOrProcedure", resourceCulture);
             }
         }
 

@@ -300,8 +300,10 @@ public sealed class ScriptRunTests
         ("Restore.vbs", "WScript.Echo \"restore\"\r\nSave\r\nSub Undo()\r\nWScript.Echo \"undone\"\r\nEnd Sub\r\n"),
     ];
 
-    // rdc run of one file of a folder: the folder's .rdproj lists every file (listed), or there is none and the file is a project of its own.
-    private static async Task<(int Exit, string Output, string Error)> RunInProjectAsync(string file, (string File, string Text)[] files, bool listed = true)
+    // rdc run of one file of a folder, or of the folder (file null): the folder's .rdproj lists every file (listed), with the build section given, or there
+    // is none and the file is a project of its own.
+    private static async Task<(int Exit, string Output, string Error)> RunInProjectAsync(string? file, (string File, string Text)[] files, bool listed = true,
+        string build = "{}")
     {
         var fileSystem = new MockFileSystem();
         fileSystem.Directory.CreateDirectory(Root);
@@ -314,7 +316,7 @@ public sealed class ScriptRunTests
         {
             var modules = string.Join(", ", files.Select(each => $$"""{ "RelativeUri": "{{each.File}}" }"""));
             fileSystem.File.WriteAllText(Path.Combine(Root, ".rdproj"),
-                $$"""{ "Version": "0.1.0", "ProjectInfo": { "Name": "Tools", "Modules": [ {{modules}} ] } }""");
+                $$"""{ "Version": "0.1.0", "ProjectInfo": { "Name": "Tools", "Modules": [ {{modules}} ], "build": {{build}} } }""");
         }
 
         var output = new StringWriter();
@@ -323,7 +325,67 @@ public sealed class ScriptRunTests
             new DirectoryLibrarySource(new FileSystem(), Symbols));
         var command = new RunCommand(fileSystem, new ProjectFileLoader(fileSystem), runner, Substitute.For<IErrorDetailsRecorder>(), output, error,
             new ScriptedKeys(interactive: false), Options.Create(new AppOptions()));
-        var exit = await command.ExecuteAsync([Path.Combine(Root, file)], CancellationToken.None);
+        var exit = await command.ExecuteAsync([file is null ? Root : Path.Combine(Root, file)], CancellationToken.None);
         return (exit, output.ToString(), error.ToString());
+    }
+
+    // a project of two scripts has two places to start: run as a folder, it is refused, each script named as Module.(Script), with how to run one.
+    [TestMethod]
+    [DataRow("en", DisplayName = "in English")]
+    [DataRow("fr", DisplayName = "in French")]
+    public async Task AProjectOfTwoScripts_RunAsAFolder_IsRefused_NamingEachScript(string culture)
+    {
+        var (exit, output, error) = await InTheLanguageOf(culture, () => RunInProjectAsync(null, ScriptsOfTools));
+
+        Assert.AreEqual(ProgramRunner.Refused, exit, error);
+        StringAssert.Contains(error, $"({ProgramRunner.AmbiguousEntryPoint})");
+        StringAssert.Contains(error, Expected(culture, nameof(RDCore.Runtime.Support.Resources.Build_AmbiguousScripts), "Backup.(Script), Restore.(Script)"));
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    // a build section's entry point that names both a script's module and another module's procedure is refused, the script named as Module.(Script)
+    // and the procedure as Module.Procedure, with how to name each.
+    [TestMethod]
+    [DataRow("en", DisplayName = "in English")]
+    [DataRow("fr", DisplayName = "in French")]
+    public async Task AnEntryPoint_ThatNamesAScriptAndAProcedure_IsRefused_NamingBoth(string culture)
+    {
+        const string tools = "Attribute VB_Name = \"Tools\"\r\nPublic Sub Backup()\r\nEnd Sub\r\n";
+        var (exit, output, error) = await InTheLanguageOf(culture, () => RunInProjectAsync(null, [("Backup.vbs", "WScript.Echo \"backup\"\r\n"), ("Tools.bas", tools)],
+            build: """{ "entryPoint": "Backup" }"""));
+
+        Assert.AreEqual(ProgramRunner.Refused, exit, error);
+        StringAssert.Contains(error, $"({ProgramRunner.AmbiguousEntryPoint})");
+        StringAssert.Contains(error, Expected(culture, nameof(RDCore.Runtime.Support.Resources.Build_AmbiguousScriptOrProcedure),
+            "Backup.(Script), Tools.Backup"));
+        Assert.AreEqual(string.Empty, output);
+    }
+
+    // the message of a culture, given its candidates; a French one that is the English one would test nothing.
+    private static string Expected(string culture, string name, string candidates)
+    {
+        var resources = RDCore.Runtime.Support.Resources.ResourceManager;
+        var message = resources.GetString(name, new System.Globalization.CultureInfo(culture))!;
+        if (culture != "en")
+        {
+            Assert.AreNotEqual(resources.GetString(name, System.Globalization.CultureInfo.InvariantCulture), message, $"{name} has no {culture} translation");
+        }
+
+        return string.Format(System.Globalization.CultureInfo.InvariantCulture, message, candidates);
+    }
+
+    // the shell's user interface in a language, for what one call says.
+    private static async Task<T> InTheLanguageOf<T>(string culture, Func<Task<T>> call)
+    {
+        var before = System.Globalization.CultureInfo.CurrentUICulture;
+        System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo(culture);
+        try
+        {
+            return await call();
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = before;
+        }
     }
 }

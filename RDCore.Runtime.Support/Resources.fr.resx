@@ -253,7 +253,13 @@
     <value>Aucun module standard ne déclare ni Public Sub Main() ni Sub Main(ParamArray Args()) : le programme n'a pas de point de départ.</value>
   </data>
   <data name="Build_AmbiguousEntryPoint" xml:space="preserve">
-    <value>Plus d'un module déclare un Sub Main, et le programme a donc plus d'un point de départ : {0}.</value>
+    <value>Plus d'un module déclare la procédure où le programme commence, et il a donc plus d'un point de départ : {0}. Nommez-en une sous la forme Module.Procedure dans la section build du projet (entryPoint).</value>
+  </data>
+  <data name="Build_AmbiguousScripts" xml:space="preserve">
+    <value>Plus d'un module du projet est un script, et le programme a donc plus d'un point de départ : {0}. Exécutez-en un par son fichier (rdc run &lt;fichier&gt;), ou nommez son module dans la section build du projet (entryPoint).</value>
+  </data>
+  <data name="Build_AmbiguousScriptOrProcedure" xml:space="preserve">
+    <value>Le point d'entrée que nomme la section build du projet est à la fois le script d'un module et une procédure : {0}. Nommez le script sous la forme Module.(Script), ou la procédure sous la forme Module.Procedure.</value>
   </data>
   <data name="Build_NamedEntryPointNotFound" xml:space="preserve">
     <value>Aucun module standard ne déclare {0}, le point d'entrée que nomme la section build du projet : le programme n'a pas de point de départ.</value>

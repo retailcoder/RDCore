@@ -47,8 +47,8 @@ internal static class ProgramRunner
         refusal = resolved.Refusal switch
         {
             null => null,
-            ProgramEntryPointRefusal.Ambiguous => Refusal(AmbiguousEntryPoint, string.Format(CultureInfo.CurrentCulture, Resources.Build_AmbiguousEntryPoint,
-                string.Join(", ", resolved.Candidates.Select(module => module.Name)))),
+            ProgramEntryPointRefusal.Ambiguous => Refusal(AmbiguousEntryPoint, string.Format(CultureInfo.CurrentCulture, AmbiguityOf(resolved.Candidates),
+                string.Join(", ", resolved.Candidates.Select(candidate => $"{candidate.Module.Name}.{candidate.Procedure.Name}")))),
             ProgramEntryPointRefusal.Library => Refusal(NoEntryPoint, Resources.Build_LibraryNotRun),
             _ when build?.EntryPoint is { Length: > 0 } named => Refusal(NoEntryPoint,
                 string.Format(CultureInfo.CurrentCulture, Resources.Build_NamedEntryPointNotFound, named)),
@@ -56,6 +56,13 @@ internal static class ProgramRunner
         };
         return resolved.IsFound ? (resolved.Module.Name, resolved.Procedure) : null;
     }
+
+    // each candidate is named as the build section names it, a script as Module.(Script): several scripts are run by their file, and a script and a
+    // procedure that the build section's entry point both names are told apart by their module.
+    private static string AmbiguityOf(IReadOnlyList<ProgramEntryPointCandidate> candidates)
+        => candidates.All(candidate => candidate.IsScript) ? Resources.Build_AmbiguousScripts
+            : candidates.Any(candidate => candidate.IsScript) ? Resources.Build_AmbiguousScriptOrProcedure
+            : Resources.Build_AmbiguousEntryPoint;
 
     private static string Refusal(RDCoreDiagnosticCode code, string message) => string.Format(CultureInfo.CurrentCulture, Resources.Build_Refusal, message, code);
 

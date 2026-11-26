@@ -1621,15 +1621,15 @@ public sealed class BuildCommandTests
     }
 
     [TestMethod]
-    public async Task Run_OfAWorkspaceWithTwoSubMain_ExitsWith2_NamingTheModules()
+    public async Task Run_OfAWorkspaceWithTwoSubMain_ExitsWith2_NamingEachAsModuleDotProcedure()
     {
         var fileSystem = Files(("One.bas", Module("One", "Public Sub Main()", "End Sub")), ("Two.bas", Module("Two", "Public Sub Main()", "End Sub")));
 
         var run = await RunAsync(fileSystem, Root);
 
         Assert.AreEqual(ProgramRunner.Refused, run.Exit);
-        Assert.Contains("One", run.Error);
-        Assert.Contains("Two", run.Error);
+        Assert.Contains(string.Format(System.Globalization.CultureInfo.CurrentCulture, RDCore.Runtime.Support.Resources.Build_AmbiguousEntryPoint,
+            "One.Main, Two.Main"), run.Error);
         Assert.Contains("(RDC30002)", run.Error);
     }
 
