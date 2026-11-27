@@ -2199,7 +2199,7 @@ namespace RDCore.Diagnostics.Model {
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to No extension installed on this platform declares &apos;@{0}&apos;: the name is misspelled, or the annotation belongs to an extension that is not installed..
+        ///   Looks up a localized string similar to No extension installed on this platform declares &apos;@{0}&apos;: the name is misspelled, or the annotation belongs to an extension that is not installed or not allowed to load..
         /// </summary>
         public static string UnrecognizedAnnotation_Message {
             get {

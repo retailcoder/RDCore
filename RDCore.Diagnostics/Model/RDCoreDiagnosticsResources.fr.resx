@@ -838,7 +838,7 @@
     <value>Aucun objet de la classe &apos;{0}&apos; n&apos;est un objet de la classe &apos;{1}&apos; du paramètre ni d&apos;une classe qui l&apos;implémente : erreur d&apos;exécution 13 (Type incompatible) chaque fois que cet appel est fait avec un objet.</value>
   </data>
   <data name="UnrecognizedAnnotation_Message" xml:space="preserve">
-    <value>Aucune extension installée sur cette plateforme ne déclare &apos;@{0}&apos; : le nom est mal écrit, ou l&apos;annotation appartient à une extension qui n&apos;est pas installée.</value>
+    <value>Aucune extension installée sur cette plateforme ne déclare &apos;@{0}&apos; : le nom est mal écrit, ou l&apos;annotation appartient à une extension qui n&apos;est pas installée ou qui n&apos;est pas autorisée à se charger.</value>
   </data>
   <data name="InvalidAnnotation_Message" xml:space="preserve">
     <value>&apos;@{0}&apos; annote {1} : elle n&apos;annote rien là où elle est écrite.</value>
