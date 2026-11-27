@@ -524,6 +524,8 @@
   href: rdc00314.md
 - name: "RDC00315: Redundant module option"
   href: rdc00315.md
+- name: "RDC00404: Invalid annotation"
+  href: rdc00404.md
 - name: "RDC00405: Implementations should be private"
   href: rdc00405.md
 - name: "RDC00407: Unmatched event handler"
@@ -538,6 +540,16 @@
   href: rdc00411.md
 - name: "RDC00413: Module variable used in one procedure"
   href: rdc00413.md
+- name: "RDC00419: Unrecognized annotation"
+  href: rdc00419.md
+- name: "RDC00420: Duplicated annotation"
+  href: rdc00420.md
+- name: "RDC00421: Annotation in an incompatible kind of module"
+  href: rdc00421.md
+- name: "RDC00422: Missing annotation argument"
+  href: rdc00422.md
+- name: "RDC00423: Superfluous annotation argument"
+  href: rdc00423.md
 - name: "RDC01001: Use meaningful identifier names"
   href: rdc01001.md
 - name: "RDC01002: Hungarian notation"

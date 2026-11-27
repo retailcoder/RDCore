@@ -2197,5 +2197,149 @@ namespace RDCore.Diagnostics.Model {
                 return ResourceManager.GetString("SingleLineIfWithNoStatement_Message", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to No extension installed on this platform declares &apos;@{0}&apos;: the name is misspelled, or the annotation belongs to an extension that is not installed..
+        /// </summary>
+        public static string UnrecognizedAnnotation_Message {
+            get {
+                return ResourceManager.GetString("UnrecognizedAnnotation_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;@{0}&apos; annotates {1}: it annotates nothing where it is written..
+        /// </summary>
+        public static string InvalidAnnotation_Message {
+            get {
+                return ResourceManager.GetString("InvalidAnnotation_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a module.
+        /// </summary>
+        public static string AnnotationTarget_Module {
+            get {
+                return ResourceManager.GetString("AnnotationTarget_Module", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a procedure.
+        /// </summary>
+        public static string AnnotationTarget_Member {
+            get {
+                return ResourceManager.GetString("AnnotationTarget_Member", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a variable.
+        /// </summary>
+        public static string AnnotationTarget_Variable {
+            get {
+                return ResourceManager.GetString("AnnotationTarget_Variable", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a line.
+        /// </summary>
+        public static string AnnotationTarget_Line {
+            get {
+                return ResourceManager.GetString("AnnotationTarget_Line", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to  or .
+        /// </summary>
+        public static string AnnotationTarget_Or {
+            get {
+                return ResourceManager.GetString("AnnotationTarget_Or", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;@{0}&apos; is written again for what it annotates, and it is read once..
+        /// </summary>
+        public static string DuplicatedAnnotation_Message {
+            get {
+                return ResourceManager.GetString("DuplicatedAnnotation_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;@{0}&apos; does not apply in {1}..
+        /// </summary>
+        public static string AnnotationInIncompatibleComponentType_Message {
+            get {
+                return ResourceManager.GetString("AnnotationInIncompatibleComponentType_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a standard module.
+        /// </summary>
+        public static string AnnotationModuleKind_Standard {
+            get {
+                return ResourceManager.GetString("AnnotationModuleKind_Standard", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a class module.
+        /// </summary>
+        public static string AnnotationModuleKind_Class {
+            get {
+                return ResourceManager.GetString("AnnotationModuleKind_Class", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a form.
+        /// </summary>
+        public static string AnnotationModuleKind_Form {
+            get {
+                return ResourceManager.GetString("AnnotationModuleKind_Form", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to a document module.
+        /// </summary>
+        public static string AnnotationModuleKind_Document {
+            get {
+                return ResourceManager.GetString("AnnotationModuleKind_Document", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;@{0}&apos; has no argument for its parameter {1}..
+        /// </summary>
+        public static string MissingAnnotationArgument_Message {
+            get {
+                return ResourceManager.GetString("MissingAnnotationArgument_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;@{0}&apos; takes no argument after its parameter {1}..
+        /// </summary>
+        public static string SuperfluousAnnotationArgument_Message {
+            get {
+                return ResourceManager.GetString("SuperfluousAnnotationArgument_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to &apos;@{0}&apos; takes no argument..
+        /// </summary>
+        public static string SuperfluousAnnotationArgument_NoParameter {
+            get {
+                return ResourceManager.GetString("SuperfluousAnnotationArgument_NoParameter", resourceCulture);
+            }
+        }
     }
 }

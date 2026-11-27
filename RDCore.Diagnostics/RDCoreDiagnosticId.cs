@@ -87,7 +87,7 @@ public enum RDCoreDiagnosticId
     RedundantModuleOption = 315, // Option Base 0, Option Compare Binary: what a module that states no option has
 
     ObsoleteMemberUsage = 401, // members with an @Obsolete annotation
-    InvalidAnnotation = 404, // @NotAnAnnotationButParsedLikeOne
+    InvalidAnnotation = 404, // [RD2:InvalidAnnotationInspection] an annotation written where it annotates nothing its declaration allows
 
     ImplementationsShouldBePrivate = 405,
     PublicDeclarationInWorksheetModule, // [RD2:PublicEnumerationDeclaredInWorksheetInspection]
@@ -97,6 +97,11 @@ public enum RDCoreDiagnosticId
     SuspiciousPredeclaredInstanceAccess = 410, // [RD2:SuspiciousPredeclaredInstanceAccessInspection] a class's own code naming its default instance, where Me is the object running
     ImplementedInterfaceMember = 411, // [RD2:ImplementedInterfaceMemberInspection] a class the project implements as an interface, with code in a member
     MoveFieldCloserToUsage = 413, // [RD2:MoveFieldCloserToUsageInspection] a variable of the module that only one procedure refers to: it can be a local
+    UnrecognizedAnnotation = 419, // [RD2:UnrecognizedAnnotationInspection] an annotation no extension the platform loads declares: misspelled, or of an extension not installed
+    DuplicatedAnnotation = 420, // [RD2:DuplicatedAnnotationInspection] an annotation that does not repeat, written twice for one target
+    AnnotationInIncompatibleComponentType = 421, // [RD2:AnnotationInIncompatibleComponentTypeInspection] in a kind of module its declaration excludes
+    MissingAnnotationArgument = 422, // [RD2:MissingAnnotationArgumentInspection] fewer arguments than the annotation's required parameters
+    SuperfluousAnnotationArgument = 423, // [RD2:SuperfluousAnnotationArgumentInspection] more arguments than the annotation's parameters take
 
     // symbol traversals [0000]
     UseMeaningfulIdentifierNames = 1001,

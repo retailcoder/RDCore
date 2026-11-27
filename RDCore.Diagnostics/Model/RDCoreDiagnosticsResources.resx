@@ -837,4 +837,52 @@
   <data name="ArgumentOfAnIncompatibleClass_Message" xml:space="preserve">
     <value>No object of class &apos;{0}&apos; is an object of the parameter&apos;s class &apos;{1}&apos; or of a class that implements it: run-time error 13 (Type mismatch) every time this call is made with an object.</value>
   </data>
+  <data name="UnrecognizedAnnotation_Message" xml:space="preserve">
+    <value>No extension installed on this platform declares &apos;@{0}&apos;: the name is misspelled, or the annotation belongs to an extension that is not installed.</value>
+  </data>
+  <data name="InvalidAnnotation_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; annotates {1}: it annotates nothing where it is written.</value>
+  </data>
+  <data name="AnnotationTarget_Module" xml:space="preserve">
+    <value>a module</value>
+  </data>
+  <data name="AnnotationTarget_Member" xml:space="preserve">
+    <value>a procedure</value>
+  </data>
+  <data name="AnnotationTarget_Variable" xml:space="preserve">
+    <value>a variable</value>
+  </data>
+  <data name="AnnotationTarget_Line" xml:space="preserve">
+    <value>a line</value>
+  </data>
+  <data name="AnnotationTarget_Or" xml:space="preserve">
+    <value> or </value>
+  </data>
+  <data name="DuplicatedAnnotation_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; is written again for what it annotates, and it is read once.</value>
+  </data>
+  <data name="AnnotationInIncompatibleComponentType_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; does not apply in {1}.</value>
+  </data>
+  <data name="AnnotationModuleKind_Standard" xml:space="preserve">
+    <value>a standard module</value>
+  </data>
+  <data name="AnnotationModuleKind_Class" xml:space="preserve">
+    <value>a class module</value>
+  </data>
+  <data name="AnnotationModuleKind_Form" xml:space="preserve">
+    <value>a form</value>
+  </data>
+  <data name="AnnotationModuleKind_Document" xml:space="preserve">
+    <value>a document module</value>
+  </data>
+  <data name="MissingAnnotationArgument_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; has no argument for its parameter {1}.</value>
+  </data>
+  <data name="SuperfluousAnnotationArgument_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; takes no argument after its parameter {1}.</value>
+  </data>
+  <data name="SuperfluousAnnotationArgument_NoParameter" xml:space="preserve">
+    <value>&apos;@{0}&apos; takes no argument.</value>
+  </data>
 </root>

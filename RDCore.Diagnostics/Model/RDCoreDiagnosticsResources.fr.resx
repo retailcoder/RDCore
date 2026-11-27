@@ -837,4 +837,52 @@
   <data name="ArgumentOfAnIncompatibleClass_Message" xml:space="preserve">
     <value>Aucun objet de la classe &apos;{0}&apos; n&apos;est un objet de la classe &apos;{1}&apos; du paramètre ni d&apos;une classe qui l&apos;implémente : erreur d&apos;exécution 13 (Type incompatible) chaque fois que cet appel est fait avec un objet.</value>
   </data>
+  <data name="UnrecognizedAnnotation_Message" xml:space="preserve">
+    <value>Aucune extension installée sur cette plateforme ne déclare &apos;@{0}&apos; : le nom est mal écrit, ou l&apos;annotation appartient à une extension qui n&apos;est pas installée.</value>
+  </data>
+  <data name="InvalidAnnotation_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; annote {1} : elle n&apos;annote rien là où elle est écrite.</value>
+  </data>
+  <data name="AnnotationTarget_Module" xml:space="preserve">
+    <value>un module</value>
+  </data>
+  <data name="AnnotationTarget_Member" xml:space="preserve">
+    <value>une procédure</value>
+  </data>
+  <data name="AnnotationTarget_Variable" xml:space="preserve">
+    <value>une variable</value>
+  </data>
+  <data name="AnnotationTarget_Line" xml:space="preserve">
+    <value>une ligne</value>
+  </data>
+  <data name="AnnotationTarget_Or" xml:space="preserve">
+    <value> ou </value>
+  </data>
+  <data name="DuplicatedAnnotation_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; est écrite de nouveau pour ce qu&apos;elle annote, et elle n&apos;est lue qu&apos;une fois.</value>
+  </data>
+  <data name="AnnotationInIncompatibleComponentType_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; ne s&apos;applique pas dans {1}.</value>
+  </data>
+  <data name="AnnotationModuleKind_Standard" xml:space="preserve">
+    <value>un module standard</value>
+  </data>
+  <data name="AnnotationModuleKind_Class" xml:space="preserve">
+    <value>un module de classe</value>
+  </data>
+  <data name="AnnotationModuleKind_Form" xml:space="preserve">
+    <value>un formulaire</value>
+  </data>
+  <data name="AnnotationModuleKind_Document" xml:space="preserve">
+    <value>un module de document</value>
+  </data>
+  <data name="MissingAnnotationArgument_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; n&apos;a aucun argument pour son paramètre {1}.</value>
+  </data>
+  <data name="SuperfluousAnnotationArgument_Message" xml:space="preserve">
+    <value>&apos;@{0}&apos; ne prend aucun argument après son paramètre {1}.</value>
+  </data>
+  <data name="SuperfluousAnnotationArgument_NoParameter" xml:space="preserve">
+    <value>&apos;@{0}&apos; ne prend aucun argument.</value>
+  </data>
 </root>

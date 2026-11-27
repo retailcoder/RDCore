@@ -309,6 +309,7 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00313](rdc00313.md)|Redundant Step 1|A For loop that states Step 1|
 |[RDC00314](rdc00314.md)|Redundant ByRef modifier|A parameter that states ByRef, under the convention that leaves it unwritten|
 |[RDC00315](rdc00315.md)|Redundant module option|A module that states Option Base 0 or Option Compare Binary|
+|[RDC00404](rdc00404.md)|Invalid annotation|An annotation written where it annotates nothing it applies to|
 |[RDC00405](rdc00405.md)|Implementations should be private|A Public implementation of an interface member or handler of an event|
 |[RDC00407](rdc00407.md)|Unmatched event handler|A handler of a form control's event that does not match the event, and that nothing calls|
 |[RDC00408](rdc00408.md)|Underscore in a public class member|A public member of a class module with an underscore in its name|
@@ -316,6 +317,11 @@ token, which literal, which type) are carried in the diagnostic's verbose detail
 |[RDC00410](rdc00410.md)|Default instance in its own class|The code of a predeclared class naming its own default instance|
 |[RDC00411](rdc00411.md)|Code in a class implemented as an interface|A class that another class implements, with a statement in a member|
 |[RDC00413](rdc00413.md)|Module variable used in one procedure|A variable of the module that only one procedure uses|
+|[RDC00419](rdc00419.md)|Unrecognized annotation|An annotation that nothing installed on the platform declares|
+|[RDC00420](rdc00420.md)|Duplicated annotation|An annotation written twice for one module, procedure or variable|
+|[RDC00421](rdc00421.md)|Annotation in an incompatible kind of module|An annotation in a kind of module it does not apply to|
+|[RDC00422](rdc00422.md)|Missing annotation argument|An annotation with no argument for a required parameter|
+|[RDC00423](rdc00423.md)|Superfluous annotation argument|An annotation with more arguments than its parameters take|
 |[RDC01001](rdc01001.md)|Use meaningful identifier names|A name too short, ending with a digit, or without a vowel|
 |[RDC01002](rdc01002.md)|Hungarian notation|A name that begins with a prefix that states its type|
 |[RDC01003](rdc01003.md)|Empty If block|An `If` or `ElseIf` branch with no statement|

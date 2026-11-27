@@ -1,6 +1,7 @@
 using RDCore.Diagnostics;
 using RDCore.Diagnostics.Analyzers;
 using RDCore.Parsing;
+using RDCore.SDK.Extensibility.Annotations;
 using RDCore.SDK.Extensibility.Diagnostics;
 using RDCore.Tests.Cli;
 
@@ -17,13 +18,15 @@ internal static class EveryAnalyzer
         .Select(Create)
         .OfType<IModuleAnalyzer>()];
 
-    // an analyzer takes nothing, or the settings of the extension, which are their defaults here.
+    // an analyzer takes nothing, the settings of the extension, which are their defaults here, or the installed annotations, the core's alone here.
     private static IModuleAnalyzer? Create(Type type)
         => type.GetConstructor(Type.EmptyTypes) is { } none
             ? (IModuleAnalyzer)none.Invoke(null)
             : type.GetConstructor([typeof(Microsoft.Extensions.Options.IOptions<DiagnosticsOptions>)]) is { } withOptions
                 ? (IModuleAnalyzer)withOptions.Invoke([Microsoft.Extensions.Options.Options.Create(new DiagnosticsOptions())])
-                : null;
+                : type.GetConstructor([typeof(AnnotationCatalogue)]) is { } withAnnotations
+                    ? (IModuleAnalyzer)withAnnotations.Invoke([new AnnotationCatalogue([AnnotationDeclarationsAnalyzer.CoreSet])])
+                    : null;
 
     /// <summary>
     /// What every analyzer reports of the module <c>Program</c> of a workspace, each finding as its code and its message: a line the fix adds moves the

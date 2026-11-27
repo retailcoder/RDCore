@@ -12,6 +12,7 @@ using RDCore.SDK.Server;
 using RDCore.SDK.Server.Configuration;
 using RDCore.SDK.Server.Services;
 using RDCore.SDK.Server.Services.States;
+using RDCore.SDK.Extensibility;
 using RDCore.SDK.Extensibility.Diagnostics;
 
 namespace RDCore.Diagnostics;
@@ -36,6 +37,7 @@ internal class CoreDiagnosticsApp(
     IServerStateProvider serverStateProvider,
     IHealthCheckService<CoreDiagnosticsApp> healthCheckService,
     ILanguageServerProtocolTransportLayer transportLayer,
+    IExtensionsProvider extensions,
     ILogger<CoreDiagnosticsApp> logger)
 : RDCoreServerApp(options, serverStateProvider, healthCheckService, transportLayer, logger)
 {
@@ -55,9 +57,13 @@ internal class CoreDiagnosticsApp(
         // instance the host configured.
         services.AddSingleton(diagnosticsOptions);
 
+        // what neither the core nor an extension the platform loads declares is unrecognized.
+        services.AddSingleton(_ => AnnotationDeclarationsAnalyzer.Installed(extensions.Discover()));
+
         // every analyzer the extension has, which the handler calls for each document it diagnoses.
         services.AddSingleton<IModuleAnalyzer, OptionExplicitAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, UndeclaredVariableAnalyzer>();
+        services.AddSingleton<IModuleAnalyzer, AnnotationDeclarationsAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, ObsoleteCallStatementAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, NotAllPathsReturnValueAnalyzer>();
         services.AddSingleton<IModuleAnalyzer, IsMissingAlwaysFalseAnalyzer>();
