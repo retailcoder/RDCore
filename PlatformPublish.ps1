@@ -295,13 +295,14 @@ $ManifestPath = Join-Path $PlatformRoot "rdcore.json"
 [IO.File]::WriteAllText($ManifestPath, $Manifest, (New-Object Text.UTF8Encoding $false))
 
 # the platform's settings, which every process of the platform reads below its own appsettings.json: the extensions it loads are the platform's, and the
-# same for each of its processes. A user's settings add to the list; a setting only the platform sets is this file's alone.
+# same for each of its processes. A user's settings add to the list; a setting only the platform sets is this file's alone. The first-party extensions
+# shipped apart from the platform (RDCore.Web, RDCore.UnitTesting) are allowed too, and load once they are published into its Extensions folder.
 $PlatformSettings = @'
 {
   "Configuration": {
     "Platform": {
       "Extensions": {
-        "Allowed": [ "RDCore.Diagnostics", "RDCore.Web" ],
+        "Allowed": [ "RDCore.Diagnostics", "RDCore.Web", "RDCore.UnitTesting" ],
         "Blocked": []
       }
     }
