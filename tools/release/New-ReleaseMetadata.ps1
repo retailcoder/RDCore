@@ -165,8 +165,10 @@ $Release = [ordered]@{
             path             = $LanguageServer
             # appsettings.json is read from the working directory
             workingDirectory = [IO.Path]::GetDirectoryName($LanguageServer).Replace("\", "/")
-            # without the client's process ID the server, and the processes it starts, never exit when the client dies
-            arguments        = @("--client-process-id", "{clientProcessId}", "--pipe-name", "{pipe}", "--workspace", "{workspaceUri}")
+            # without the client's process ID the server, and the processes it starts, never exit when the client dies; the server is given its platform root,
+            # which it never derives (PlatformEnvironment.Root)
+            arguments        = @("--client-process-id", "{clientProcessId}", "--pipe-name", "{pipe}", "--workspace", "{workspaceUri}",
+                "--platform-root", "{platformRoot}")
         }
     }
     source        = [ordered]@{

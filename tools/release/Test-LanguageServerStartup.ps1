@@ -126,8 +126,11 @@ try {
     $startInfo.WorkingDirectory = Split-Path -Parent $executable
     # the launch contract of release.json (launch.languageServer.arguments). the client process ID is what lets the
     # server and its children exit when the client dies; the server only acts on it at LSP initialize, which this
-    # test doesn't send, so it's passed to match the contract rather than checked.
-    foreach ($argument in "--client-process-id", "$PID", "--pipe-name", $PipeName, "--workspace", $Workspace) { $startInfo.ArgumentList.Add($argument) }
+    # test doesn't send, so it's passed to match the contract rather than checked. the root is named on the command line, and the
+    # variable is not inherited: the contract alone starts the server
+    foreach ($argument in "--client-process-id", "$PID", "--pipe-name", $PipeName, "--workspace", $Workspace, "--platform-root", $Tree) {
+        $startInfo.ArgumentList.Add($argument)
+    }
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true

@@ -16,15 +16,27 @@ param(
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 $sides = [ordered]@{ merged = $Merged; reference = $Reference }
+
+# a build of rdc is rooted in its own folder, which must hold rdcore.json: one run from its build output, which holds none, is given that folder with
+# --platform-root. A build that predates the argument refuses it, as it refuses the option made up to probe it, and runs with no root named.
+$roots = @{}
+foreach ($side in $sides.Keys) {
+    $folder = Split-Path -Parent $sides[$side]
+    $probe = & $sides[$side] bench --platform-root $folder --platform-root-probe *>&1 | Out-String
+    $roots[$side] = if ($probe -match "'platform-root' is unknown") { @() } else { @('--platform-root', $folder) }
+}
+
 $warms = @{}
 foreach ($side in $sides.Keys) {
-    $warms[$side] = (& $sides[$side] bench --help *>&1 | Out-String) -match '--no-warm-up'
+    $root = $roots[$side]
+    $warms[$side] = (& $sides[$side] bench --help @root *>&1 | Out-String) -match '--no-warm-up'
 }
 
 $both = $warms.merged -and $warms.reference
 $arguments = @{}
 foreach ($side in $sides.Keys) {
-    $arguments[$side] = if ($both) { @('--runs', $Runs) } elseif ($warms[$side]) { @('--runs', $ColdRuns, '--no-warm-up') } else { @('--runs', $ColdRuns) }
+    $each = if ($both) { @('--runs', $Runs) } elseif ($warms[$side]) { @('--runs', $ColdRuns, '--no-warm-up') } else { @('--runs', $ColdRuns) }
+    $arguments[$side] = @($each) + @($roots[$side])
 }
 
 $how = if ($both) { "both builds warm each case up, then $Runs timed runs" } else { "a build predates the warm-up: neither warms up, $ColdRuns runs a case" }
