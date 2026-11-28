@@ -78,7 +78,7 @@ public class Program
         var mode = Environment.GetEnvironmentVariable(RDCoreServerProcess.ModeEnvironmentVariable);
         // rdc sits at the root of its platform, beside rdcore.json: its root is its own folder, the one --platform-root names, or, as a server of another
         // process, the one that process gives it, and every process it starts is told it. A folder that holds no rdcore.json is not a platform's, and
-        // nothing else is tried. Once applied, the argument is no verb's.
+        // nothing else is tried. Once applied, the argument is removed before the verb is parsed.
         try
         {
             PlatformEnvironment.ApplyOwnFolderAsRoot(args);
