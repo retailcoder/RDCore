@@ -73,11 +73,12 @@ internal sealed record class ProgramServices(
     IFileSystem FileSystem, ILibrarySource Libraries, ILoggerFactory Loggers, IOptions<SdkAppOptions>? Options = null, ExternalWorld? Outside = null);
 
 // a program composed once, which makes as many machines as its host runs at once, concurrently. The session it was composed in (loaded), when it is given,
-// is the first machine's: nothing ran in it. Every other machine has a session of its own, composed again from the image. Disposing the program disposes
-// that first session if no machine took it, and no machine.
+// is the first machine's: nothing ran in it. Every other machine has a session of its own, composed again from the image, with what the machines have in
+// common found once (CompositionReplay). Disposing the program disposes that first session if no machine took it, and no machine.
 internal sealed class ComposedProgram(ProgramCompositionImage image, ProgramServices services, EnvironmentSessionProvider? loaded = null) : IComposedProgram
 {
     private EnvironmentSessionProvider? _loaded = loaded;
+    private readonly CompositionReplay _replay = new();
     private int _disposed;
 
     public IReadOnlyList<RDCoreDocument> Documents => image.Documents;
@@ -102,7 +103,8 @@ internal sealed class ComposedProgram(ProgramCompositionImage image, ProgramServ
     }
 
     // a session composed for the project and each definition defined in it again, in the order it was defined in the first, then its code swept as the
-    // first's was. The definitions loaded once: one that does not load again is a defect of the image, not of the program.
+    // first's was. The definitions loaded once: one that does not load again is a defect of the image, not of the program. Once a machine's session has loaded
+    // them all with nothing wrong with them, the next loads them to run, and neither checks nor sweeps them again (ModuleLoader.Checks): its code is the same.
     private async Task<EnvironmentSessionProvider> ComposeAsync(IErrorDetailsRecorder errorDetails, CancellationToken token)
     {
         var profile = image.Profile;
@@ -117,7 +119,10 @@ internal sealed class ComposedProgram(ProgramCompositionImage image, ProgramServ
                 new ProjectAnalysisSessions(
                     profile, services.FileSystem, services.Loggers.CreateLogger<ProjectAnalysisSessions>(), services.Libraries, services.Options),
                 errorDetails,
-                services.Loggers.CreateLogger<DefineSymbolsHandler>());
+                services.Loggers.CreateLogger<DefineSymbolsHandler>())
+            {
+                Replay = _replay,
+            };
             foreach (var definition in image.Definitions)
             {
                 var defined = await define.Handle(definition, token);
@@ -128,6 +133,7 @@ internal sealed class ComposedProgram(ProgramCompositionImage image, ProgramServ
             }
 
             await provider.Image.Semantics.WhenAllEvaluatedAsync(token);
+            _replay.Checked();
             return provider;
         }
         catch

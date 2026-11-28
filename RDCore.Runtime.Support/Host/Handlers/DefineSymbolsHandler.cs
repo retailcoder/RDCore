@@ -38,6 +38,9 @@ internal sealed class DefineSymbolsHandler(
     IErrorDetailsRecorder errorDetails,
     ILogger<DefineSymbolsHandler> logger) : RDCoreRequestHandler<DefineSymbolsParams, DefineSymbolsResult>
 {
+    // what the machines of a composed program have in common, when the definitions are a composed program's: none otherwise.
+    internal CompositionReplay? Replay { get; init; }
+
     protected override Task<DefineSymbolsResult> HandleAsync(DefineSymbolsParams request, CancellationToken token)
     {
         // a project that is analyzed and not run: no program runs in its session, and what is defined in it is defined at once.
@@ -172,6 +175,11 @@ internal sealed class DefineSymbolsHandler(
             return [];
         }
 
+        if (Replay is { } replay)
+        {
+            return replay.DeadBranchesOf(request, trivia => DeadBranchesOf(target, trivia));
+        }
+
         // a module is defined in phases, each request carrying the same directives: they are read and evaluated once per session and module, for as long as
         // the project's constants are what they were evaluated with.
         var evaluated = DeadRangesBySession.GetOrCreateValue(session);
@@ -182,16 +190,18 @@ internal sealed class DefineSymbolsHandler(
             || !string.Equals(cached.Constants, constants, StringComparison.Ordinal))
         {
             var trivia = PlatformJson.Deserialize<ImmutableArray<RDCore.SDK.Model.AST.Abstract.SyntaxNode>>(request.PrecompilerTriviaJson);
-            var dead = trivia.IsDefaultOrEmpty
-                ? []
-                : PrecompilerLiveBranchEvaluator.Evaluate(session, RuntimeExecutionPipeline.Create(session, target.Image, errorDetails).Expressions,
-                    new RDCore.Runtime.Semantics.RuntimeEvaluationContext(StaticSymbol.GlobalUri), trivia).DeadBranches;
-            cached = (request.PrecompilerTriviaJson, constants, dead);
+            cached = (request.PrecompilerTriviaJson, constants, DeadBranchesOf(target, trivia));
             evaluated[key] = cached;
         }
 
         return cached.Dead;
     }
+
+    private ImmutableArray<SourceLocation> DeadBranchesOf(Target target, ImmutableArray<RDCore.SDK.Model.AST.Abstract.SyntaxNode> trivia)
+        => trivia.IsDefaultOrEmpty
+            ? []
+            : PrecompilerLiveBranchEvaluator.Evaluate(target.Session, RuntimeExecutionPipeline.Create(target.Session, target.Image, errorDetails).Expressions,
+                new RDCore.Runtime.Semantics.RuntimeEvaluationContext(StaticSymbol.GlobalUri), trivia).DeadBranches;
 
     // whether a declaration is in a dead branch; null when no branch is dead. A module of several files may have a dead branch of each at the same range: a
     // dead branch is of the file it is written in.
@@ -295,11 +305,17 @@ internal sealed class DefineSymbolsHandler(
         // module's members reach the project scope, and the project scope is only an ancestor of a
         // module's own. A request that names no module has no such vantage point, and resolves
         // intrinsics only.
-        if (moduleUri is not null
-            && DeclaredTypes.Resolve(session.Symbols.Resolver, typeName, moduleUri, session.Environment.Is64Bit,
-                ProjectVisibility.Instance, ProjectVisibility.ProjectOf(session.Symbols, moduleUri)) is { } declared)
+        // the session's own symbols resolve a type name against the symbols it can name alone, whose tree the definitions of variables and procedures leave as
+        // it is: every phase of a module would otherwise build the session's whole tree again, to read the types its declarations name.
+        if (moduleUri is not null)
         {
-            return declared;
+            var (names, project) = session.Symbols is SessionSymbols symbols
+                ? symbols.TypeNamesSeenFrom(moduleUri)
+                : (session.Symbols.Resolver, ProjectVisibility.ProjectOf(session.Symbols, moduleUri));
+            if (DeclaredTypes.Resolve(names, typeName, moduleUri, session.Environment.Is64Bit, ProjectVisibility.Instance, project) is { } declared)
+            {
+                return declared;
+            }
         }
 
         unresolvedTypeNames.Add(typeName);
@@ -433,7 +449,7 @@ internal sealed class DefineSymbolsHandler(
     {
         var session = target.Session;
         if (request.ParseResultJson.Length == 0
-            || PlatformJson.Deserialize<ModuleParseResult>(request.ParseResultJson) is not { } parseResult
+            || ParseOf(request) is not { } parseResult
             || !session.Symbols.TryGetModule(request.ModuleName, out var module))
         {
             return [];
@@ -455,7 +471,7 @@ internal sealed class DefineSymbolsHandler(
     private ImmutableArray<string> LoadLibraryCode(Target target, DefineSymbolsParams request, Uri moduleUri)
     {
         if (request.ParseResultJson.Length == 0
-            || PlatformJson.Deserialize<ModuleParseResult>(request.ParseResultJson) is not { } parseResult
+            || ParseOf(request) is not { } parseResult
             || !target.Session.Symbols.TryGetModule(moduleUri, out var module))
         {
             return [];
@@ -464,10 +480,14 @@ internal sealed class DefineSymbolsHandler(
         return Load(target, $"{request.Library}.{request.ModuleName}", module, parseResult);
     }
 
+    // a composed program's machines share the parse: syntax, which nothing changes.
+    private ModuleParseResult? ParseOf(DefineSymbolsParams request)
+        => Replay is { } replay ? replay.ParseOf(request) : PlatformJson.Deserialize<ModuleParseResult>(request.ParseResultJson);
+
     private ImmutableArray<string> Load(Target target, string name, VBModuleSymbol module, ModuleParseResult parseResult)
     {
         var session = target.Session;
-        var errors = new ModuleLoader(target.Session, target.Image, errorDetails).Load(module, parseResult);
+        var errors = new ModuleLoader(target.Session, target.Image, errorDetails) { Checks = Replay is not { IsChecked: true } }.Load(module, parseResult);
 
         // a module is loaded again at every edit of it: what a load failed with is said once, as long as the next fails with the same, and so is that it loads again.
         switch (LoadFailuresBySession.GetOrCreateValue(session).Record(name, errors))
