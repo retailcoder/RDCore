@@ -44,9 +44,11 @@ public sealed class TestPlatformRootTests
     {
         var root = TestPlatformRoot.Create(_folder, new DirectoryInfo(_components), Now);
 
-        Assert.IsTrue(File.Exists(Path.Combine(root, "Platform", "runtimes", "native.dll")));
+        // the components are at the root, as rdc is in a deployment: beside the manifest.
+        Assert.IsTrue(File.Exists(Path.Combine(root, "runtimes", "native.dll")));
         var manifest = SDK.Client.RDCoreLanguageServerLaunch.ReadManifest(root);
-        StringAssert.StartsWith(manifest.LangService, "Platform/");
+        Assert.AreEqual(OperatingSystem.IsWindows() ? "rdc.exe" : "rdc", manifest.HostService);
+        Assert.AreEqual(OperatingSystem.IsWindows() ? "RDCore.LanguageServer.exe" : "RDCore.LanguageServer", manifest.LangService);
     }
 
     [TestMethod]

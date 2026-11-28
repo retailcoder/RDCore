@@ -1,4 +1,3 @@
-using RDCore.SDK.Platform;
 using RDCore.Tests.Runtime.Libraries;
 using System.Diagnostics;
 
@@ -57,7 +56,8 @@ public sealed class RDFormsFailedStartTests
               "References": [ { "Name": "VB" }, { "Name": "VBRUN" } ] } }
             """);
 
-        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "rdc"))
+        // a deployment's rdc, beside its manifest: the libraries the project references (VB, VBRUN, and DAO, which VB needs) are in its root's Symbols folder.
+        var start = new ProcessStartInfo(RDCore.Tests.Client.TestPlatformRoot.Rdc)
         {
             ArgumentList = { "run", workspace },
             WorkingDirectory = workspace,
@@ -65,9 +65,6 @@ public sealed class RDFormsFailedStartTests
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-
-        // the libraries the project references (VB, VBRUN, and DAO, which VB needs) are in the Symbols folder of the platform's root, the repository's here.
-        start.Environment[PlatformEnvironment.RootEnvironmentVariable] = Path.GetDirectoryName(ShippedLibrariesTests.Symbols);
 
         // a desktop with no display: the windows are the desktop's, which X11 cannot open.
         start.Environment.Remove("DISPLAY");

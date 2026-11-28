@@ -70,8 +70,8 @@ public sealed class McpCommandTests
             "End Function",
             ""));
 
-        var platform = TestPlatformRoot.Directory;
-        var start = new ProcessStartInfo(Path.Combine(platform, "Platform", OperatingSystem.IsWindows() ? "rdc.exe" : "rdc"))
+        // the root's rdc, beside its manifest: its root is its own folder.
+        var start = new ProcessStartInfo(TestPlatformRoot.Rdc)
         {
             ArgumentList = { "mcp", "--workspace", workspace },
             WorkingDirectory = workspace,
@@ -83,7 +83,6 @@ public sealed class McpCommandTests
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        start.Environment[PlatformEnvironment.RootEnvironmentVariable] = platform;
         start.Environment[PlatformEnvironment.UserDataEnvironmentVariable] = Path.Combine(root, "User");
         start.Environment[PlatformEnvironment.LogsEnvironmentVariable] = Path.Combine(root, "Logs");
 

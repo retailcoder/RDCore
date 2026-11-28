@@ -50,20 +50,19 @@ public sealed class InstallCommandTests
         }
     }
 
-    // a platform tree as a release archive unpacks: rdcore.json, the language server it names, and rdc.
+    // a platform tree as a release archive unpacks: rdcore.json, rdc beside it, and the language server it names in its own folder.
     private string Tree(string version, string name = "tree")
     {
         var tree = Path.Combine(_folder, name + "-" + version);
         Directory.CreateDirectory(Path.Combine(tree, "RDCore.LanguageServer"));
-        Directory.CreateDirectory(Path.Combine(tree, "RDCore.CLI"));
         var exe = OperatingSystem.IsWindows() ? ".exe" : string.Empty;
         File.WriteAllText(Path.Combine(tree, "RDCore.LanguageServer", "RDCore.LanguageServer" + exe), "server");
-        File.WriteAllText(Path.Combine(tree, "RDCore.CLI", "rdc" + exe), "rdc " + version);
+        File.WriteAllText(Path.Combine(tree, "rdc" + exe), "rdc " + version);
         File.WriteAllText(Path.Combine(tree, "rdcore.json"), $$"""
             {
               "platformVersion": "{{version}}",
               "rid": "{{(OperatingSystem.IsWindows() ? "win-x64" : "linux-x64")}}",
-              "hostService": "RDCore.CLI/rdc{{exe}}",
+              "hostService": "rdc{{exe}}",
               "langService": "RDCore.LanguageServer/RDCore.LanguageServer{{exe}}"
             }
             """);
@@ -80,7 +79,7 @@ public sealed class InstallCommandTests
 
     private string Version(string version) => Path.Combine(_root, "versions", version);
 
-    private string RdcOf(string version) => Path.Combine(Version(version), "RDCore.CLI", OperatingSystem.IsWindows() ? "rdc.exe" : "rdc");
+    private string RdcOf(string version) => Path.Combine(Version(version), OperatingSystem.IsWindows() ? "rdc.exe" : "rdc");
 
     // what the user's PATH leads to: the folder in the Windows Path, or what ~/.local/bin/rdc links to.
     private string? OnPath()
@@ -164,7 +163,7 @@ public sealed class InstallCommandTests
     {
         await InstallAsync(Tree("0.2.0"));
         var second = Tree("0.2.0", "other");
-        File.WriteAllText(Path.Combine(second, "RDCore.CLI", OperatingSystem.IsWindows() ? "rdc.exe" : "rdc"), "another build");
+        File.WriteAllText(Path.Combine(second, OperatingSystem.IsWindows() ? "rdc.exe" : "rdc"), "another build");
 
         Assert.AreEqual(0, await InstallAsync(second));
 
@@ -176,7 +175,7 @@ public sealed class InstallCommandTests
     public async Task AVersionFolderThatIsNoWholePlatform_IsDeployedAgain()
     {
         // what is left of a deployment someone broke: a folder of the version, without its language server.
-        Directory.CreateDirectory(Path.Combine(Version("0.2.0"), "RDCore.CLI"));
+        Directory.CreateDirectory(Version("0.2.0"));
         File.WriteAllText(Path.Combine(Version("0.2.0"), "rdcore.json"), """{"platformVersion":"0.2.0","langService":"RDCore.LanguageServer/RDCore.LanguageServer"}""");
 
         Assert.AreEqual(0, await InstallAsync(Tree("0.2.0")));
@@ -432,7 +431,7 @@ public sealed class InstallCommandTests
 
         var link = Path.Combine(_home, ".local", "bin", "rdc");
         Directory.CreateDirectory(Path.GetDirectoryName(link)!);
-        File.CreateSymbolicLink(link, Path.Combine(TestPlatformRoot.Directory, "Platform", "rdc"));
+        File.CreateSymbolicLink(link, TestPlatformRoot.Rdc);
 
         var start = new ProcessStartInfo(link, ["no-such-command"]) { RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = _home };
         using var process = Process.Start(start)!;

@@ -33,7 +33,8 @@ public sealed class CommandModeExternalHostTests
             "End Sub",
             ""));
 
-        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "rdc.exe"))
+        // a deployment's rdc, beside its manifest: its root is its own folder.
+        var start = new ProcessStartInfo(RDCore.Tests.Client.TestPlatformRoot.Rdc)
         {
             ArgumentList = { "run", workspace },
             WorkingDirectory = workspace,

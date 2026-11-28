@@ -6,12 +6,23 @@ using System.Reflection.PortableExecutable;
 
 namespace RDCore.CLI.App.Build;
 
-// a built program's folder; the license terms it carries are those of the platform rdc runs from, whose root holds its runtime folder (ProgramNotices).
+// a built program's folder. What it runs on is copied from the runtime folder, and the license terms it carries are those of the platform at platformRoot
+// (ProgramNotices), the folder rdc sits in, beside rdcore.json and the platform's notices: the runtime folder itself unless it is named.
 internal sealed class ProgramOutput(IFileSystem fileSystem, string runtimeFolder, string? platformRoot = null)
 {
     private const string RdcName = "rdc";
 
+    // the folder beside a published rdc that holds what the programs it builds run on, as files: rdc is one file, its own assemblies in it.
+    public const string ShippedRuntimeFolder = "runtime";
+
     public string RuntimeFolder => runtimeFolder;
+
+    // the runtime folder of the rdc in rdcFolder: the one it ships beside it when it is one file, and its own folder when its assemblies are files there, as
+    // in its build output and in a test run.
+    public static string RuntimeFolderOf(string rdcFolder, bool singleFile) => singleFile ? Path.Combine(rdcFolder, ShippedRuntimeFolder) : rdcFolder;
+
+    // whether this rdc is one file: an assembly read out of a single-file bundle has no file of its own.
+    public static bool IsSingleFile => string.IsNullOrEmpty(typeof(ProgramOutput).Assembly.Location);
 
     public bool IsTaken(string program)
         => fileSystem.File.Exists(fileSystem.Path.Combine(runtimeFolder, $"{program}.dll")) || string.Equals(program, RdcName, StringComparison.OrdinalIgnoreCase);
@@ -51,7 +62,8 @@ internal sealed class ProgramOutput(IFileSystem fileSystem, string runtimeFolder
             }
         }
 
-        var lacking = new ProgramNotices(fileSystem, PlatformRoot).Write(folder, program, closure, [.. natives.Select(native => native.Name)], host,
+        var lacking = new ProgramNotices(fileSystem, platformRoot ?? runtimeFolder).Write(folder, program, closure, [.. natives.Select(native => native.Name)],
+            host,
             executable is null ? null : fileSystem.Path.GetFileName(executable), runtime);
         return (executable, lacking);
     }
@@ -79,9 +91,6 @@ internal sealed class ProgramOutput(IFileSystem fileSystem, string runtimeFolder
             fileSystem.File.WriteAllText(fileSystem.Path.Combine(symbols, library.Name + DirectoryLibrarySource.Extension), LibraryJson.Write(library));
         }
     }
-
-    // the folder of the platform's rdcore.json, as rdc install has it: the one that holds the runtime folder.
-    private string PlatformRoot => platformRoot ?? fileSystem.Path.GetDirectoryName(fileSystem.Path.TrimEndingDirectorySeparator(runtimeFolder)) ?? runtimeFolder;
 
     // what .NET runs the program on: what it runs rdc on, as rdc's own runtime configuration says, so the runtime's assemblies find what they were built
     // against; the shared framework of the version rdc runs on when rdc has none.

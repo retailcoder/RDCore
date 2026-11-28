@@ -32,9 +32,11 @@ internal sealed record InstallLocations(string Tree, string Root, string Home, s
     /// <summary>
     /// This user's: the tree <c>rdc</c> runs from, the shared root, the home folder, and the user's own <c>Path</c>.
     /// </summary>
+    // the tree is the one rdc runs from, its own folder, beside its rdcore.json, and never the root --platform-root names: what is installed is the
+    // platform this rdc is part of, whole, and a root named for this run (a test's, an IDE launcher's) is not a tree to deploy.
     public static InstallLocations ForThisUser()
         => new(
-            Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory))!,
+            Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory),
             SharedPlatformRoot.ForThisUser,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Environment.GetEnvironmentVariable("PATH"),
@@ -167,11 +169,11 @@ internal sealed class InstallCommand(IConsoleMessageWriter writer, InstallLocati
         return true;
     }
 
-    // the current version's rdc, where its rdcore.json names it: the environment host is rdc.
+    // the current version's rdc, where its rdcore.json names it: the environment host is rdc, at the root.
     private static string RdcOf(DeployedPlatform platform)
     {
         var named = RDCoreLanguageServerLaunch.ReadManifest(platform.Root).HostService;
-        var host = string.IsNullOrWhiteSpace(named) ? "RDCore.CLI/rdc" : named;
+        var host = string.IsNullOrWhiteSpace(named) ? "rdc" : named;
         var path = Path.GetFullPath(Path.Combine(platform.Root, host.Replace('\\', '/').Replace('/', Path.DirectorySeparatorChar)));
         return OperatingSystem.IsWindows() || File.Exists(path) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? path : path[..^4];
     }

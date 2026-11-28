@@ -111,21 +111,35 @@ if (-not $Silent) {
 }
 Write-Host "✅ User confirmation cleared."
 
+# Name is the project's staging folder; Folder is where it goes under the platform root. rdc sits at the root itself, beside rdcore.json: its root is
+# its own folder (PlatformEnvironment.ApplyOwnFolderAsRoot). It is one file there (SingleFile), so that the root holds little else than rdc, the
+# settings and the notices. What the programs rdc build writes run on are files, in runtime/: the same rdc published as files, which rdc build copies a
+# program's runtime from (ProgramOutput.ShippedRuntimeFolder). Every other component has a folder of its own under the root.
 $Projects = @(
     @{
-        Name = "RDCore.CLI"
+        Name = "RDCore.CLI.runtime"
+        Folder = "runtime"
         Project = "RDCore.CLI/RDCore.CLI.csproj"
     },
     @{
+        Name = "RDCore.CLI"
+        Folder = ""
+        Project = "RDCore.CLI/RDCore.CLI.csproj"
+        SingleFile = $true
+    },
+    @{
         Name = "RDCore.LanguageServer"
+        Folder = "RDCore.LanguageServer"
         Project = "RDCore.LanguageServer/RDCore.LanguageServer.csproj"
     },
     @{
         Name = "RDCore.Parsing"
+        Folder = "RDCore.Parsing"
         Project = "RDCore.ParseServer/RDCore.ParseServer.csproj"
     },
     @{
         Name = "Extensions/RDCore.Diagnostics"
+        Folder = "Extensions/RDCore.Diagnostics"
         Project = "RDCore.Diagnostics/RDCore.Diagnostics.csproj"
     }
 )
@@ -176,6 +190,19 @@ if ($env:GITHUB_ACTIONS -eq "true")
     $PublishArguments += "-p:ContinuousIntegrationBuild=true"
 }
 
+# a single-file executable is one system's: rdc is published for the one the tree is, or for this one when the tree is portable. It is framework-dependent,
+# as every component is, and its natives (SkiaSharp's, for RDForms) are in it too, extracted on its first start (IncludeNativeLibrariesForSelfExtract):
+# AppContext.BaseDirectory stays the folder of rdc.exe, the platform root.
+$SingleFileRid = if ($RuntimeIdentifier) { $RuntimeIdentifier } else { [System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier }
+$SingleFileArguments = @(
+    "-p:PublishSingleFile=true",
+    "-p:IncludeNativeLibrariesForSelfExtract=true"
+)
+if (-not $RuntimeIdentifier)
+{
+    $SingleFileArguments += @("-r", $SingleFileRid, "--self-contained", "false")
+}
+
 foreach ($project in $Projects)
 {
     $publishPath = Join-Path $StagingRoot $project.Name
@@ -183,11 +210,25 @@ foreach ($project in $Projects)
 
     New-Item $publishPath -ItemType Directory -Force | Out-Null
 
-    dotnet publish $projPath --output $publishPath @PublishArguments
+    $projectArguments = if ($project.SingleFile) { @($PublishArguments) + $SingleFileArguments } else { @($PublishArguments) }
+    dotnet publish $projPath --output $publishPath @projectArguments
 
     if ($LASTEXITCODE -ne 0)
     {
         throw "Publish failed for $($project.Name)"
+    }
+
+    if ($project.SingleFile)
+    {
+        # the symbols of what is in the executable are runtime/'s: the root keeps none.
+        Get-ChildItem -LiteralPath $publishPath -Filter "*.pdb" -File | Remove-Item -Force
+    }
+    elseif ($project.Folder -eq "runtime")
+    {
+        # what a built program runs on, and the rdc.dll this script runs under the dotnet host: rdc's executable is the one at the root, and so is the
+        # application host its programs are made of (apphost/).
+        Get-ChildItem -LiteralPath $publishPath -Filter "rdc$ExecutableSuffix" -File | Remove-Item -Force
+        Remove-Item -LiteralPath (Join-Path $publishPath "apphost") -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     Write-Host "🚀 $($project.Name) was published successfully."
@@ -224,9 +265,10 @@ if (Test-Path -LiteralPath $SymbolsSource -PathType Container)
 foreach ($project in $Projects)
 {
     $source = Join-Path $StagingRoot $project.Name
-    $target = Join-Path $PlatformRoot $project.Name
+    $target = if ($project.Folder) { Join-Path $PlatformRoot $project.Folder } else { $PlatformRoot }
 
-    New-Item $target -ItemType "directory" | Out-Null
+    # -Force: the root itself is there already.
+    New-Item $target -ItemType "directory" -Force | Out-Null
     Get-ChildItem -LiteralPath $source | Copy-Item -Destination $target -Recurse
 }
 
@@ -282,7 +324,7 @@ $Manifest = ConvertTo-ManifestJson ([ordered]@{
     rid = $Rid
     generatedUtc = $GeneratedUtc.ToString("o", [Globalization.CultureInfo]::InvariantCulture)
 
-    hostService = "RDCore.CLI/rdc$ExecutableSuffix"
+    hostService = "rdc$ExecutableSuffix"
     langService = "RDCore.LanguageServer/RDCore.LanguageServer$ExecutableSuffix"
     parseServer = "RDCore.Parsing/RDCore.ParseServer$ExecutableSuffix"
 
@@ -320,9 +362,10 @@ Write-Host ""
 # rdc runs through the dotnet host (`dotnet rdc.dll`) rather than its apphost, which is the target system's: a tree published for
 # another system (-RuntimeIdentifier linux-x64 on Windows, say) has an rdc this one cannot start, and the same rdc.dll.
 # relative to the extension folder (Extensions/<Folder>) it runs in, so that no folder name of the platform root is in the path:
-# a root like rdcore[1] is then never read as a wildcard.
+# a root like rdcore[1] is then never read as a wildcard. rdc.dll is runtime/'s, the root's rdc being one file: its folder holds no rdcore.json, so it is
+# named the root, two folders up, with --platform-root.
 $Dotnet = "dotnet"
-$RdcAssembly = "../../RDCore.CLI/rdc.dll"
+$RdcAssembly = "../../runtime/rdc.dll"
 
 $Extensions = @(
     @{ Folder = "RDCore.Diagnostics"; Executable = "RDCore.Diagnostics$ExecutableSuffix"; Description = "RDCore core inspection extension." }
@@ -338,7 +381,8 @@ foreach ($extension in $Extensions)
         # --unsafe-dev-mode only lets describe-ext run without a signing setup. the manifest FileHash it
         # records is base64(SHA-512) of this exact exe, so nothing may modify the exe after this step. Its output goes through a pipe, which is
         # not a console: rdc shows no splash as it starts, and the one splash the script shows is the one at its end.
-        & $Dotnet $RdcAssembly describe-ext $extension.Executable --description $extension.Description --overwrite --unsafe-dev-mode | Out-Host
+        & $Dotnet $RdcAssembly describe-ext $extension.Executable --description $extension.Description --overwrite --unsafe-dev-mode --platform-root "../.." |
+            Out-Host
         if ($LASTEXITCODE -ne 0)
         {
             throw "describe-ext failed for $($extension.Folder) (exit $LASTEXITCODE)."
@@ -353,12 +397,13 @@ foreach ($extension in $Extensions)
 }
 
 # the platform's splash, as the platform just published says it (`rdc splash`): the script keeps no copy of it, and the SDK is its only home. It runs
-# from the CLI's folder for the reason describe-ext runs from the extension's, and a splash that cannot be shown is not a publish that failed.
+# from the platform root, rdc's folder, for the reason describe-ext runs from the extension's, and a splash that cannot be shown is not a publish that
+# failed.
 Write-Host ""
-Push-Location -LiteralPath (Join-Path $PlatformRoot "RDCore.CLI")
+Push-Location -LiteralPath $PlatformRoot
 try
 {
-    & $Dotnet "rdc.dll" splash
+    & $Dotnet "runtime/rdc.dll" splash --platform-root "."
     if ($LASTEXITCODE -ne 0)
     {
         Write-Warning "rdc splash failed (exit $LASTEXITCODE)."

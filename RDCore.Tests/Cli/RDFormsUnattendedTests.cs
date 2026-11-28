@@ -1,4 +1,3 @@
-using RDCore.SDK.Platform;
 using RDCore.Tests.Runtime.Libraries;
 using System.Diagnostics;
 
@@ -58,7 +57,8 @@ public sealed class RDFormsUnattendedTests
               "References": [ { "Name": "VB" }, { "Name": "VBRUN" } ] } }
             """);
 
-        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "rdc.exe" : "rdc"))
+        // a deployment's rdc, beside its manifest: the libraries the project references (VB, VBRUN, and DAO, which VB needs) are in its root's Symbols folder.
+        var start = new ProcessStartInfo(RDCore.Tests.Client.TestPlatformRoot.Rdc)
         {
             ArgumentList = { "run", "--unattended", workspace },
             WorkingDirectory = workspace,
@@ -67,9 +67,6 @@ public sealed class RDFormsUnattendedTests
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-
-        // the libraries the project references (VB, VBRUN, and DAO, which VB needs) are in the Symbols folder of the platform's root, the repository's here.
-        start.Environment[PlatformEnvironment.RootEnvironmentVariable] = Path.GetDirectoryName(ShippedLibrariesTests.Symbols);
 
         // no display to open: a desktop's windows could not be started.
         start.Environment.Remove("DISPLAY");

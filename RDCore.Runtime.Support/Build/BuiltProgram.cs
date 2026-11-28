@@ -90,6 +90,10 @@ public static class BuiltProgram
 
     private static async Task<int> EntryAsync(Assembly program, string[] args)
     {
+        // a built program's root is its own folder, which holds what it runs with (its libraries' descriptions, its external host): it reads nothing of a
+        // platform's, wherever one is installed, and its external host is told the same root.
+        PlatformEnvironment.ApplyRoot(AppContext.BaseDirectory);
+
         // started by the program as its external host: it makes the calls the program makes to the outside world, and runs no program of its own.
         if (string.Equals(Environment.GetEnvironmentVariable(RDCoreServerProcess.ModeEnvironmentVariable), RDCoreServerProcess.ExternalMode, StringComparison.OrdinalIgnoreCase))
         {

@@ -270,7 +270,9 @@ if ($Manifest -and $Manifest.hostService -and (Test-RelativePath $Manifest.hostS
     if ($Manifest.rid -and $Manifest.rid -cne "any" -and $rids -cnotcontains $Manifest.rid) { $rids += $Manifest.rid }
     foreach ($rid in $rids) {
         $hostFile = if ($rid -like "win*") { "apphost.exe" } else { "apphost" }
-        $pack = Join-Path $Root (Split-Path $Manifest.hostService -Parent) "apphost/packs/Microsoft.NETCore.App.Host.$rid"
+        # rdc's folder: the root itself, where rdc is, which Join-Path refuses to be given as an empty child path.
+        $hostFolder = Split-Path $Manifest.hostService -Parent
+        $pack = Join-Path $(if ($hostFolder) { Join-Path $Root $hostFolder } else { $Root }) "apphost/packs/Microsoft.NETCore.App.Host.$rid"
         $hosts = @(if (Test-Path -LiteralPath $pack -PathType Container) {
             Get-ChildItem -LiteralPath $pack -Directory | ForEach-Object { Join-Path $_.FullName "runtimes/$rid/native/$hostFile" } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
         })
@@ -286,6 +288,18 @@ if ($Manifest -and $Manifest.hostService -and (Test-RelativePath $Manifest.hostS
         if ($at -lt 0 -or $text.IndexOf($placeholder, $at + $placeholder.Length, [StringComparison]::Ordinal) -ge 0) {
             Add-Failure "$(Get-RelativePath $hosts[0]) does not have the placeholder for the program's assembly exactly once: it is not an application host rdc build can patch."
         }
+    }
+}
+
+# (g) the root is for a user to find their way in: rdc as one file (hostService), the settings, the notices, and the components' folders. Everything
+# else is in a subfolder. appsettings.json is rdc's own settings, which the generic host reads from the application's folder (AppHost's content root).
+$RootFiles = @([string]$Manifest.hostService, "rdcore.json", "platform-settings.json", "appsettings.json") +
+    $Required + @("THIRD-PARTY-NOTICES.txt", "THIRD-PARTY-NOTICES.json", "SOURCE.md", "release.json")
+$RootFolders = @("Extensions", "Symbols", "RDCore.LanguageServer", "RDCore.Parsing", "runtime", "apphost", "Themes", "Logs")
+foreach ($entry in Get-ChildItem -LiteralPath $Root -Force) {
+    $expected = if ($entry.PSIsContainer) { $RootFolders } else { $RootFiles }
+    if ($entry.Name -cnotin $expected) {
+        Add-Failure "the platform root holds $(if ($entry.PSIsContainer) { 'a folder' } else { 'a file' }) '$($entry.Name)' that belongs in a subfolder."
     }
 }
 

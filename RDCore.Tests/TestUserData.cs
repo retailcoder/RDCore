@@ -15,11 +15,19 @@ public static class TestUserData
     /// <summary>The folder the platforms a test starts log to, unless the test gives them one of its own: never the logs of whoever runs the suite.</summary>
     public static string LogsDirectory { get; } = Path.Combine(Path.GetTempPath(), "rdcore-tests-logs-" + Environment.ProcessId);
 
+    /// <summary>
+    /// The platform root of the test process, which is empty: a process of the platform is given its root and never derives one, and the hosts a test
+    /// runs in this process read it. A test that starts a platform starts one that has a root of its own (<see cref="Client.TestPlatformRoot"/>).
+    /// </summary>
+    public static string PlatformRoot { get; } = Path.Combine(Path.GetTempPath(), "rdcore-tests-root-" + Environment.ProcessId);
+
     [AssemblyInitialize]
     public static void Initialize(TestContext context)
     {
         Environment.SetEnvironmentVariable(PlatformEnvironment.UserDataEnvironmentVariable, Directory);
         Environment.SetEnvironmentVariable(PlatformEnvironment.LogsEnvironmentVariable, LogsDirectory);
+        System.IO.Directory.CreateDirectory(PlatformRoot);
+        Environment.SetEnvironmentVariable(PlatformEnvironment.RootEnvironmentVariable, PlatformRoot);
 
         // the suite runs each way the code can run, to compare the two: by default it compiles every procedure that can be, as the platform does, and
         // RDCORE_ENGINE=Interpreter interprets them all.

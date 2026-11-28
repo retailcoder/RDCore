@@ -4,16 +4,15 @@ using System.Text.Json;
 namespace RDCore.Tests.Client;
 
 /// <summary>
-/// A platform root as a deployment has it, for the tests that start the language server as an IDE does (<see cref="RDCore.SDK.Client.RDCoreLanguageServerLaunch"/>):
-/// the components this test run built, under the root, and a manifest that names them relative to it. A launch runs only the executables under its root, so the
-/// test run's own folder is copied in, once for the run; nothing the platform runs writes to its root, and every test that starts it shares this one.
+/// A platform root as a deployment has it, for the tests that start the language server as an IDE does
+/// (<see cref="RDCore.SDK.Client.RDCoreLanguageServerLaunch"/>) and those that start <c>rdc</c>: the components this test run built, at the root, and a
+/// manifest that names them relative to it. <c>rdc</c> is beside the manifest, as it is in a deployment, so its root is its own folder. A launch runs only
+/// the executables under its root, so the test run's own folder is copied in, once for the run; nothing the platform runs writes to its root, and every
+/// test that starts it shares this one.
 /// </summary>
 [TestClass]
 public static class TestPlatformRoot
 {
-    // the folder under the root the build output is copied to.
-    private const string Components = "Platform";
-
     // what a root's folder is named, under the folder the roots are made in.
     private const string Prefix = "platform-";
 
@@ -37,7 +36,12 @@ public static class TestPlatformRoot
         }
     }
 
-    private static string AppHost(string name) => $"{Components}/{(OperatingSystem.IsWindows() ? $"{name}.exe" : name)}";
+    /// <summary>
+    /// The root's <c>rdc</c>, beside its manifest: started with no root named, its root is its own folder.
+    /// </summary>
+    public static string Rdc => Path.Combine(Directory, AppHost("rdc"));
+
+    private static string AppHost(string name) => OperatingSystem.IsWindows() ? $"{name}.exe" : name;
 
     /// <summary>
     /// Makes a root in <paramref name="folder"/>, with a copy of <paramref name="components"/>, after taking away the roots there that were abandoned at
@@ -57,7 +61,7 @@ public static class TestPlatformRoot
         var root = Path.Combine(folder, $"{Prefix}{Environment.ProcessId}-{Guid.NewGuid():N}");
         try
         {
-            Copy(components, System.IO.Directory.CreateDirectory(Path.Combine(root, Components)));
+            Copy(components, System.IO.Directory.CreateDirectory(root));
             if (symbols is not null)
             {
                 var deployed = System.IO.Directory.CreateDirectory(Path.Combine(root, PlatformEnvironment.SymbolsDirectory));

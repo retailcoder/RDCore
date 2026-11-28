@@ -76,6 +76,20 @@ public class Program
         // in every mode, a form ported to RDForms declares what its .xaml does, as RDForms reads it: the bench and rdc build read its .rdform's form so.
         RDCore.SDK.Workspace.Forms.FormDesigner.Register(RDCore.Forms.Xaml.FormXamlDocumentReader.Instance);
         var mode = Environment.GetEnvironmentVariable(RDCoreServerProcess.ModeEnvironmentVariable);
+        // rdc sits at the root of its platform, beside rdcore.json: its root is its own folder, the one --platform-root names, or, as a server of another
+        // process, the one that process gives it, and every process it starts is told it. A folder that holds no rdcore.json is not a platform's, and
+        // nothing else is tried. Once applied, the argument is no verb's.
+        try
+        {
+            PlatformEnvironment.ApplyOwnFolderAsRoot(args);
+            args = SdkCommandLine.WithoutPlatformRoot(args);
+        }
+        catch (NotAPlatformRootException notARoot)
+        {
+            await Console.Error.WriteLineAsync(notARoot.Message);
+            return -1;
+        }
+
         // in every mode, the version of the platform rdc runs from is held until it exits: a deployment into the shared root does not remove it.
         using var lease = PlatformTree.Hold(PlatformEnvironment.Default.Root);
         try

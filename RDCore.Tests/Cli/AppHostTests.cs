@@ -85,7 +85,7 @@ public sealed class AppHostTests
     [TestMethod]
     public void TheHostThePlatformShipsBesideRdc_IsNamedAfterThePackItIsOut()
     {
-        var shipped = Path.Combine(Path.GetTempPath(), "platform", "RDCore.CLI", AppHost.ShippedFolder);
+        var shipped = Path.Combine(Path.GetTempPath(), "platform", AppHost.ShippedFolder);
 
         var (pack, version) = AppHost.PackOf(Path.Combine(Pack(shipped, "linux-x64", "11.0.2"), "apphost"), "linux-x64");
 

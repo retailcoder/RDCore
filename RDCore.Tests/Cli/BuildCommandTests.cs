@@ -34,7 +34,8 @@ public sealed class BuildCommandTests
 {
     private static readonly string Root = Path.Combine(Path.GetTempPath(), "rdcore-build-ws");
     private static readonly string Platform = Path.Combine(Path.GetTempPath(), "rdcore-build-platform");
-    private static readonly string Runtime = Path.Combine(Platform, "RDCore.CLI");
+    // rdc's runtime folder: the platform's root, where rdc is, beside the platform's notices.
+    private static readonly string Runtime = Platform;
     private static readonly string Host = Path.Combine(Path.GetTempPath(), "rdcore-build-dotnet", "packs", "Microsoft.NETCore.App.Host.win-x64", "10.0.11",
         "runtimes", "win-x64", "native", "apphost.exe");
     // a macOS runtime's host is a Mach-O, which rdc build signs: the host of the Microsoft.NETCore.App.Host.osx-arm64 package, which the tests' project
@@ -1674,6 +1675,94 @@ public sealed class BuildCommandTests
 
             Assert.AreEqual(0, process.ExitCode, error);
             Assert.AreEqual(printed, output.Trim());
+        }
+        finally
+        {
+            await DeleteAsync(workspace);
+        }
+    }
+
+    private static readonly string ProgramForm = string.Join("\r\n",
+        "VERSION 5.00",
+        "Begin VB.Form Form1 ",
+        "   Caption         =   \"Form1\"",
+        "   ClientHeight    =   3195",
+        "   Begin VB.TextBox Text1 ",
+        "      TabIndex        =   0",
+        "      Text            =   \"Text1\"",
+        "   End",
+        "End",
+        "Attribute VB_Name = \"Form1\"",
+        "Attribute VB_GlobalNameSpace = False",
+        "Attribute VB_Creatable = False",
+        "Attribute VB_PredeclaredId = True",
+        "Attribute VB_Exposed = False",
+        "Option Explicit",
+        "Private Sub Form_Load()",
+        "    Debug.Print \"Load\"",
+        "End Sub",
+        "Private Sub Form_Unload(Cancel As Integer)",
+        "    Debug.Print \"Unload\"",
+        "End Sub",
+        string.Empty);
+
+    // a program with a Visual Basic 6.0 form, built into a folder of its own and started there, unattended, with no platform root in its environment or with
+    // one that names a folder that is not there: its folder is its root, and the form is loaded by its external host, which is its own executable. What it
+    // runs on is copied from rdc's own folder, as from an rdc whose assemblies are files, or from a folder of a platform beside rdc, as from the runtime
+    // folder a single-file rdc ships (ProgramOutput.ShippedRuntimeFolder).
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    [DataRow(false, false, DisplayName = "no root in its environment, built from rdc's folder")]
+    [DataRow(true, true, DisplayName = "a root in its environment that is not there, built from a runtime folder of a platform")]
+    public async Task TheBuiltProgramWithAForm_StartedInItsOwnFolder_RunsOnWhatTheFolderHolds(bool givenAnotherRoot, bool fromShippedRuntime)
+    {
+        CompiledExecutionTests.RequirePayloads();
+        var workspace = Directory.CreateTempSubdirectory("rdcore-build-forms-");
+        var folder = Path.Combine(workspace.FullName, "out");
+        try
+        {
+            File.WriteAllText(Path.Combine(workspace.FullName, "Form1.frm"), ProgramForm);
+            File.WriteAllText(Path.Combine(workspace.FullName, "Program.bas"), Module("Program", "Public Sub Main()", "    Dim f As Form1",
+                "    Set f = New Form1", "    Load f", "    f.Text1.Text = \"probe\"",
+                "    Debug.Print f.Text1.Text", "    Unload f", "    Debug.Print \"end\"",
+                "End Sub"));
+            File.WriteAllText(Path.Combine(workspace.FullName, ".rdproj"), """
+                { "Version": "0.1.0", "ProjectInfo": { "Name": "Hello", "Modules": [ { "RelativeUri": "Program.bas" }, { "RelativeUri": "Form1.frm" } ],
+                  "References": [ { "Name": "VB" }, { "Name": "VBRUN" } ] } }
+                """);
+            var fileSystem = new System.IO.Abstractions.FileSystem();
+            var writer = Substitute.For<IConsoleMessageWriter>();
+            var runner = new BenchRunner(RuntimeEnvironmentProfile.Default, fileSystem, Substitute.For<IErrorDetailsRecorder>(), NullLoggerFactory.Instance,
+                RDCore.Tests.Runtime.Libraries.ShippedLibrariesTests.Platform);
+            // the test platform root holds the components this test run built, as a runtime folder of a platform holds what rdc was published with.
+            var platform = RDCore.Tests.Client.TestPlatformRoot.Directory;
+            var shipped = fromShippedRuntime ? new ProgramOutput(fileSystem, platform, platform) : null;
+            var command = new BuildCommand(writer, fileSystem, new ProjectFileLoader(fileSystem), runner, shipped);
+            Assert.AreEqual(0, await command.ExecuteAsync([workspace.FullName, "--name", "Hello", "--output", folder], CancellationToken.None));
+            Assert.IsFalse(File.Exists(Path.Combine(folder, "rdc.exe")), "the program's folder holds no rdc");
+            Assert.IsFalse(File.Exists(Path.Combine(folder, RDCore.SDK.Platform.PlatformManifest.FileName)), "the program's folder holds no platform");
+
+            var start = new System.Diagnostics.ProcessStartInfo(Path.Combine(folder, "Hello.exe"))
+            {
+                ArgumentList = { "--unattended" },
+                RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = folder,
+            };
+            start.Environment.Remove(RDCore.SDK.Platform.PlatformEnvironment.RootEnvironmentVariable);
+            if (givenAnotherRoot)
+            {
+                start.Environment[RDCore.SDK.Platform.PlatformEnvironment.RootEnvironmentVariable] = Path.Combine(workspace.FullName, "no-platform");
+            }
+
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            var printed = (await output).Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+            var context = $"{string.Join("\n", printed)}\n{error}";
+            Assert.AreEqual(0, process.ExitCode, context);
+            CollectionAssert.AreEqual(new[] { "Load", "probe", "Unload", "end" }, printed, context);
+            Assert.IsFalse(Directory.Exists(Path.Combine(workspace.FullName, "no-platform")), "the program writes nothing under the root it was not given");
         }
         finally
         {

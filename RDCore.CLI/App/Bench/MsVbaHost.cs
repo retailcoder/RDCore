@@ -362,7 +362,8 @@ internal sealed class RdcProcess : IRdcProcess
 
         if (string.Equals(Path.GetFileNameWithoutExtension(path), "dotnet", StringComparison.OrdinalIgnoreCase))
         {
-            start.ArgumentList.Add(typeof(RdcProcess).Assembly.Location);
+            // rdc run as dotnet rdc.dll: its assembly is a file in its folder. A single-file rdc is its own process, and never runs this.
+            start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, typeof(RdcProcess).Assembly.GetName().Name + ".dll"));
         }
 
         foreach (var argument in arguments)

@@ -41,7 +41,9 @@ internal sealed class BuildCommandOptions
 internal sealed class BuildCommand(IConsoleMessageWriter writer, IFileSystem fileSystem, IProjectFileLoader projects, BenchRunner runner,
     ProgramOutput? output = null, Func<string, string?>? hosts = null, IOptions<AppOptions>? settings = null) : ICliCommand
 {
-    private ProgramOutput Output => output ?? new ProgramOutput(fileSystem, AppContext.BaseDirectory);
+    private ProgramOutput Output
+        => output
+            ?? new ProgramOutput(fileSystem, ProgramOutput.RuntimeFolderOf(AppContext.BaseDirectory, ProgramOutput.IsSingleFile), AppContext.BaseDirectory);
 
     public string Name => CommandNames.BuildCommand.Name;
     public IReadOnlyList<string> Aliases => [CommandNames.BuildCommand.Alias];
