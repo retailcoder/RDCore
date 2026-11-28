@@ -14,6 +14,13 @@
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
   </PropertyGroup>
 
+  <!-- rdc published as one file, its natives in it (PlatformPublish.ps1 sets RdcSingleFile). Set here and not on the command line, where it would be every
+       referenced project's too, and turn the single-file analyzers on for each of them. -->
+  <PropertyGroup Condition="'$(RdcSingleFile)' == 'true'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Include="logo.ico" />
   </ItemGroup>

@@ -17,12 +17,12 @@ internal sealed class ProgramOutput(IFileSystem fileSystem, string runtimeFolder
 
     public string RuntimeFolder => runtimeFolder;
 
-    // the runtime folder of the rdc in rdcFolder: the one it ships beside it when it is one file, and its own folder when its assemblies are files there, as
-    // in its build output and in a test run.
-    public static string RuntimeFolderOf(string rdcFolder, bool singleFile) => singleFile ? Path.Combine(rdcFolder, ShippedRuntimeFolder) : rdcFolder;
-
-    // whether this rdc is one file: an assembly read out of a single-file bundle has no file of its own.
-    public static bool IsSingleFile => string.IsNullOrEmpty(typeof(ProgramOutput).Assembly.Location);
+    // the runtime folder of the rdc in rdcFolder: its own folder when the assembly a built program calls into is a file there, as in its build output and
+    // in a test run, and the one it ships beside it otherwise, when it is one file and its assemblies are in it.
+    public static string RuntimeFolderOf(IFileSystem fileSystem, string rdcFolder)
+        => fileSystem.File.Exists(fileSystem.Path.Combine(rdcFolder, $"{SupportName}.dll"))
+            ? rdcFolder
+            : fileSystem.Path.Combine(rdcFolder, ShippedRuntimeFolder);
 
     public bool IsTaken(string program)
         => fileSystem.File.Exists(fileSystem.Path.Combine(runtimeFolder, $"{program}.dll")) || string.Equals(program, RdcName, StringComparison.OrdinalIgnoreCase);

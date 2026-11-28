@@ -192,11 +192,10 @@ if ($env:GITHUB_ACTIONS -eq "true")
 
 # a single-file executable is one system's: rdc is published for the one the tree is, or for this one when the tree is portable. It is framework-dependent,
 # as every component is, and its natives (SkiaSharp's, for RDForms) are in it too, extracted on its first start (IncludeNativeLibrariesForSelfExtract):
-# AppContext.BaseDirectory stays the folder of rdc.exe, the platform root.
+# AppContext.BaseDirectory stays the folder of rdc.exe, the platform root. RDCore.CLI.csproj sets both when given RdcSingleFile.
 $SingleFileRid = if ($RuntimeIdentifier) { $RuntimeIdentifier } else { [System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier }
 $SingleFileArguments = @(
-    "-p:PublishSingleFile=true",
-    "-p:IncludeNativeLibrariesForSelfExtract=true"
+    "-p:RdcSingleFile=true"
 )
 if (-not $RuntimeIdentifier)
 {

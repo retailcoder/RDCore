@@ -1706,6 +1706,26 @@ public sealed class BuildCommandTests
         "End Sub",
         string.Empty);
 
+    // what a built program runs on is copied from the folder that holds the assembly it calls into as a file: rdc's own folder when it is there, as in rdc's
+    // build output, and the runtime folder beside rdc otherwise, when rdc is one file and holds that assembly in it.
+    [TestMethod]
+    [DataRow(true, DisplayName = "the assembly a file beside rdc")]
+    [DataRow(false, DisplayName = "rdc one file, its runtime folder beside it")]
+    public void WhatABuiltProgramRunsOn_IsCopiedFromTheFolderThatHoldsItsAssemblyAsAFile(bool besideRdc)
+    {
+        var fileSystem = new MockFileSystem();
+        var rdc = fileSystem.Path.Combine(fileSystem.Path.GetTempPath(), "platform");
+        var runtime = fileSystem.Path.Combine(rdc, ProgramOutput.ShippedRuntimeFolder);
+        fileSystem.AddFile(fileSystem.Path.Combine(rdc, "rdc.exe"), new MockFileData([1]));
+        fileSystem.AddFile(fileSystem.Path.Combine(runtime, $"{ProgramOutput.SupportName}.dll"), new MockFileData([1]));
+        if (besideRdc)
+        {
+            fileSystem.AddFile(fileSystem.Path.Combine(rdc, $"{ProgramOutput.SupportName}.dll"), new MockFileData([1]));
+        }
+
+        Assert.AreEqual(besideRdc ? rdc : runtime, ProgramOutput.RuntimeFolderOf(fileSystem, rdc));
+    }
+
     // a program with a Visual Basic 6.0 form, built into a folder of its own and started there, unattended, with no platform root in its environment or with
     // one that names a folder that is not there: its folder is its root, and the form is loaded by its external host, which is its own executable. What it
     // runs on is copied from rdc's own folder, as from an rdc whose assemblies are files, or from a folder of a platform beside rdc, as from the runtime

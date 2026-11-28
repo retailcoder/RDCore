@@ -43,7 +43,7 @@ internal sealed class BuildCommand(IConsoleMessageWriter writer, IFileSystem fil
 {
     private ProgramOutput Output
         => output
-            ?? new ProgramOutput(fileSystem, ProgramOutput.RuntimeFolderOf(AppContext.BaseDirectory, ProgramOutput.IsSingleFile), AppContext.BaseDirectory);
+            ?? new ProgramOutput(fileSystem, ProgramOutput.RuntimeFolderOf(fileSystem, AppContext.BaseDirectory), AppContext.BaseDirectory);
 
     public string Name => CommandNames.BuildCommand.Name;
     public IReadOnlyList<string> Aliases => [CommandNames.BuildCommand.Alias];
