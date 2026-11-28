@@ -423,6 +423,11 @@ public sealed class ScopeTreeSymbolResolver(ScopeTree scopeTree) : ISymbolResolv
 
     private static bool IsProjectOrModule(Symbol symbol) => symbol is VBProjectSymbol or VBModuleSymbol || symbol.Kind is SymbolKindExt.TypeDescriptor;
 
+    // what a type name can resolve to, by ResolveType, ResolveQualifier and ResolveProjectType: each of them takes its candidates from these alone. A tree
+    // of these symbols has the scope of every module and project the whole tree has, so a type name resolved in it as seen from a module resolves to what it
+    // does in the whole tree.
+    public static bool IsTypeCandidate(Symbol symbol) => IsTypeDeclaration(symbol) || IsProjectOrModule(symbol);
+
     // MS-VBAL §5.3.1
     // one representative accessor, Get first: Symbol.CreateUri keys on the name, so Get, Let and Set share one Uri.
     private static SymbolResolutionResult? TryResolvePropertyAccessors(Symbol[] matches)

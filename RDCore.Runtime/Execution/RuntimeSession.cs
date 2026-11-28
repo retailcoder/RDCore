@@ -1114,6 +1114,11 @@ internal sealed class SessionSymbols(ISessionStorage storage, RuntimeCallStack c
 
     public LexicalScope? ScopeOf(Uri uri) => table.ScopeTree.TryGetScope(uri, out var scope) ? scope : null;
 
+    // what a type name written in a module resolves against (SymbolTable.TypeNames), and the root of the module's project, which ProjectVisibility.ProjectOf
+    // finds in the same scope of the whole tree.
+    internal (ISymbolResolver Names, Uri? Project) TypeNamesSeenFrom(Uri module)
+        => (table.TypeNames, table.TypeScopeTree.TryGetScope(module, out var scope) ? LanguageCore.Symbols.ProjectVisibility.ProjectOf(scope) : null);
+
     public ScopeTree Scopes => table.ScopeTree;
 
     // a class module symbol holds no storage and is keyed by its identity, which the newer one shares.

@@ -1,7 +1,11 @@
 using RDCore.Runtime.Execution;
+using RDCore.Runtime.LanguageCore.Symbols;
+using RDCore.SDK.Model;
+using RDCore.SDK.Model.Source;
 using RDCore.SDK.Model.Symbols;
 using RDCore.SDK.Model.Symbols.Abstract;
 using RDCore.SDK.Model.Symbols.VBProject;
+using RDCore.SDK.Model.Types;
 
 namespace RDCore.Tests.Runtime.Execution;
 
@@ -129,5 +133,67 @@ public sealed class SymbolTableTests
         first.TryAdd(module, module.ScopeKind);
 
         Assert.IsEmpty(second.All());
+    }
+
+    private static VBUserDefinedTypeMemberSymbol PublicType(VBModuleSymbol module, string name)
+        => new(module.WorkspaceRoot, module.Uri, name, ScopeKind.Module, SourceRange.Empty, SourceRange.Empty, AccessModifier.Public);
+
+    private static VBModuleFieldVariableMemberSymbol PublicField(VBModuleSymbol module, string name)
+        => new(module.WorkspaceRoot, module.Uri, name, ScopeKind.Module, VBLongType.TypeInfo, SourceRange.Empty, SourceRange.Empty, AccessModifier.Public);
+
+    // the tree its type names resolve against holds what a type name can name: a variable defined leaves it as it is, and a type defined builds it again.
+    [TestMethod]
+    public void ItsTypeScopeTree_IsBuiltAgain_WhenATypeIsDefined_AndNotWhenAVariableIs()
+    {
+        var table = new SymbolTable();
+        var module = Module("Module1");
+        table.TryAdd(module, module.ScopeKind);
+        var (tree, types) = (table.ScopeTree, table.TypeScopeTree);
+
+        Assert.IsTrue(table.TryAdd(PublicField(module, "Total"), ScopeKind.Module));
+
+        Assert.AreNotSame(tree, table.ScopeTree, "the variable is declared in the table's whole tree, built again");
+        Assert.AreSame(types, table.TypeScopeTree);
+        var point = PublicType(module, "TPoint");
+        Assert.IsTrue(table.TryAdd(point, point.ScopeKind));
+        Assert.AreNotSame(types, table.TypeScopeTree);
+        Assert.AreSame(point, table.TypeNames.ResolveType("TPoint", ScopeKind.Module, module.Uri).Symbol);
+    }
+
+    // a type name resolves against the type scope tree to what it resolves to against the whole tree, from each module, qualified by a module or not, and
+    // whatever else is declared by the name: a variable named after a class is no type, and the class is what the name names.
+    [TestMethod]
+    public void ItsTypeNames_ResolveAsItsNames_FromEveryModule()
+    {
+        var table = new SymbolTable();
+        var (shapes, other) = (Module("Shapes"), Module("Other"));
+        var widget = new VBClassModuleSymbol(shapes.WorkspaceRoot, shapes.WorkspaceRoot, "Widget");
+        Symbol[] declared = [shapes, other, widget, PublicType(shapes, "TPoint"), PublicField(shapes, "Widget"), PublicField(other, "TPoint")];
+        foreach (var symbol in declared)
+        {
+            Assert.IsTrue(table.TryAdd(symbol, symbol.ScopeKind));
+        }
+
+        Assert.IsInstanceOfType<VBModuleFieldVariableMemberSymbol>(table.Names.ResolveValue("Widget", ScopeKind.Module, shapes.Uri).Symbol,
+            "a variable of the module is named after the class");
+        foreach (var from in new[] { shapes, other })
+        {
+            foreach (var name in new[] { "TPoint", "Widget", "Shapes", "Missing" })
+            {
+                var inWhole = table.Names.ResolveType(name, ScopeKind.Module, from.Uri);
+                var inTypes = table.TypeNames.ResolveType(name, ScopeKind.Module, from.Uri);
+                Assert.AreEqual(inWhole.IsResolved, inTypes.IsResolved, $"{name} from {from.Name}");
+                Assert.AreSame(inWhole.Symbol, inTypes.Symbol, $"{name} from {from.Name}");
+            }
+
+            var (qualifiedInWhole, qualifiedInTypes) = (
+                VBProjectSymbol.ResolveQualifiedType(table.Names, "Shapes", "TPoint", from.Uri, ProjectVisibility.Instance, from.WorkspaceRoot),
+                VBProjectSymbol.ResolveQualifiedType(table.TypeNames, "Shapes", "TPoint", from.Uri, ProjectVisibility.Instance, from.WorkspaceRoot));
+            Assert.IsTrue(qualifiedInWhole.IsResolved, $"Shapes.TPoint from {from.Name}");
+            Assert.AreSame(qualifiedInWhole.Symbol, qualifiedInTypes.Symbol, $"Shapes.TPoint from {from.Name}");
+        }
+
+        Assert.IsInstanceOfType<VBUserDefinedTypeMemberSymbol>(table.TypeNames.ResolveType("TPoint", ScopeKind.Module, other.Uri).Symbol,
+            "a type of another module is found past a variable of its name");
     }
 }

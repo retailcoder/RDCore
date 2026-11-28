@@ -36,6 +36,7 @@ internal sealed class SymbolTable
     private readonly Dictionary<SymbolIdentity, Symbol> _localSymbols = [];
 
     private ScopeTree? _scopeTree;
+    private ScopeTree? _typeScopeTree;
 
     /// <summary>
     /// What makes two definitions the same declaration: the symbol's own semantic identity, plus its
@@ -60,7 +61,16 @@ internal sealed class SymbolTable
     /// <summary>
     /// Resolves names against the table as it is when the name is looked up.
     /// </summary>
-    public ISymbolResolver Names => new LiveScopeResolver(this);
+    public ISymbolResolver Names => new LiveScopeResolver(() => ScopeTree);
+
+    /// <summary>
+    /// Resolves type names against the table as it is when the name is looked up, as <see cref="Names"/> resolves them as seen from a module.
+    /// </summary>
+    /// <remarks>
+    /// Its tree is that of the symbols a type name can resolve to (<see cref="ScopeTreeSymbolResolver.IsTypeCandidate"/>), built again only when one of them
+    /// changes: the variables and procedures of a module, which are declared with the types they name, are defined without building it again.
+    /// </remarks>
+    public ISymbolResolver TypeNames => new LiveScopeResolver(() => TypeScopeTree);
 
     /// <summary>
     /// The symbols declared in the instance tier: the fields of the classes.
@@ -90,6 +100,11 @@ internal sealed class SymbolTable
     /// The scope tree of the symbols as they are now.
     /// </summary>
     public ScopeTree ScopeTree => _scopeTree ??= ProjectVisibility.ScopeTreeOf(All());
+
+    /// <summary>
+    /// The scope tree of the symbols a type name can resolve to, as the table holds them (<see cref="TypeNames"/>).
+    /// </summary>
+    public ScopeTree TypeScopeTree => _typeScopeTree ??= ProjectVisibility.ScopeTreeOf(All().Where(ScopeTreeSymbolResolver.IsTypeCandidate));
 
     /// <summary>
     /// Finds the module of this name, a standard module or a class module: the project's, or a library's when the project has none of the name.
@@ -167,6 +182,7 @@ internal sealed class SymbolTable
         if (added)
         {
             Version++;
+            ForgetTypeScopeTreeOf(symbol);
         }
 
         return added;
@@ -193,9 +209,20 @@ internal sealed class SymbolTable
             _scopeTree = null;
             _modules = null;
             Version++;
+            ForgetTypeScopeTreeOf(symbol);
         }
 
         return removed;
+    }
+
+    // the type scope tree is built again when a symbol of it changes: a symbol's identity includes its concrete type, so a newer definition is of it when the
+    // one it replaces is.
+    private void ForgetTypeScopeTreeOf(Symbol symbol)
+    {
+        if (ScopeTreeSymbolResolver.IsTypeCandidate(symbol))
+        {
+            _typeScopeTree = null;
+        }
     }
 
     /// <summary>
@@ -213,6 +240,7 @@ internal sealed class SymbolTable
         _scopeTree = null;
         _modules = null;
         Version++;
+        ForgetTypeScopeTreeOf(symbol);
     }
 
     // one bucket per RD-VBAL §2.3.1.2 heap tier; every scope maps onto exactly one.
@@ -225,13 +253,13 @@ internal sealed class SymbolTable
     };
 
     /// <summary>
-    /// The name-lookup half of a session's resolver: a <see cref="ScopeTreeSymbolResolver"/> over the table's always-current scope tree.
+    /// The name-lookup half of a session's resolver: a <see cref="ScopeTreeSymbolResolver"/> over one of the table's always-current scope trees.
     /// </summary>
     /// <remarks>
     /// A resolver holds nothing but its tree, so the one made for a tree resolves every name looked up in it, until a declaration changes and the table
     /// builds another tree. The tree and its resolver are kept together, so a thread that reads them while another replaces them reads a pair.
     /// </remarks>
-    private sealed class LiveScopeResolver(SymbolTable owner) : ISymbolResolver
+    private sealed class LiveScopeResolver(Func<ScopeTree> treeOf) : ISymbolResolver
     {
         private sealed record class TreeResolver(ScopeTree Tree, ScopeTreeSymbolResolver Resolver);
 
@@ -241,7 +269,7 @@ internal sealed class SymbolTable
         {
             get
             {
-                var tree = owner.ScopeTree;
+                var tree = treeOf();
                 if (_current is not { } current || !ReferenceEquals(current.Tree, tree))
                 {
                     _current = current = new TreeResolver(tree, new ScopeTreeSymbolResolver(tree));
