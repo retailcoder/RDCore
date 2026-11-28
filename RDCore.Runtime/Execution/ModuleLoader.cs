@@ -51,6 +51,17 @@ namespace RDCore.Runtime.Execution;
 public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IErrorDetailsRecorder errorDetails)
 {
     /// <summary>
+    /// Whether the module's static semantics are evaluated and kept in the image (<see cref="ProgramImage.Semantics"/>), along with what they find wrong with
+    /// its code. <see langword="true"/> unless it is set otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Code known to have nothing wrong with it (a module of a composed program, loaded once already against the same declarations) is loaded to run and for
+    /// nothing else: its procedures are lowered and loaded, and what its directives, constants and declared sizes evaluate to is reported, since those are
+    /// evaluated either way. The image then has no semantic model of the module.
+    /// </remarks>
+    public bool Checks { get; init; } = true;
+
+    /// <summary>
     /// Lowers the procedures of <paramref name="module"/> and loads them, replacing what was loaded for it before.
     /// </summary>
     /// <param name="module">The module's symbol, as the session has it.</param>
@@ -134,6 +145,11 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
             var body = new StatementBlock([.. declaration.Children]);
             // the declaration as it is written, whatever header is live: its End statement is on its last line.
             var lowering = InstructionListLowering.Lower(body, options, declaration.MemberKind, member.SourceLocation);
+            procedures.Add(new(procedure.SemanticId, lowering.InstructionList));
+            if (!Checks)
+            {
+                continue;
+            }
 
             // the static pass is told what the session defines, so what is wrong with an expression is found out along with what is wrong with the
             // structure of the body.
@@ -168,13 +184,17 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
                 EmptiedControlReads = ForEachControlAnalysis.Of(model, lowering.InstructionList, automaticLocals),
                 JumpsIntoLoops = JumpIntoLoopAnalysis.Of(lowering.InstructionList),
             });
-            procedures.Add(new(procedure.SemanticId, lowering.InstructionList));
             // a declaration that repeats another resolves to the symbol of the first, whose code is the one the session has: the repeat is an error of
             // the declarations, and its code is not evaluated for it.
             if (model.IsValid && swept.Add(procedure.SemanticId))
             {
                 sweepable.Add((procedure, lowering.InstructionList));
             }
+        }
+
+        if (!Checks)
+        {
+            return Loaded(module, procedures, [.. precompiled.Errors, .. headerErrors, .. constantErrors, .. sizeErrors], parseResult, deadRanges);
         }
 
         // what the expressions of the module's own declarations refer to: a constant of the module is referred to by those as well as by its procedures.
@@ -231,6 +251,14 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
         image.Semantics.Store(moduleModel, sweep is null ? null : sweep.Evaluate, declarationFacts, excludedBranchNames, platforms,
             LateBoundNames.Of(syntaxTree, moduleModel.Procedures), unanalyzedNames, byRefArguments);
 
+        return Loaded(module, procedures, moduleModel.CompileErrors, parseResult, deadRanges);
+    }
+
+    // the module's procedures loaded, when nothing is wrong with its code, and what is wrong with it.
+    private ImmutableArray<string> Loaded(
+        Symbol module, List<KeyValuePair<SemanticId, InstructionList>> procedures, IEnumerable<VBCompileErrorInfo> compileErrors, ModuleParseResult parseResult,
+        ImmutableArray<SDK.Model.Source.SourceLocation> deadRanges)
+    {
         // what the error is, and the detail that says which of the module's statements it is about. A module with a syntax error is not loaded either, so that a
         // run of it is refused before any of it runs (RD-VBAL 2.6.1): what the parser could not read is no code - a statement it read up to the error, an
         // expression kept as text - and the statements around it would run without it. The syntax errors are the parser's, which the module's model does not
@@ -239,7 +267,7 @@ public sealed class ModuleLoader(IRuntimeSession session, ProgramImage image, IE
         // A block that a dead branch opens and does not close is reported where its end was expected, which can be live (the End Sub after the #End If). The
         // parser reads every branch, and the live statements after the branch are in that block: the tree is not the code MS-VBA compiles, which runs them.
         // RD-VBA refuses the run, and says why (RD-VBAL 2.6.1).
-        var errors = moduleModel.CompileErrors.Select(error => (error.Description, error.Verbose))
+        var errors = compileErrors.Select(error => (error.Description, error.Verbose))
             .Concat(parseResult.SyntaxErrors.Where(error => !IsDead(error.Location, deadRanges))
                 .Select(error => error.StatementStart is { } statement && IsDead(error.Location with { Range = new(statement, statement) }, deadRanges)
                     ? (error.Description, Verbose: Exceptions.VBCompileError_BlockNotClosedInItsBranch_Verbose)
